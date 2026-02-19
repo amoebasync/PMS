@@ -5,8 +5,6 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // ※今回はテスト用として、GeoJSONを持つエリアを最大1000件取得します。
-    // 本番稼働時は、フロントから渡された「表示している地図の範囲（緯度経度）」で絞り込むのが一般的です。
     const areas = await prisma.area.findMany({
       where: {
         boundary_geojson: { not: null }
@@ -17,8 +15,8 @@ export async function GET() {
         address_code: true,
         town_name: true,
         chome_name: true,
-        posting_cap_with_ng: true, // ★ 配布可能枚数
-        boundary_geojson: true,    // ★ ポリゴンデータ
+        posting_cap_with_ng: true, 
+        boundary_geojson: true, 
         city: { select: { name: true } }
       }
     });
