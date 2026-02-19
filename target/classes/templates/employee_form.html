@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: mainLayout('社員登録', ~{::section})}">
+<body>
+<section>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold mb-0">
+            <i class="bi bi-person-plus-fill me-2 text-primary"></i>
+            <span th:text="${employee.id == null ? '新規社員登録' : '社員情報編集'}"></span>
+        </h3>
+        <a th:href="@{/employees}" class="btn btn-outline-secondary">キャンセル</a>
+    </div>
+
+    <form th:action="@{/employees/save}" th:object="${employee}" method="post">
+        <input type="hidden" th:field="*{id}" />
+        
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4 text-primary">基本情報</h5>
+                        
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">社員コード <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" th:field="*{employeeCode}" placeholder="EMP0001" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">入社日</label>
+                                <input type="date" class="form-control" th:field="*{hireDate}">
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">氏 (漢字) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" th:field="*{lastNameJa}" placeholder="山田" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">名 (漢字) <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" th:field="*{firstNameJa}" placeholder="太郎" required>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">氏 (カナ)</label>
+                                <input type="text" class="form-control" th:field="*{lastNameKana}" placeholder="ヤマダ">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">名 (カナ)</label>
+                                <input type="text" class="form-control" th:field="*{firstNameKana}" placeholder="タロウ">
+                            </div>
+                        </div>
+
+                        <h5 class="fw-bold mb-3 text-primary border-top pt-4">所属・連絡先</h5>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">部署</label>
+                                <select class="form-select" th:field="*{departmentId}">
+                                    <option value="">(未所属)</option>
+                                    <option th:each="d : ${departments}" th:value="${d.id}" th:text="${d.name}"></option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold text-muted">メールアドレス <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" th:field="*{email}" required>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body p-4">
+                        <h5 class="fw-bold mb-4 text-primary">アカウント設定</h5>
+                        
+                        <div class="mb-4">
+                            <label class="form-label small fw-bold text-muted">ログインパスワード</label>
+                            <input type="password" name="rawPassword" class="form-control" 
+                                   th:placeholder="${employee.id == null ? '必須入力' : '変更する場合のみ入力'}">
+                            <div class="form-text small" th:if="${employee.id != null}">※空白の場合は現在のパスワードが維持されます</div>
+                        </div>
+
+                        <div class="form-check form-switch p-3 bg-light rounded">
+                            <input class="form-check-input ms-0 me-3" type="checkbox" id="isActive" th:field="*{isActive}">
+                            <label class="form-check-label fw-bold" for="isActive">アカウント有効化</label>
+                        </div>
+                    </div>
+                    <div class="card-footer bg-white border-0 p-4">
+                        <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+                            <i class="bi bi-save me-1"></i> 保存する
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</section>
+</body>
+</html>

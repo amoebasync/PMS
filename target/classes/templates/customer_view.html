@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout :: mainLayout('顧客詳細照会', ~{::section})}">
+<body>
+<section>
+    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5rem;">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb" style="font-size: 0.8rem; margin-bottom: 0.5rem; background: transparent; padding: 0;">
+                    <li class="breadcrumb-item"><a th:href="@{/customers}" style="color: #3b82f6; text-decoration: none; font-weight: 600;">顧客マスタ</a></li>
+                    <li class="breadcrumb-item active" style="color: #94a3b8;">詳細照会</li>
+                </ol>
+            </nav>
+            <h3 style="font-weight: 800; margin: 0; color: #0f172a; font-size: 1.8rem; letter-spacing: -0.025em;">
+                <i class="bi bi-person-vcard-fill" style="margin-right: 12px; color: #2563eb;"></i>顧客詳細照会
+            </h3>
+        </div>
+        <div style="display: flex; gap: 12px;">
+            <a th:href="@{/customers}" class="btn" style="background: #ffffff; border: 1.5px solid #e2e8f0; color: #64748b; font-weight: 700; padding: 0.7rem 1.5rem; border-radius: 12px; transition: 0.2s;">
+                <i class="bi bi-arrow-left me-1"></i> 一覧に戻る
+            </a>
+            <a th:href="@{/customers/edit/{id}(id=${customer.id})}" class="btn shadow" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); border: none; color: white; font-weight: 700; padding: 0.7rem 1.8rem; border-radius: 12px; transition: 0.2s;">
+                <i class="bi bi-pencil-square me-1"></i> 情報を変更する
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div style="background: #ffffff; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 10px 30px rgba(0,0,0,0.04); padding: 3rem;">
+                
+                <div style="margin-bottom: 3rem; display: flex; align-items: flex-start; justify-content: space-between;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 0.6rem;">
+                            <span style="background: #f1f5f9; color: #475569; padding: 0.4rem 0.8rem; border-radius: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; border: 1px solid #e2e8f0;" th:text="${customer.customerCode}"></span>
+                            <h2 style="font-weight: 900; margin: 0; color: #0f172a; font-size: 2.2rem; letter-spacing: -0.04em;" th:text="${customer.name}"></h2>
+                        </div>
+                        <div style="color: #94a3b8; font-size: 1.1rem; letter-spacing: 0.05em; font-weight: 500;" th:text="${customer.nameKana}"></div>
+                    </div>
+                    <div>
+                        <span th:if="${customer.status.name() == 'active'}" style="background: #dcfce7; color: #166534; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="bi bi-check-circle-fill"></i> 有効
+                        </span>
+                        <span th:if="${customer.status.name() == 'prospect'}" style="background: #e0f2fe; color: #075985; padding: 0.6rem 1.2rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                            <i class="bi bi-lightning-fill"></i> 見込
+                        </span>
+                    </div>
+                </div>
+
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-telephone-fill" style="color: #3b82f6;"></i> 連絡先
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.2rem;">代表電話番号</div>
+                            <div style="font-size: 1.15rem; color: #1e293b; font-weight: 700;" th:text="${customer.phone ?: '---'}"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.2rem;">FAX番号</div>
+                            <div style="font-size: 1.15rem; color: #1e293b; font-weight: 700;" th:text="${customer.fax ?: '---'}"></div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1rem; display: flex; align-items: center; gap: 8px;">
+                            <i class="bi bi-geo-alt-fill" style="color: #3b82f6;"></i> 所在地
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.2rem;">郵便番号</div>
+                            <div style="font-size: 1.15rem; color: #1e293b; font-weight: 700; margin-bottom: 1rem;" th:text="${'〒' + (customer.postalCode ?: '000-0000')}"></div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.2rem;">住所</div>
+                            <div style="font-size: 1.1rem; color: #1e293b; font-weight: 700; line-height: 1.5;" th:text="${customer.address ?: '住所未登録'}"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <hr style="border-top: 2px solid #f8fafc; margin: 3rem 0;">
+
+                <div class="row g-5">
+                    <div class="col-md-6">
+                        <div style="color: #2563eb; font-size: 0.95rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                            <i class="bi bi-receipt-cutoff"></i> 請求・インボイス設定
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem;">適格請求書登録番号</div>
+                            <div style="font-size: 1.3rem; color: #0f172a; font-weight: 900; letter-spacing: 0.05em;" th:text="${customer.invoiceRegistrationNumber != null ? 'T' + customer.invoiceRegistrationNumber : '未登録'}"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.6rem;">回収条件</div>
+                            <div style="display: flex; gap: 8px;">
+                                <span style="background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; color: #1e293b;" th:text="${(customer.billingCutoffDay == 99 ? '末' : (customer.billingCutoffDay != null ? customer.billingCutoffDay : '--')) + '日締'}"></span>
+                                <span style="background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; color: #1e293b;" th:text="${(customer.paymentMonthDelay == 0 ? '当月' : customer.paymentMonthDelay == 1 ? '翌月' : '翌々月') + '払'}"></span>
+                                <span style="background: #f8fafc; border: 1.5px solid #e2e8f0; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; font-size: 0.85rem; color: #1e293b;" th:text="${(customer.paymentDay == 99 ? '末' : (customer.paymentDay != null ? customer.paymentDay : '--')) + '日'}"></span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div style="color: #2563eb; font-size: 0.95rem; font-weight: 800; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                            <i class="bi bi-diagram-3-fill"></i> 組織構造 & 担当
+                        </div>
+                        <div style="margin-bottom: 1.5rem;">
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem;">担当営業</div>
+                            <div style="font-size: 1.1rem; color: #1e293b; font-weight: 700;"><i class="bi bi-person-check-fill me-2" style="color: #94a3b8;"></i>担当ID: <span th:text="${customer.salesRepId}"></span></div>
+                        </div>
+                        <div style="margin-bottom: 1.2rem;">
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem;">親会社・本部</div>
+                            <div style="font-size: 1rem; color: #475569; font-weight: 600;" th:text="${customer.parentCustomerId ?: 'なし'}"></div>
+                        </div>
+                        <div>
+                            <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.4rem;">代表請求先</div>
+                            <div style="font-size: 1rem; color: #475569; font-weight: 600;" th:text="${customer.billingCustomerId != null ? '個別設定あり' : '自社請求（デフォルト）'}"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div style="background: #ffffff; border-radius: 24px; border: 1px solid #f1f5f9; box-shadow: 0 10px 30px rgba(0,0,0,0.04); padding: 2.2rem; height: 100%; position: sticky; top: 2rem;">
+                <div style="color: #94a3b8; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px;">
+                    <i class="bi bi-sticky-fill" style="color: #3b82f6;"></i> 内部備考・特記事項
+                </div>
+                <div style="background: #f8fafc; border-radius: 16px; padding: 1.8rem; color: #475569; font-size: 0.95rem; line-height: 1.9; min-height: 350px; white-space: pre-wrap; border: 1px solid #f1f5f9;" th:text="${customer.note ?: '特記事項はありません。'}"></div>
+                
+                <div style="margin-top: 2rem; padding: 1.5rem; background: #eff6ff; border-radius: 16px; border: 1px dashed #bfdbfe;">
+                    <div style="font-size: 0.7rem; color: #1e40af; font-weight: 800; margin-bottom: 0.5rem; text-transform: uppercase;">System Audit</div>
+                    <div style="font-size: 0.8rem; color: #1e40af; opacity: 0.8;">最終更新: 2026-02-18</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>

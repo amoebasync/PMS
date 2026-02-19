@@ -1,0 +1,537 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL") // ★これが必要です
+}
+
+// 3. モデル定義（今回投入したテーブル構造に合わせます）
+model Prefecture {
+  id        Int    @id
+  name      String @unique
+  name_kana String
+  areas     Area[] // リレーション
+
+  @@map("prefectures") // 実際のテーブル名が複数形なら合わせる
+}
+
+model City {
+  id                    Int                    @id
+  prefecture_id         Int
+  code                  String                 @unique
+  name                  String
+  name_kana             String
+  areas                 Area[] // リレーション
+  distributionSchedules DistributionSchedule[]
+
+  @@map("cities")
+}
+
+model Area {
+  id                  Int     @id @default(autoincrement())
+  prefecture_id       Int
+  city_id             Int
+  address_code        String  @unique
+  town_name           String
+  chome_name          String
+  boundary_geojson    String? @db.LongText // ｜で繋いだデータは長くなるのでLongText推奨
+  door_to_door_count  Int     @default(0)
+  multi_family_count  Int     @default(0)
+  posting_cap_raw     Int     @default(0)
+  posting_cap_with_ng Int     @default(0)
+  area_rank_id        Int
+  is_client_visible   Int     @default(1)
+
+  // リレーションの定義
+  prefecture            Prefecture             @relation(fields: [prefecture_id], references: [id])
+  city                  City                   @relation(fields: [city_id], references: [id])
+  distributionSchedules DistributionSchedule[]
+
+  @@map("areas")
+}
+
+enum Gender {
+  male
+  female
+  other
+  unknown
+}
+
+model Employee {
+  id           Int     @id @default(autoincrement())
+  departmentId Int?    @map("department_id")
+  roleId       Int?    @map("role_id")
+  countryId    Int?    @map("country_id")
+  employeeCode String? @unique @map("employee_code") @db.VarChar(20)
+
+  // 氏名情報
+  lastNameJa    String  @map("last_name_ja") @db.VarChar(50)
+  firstNameJa   String  @map("first_name_ja") @db.VarChar(50)
+  lastNameKana  String  @map("last_name_kana") @db.VarChar(50)
+  firstNameKana String  @map("first_name_kana") @db.VarChar(50)
+  lastNameEn    String? @map("last_name_en") @db.VarChar(50)
+  firstNameEn   String? @map("first_name_en") @db.VarChar(50)
+
+  gender       Gender    @default(unknown)
+  birthday     DateTime? @db.Date
+  email        String    @unique @db.VarChar(100)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+
+  hireDate        DateTime  @map("hire_date") @db.Date
+  resignationDate DateTime? @map("resignation_date") @db.Date
+
+  isActive    Boolean   @default(true) @map("is_active") // tinyint(1) は Boolean に変換されます
+  lastLoginAt DateTime? @map("last_login_at") @db.DateTime(0)
+
+  // リレーション（外部キー設定）
+  department Department? @relation(fields: [departmentId], references: [id])
+  role       Role?       @relation(fields: [roleId], references: [id])
+  country    Country?    @relation(fields: [countryId], references: [id])
+
+  customers        Customer[] // 担当している顧客リスト
+  managedBranches1 Branch[]   @relation("BranchManager1")
+  managedBranches2 Branch[]   @relation("BranchManager2")
+  managedBranches3 Branch[]   @relation("BranchManager3")
+  managedBranches4 Branch[]   @relation("BranchManager4")
+
+  @@map("employees") // 実際のテーブル名
+}
+
+model Country {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.Char(2) // 'JP', 'US' など
+  name      String   @db.VarChar(50) // '日本'
+  nameEn    String?  @map("name_en") @db.VarChar(50) // 'Japan'
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  employees    Employee[]
+  distributors FlyerDistributor[]
+
+  @@map("countries")
+}
+
+model Department {
+  id        Int      @id @default(autoincrement())
+  code      String?  @unique @db.VarChar(20)
+  name      String   @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  employees Employee[]
+
+  @@map("departments")
+}
+
+model Role {
+  id              Int      @id @default(autoincrement())
+  name            String   @db.VarChar(50)
+  permissionLevel String   @map("permission_level") @db.VarChar(20)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  employees Employee[]
+
+  @@map("roles")
+}
+
+// --- 顧客ステータス (Enum) ---
+enum CustomerStatus {
+  VALID   @map("有効")
+  INVALID @map("無効")
+}
+
+// --- 顧客マスタ (Customers) ---
+model Customer {
+  id           Int    @id @default(autoincrement())
+  customerCode String @unique @map("customer_code") @db.VarChar(20)
+
+  // 人・組織との紐付け
+  salesRepId        Int? @map("sales_rep_id")
+  billingCustomerId Int? @map("billing_customer_id")
+  parentCustomerId  Int? @map("parent_customer_id")
+
+  // 基本情報
+  name     String @db.VarChar(100)
+  nameKana String @map("name_kana") @db.VarChar(100)
+
+  // 請求・インボイス関連
+  invoiceRegistrationNumber String? @map("invoice_registration_number") @db.VarChar(14)
+  billingCutoffDay          Int?    @map("billing_cutoff_day") @db.TinyInt
+  paymentMonthDelay         Int?    @default(1) @map("payment_month_delay") @db.TinyInt
+  paymentDay                Int?    @map("payment_day") @db.TinyInt
+
+  // 連絡先
+  postalCode      String? @map("postal_code") @db.VarChar(8)
+  address         String? @db.VarChar(255) // 住所
+  addressBuilding String? @map("address_building") @db.VarChar(255) // 建物名以降 (DDLの2つ目のaddress)
+  phone           String? @db.VarChar(20)
+  fax             String? @db.VarChar(20)
+
+  // システム制御
+  status    CustomerStatus @default(VALID)
+  note      String?        @db.Text
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+  deletedAt DateTime?      @map("deleted_at")
+
+  // --- リレーション定義 ---
+
+  // 1. 担当営業 (Employeeとの紐付け)
+  salesRep Employee? @relation(fields: [salesRepId], references: [id])
+
+  // 2. 請求先顧客 (自己参照: 親)
+  billingCustomer   Customer?  @relation("BillingRelation", fields: [billingCustomerId], references: [id])
+  //    請求先として自身を参照している顧客 (自己参照: 子)
+  billedByCustomers Customer[] @relation("BillingRelation")
+
+  // 3. 親顧客 (自己参照: 親)
+  parentCustomer Customer?  @relation("ParentRelation", fields: [parentCustomerId], references: [id])
+  //    子顧客 (自己参照: 子)
+  childCustomers Customer[] @relation("ParentRelation")
+
+  // 4. 担当者マスタ
+  contacts CustomerContact[]
+
+  // リレーション（この顧客の配布アイテム明細）
+  distributionItems DistributionItem[]
+
+  flyers Flyer[]
+
+  @@map("customers")
+}
+
+// --- 顧客担当者マスタ (CustomerContacts) ---
+model CustomerContact {
+  id         Int @id @default(autoincrement())
+  customerId Int @map("customer_id")
+
+  // 担当者個人情報
+  name        String  @db.VarChar(50)
+  department  String? @db.VarChar(50)
+  position    String? @db.VarChar(50)
+  email       String? @db.VarChar(100)
+  mobilePhone String? @map("mobile_phone") @db.VarChar(20)
+  directLine  String? @map("direct_line") @db.VarChar(20)
+
+  // 役割フラグ
+  isPrimary        Boolean @default(false) @map("is_primary")
+  isBillingContact Boolean @default(false) @map("is_billing_contact")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@map("customer_contacts")
+}
+
+// --- チラシ配布員マスタ (Flyer Distributors) ---
+model FlyerDistributor {
+  id       Int     @id @default(autoincrement())
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id])
+  // ▲ ここまで ▲
+
+  // ★ 追加：国籍のリレーション
+  countryId Int?     @map("country_id")
+  country   Country? @relation(fields: [countryId], references: [id])
+
+  // 基本情報
+  staffId  String    @unique @map("staff_id") @db.VarChar(20) // スタッフID (MBF1001など)
+  name     String    @db.VarChar(100) // 名前
+  phone    String?   @db.VarChar(20) // 電話番号
+  email    String?   @db.VarChar(100) // メールアドレス
+  birthday DateTime? @db.Date // 誕生日
+  gender   String?   @db.VarChar(10) // 性別 (男性, 女性など)
+  address  String?   @db.Text // 住所
+
+  // 在留資格・契約情報
+  visaType              String?   @map("visa_type") @db.VarChar(50) // ビザ (ワーホリ, 特定活動など)
+  visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date // 有効期限
+  hasAgreedPersonalInfo Boolean   @default(false) @map("has_agreed_personal_info") // 個人情報同意 (○)
+  hasSignedContract     Boolean   @default(false) @map("has_signed_contract") // 業務委託締結 (○)
+  hasResidenceCard      Boolean   @default(false) @map("has_residence_card") // 在留カード (○)
+
+  // 在籍情報
+  joinDate    DateTime? @map("join_date") @db.Date // 入社日
+  leaveDate   DateTime? @map("leave_date") @db.Date // 退社日
+  leaveReason String?   @map("leave_reason") @db.Text // 退社理由
+
+  // 支払い・口座情報
+  paymentMethod       String? @map("payment_method") @db.VarChar(20) // 支払い方法 (現金, 振込など)
+  bankName            String? @map("bank_name") @db.VarChar(50) // 銀行
+  bankBranchCode      String? @map("bank_branch_code") @db.VarChar(20) // 支店番号
+  bankAccountType     String? @map("bank_account_type") @db.VarChar(20) // 口座種類 (普通など)
+  bankAccountNumber   String? @map("bank_account_number") @db.VarChar(20) // 口座番号
+  bankAccountName     String? @map("bank_account_name") @db.VarChar(100) // 名義
+  bankAccountNameKana String? @map("bank_account_name_kana") @db.VarChar(100) // 名義（半角カナ）
+  transferNumber      String? @map("transfer_number") @db.VarChar(50) // 振込番号
+
+  // 貸与品・稼働形態
+  equipmentBattery     String? @map("equipment_battery") @db.VarChar(50) // バッテリー
+  equipmentBag         String? @map("equipment_bag") @db.VarChar(50) // カバン
+  equipmentMobile      String? @map("equipment_mobile") @db.VarChar(50) // 携帯
+  flyerDeliveryMethod  String? @map("flyer_delivery_method") @db.VarChar(50) // チラシ届け
+  transportationMethod String? @map("transportation_method") @db.VarChar(50) // 移動方法 (徒歩など)
+
+  // 給与・評価レート情報
+  ratePlan          String? @map("rate_plan") @db.VarChar(50) // Rate (Basic, Regular, Advancedなど)
+  rate1Type         Float?  @map("rate_1_type") // 1type
+  rate2Type         Float?  @map("rate_2_type") // 2type
+  rate3Type         Float?  @map("rate_3_type") // 3type
+  rate4Type         Float?  @map("rate_4_type") // 4type
+  rate5Type         Float?  @map("rate_5_type") // 5type
+  rate6Type         Float?  @map("rate_6_type") // 6type
+  transportationFee String? @map("transportation_fee") @db.VarChar(50) // Transporation fee (FULL, 1000など)
+  trainingAllowance String? @map("training_allowance") @db.VarChar(50) // 研修手当
+
+  // 目標・実績（KPI）
+  rank            String? @db.VarChar(10) // ランク (A, Cなど)
+  attendanceCount Int?    @default(0) @map("attendance_count") // 出勤回数
+  minTypes        Int?    @map("min_types") // 最低種類
+  maxTypes        Int?    @map("max_types") // 最高種類
+  minSheets       Int?    @map("min_sheets") // 最低枚数1
+  maxSheets       Int?    @map("max_sheets") // 最高枚数1
+  targetAmount    String? @map("target_amount") @db.VarChar(50) // 目標金額 (¥8,000–¥9,999など)
+
+  // システム用
+  note      String?  @db.Text // 備考
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  schedules DistributionSchedule[]
+
+  @@map("flyer_distributors")
+}
+
+// --- 支店マスタ (Branches) ---
+model Branch {
+  id Int @id @default(autoincrement())
+
+  // 支店名
+  nameJa String @map("name_ja") @db.VarChar(100) // 日本語名 (例: 高田馬場)
+  nameEn String @map("name_en") @db.VarChar(100) // 英語名 (例: Takadanobaba)
+
+  // 店舗情報
+  address      String? @db.Text // 住所
+  googleMapUrl String? @map("google_map_url") @db.Text // GoogleMapリンク
+  openingTime  String? @map("opening_time") @db.VarChar(10) // 開店時間 (例: "07:00")
+  closedDays   String? @map("closed_days") @db.VarChar(50) // 定休日 (例: "火曜日", "土日祝")
+
+  // 店長枠 (1〜4) : Employeeとの紐付け
+  manager1Id Int? @map("manager1_id")
+  manager2Id Int? @map("manager2_id")
+  manager3Id Int? @map("manager3_id")
+  manager4Id Int? @map("manager4_id")
+
+  manager1 Employee? @relation("BranchManager1", fields: [manager1Id], references: [id])
+  manager2 Employee? @relation("BranchManager2", fields: [manager2Id], references: [id])
+  manager3 Employee? @relation("BranchManager3", fields: [manager3Id], references: [id])
+  manager4 Employee? @relation("BranchManager4", fields: [manager4Id], references: [id])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション（この支店に所属する配布員）
+  distributors FlyerDistributor[]
+  schedules    DistributionSchedule[]
+
+  @@map("branches")
+}
+
+// ==========================================
+// トランザクション (配布予定・実績)
+// ==========================================
+
+// --- 1. 配布スケジュール (誰が、どこで、いつ) ---
+model DistributionSchedule {
+  id          Int            @id @default(autoincrement())
+  jobNumber   String?        @map("job_number") @db.VarChar(50) // 仕事番号
+  jobCategory String?        @map("job_category") @db.VarChar(50) // 仕事分類
+  status      ScheduleStatus @default(UNSTARTED)
+  date        DateTime?      @db.Date // 年月日
+
+  // Who (誰が) - 配布員マスタ
+  distributorId Int?              @map("distributor_id")
+  distributor   FlyerDistributor? @relation(fields: [distributorId], references: [id])
+
+  // 拠点 - 支店マスタ
+  branchId Int?    @map("branch_id")
+  branch   Branch? @relation(fields: [branchId], references: [id])
+
+  // Where (どこで) - City / Areaマスタと紐付け
+  cityId Int?  @map("city_id")
+  city   City? @relation(fields: [cityId], references: [id])
+
+  areaId Int?  @map("area_id")
+  area   Area? @relation(fields: [areaId], references: [id])
+
+  // 単価・備考
+  areaUnitPrice Float?  @map("area_unit_price") // エリア単価
+  sizeUnitPrice Float?  @map("size_unit_price") // サイズ単価
+  remarks       String? @db.Text // 備考
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // リレーション (What: このスケジュールで配る最大6種類のチラシ)
+  items DistributionItem[]
+
+  @@map("distribution_schedules")
+}
+
+// --- 2. 配布アイテム明細 (何を、何枚) ---
+// --- 2. 配布アイテム明細 (何を、何枚) ---
+model DistributionItem {
+  id Int @id @default(autoincrement())
+
+  // 親スケジュールとの紐付け
+  scheduleId Int                  @map("schedule_id")
+  schedule   DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  // 何番目のチラシか (1〜6)
+  slotIndex Int @map("slot_index")
+
+  // What (何を)
+  flyerName String? @map("flyer_name") @db.VarChar(200) // チラシ名
+  flyerCode String? @map("flyer_code") @db.VarChar(50) // チラシコード
+
+  // 顧客マスタとの紐付け
+  customerId Int?      @map("customer_id")
+  customer   Customer? @relation(fields: [customerId], references: [id])
+
+  // 受注テーブル(Order)のIDが入る枠
+  orderId Int? @map("order_id")
+
+  // 日付フォーマット
+  startDate DateTime? @map("start_date") @db.Date // 配布開始日
+  endDate   DateTime? @map("end_date") @db.Date // 配布期限
+  spareDate DateTime? @map("spare_date") @db.Date // 配布期限予備
+
+  method       String? @db.VarChar(50) // 配布方法 (例: 軒並)
+  plannedCount Int?    @map("planned_count") // 予定枚数
+  actualCount  Int?    @map("actual_count") // 配布枚数
+
+  // ★ 追加: アイテムごとの備考
+  remarks String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // ★ 以下を追加 (Flyerとの紐付け)
+  flyerId Int? @map("flyer_id")
+  flyer   Flyer? @relation(fields: [flyerId], references: [id])
+
+  @@map("distribution_items")
+}
+
+enum ScheduleStatus {
+  UNSTARTED // 未開始
+  IN_PROGRESS // 配布中
+  COMPLETED // 完了
+}
+
+// ==========================================
+// チラシ・在庫管理モジュール
+// ==========================================
+
+// --- 業種マスタ ---
+model Industry {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  flyers    Flyer[]
+  @@map("industries")
+}
+
+// --- サイズマスタ ---
+model FlyerSize {
+  id               Int      @id @default(autoincrement())
+  name             String   @unique @db.VarChar(20) // 例: A4, B4, A3
+  basePriceAddon   Float    @default(0) @map("base_price_addon")
+  isFoldRequired   Boolean  @default(false) @map("is_fold_required")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  flyers           Flyer[]
+  @@map("flyer_sizes")
+}
+
+// --- 折りステータス (Enum) ---
+enum FoldStatus {
+  NEEDS_FOLDING       // 要折 (自社で折る作業が必要。この状態では配布不可)
+  NO_FOLDING_REQUIRED // 折無し (折らずにそのまま配布。配布可能)
+  FOLDED              // 折済 (納品時から折られている、または自社で折り作業完了。配布可能)
+}
+
+// --- チラシ案件マスタ (Flyer) ---
+model Flyer {
+  id           Int        @id @default(autoincrement())
+  name         String     @db.VarChar(200)
+  flyerCode    String?    @unique @map("flyer_code") @db.VarChar(50)
+
+  // 関連マスタ
+  customerId   Int        @map("customer_id")
+  customer     Customer   @relation(fields: [customerId], references: [id])
+  industryId   Int        @map("industry_id")
+  industry     Industry   @relation(fields: [industryId], references: [id])
+  sizeId       Int        @map("size_id")
+  size         FlyerSize  @relation(fields: [sizeId], references: [id])
+
+  startDate    DateTime?  @map("start_date") @db.Date
+  endDate      DateTime?  @map("end_date") @db.Date
+
+  // ★ いただいた3つのステータスを適用
+  foldStatus   FoldStatus @default(NO_FOLDING_REQUIRED) @map("fold_status")
+
+  totalReceived Int       @default(0) @map("total_received") // 累計納品枚数
+  stockCount    Int       @default(0) @map("stock_count")    // 現在の有効在庫枚数
+
+  remarks      String?    @db.Text
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  deliveries        FlyerDelivery[]
+  // DistributionItem(スケジュール明細)との紐付けも後ほど追加します
+  distributionItems DistributionItem[]
+
+  @@map("flyers")
+}
+
+// --- 納品ステータス (Enum) ---
+enum DeliveryStatus {
+  PENDING   // 未納品 (予定)
+  COMPLETED // 完了 (納品済み)
+  CANCELED  // キャンセル
+}
+
+// --- 納品予定＆実績 (FlyerDelivery) ---
+model FlyerDelivery {
+  id           Int            @id @default(autoincrement())
+  flyerId      Int            @map("flyer_id")
+  flyer        Flyer          @relation(fields: [flyerId], references: [id], onDelete: Cascade)
+
+  // ★ 日付だけでなく「時間」も管理できるように DateTime 型に変更
+  expectedAt   DateTime       @map("expected_at") @db.DateTime(0) // 納品予定日時
+  actualAt     DateTime?      @map("actual_at") @db.DateTime(0)   // 実際の納品日時
+
+  count        Int            // 納品(予定)枚数
+
+  status       DeliveryStatus @default(PENDING)
+  isDelayed    Boolean        @default(false) @map("is_delayed") // 遅延アラート用
+
+  note         String?        @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  @@map("flyer_deliveries")
+}

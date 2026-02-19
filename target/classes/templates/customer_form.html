@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout :: mainLayout(${customer.id == null} ? '顧客新規登録' : '顧客情報編集', ~{::section})}">
+<body>
+<section>
+    <div class="mb-5">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-2" style="font-size: 0.85rem;">
+                <li class="breadcrumb-item"><a th:href="@{/customers}" class="text-decoration-none" style="color: #3b82f6;">顧客マスタ</a></li>
+                <li class="breadcrumb-item active" th:text="${customer.id == null} ? '新規登録' : '編集'"></li>
+            </ol>
+        </nav>
+        <h2 class="fw-bold m-0" th:text="${customer.id == null} ? '新規顧客の登録' : '顧客情報の編集'" style="font-size: 1.8rem; color: #0f172a; letter-spacing: -1px;"></h2>
+    </div>
+
+    <form th:action="@{/customers/save}" th:object="${customer}" method="post">
+        <input type="hidden" th:field="*{id}">
+        <input type="hidden" th:field="*{customerCode}">
+
+        <div class="row g-4">
+            <div class="col-lg-9">
+
+                <div style="background: #ffffff; border-radius: 16px; padding: 2rem; margin-bottom: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div style="display: flex; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.8rem; border-bottom: 2px solid #f1f5f9;">
+                        <div style="width: 36px; height: 36px; background: #eff6ff; color: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 1.2rem;">
+                            <i class="bi bi-person-vcard"></i>
+                        </div>
+                        <h5 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0;">基本プロファイル</h5>
+                    </div>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">顧客コード</label>
+                            <input type="text" class="form-control fw-bold" th:value="${customer.customerCode ?: '自動採番'}" style="background-color: #f8fafc; border: 1.5px solid #e2e8f0;" readonly>
+                        </div>
+                        <div class="col-md-5">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">顧客名（社名・屋号） <span class="text-danger">*</span></label>
+                            <input type="text" th:field="*{name}" class="form-control" style="border: 1.5px solid #e2e8f0;" required placeholder="例：株式会社ティラミス">
+                        </div>
+                        <div class="col-md-4">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">担当営業 <span class="text-danger">*</span></label>
+                            <select th:field="*{salesRepId}" class="form-select" style="border: 1.5px solid #e2e8f0;" required>
+                                <option value="">担当者を選択...</option>
+                                <option th:each="emp : ${employees}" th:value="${emp.id}" th:text="${emp.lastNameJa + ' ' + emp.firstNameJa}"></option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">顧客名カナ <span class="text-danger">*</span></label>
+                            <input type="text" th:field="*{nameKana}" class="form-control" style="border: 1.5px solid #e2e8f0;" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">ステータス</label>
+                            <select th:field="*{status}" class="form-select" style="border: 1.5px solid #e2e8f0;">
+                                <option th:each="s : ${T(com.example.pms.Customer.Status).values()}" th:value="${s}" th:text="${s}"></option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #ffffff; border-radius: 16px; padding: 2rem; margin-bottom: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div style="display: flex; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.8rem; border-bottom: 2px solid #f1f5f9;">
+                        <div style="width: 36px; height: 36px; background: #eff6ff; color: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 1.2rem;">
+                            <i class="bi bi-geo-alt"></i>
+                        </div>
+                        <h5 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0;">ロケーション & 連絡先</h5>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">郵便番号</label>
+                            <div class="input-group">
+                                <span class="input-group-text" style="background: #f8fafc; border: 1.5px solid #e2e8f0;">〒</span>
+                                <input type="text" th:field="*{postalCode}" class="form-control" style="border: 1.5px solid #e2e8f0;" placeholder="000-0000">
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">所在地</label>
+                            <input type="text" th:field="*{address}" class="form-control" style="border: 1.5px solid #e2e8f0;" placeholder="都道府県から建物名まで入力">
+                        </div>
+                        <div class="col-md-6">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">電話番号</label>
+                            <div class="input-group">
+                                <span class="input-group-text" style="background: #f8fafc; border: 1.5px solid #e2e8f0;"><i class="bi bi-telephone"></i></span>
+                                <input type="text" th:field="*{phone}" class="form-control" style="border: 1.5px solid #e2e8f0;" placeholder="00-0000-0000">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">FAX番号</label>
+                            <div class="input-group">
+                                <span class="input-group-text" style="background: #f8fafc; border: 1.5px solid #e2e8f0;"><i class="bi bi-printer"></i></span>
+                                <input type="text" th:field="*{fax}" class="form-control" style="border: 1.5px solid #e2e8f0;" placeholder="00-0000-0000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: #ffffff; border-radius: 16px; padding: 2rem; margin-bottom: 2rem; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
+                    <div style="display: flex; align-items: center; margin-bottom: 1.5rem; padding-bottom: 0.8rem; border-bottom: 2px solid #f1f5f9;">
+                        <div style="width: 36px; height: 36px; background: #eff6ff; color: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-right: 12px; font-size: 1.2rem;">
+                            <i class="bi bi-receipt-cutoff"></i>
+                        </div>
+                        <h5 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0;">商流・インボイス設定</h5>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">適格請求書登録番号</label>
+                            <div class="input-group">
+                                <span class="input-group-text" style="background: #f8fafc; border: 1.5px solid #e2e8f0; font-weight: bold;">T</span>
+                                <input type="text" th:field="*{invoiceRegistrationNumber}" class="form-control" style="border: 1.5px solid #e2e8f0;" placeholder="13桁の数字を入力">
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">締日</label>
+                            <select th:field="*{billingCutoffDay}" class="form-select" style="border: 1.5px solid #e2e8f0;">
+                                <option value="">未設定</option>
+                                <option value="5">5日</option><option value="10">10日</option>
+                                <option value="20">20日</option><option value="99">末日</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">支払月</label>
+                            <select th:field="*{paymentMonthDelay}" class="form-select" style="border: 1.5px solid #e2e8f0;">
+                                <option value="0">当月</option><option value="1">翌月</option><option value="2">翌々月</option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: block;">支払日</label>
+                            <select th:field="*{paymentDay}" class="form-select" style="border: 1.5px solid #e2e8f0;">
+                                <option value="">未設定</option>
+                                <option value="5">5日</option><option value="10">10日</option>
+                                <option value="25">25日</option><option value="99">末日</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center" style="margin-top: 3rem; margin-bottom: 3rem;">
+                    <a th:href="@{/customers}" class="btn shadow-sm" style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; padding: 0.8rem 2rem; border-radius: 12px; font-weight: 600; text-decoration: none;">
+                        <i class="bi bi-x-lg me-2"></i> キャンセル
+                    </a>
+                    <button type="submit" class="btn shadow" style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; border: none; padding: 1rem 3.5rem; border-radius: 12px; font-weight: 800; font-size: 1.05rem;">
+                        <i class="bi bi-cloud-arrow-up-fill me-2"></i> <span th:text="${customer.id == null} ? 'この内容で登録する' : '変更内容を保存する'"></span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="col-lg-3">
+                <div class="sticky-top" style="top: 2rem; z-index: 10;">
+                    <div style="border: none; border-radius: 16px; background: #ffffff; box-shadow: 0 10px 25px -3px rgba(0,0,0,0.1); overflow: hidden; border: 1px solid #dbeafe;">
+                        <div style="background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 1.5rem; text-align: center;">
+                            <h6 class="m-0 fw-bold" style="font-size: 1.1rem;"><i class="bi bi-lightbulb-fill me-2"></i>登録ガイド</h6>
+                        </div>
+                        <div style="padding: 1.5rem; background: #f8fafc;">
+                            <div style="background: white; border-radius: 10px; padding: 1.2rem; margin-bottom: 1.2rem; border: 1px solid #e2e8f0; display: flex; gap: 12px; font-size: 0.88rem;">
+                                <i class="bi bi-check-circle-fill" style="color: #3b82f6; font-size: 1.2rem;"></i>
+                                <div><strong style="color: #1e293b;">必須項目</strong><br><span style="color: #64748b;">名前、カナ、担当営業は必ず入力してください。</span></div>
+                            </div>
+                            <div style="background: white; border-radius: 10px; padding: 1.2rem; margin-bottom: 1.2rem; border: 1px solid #e2e8f0; display: flex; gap: 12px; font-size: 0.88rem;">
+                                <i class="bi bi-patch-check-fill" style="color: #3b82f6; font-size: 1.2rem;"></i>
+                                <div><strong style="color: #1e293b;">インボイス</strong><br><span style="color: #64748b;">T以降の13桁を入力。適格請求書発行に必要です。</span></div>
+                            </div>
+                            <div style="background: white; border-radius: 10px; padding: 1.2rem; margin-bottom: 1.2rem; border: 1px solid #e2e8f0; display: flex; gap: 12px; font-size: 0.88rem;">
+                                <i class="bi bi-calendar-check-fill" style="color: #3b82f6; font-size: 1.2rem;"></i>
+                                <div><strong style="color: #1e293b;">回収条件</strong><br><span style="color: #64748b;">締日と支払条件で、入金管理が自動化されます。</span></div>
+                            </div>
+                            
+                            <div style="padding: 1rem; border-radius: 12px; text-align: center; background: #eff6ff; border: 1px dashed #3b82f6; margin-top: 1.5rem;">
+                                <div style="font-size: 0.75rem; font-weight: bold; color: #64748b; margin-bottom: 0.4rem; text-transform: uppercase;">Operation Status</div>
+                                <div th:if="${customer.id == null}" style="color: #2563eb; font-weight: 800; font-size: 0.95rem;">
+                                    <i class="bi bi-plus-circle-fill me-1"></i> 新規作成モード
+                                </div>
+                                <div th:if="${customer.id != null}" style="color: #059669; font-weight: 800; font-size: 0.95rem;">
+                                    <i class="bi bi-pencil-square me-1"></i> 既存データ編集
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</section>
+</body>
+</html>
