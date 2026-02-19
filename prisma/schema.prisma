@@ -478,6 +478,7 @@ model Flyer {
   id           Int        @id @default(autoincrement())
   name         String     @db.VarChar(200)
   flyerCode    String?    @unique @map("flyer_code") @db.VarChar(50)
+  bundleCount  Int?       @map("bundle_count") // 1束あたりの枚数
 
   // 関連マスタ
   customerId   Int        @map("customer_id")

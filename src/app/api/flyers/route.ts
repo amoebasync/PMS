@@ -29,6 +29,7 @@ export async function POST(request: Request) {
       data: {
         name: body.name,
         flyerCode: body.flyerCode || null,
+        bundleCount: body.bundleCount ? parseInt(body.bundleCount, 10) : null,
         customerId: parseInt(body.customerId),
         industryId: parseInt(body.industryId),
         sizeId: parseInt(body.sizeId),

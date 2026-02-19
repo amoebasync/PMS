@@ -14,19 +14,18 @@ export default function FlyerPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // チラシ登録・編集用State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
 
-  // ★ 追加: 納品履歴・在庫追加用State
   const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
   const [selectedFlyer, setSelectedFlyer] = useState<any>(null);
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [deliveryForm, setDeliveryForm] = useState({ expectedAt: '', count: '', status: 'COMPLETED', note: '' });
   const [isDeliverySaving, setIsDeliverySaving] = useState(false);
 
+  // ★ 初期値に bundleCount を追加
   const initialForm = {
-    name: '', flyerCode: '', customerId: '', industryId: '', sizeId: '',
+    name: '', flyerCode: '', bundleCount: '', customerId: '', industryId: '', sizeId: '',
     startDate: '', endDate: '', foldStatus: 'NO_FOLDING_REQUIRED', remarks: ''
   };
   const [formData, setFormData] = useState(initialForm);
@@ -62,6 +61,7 @@ export default function FlyerPage() {
       setFormData({
         name: flyer.name,
         flyerCode: flyer.flyerCode || '',
+        bundleCount: flyer.bundleCount?.toString() || '', // ★ 追加
         customerId: flyer.customerId.toString(),
         industryId: flyer.industryId.toString(),
         sizeId: flyer.sizeId.toString(),
@@ -85,10 +85,14 @@ export default function FlyerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        // UNIQUE制約エラー（同じチラシコードが既に存在する場合）などの対応
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || '保存に失敗しました。チラシコードが重複している可能性があります。');
+      }
       setIsFormOpen(false);
       fetchData();
-    } catch (e) { alert('保存に失敗しました'); }
+    } catch (e: any) { alert(e.message); }
   };
 
   const del = async (id: number) => {
@@ -100,13 +104,11 @@ export default function FlyerPage() {
     } catch (e) { alert('削除に失敗しました。関連データが存在する可能性があります。'); }
   };
 
-  // ★ 追加: 納品履歴モーダルを開く関数
   const openDeliveryModal = async (flyer: any) => {
     setSelectedFlyer(flyer);
     setDeliveries([]);
     setIsDeliveryOpen(true);
 
-    // デフォルトで現在時刻をセット (YYYY-MM-DDThh:mm形式)
     const now = new Date();
     now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
     setDeliveryForm({ expectedAt: now.toISOString().slice(0, 16), count: '', status: 'COMPLETED', note: '' });
@@ -117,7 +119,6 @@ export default function FlyerPage() {
     } catch (e) { console.error(e); }
   };
 
-  // ★ 追加: 納品データの保存処理
   const saveDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedFlyer) return;
@@ -132,7 +133,6 @@ export default function FlyerPage() {
       
       if (!res.ok) throw new Error();
       
-      // 成功したら、モーダルを閉じてチラシ一覧全体を更新（在庫数を最新にするため）
       setIsDeliveryOpen(false);
       fetchData();
       alert('納品情報を登録し、在庫を更新しました！');
@@ -143,7 +143,9 @@ export default function FlyerPage() {
   };
 
   const filteredFlyers = flyers.filter(f => 
-    f.name.includes(searchTerm) || (f.customer?.name || '').includes(searchTerm)
+    f.name.includes(searchTerm) || 
+    (f.customer?.name || '').includes(searchTerm) || 
+    (f.flyerCode || '').includes(searchTerm)
   );
 
   return (
@@ -165,7 +167,7 @@ export default function FlyerPage() {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="relative max-w-md">
           <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input type="text" placeholder="チラシ名、顧客名で検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-fuchsia-500" />
+          <input type="text" placeholder="チラシ名、コード、顧客名で検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-fuchsia-500" />
         </div>
       </div>
 
@@ -177,18 +179,19 @@ export default function FlyerPage() {
               <th className="px-6 py-4">チラシ名 / コード</th>
               <th className="px-6 py-4">顧客 / 業種</th>
               <th className="px-6 py-4">サイズ / 折ステータス</th>
+              <th className="px-6 py-4">1束の枚数</th>
               <th className="px-6 py-4">有効期間</th>
               <th className="px-6 py-4 text-right bg-slate-100">現在庫</th>
               <th className="px-6 py-4 text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td colSpan={6} className="p-8 text-center">読み込み中...</td></tr> : 
+            {isLoading ? <tr><td colSpan={7} className="p-8 text-center">読み込み中...</td></tr> : 
              filteredFlyers.map(f => (
               <tr key={f.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4">
                   <div className="font-bold text-slate-800 text-base">{f.name}</div>
-                  <div className="font-mono text-xs text-slate-400 mt-1">{f.flyerCode || 'コード未設定'}</div>
+                  <div className="font-mono text-xs text-slate-400 mt-1"><i className="bi bi-upc-scan text-slate-300"></i> {f.flyerCode || 'コードなし'}</div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="font-bold text-slate-700">{f.customer?.name}</div>
@@ -200,13 +203,18 @@ export default function FlyerPage() {
                     {FOLD_STATUS_MAP[f.foldStatus].label}
                   </span>
                 </td>
+                {/* ★ 1束の枚数を表示 */}
+                <td className="px-6 py-4">
+                  {f.bundleCount ? (
+                    <span className="font-bold text-slate-700">{f.bundleCount.toLocaleString()} <span className="text-xs font-normal">枚</span></span>
+                  ) : <span className="text-slate-400">-</span>}
+                </td>
                 <td className="px-6 py-4 text-xs text-slate-600 font-mono">
                   {f.startDate ? new Date(f.startDate).toLocaleDateString() : '未定'} <br/>
                   〜 {f.endDate ? new Date(f.endDate).toLocaleDateString() : '未定'}
                 </td>
                 <td className="px-6 py-4 text-right bg-slate-50">
                   <div className="font-bold text-lg text-fuchsia-600">{f.stockCount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">枚</span></div>
-                  {/* ★ 修正: 在庫追加ボタン */}
                   <button onClick={() => openDeliveryModal(f)} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">納品履歴・追加 &gt;</button>
                 </td>
                 <td className="px-6 py-4 text-right">
@@ -219,12 +227,10 @@ export default function FlyerPage() {
         </table>
       </div>
 
-      {/* --- ★ 追加: 納品履歴・在庫追加モーダル --- */}
+      {/* 納品履歴・在庫追加モーダル */}
       {isDeliveryOpen && selectedFlyer && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row max-h-[90vh] overflow-hidden">
-            
-            {/* 左側: 新規納品フォーム */}
             <div className="w-full md:w-1/3 bg-slate-50 p-6 border-r border-slate-200">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-slate-800"><i className="bi bi-box-seam-fill text-blue-600 mr-2"></i>納品の追加</h3>
@@ -260,7 +266,6 @@ export default function FlyerPage() {
               </form>
             </div>
 
-            {/* 右側: 履歴一覧 */}
             <div className="flex-1 bg-white p-6 overflow-y-auto">
               <div className="flex justify-between items-center mb-6 hidden md:flex">
                 <div>
@@ -312,9 +317,15 @@ export default function FlyerPage() {
             
             <form onSubmit={save} className="p-6 overflow-y-auto space-y-6">
               <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+                <div className="col-span-2 md:col-span-1">
                   <label className="text-xs font-bold text-slate-600">チラシ名 *</label>
-                  <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 春の入会キャンペーンチラシ" />
+                  <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 春の入会キャンペーン" />
+                </div>
+                
+                {/* ★ チラシコード欄を独立させて強調 */}
+                <div className="col-span-2 md:col-span-1">
+                  <label className="text-xs font-bold text-slate-600">チラシコード (UNIQUE)</label>
+                  <input name="flyerCode" value={formData.flyerCode} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-blue-50 focus:bg-white" placeholder="クライアント独自のIDなど" />
                 </div>
                 
                 <div className="col-span-2">
@@ -348,6 +359,16 @@ export default function FlyerPage() {
                 <div>
                   <label className="text-xs font-bold text-slate-600">配布完了期限</label>
                   <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" />
+                </div>
+
+                {/* ★ 1束の枚数入力欄を追加 */}
+                <div className="col-span-2 p-4 bg-fuchsia-50/50 border border-fuchsia-100 rounded-lg">
+                  <label className="text-xs font-bold text-slate-600">1束の枚数 (結束用)</label>
+                  <div className="relative mt-1 max-w-xs">
+                    <input type="number" min="1" name="bundleCount" value={formData.bundleCount} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white pr-8 text-right font-bold text-slate-700" placeholder="例: 500" />
+                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">枚</span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-1">※この枚数単位で在庫の持ち出し計算が行われます</p>
                 </div>
 
                 <div className="col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-lg">

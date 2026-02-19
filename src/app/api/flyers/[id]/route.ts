@@ -14,6 +14,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       data: {
         name: body.name,
         flyerCode: body.flyerCode || null,
+        bundleCount: body.bundleCount ? parseInt(body.bundleCount, 10) : null,
         customerId: parseInt(body.customerId),
         industryId: parseInt(body.industryId),
         sizeId: parseInt(body.sizeId),
