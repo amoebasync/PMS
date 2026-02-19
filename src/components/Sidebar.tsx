@@ -44,6 +44,7 @@ export default function Sidebar() {
     { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
     { name: '支店管理', href: '/branches', icon: 'bi-shop' },
     { name: 'スケジュール照会', href: '/schedules', icon: 'bi bi-calendar-day' },
+    { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
   ];
 
   return (
