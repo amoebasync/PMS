@@ -40,11 +40,13 @@ export default function Sidebar() {
     { name: '顧客管理', href: '/customers', icon: 'bi-people-fill' },
     { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
     { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
-    { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, // 追加
+    { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
     { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
     { name: '支店管理', href: '/branches', icon: 'bi-shop' },
     { name: 'スケジュール照会', href: '/schedules', icon: 'bi bi-calendar-day' },
     { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
+    { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
+    { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' }, 
   ];
 
   return (

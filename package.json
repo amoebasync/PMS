@@ -13,13 +13,16 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@react-google-maps/api": "^2.20.8",
     "@tailwindcss/postcss": "^4.1.18",
+    "@turf/turf": "^7.3.4",
     "next": "^16.1.6",
     "papaparse": "^5.5.3",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@prisma/client": "^5.10.0",
+    "@types/google.maps": "^3.58.1",
     "@types/node": "^25.2.3",
     "@types/papaparse": "^5.5.2",
     "@types/react": "19.2.14",

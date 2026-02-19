@@ -48,6 +48,7 @@ model Area {
   prefecture            Prefecture             @relation(fields: [prefecture_id], references: [id])
   city                  City                   @relation(fields: [city_id], references: [id])
   distributionSchedules DistributionSchedule[]
+  orderDistributions OrderDistributionArea[]
 
   @@map("areas")
 }
@@ -89,6 +90,8 @@ model Employee {
   department Department? @relation(fields: [departmentId], references: [id])
   role       Role?       @relation(fields: [roleId], references: [id])
   country    Country?    @relation(fields: [countryId], references: [id])
+  orders          Order[]       // 担当した受注
+  designOrders    OrderDesign[] // 担当したデザイン案件
 
   customers        Customer[] // 担当している顧客リスト
   managedBranches1 Branch[]   @relation("BranchManager1")
@@ -202,6 +205,7 @@ model Customer {
   distributionItems DistributionItem[]
 
   flyers Flyer[]
+  orders   Order[]
 
   @@map("customers")
 }
@@ -228,6 +232,7 @@ model CustomerContact {
 
   // リレーション
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  orderContacts OrderContact[]
 
   @@map("customer_contacts")
 }
@@ -504,6 +509,8 @@ model Flyer {
   deliveries        FlyerDelivery[]
   // DistributionItem(スケジュール明細)との紐付けも後ほど追加します
   distributionItems DistributionItem[]
+  orderDistributions OrderDistribution[]
+  orderPrintings     OrderPrinting[]
 
   @@map("flyers")
 }
@@ -535,4 +542,200 @@ model FlyerDelivery {
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
   @@map("flyer_deliveries")
+}
+
+// ==========================================
+// パートナー（外注先）マスタ
+// ==========================================
+model Partner {
+  id            Int         @id @default(autoincrement())
+  name          String      @db.VarChar(100) // 外注先企業名
+  contactInfo   String?     @map("contact_info") @db.Text
+
+  // ★ 文字列から「パートナータイプマスタ」への紐付けに変更
+  partnerTypeId Int         @map("partner_type_id")
+  partnerType   PartnerType @relation(fields: [partnerTypeId], references: [id])
+
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  printings         OrderPrinting[]
+  newspaperInserts  OrderNewspaperInsert[]
+  designs           OrderDesign[]
+
+  @@map("partners")
+}
+
+// --- パートナータイプマスタ (追加) ---
+model PartnerType {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique @db.VarChar(50) // 例: "印刷会社", "新聞折込" など
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  partners  Partner[]
+
+  @@map("partner_types")
+}
+
+// ==========================================
+// 受注管理モジュール
+// ==========================================
+
+// --- 受注全体ステータス ---
+enum OrderStatus {
+  PLANNING    // 提案中・見積中
+  CONFIRMED   // 受注確定
+  IN_PROGRESS // 作業中
+  COMPLETED   // 完了
+  CANCELED    // キャンセル
+}
+
+// --- 受注ヘッダ (親) ---
+model Order {
+  id           Int         @id @default(autoincrement())
+  orderNo      String      @unique @map("order_no") @db.VarChar(50) // 受注番号 (ORD-202602-001など)
+  
+  customerId   Int         @map("customer_id")
+  customer     Customer    @relation(fields: [customerId], references: [id])
+  
+  salesRepId   Int?        @map("sales_rep_id")
+  salesRep     Employee?   @relation(fields: [salesRepId], references: [id]) // 担当営業
+
+  orderDate    DateTime    @map("order_date") @db.Date // 受注日
+  totalAmount  Int?        @map("total_amount") // 受注総額
+  status       OrderStatus @default(PLANNING)
+  remarks      String?     @db.Text
+
+  // リレーション (子テーブル)
+  contacts           OrderContact[] // 顧客担当者 (1:N)
+  distributions      OrderDistribution[]
+  printings          OrderPrinting[]
+  newspaperInserts   OrderNewspaperInsert[]
+  designs            OrderDesign[]
+
+  @@map("orders")
+}
+
+// --- 受注と顧客担当者の中間テーブル (1受注 : N担当者) ---
+model OrderContact {
+  id                Int             @id @default(autoincrement())
+  orderId           Int             @map("order_id")
+  order             Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  customerContactId Int             @map("customer_contact_id")
+  customerContact   CustomerContact @relation(fields: [customerContactId], references: [id])
+
+  @@map("order_contacts")
+}
+
+// --- 1. 配布依頼 ---
+model OrderDistribution {
+  id           Int       @id @default(autoincrement())
+  orderId      Int       @map("order_id")
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // ★ どのチラシを配るか
+  flyerId      Int       @map("flyer_id")
+  flyer        Flyer     @relation(fields: [flyerId], references: [id])
+
+  method       String    @db.VarChar(50) // 軒並み, 戸建限定 など
+  plannedCount Int       @map("planned_count") // 配布予定枚数
+
+  startDate    DateTime? @map("start_date") @db.Date // 配布開始日
+  endDate      DateTime? @map("end_date") @db.Date   // 配布完了期限
+  spareDate    DateTime? @map("spare_date") @db.Date // ★ 予備期限 (悪天候時の許容日)
+
+  status       String    @default("UNSTARTED") @db.VarChar(20) // 未手配, 手配済, 配布中, 完了
+  remarks      String?   @db.Text
+
+  // ★ 配布エリア (1:N)
+  areas        OrderDistributionArea[]
+
+  @@map("order_distributions")
+}
+
+// --- 配布依頼とエリアの中間テーブル (1配布依頼 : Nエリア) ---
+model OrderDistributionArea {
+  id                  Int               @id @default(autoincrement())
+  orderDistributionId Int               @map("order_distribution_id")
+  orderDistribution   OrderDistribution @relation(fields: [orderDistributionId], references: [id], onDelete: Cascade)
+  
+  areaId              Int               @map("area_id")
+  area                Area              @relation(fields: [areaId], references: [id])
+
+  @@map("order_distribution_areas")
+}
+
+// --- 2. 印刷依頼 ---
+model OrderPrinting {
+  id                   Int       @id @default(autoincrement())
+  orderId              Int       @map("order_id")
+  order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // ★ 印刷するチラシ(すでに登録済みの枠として)
+  flyerId              Int?      @map("flyer_id")
+  flyer                Flyer?    @relation(fields: [flyerId], references: [id])
+
+  partnerId            Int?      @map("partner_id")
+  partner              Partner?  @relation(fields: [partnerId], references: [id]) // 印刷発注先
+
+  printCount           Int       @map("print_count") // 印刷枚数 (配布数+折込数から自動計算等)
+  paperSizeId          Int?      @map("paper_size_id")
+  // paperSize            FlyerSize? @relation(fields: [paperSizeId], references: [id])
+  
+  paperType            String?   @map("paper_type") @db.VarChar(50) // コート, マット等
+  paperWeight          String?   @map("paper_weight") @db.VarChar(20) // 73kg, 90kg等
+  colorType            String?   @map("color_type") @db.VarChar(20) // 両面カラー等
+  
+  designFileUrl        String?   @map("design_file_url") @db.Text // 原稿データのURL
+
+  orderDate            DateTime? @map("order_date") @db.Date // 印刷発注日
+  expectedDeliveryDate DateTime? @map("expected_delivery_date") @db.Date // 納品予定日
+  
+  status               String    @default("UNORDERED") @db.VarChar(20) // 未発注, 発注済, 納品済
+
+  @@map("order_printings")
+}
+
+// --- 3. 新聞折込依頼 ---
+model OrderNewspaperInsert {
+  id                Int       @id @default(autoincrement())
+  orderId           Int       @map("order_id")
+  order             Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  partnerId         Int?      @map("partner_id")
+  partner           Partner?  @relation(fields: [partnerId], references: [id]) // 折込手配会社
+
+  insertDate        DateTime? @map("insert_date") @db.Date // 折込指定日
+  plannedCount      Int       @map("planned_count") // 折込枚数
+  newspaperName     String?   @map("newspaper_name") @db.VarChar(50) // 指定紙 (読売, 朝日等)
+  areaSpecification String?   @map("area_specification") @db.Text // エリア指定メモ
+
+  status            String    @default("UNORDERED") @db.VarChar(20) // 未手配, 手配済, 完了
+
+  @@map("order_newspaper_inserts")
+}
+
+// --- 4. デザイン依頼 ---
+model OrderDesign {
+  id                 Int       @id @default(autoincrement())
+  orderId            Int       @map("order_id")
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  partnerId          Int?      @map("partner_id")
+  partner            Partner?  @relation(fields: [partnerId], references: [id]) // 外注デザイナーの場合
+  
+  employeeId         Int?      @map("employee_id")
+  employee           Employee? @relation(fields: [employeeId], references: [id]) // 社内デザイナーの場合
+
+  designConcept      String?   @map("design_concept") @db.Text
+  firstDraftDeadline DateTime? @map("first_draft_deadline") @db.Date
+  finalDeadline      DateTime? @map("final_deadline") @db.Date
+  
+  finalDataUrl       String?   @map("final_data_url") @db.Text // 完成デザインデータURL
+
+  status             String    @default("NOT_STARTED") @db.VarChar(20) // 未着手, 制作中, 校了
+
+  @@map("order_designs")
 }
