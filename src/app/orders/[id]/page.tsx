@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use } from 'react';
+import React, { useState, useEffect, use, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -8,114 +8,73 @@ import { GoogleMap, useJsApiLoader, Polygon, Circle, Marker } from '@react-googl
 import * as turf from '@turf/turf';
 
 const mapContainerStyle = { width: '100%', height: '100%' };
-const initialCenter = { lat: 35.6581, lng: 139.7414 }; // 東京タワー初期位置
+const initialCenter = { lat: 35.6581, lng: 139.7414 }; // デフォルト: 東京タワー
 
-// ★ 追加: Google Maps Encoded Polyline を緯度経度にデコードする関数
+const LIBRARIES: ("geometry" | "drawing" | "places")[] = ["geometry"];
+
+// --- 座標抽出・デコード関数 ---
 const decodePolyline = (str: string) => {
   let index = 0, lat = 0, lng = 0, coordinates = [];
   let shift = 0, result = 0, byte = null, latitude_change, longitude_change, factor = Math.pow(10, 5);
-
   while (index < str.length) {
     byte = null; shift = 0; result = 0;
-    do {
-      byte = str.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20);
+    do { byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
     latitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
     shift = result = 0;
-    do {
-      byte = str.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-    } while (byte >= 0x20);
+    do { if (index >= str.length) break; byte = str.charCodeAt(index++) - 63; result |= (byte & 0x1f) << shift; shift += 5; } while (byte >= 0x20);
     longitude_change = ((result & 1) ? ~(result >> 1) : (result >> 1));
-
-    lat += latitude_change;
-    lng += longitude_change;
+    lat += latitude_change; lng += longitude_change;
     coordinates.push({ lat: lat / factor, lng: lng / factor });
   }
   return coordinates;
 };
 
-// ★ 強化版: どんなフォーマットの座標データでも安全に緯度経度を抽出するロジック
 const extractPaths = (geojsonStr: string) => {
   if (!geojsonStr) return [];
-  
-  // パターン1: JSONフォーマット
-  if (geojsonStr.trim().startsWith('{')) {
-    try {
+  try {
+    if (geojsonStr.trim().startsWith('{')) {
       const geojson = JSON.parse(geojsonStr);
       let feature = geojson;
       if (geojson.type === 'FeatureCollection' && geojson.features.length > 0) feature = geojson.features[0];
       const geometry = feature.geometry || feature;
-      let coords: any[] = [];
-      if (geometry.type === 'Polygon') coords = geometry.coordinates[0];
-      else if (geometry.type === 'MultiPolygon') coords = geometry.coordinates[0][0];
-      if (!coords || !Array.isArray(coords)) return [];
-      return coords.map((c: any[]) => ({ lat: parseFloat(c[1]), lng: parseFloat(c[0]) })).filter(c => !isNaN(c.lat) && !isNaN(c.lng));
-    } catch (e) { return []; }
-  }
-
-  // パターン2: Encoded Polyline (数字が含まれていない場合は100%これ)
-  if (!/[0-9]/.test(geojsonStr)) {
-    try {
-      return decodePolyline(geojsonStr);
-    } catch (e) { return []; }
-  }
-
-  // パターン3: "緯度,経度|緯度,経度" の独自フォーマット
-  if (geojsonStr.includes('|')) {
-    try {
+      let rawCoords: any[] = [];
+      if (geometry.type === 'Polygon') rawCoords = geometry.coordinates[0];
+      else if (geometry.type === 'MultiPolygon') rawCoords = geometry.coordinates[0][0];
+      return rawCoords.map((c: any[]) => ({ lat: parseFloat(c[1]), lng: parseFloat(c[0]) }));
+    }
+    if (geojsonStr.includes('|') && !/[a-zA-Z]/.test(geojsonStr)) {
       return geojsonStr.split('|').map(point => {
         const parts = point.split(/[,\s]+/).filter(Boolean);
         if (parts.length >= 2) {
-          const val1 = parseFloat(parts[0]);
-          const val2 = parseFloat(parts[1]);
-          if (!isNaN(val1) && !isNaN(val2)) {
-            return { lat: val1 < 90 ? val1 : val2, lng: val1 > 90 ? val1 : val2 };
-          }
+          const val1 = parseFloat(parts[0]), val2 = parseFloat(parts[1]);
+          return { lat: val1 < 90 ? val1 : val2, lng: val1 > 90 ? val1 : val2 };
         }
-        return null;
-      }).filter(p => p !== null);
-    } catch (e) { return []; }
-  }
-
+        return { lat: NaN, lng: NaN };
+      });
+    }
+    const sanitizedStr = geojsonStr.replace(/\t/g, '\\t').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\f/g, '\\f');
+    if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.geometry) {
+      const decodedPath = window.google.maps.geometry.encoding.decodePath(sanitizedStr);
+      return decodedPath.map(p => ({ lat: p.lat(), lng: p.lng() }));
+    }
+  } catch (e) { console.error("Extraction error:", e); }
   return [];
 };
 
-// ★ 強化版: Turf.jsでの交差判定用ポリゴン生成ロジック
 const createTurfFeature = (geojsonStr: string) => {
   if (!geojsonStr) return null;
-
-  // JSON形式
   if (geojsonStr.trim().startsWith('{')) {
     try {
       const geojson = JSON.parse(geojsonStr);
       return geojson.type === 'FeatureCollection' ? geojson.features[0] : geojson;
     } catch (e) { return null; }
   }
-
-  let coordsList: {lat: number, lng: number}[] = [];
-  
-  // Encoded Polyline または | 区切り
-  if (!/[0-9]/.test(geojsonStr)) {
-    coordsList = decodePolyline(geojsonStr);
-  } else if (geojsonStr.includes('|')) {
-    coordsList = extractPaths(geojsonStr) as {lat: number, lng: number}[];
-  }
-
-  if (coordsList.length > 0) {
-    const coords = coordsList.map(p => [p.lng, p.lat]); // Turfは [lng, lat]
-    const first = coords[0];
-    const last = coords[coords.length - 1];
-    
-    // ポリゴンは始点と終点が一致している必要があるため補完
-    if (first[0] !== last[0] || first[1] !== last[1]) {
-      coords.push([...first]);
-    }
-    if (coords.length >= 4) return turf.polygon([coords]);
-  }
+  const paths = extractPaths(geojsonStr);
+  if (paths.length === 0) return null;
+  const coords = paths.map(p => [p.lng, p.lat]);
+  const first = coords[0], last = coords[coords.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) coords.push([...first]);
+  if (coords.length >= 4) return turf.polygon([coords]);
   return null;
 };
 
@@ -141,16 +100,22 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     flyerId: '', method: '軒並み配布', plannedCount: '', startDate: '', endDate: '', spareDate: '', remarks: ''
   });
 
+  // --- 地図とポリゴン動的ロード用のState ---
   const [mapAreas, setMapAreas] = useState<any[]>([]);
+  const [loadedCities, setLoadedCities] = useState<Set<string>>(new Set()); // 取得済みの市区町村名を記録
   const [selectedAreaIds, setSelectedAreaIds] = useState<Set<number>>(new Set());
+  
   const [searchAddress, setSearchAddress] = useState('');
   const [radiusKm, setRadiusKm] = useState(1);
   const [mapCenter, setMapCenter] = useState(initialCenter);
   const [searchMarker, setSearchMarker] = useState<{lat: number, lng: number} | null>(null);
+  
+  const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES,
   });
 
   useEffect(() => {
@@ -170,12 +135,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               orderDate: order.orderDate ? order.orderDate.split('T')[0] : '', totalAmount: order.totalAmount?.toString() || '',
               status: order.status, remarks: order.remarks || ''
             });
-
             if (order.customerId) {
               const flyerRes = await fetch(`/api/flyers/customer/${order.customerId}`);
               if (flyerRes.ok) setCustomerFlyers(await flyerRes.json());
             }
-
             if (order.distributions && order.distributions.length > 0) {
               const dist = order.distributions[0];
               setDistForm({
@@ -192,17 +155,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     fetchInitialData();
   }, [id, isNew]);
 
-  useEffect(() => {
-    if (activeTab === 'DIST' && mapAreas.length === 0) {
-      fetch('/api/areas/map')
-        .then(r => r.json())
-        .then(data => {
-          if(Array.isArray(data)) setMapAreas(data);
-        })
-        .catch(e => console.error("Map Areas Fetch Error:", e));
-    }
-  }, [activeTab]);
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -213,6 +165,51 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     setDistForm(prev => ({ ...prev, [name]: value }));
   };
 
+  // ★ 追加: 地図の中心座標から市区町村を調べ、未取得ならAPIを叩いてポリゴンを追加する関数
+  const fetchAreasForLocation = (lat: number, lng: number, onFetched?: (newAreas: any[]) => void) => {
+    if (!window.google) return;
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng } }, async (results, status) => {
+      if (status === 'OK' && results && results[0]) {
+        let cityName = '';
+        for (const component of results[0].address_components) {
+          if (component.types.includes('locality') || component.types.includes('ward')) {
+            cityName = component.long_name;
+            break;
+          }
+        }
+        
+        // 未取得の市区町村ならAPIで取得
+        if (cityName && !loadedCities.has(cityName)) {
+          setLoadedCities(prev => new Set(prev).add(cityName));
+          try {
+            const res = await fetch(`/api/areas/map?cityName=${encodeURIComponent(cityName)}`);
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              setMapAreas(prev => {
+                const existingIds = new Set(prev.map(a => a.id));
+                const newAreas = data.filter(a => !existingIds.has(a.id));
+                if (onFetched) onFetched([...prev, ...newAreas]); // 検索時の処理用
+                return [...prev, ...newAreas];
+              });
+            }
+          } catch (e) { console.error(e); }
+        } else {
+          if (onFetched) onFetched(mapAreas);
+        }
+      }
+    });
+  };
+
+  // 地図のスクロール・移動が止まったら発火し、周辺ポリゴンをロードする
+  const handleMapIdle = () => {
+    if (mapRef) {
+      const center = mapRef.getCenter();
+      if (center) fetchAreasForLocation(center.lat(), center.lng());
+    }
+  };
+
+  // 検索＆自動選択ロジック
   const handleSearchAndSelect = () => {
     if (!searchAddress || !window.google) return;
     const geocoder = new window.google.maps.Geocoder();
@@ -229,24 +226,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         const centerPoint = turf.point([lng, lat]);
         const searchCircle = turf.circle(centerPoint, radiusKm, { steps: 64, units: 'kilometers' });
 
-        const newSelected = new Set<number>();
+        // 周辺データを取得してから交差判定を行う
+        fetchAreasForLocation(lat, lng, (currentAreas) => {
+          const newSelected = new Set<number>(); // 検索のたびに選択をリセット（上書き）
 
-        mapAreas.forEach(area => {
-          const feature = createTurfFeature(area.boundary_geojson);
-          if (feature) {
-            try {
-              const features = feature.type === 'FeatureCollection' ? feature.features : [feature];
-              for (const f of features) {
-                if (turf.booleanIntersects(searchCircle, f)) {
-                  newSelected.add(area.id);
-                  break; 
+          currentAreas.forEach(area => {
+            const feature = createTurfFeature(area.boundary_geojson);
+            if (feature) {
+              try {
+                const features = feature.type === 'FeatureCollection' ? feature.features : [feature];
+                for (const f of features) {
+                  if (turf.booleanIntersects(searchCircle, f)) {
+                    newSelected.add(area.id);
+                    break; 
+                  }
                 }
-              }
-            } catch (e) { /* skip */ }
-          }
+              } catch (e) { /* skip */ }
+            }
+          });
+          setSelectedAreaIds(newSelected);
         });
-
-        setSelectedAreaIds(newSelected);
       } else {
         alert('入力された住所が見つかりませんでした。');
       }
@@ -276,9 +275,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     } catch (err) { alert('通信エラーが発生しました'); }
   };
 
+  // 配布方法に応じた枚数計算ロジック
   const totalCapacity = mapAreas
     .filter(a => selectedAreaIds.has(a.id))
-    .reduce((sum, a) => sum + (a.posting_cap_with_ng || 0), 0);
+    .reduce((sum, a) => {
+      if (distForm.method === '軒並み配布') {
+        return sum + (a.door_to_door_count || 0);
+      } else if (distForm.method === '集合住宅限定') {
+        return sum + (a.multi_family_count || 0);
+      } else if (distForm.method === '戸建限定') {
+        return sum + Math.max(0, (a.door_to_door_count || 0) - (a.multi_family_count || 0));
+      } else {
+        return sum + (a.posting_cap_with_ng || 0);
+      }
+    }, 0);
 
   const plannedCount = parseInt(distForm.plannedCount) || 0;
   const isCapacityEnough = plannedCount > 0 && totalCapacity >= plannedCount;
@@ -373,7 +383,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 block mb-1">配布方法 *</label>
-                  <select name="method" value={distForm.method} onChange={handleDistChange} className="w-full border p-2.5 rounded-lg text-sm bg-white">
+                  <select name="method" value={distForm.method} onChange={handleDistChange} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
                     <option value="軒並み配布">軒並み配布 (標準)</option>
                     <option value="戸建限定">戸建限定</option>
                     <option value="集合住宅限定">集合住宅限定</option>
@@ -397,7 +407,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <i className="bi bi-geo-alt absolute left-3 top-2.5 text-slate-400"></i>
                     <input 
                       type="text" 
-                      placeholder="住所で検索 (例: 港区芝公園)" 
+                      placeholder="住所で検索 (例: 新宿区高田馬場)" 
                       value={searchAddress}
                       onChange={e => setSearchAddress(e.target.value)}
                       onKeyDown={e => e.key === 'Enter' && handleSearchAndSelect()}
@@ -424,14 +434,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 {!isLoaded ? (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold"><i className="bi bi-arrow-repeat animate-spin mr-2"></i>地図を読み込んでいます...</div>
                 ) : (
-                  <GoogleMap mapContainerStyle={mapContainerStyle} center={mapCenter} zoom={14} options={{ mapTypeControl: false, streetViewControl: false }}>
+                  <GoogleMap 
+                    mapContainerStyle={mapContainerStyle} 
+                    center={mapCenter} 
+                    zoom={15} 
+                    options={{ mapTypeControl: false, streetViewControl: false }}
+                    onLoad={map => setMapRef(map)}
+                    onIdle={handleMapIdle} // ★地図の移動が止まるたびに周辺のエリアを取得
+                  >
                     {searchMarker && <Marker position={searchMarker} />}
                     {searchMarker && (
-                      <Circle 
-                        center={searchMarker} 
-                        radius={radiusKm * 1000} 
-                        options={{ fillColor: '#10b981', fillOpacity: 0.1, strokeColor: '#059669', strokeWeight: 2, borderStyle: 'dashed' }} 
-                      />
+                      <Circle center={searchMarker} radius={radiusKm * 1000} options={{ fillColor: '#10b981', fillOpacity: 0.1, strokeColor: '#059669', strokeWeight: 2, borderStyle: 'dashed' }} />
                     )}
 
                     {mapAreas.map(area => {
@@ -464,6 +477,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[10px]">{selectedAreaIds.size} エリア</span>
                   </h4>
                   
+                  <div className="flex justify-between items-end mb-2">
+                    <span className="text-sm font-bold text-slate-600">配布方法</span>
+                    <span className="text-sm font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">{distForm.method}</span>
+                  </div>
+
                   <div className="flex justify-between items-end mb-4">
                     <span className="text-sm font-bold text-slate-600">配布可能枚数 (合計)</span>
                     <div className="text-right">
@@ -497,15 +515,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <i className="bi bi-cloud-arrow-up-fill mr-2"></i>
                     配布依頼を保存する
                   </button>
-                  {(!distForm.flyerId) && (
-                    <p className="text-[10px] text-center text-slate-400 mt-2">※上部で「配布するチラシ」を選択してください</p>
-                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
 
+        {/* プレースホルダー（他のタブ用） */}
         {activeTab !== 'BASIC' && activeTab !== 'DIST' && (
           <div className="py-20 text-center flex flex-col items-center">
             <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center text-3xl mb-4">
