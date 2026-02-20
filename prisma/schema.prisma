@@ -233,6 +233,8 @@ model CustomerContact {
   // リレーション
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   orderContacts OrderContact[]
+  passwordHash String?   @map("password_hash") @db.VarChar(255) // クライアントログイン用パスワード
+  lastLoginAt  DateTime? @map("last_login_at") @db.DateTime(0)
 
   @@map("customer_contacts")
 }
@@ -511,6 +513,7 @@ model Flyer {
   distributionItems DistributionItem[]
   orderDistributions OrderDistribution[]
   orderPrintings     OrderPrinting[]
+  qrCodes QrCode[]
 
   @@map("flyers")
 }
@@ -738,4 +741,53 @@ model OrderDesign {
   status             String    @default("NOT_STARTED") @db.VarChar(20) // 未着手, 制作中, 校了
 
   @@map("order_designs")
+}
+
+// ==========================================
+// ★ 追加: 反響測定（QRコード・トラッキング）モジュール
+// ==========================================
+
+model QrCode {
+  id          Int      @id @default(autoincrement())
+  
+  flyerId     Int      @map("flyer_id")
+  flyer       Flyer    @relation(fields: [flyerId], references: [id], onDelete: Cascade)
+
+  alias       String   @unique @db.VarChar(100) 
+  redirectUrl String   @map("redirect_url") @db.Text 
+  memo        String?  @db.VarChar(255)
+
+  isActive    Boolean  @default(true) @map("is_active")
+
+  // ★ 追加: メール通知設定
+  notifyOnScan       Boolean  @default(false) @map("notify_on_scan")
+  notificationEmails String?  @map("notification_emails") @db.Text // カンマ区切りで複数保存
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  scanLogs    QrScanLog[]
+
+  @@map("qr_codes")
+}
+
+model QrScanLog {
+  id          Int      @id @default(autoincrement())
+  
+  qrCodeId    Int      @map("qr_code_id")
+  qrCode      QrCode   @relation(fields: [qrCodeId], references: [id], onDelete: Cascade)
+
+  scannedAt   DateTime @default(now()) @map("scanned_at") 
+
+  ipAddress   String?  @map("ip_address") @db.VarChar(50)
+  userAgent   String?  @map("user_agent") @db.Text
+  deviceType  String?  @map("device_type") @db.VarChar(50)
+  os          String?  @db.VarChar(50)
+  browser     String?  @db.VarChar(50)
+  location    String?  @db.VarChar(100) 
+  
+  // ★ 追加: ユニークユーザー識別用ID (Cookieの値を保存)
+  visitorId   String?  @map("visitor_id") @db.VarChar(100)
+
+  @@map("qr_scan_logs")
 }

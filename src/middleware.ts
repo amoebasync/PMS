@@ -5,8 +5,8 @@ export function middleware(request: NextRequest) {
   // 現在アクセスしようとしているURLのパス（例: '/employees', '/login' など）
   const path = request.nextUrl.pathname;
 
-  // ログイン不要でアクセスできるパスを定義
-  const isPublicPath = path === '/login' || path.startsWith('/api/auth');
+  // ★ 修正: ログイン不要でアクセスできるパスに `path.startsWith('/q/')` を追加！
+  const isPublicPath = path === '/login' || path.startsWith('/api/auth') || path.startsWith('/q/');
 
   // ブラウザのCookieからセッション（ログイン情報）を取得
   const session = request.cookies.get('pms_session')?.value;
