@@ -1,20 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image'; // 画像用コンポーネントを追加
-import { usePathname } from 'next/navigation';
+import Image from 'next/image'; 
+import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
-export default function Sidebar() {
-  const pathname = usePathname();
-  // 初期値を空にすることで、サーバーとクライアントの不一致（Hydration Error）を完全に防ぎます
-  const [mounted, setMounted] = useState(false);
-  const [time, setTime] = useState({ 
-    clock: '00:00:00', 
-    date: '----/--/--' 
-  });
+// Propsの型定義
+interface SidebarProps {
+  isCollapsed: boolean;
+  toggleCollapse: () => void;
+}
 
-  // マウント後に時計を動かす
+export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // ユーザーメニュー開閉用
+  const [time, setTime] = useState({ clock: '00:00:00', date: '----/--/--' });
+
   useEffect(() => {
     setMounted(true);
     const updateTime = () => {
@@ -25,104 +28,158 @@ export default function Sidebar() {
       });
     };
 
-    updateTime(); // 初回実行
+    updateTime(); 
     const timer = setInterval(updateTime, 1000);
     return () => clearInterval(timer);
   }, []);
 
-  if (pathname === '/login') {
-    return null;
-  }
+  if (pathname === '/login') return null;
 
-  // ★ ここに配布員管理を追加しました ★
-  const navItems = [
-    { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' }, 
-    { name: '顧客管理', href: '/customers', icon: 'bi-people-fill' },
-    { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
-    { name: 'スケジュール照会', href: '/schedules', icon: 'bi bi-calendar-day' },
-    { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' }, 
-    { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
-    { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
-    { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
-    { name: '支店管理', href: '/branches', icon: 'bi-shop' },
-    { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
-    { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
-    { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' }, 
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch (e) {
+      alert('ログアウトに失敗しました');
+    }
+  };
+
+  // ★ 変更: メニューを見やすくグループ化
+  const menuGroups = [
+    {
+      title: 'WORKFLOW',
+      items: [
+        { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' }, 
+        { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' }, 
+        { name: 'スケジュール照会', href: '/schedules', icon: 'bi-calendar-check' },
+        { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' }, 
+      ]
+    },
+    {
+      title: 'MASTERS',
+      items: [
+        { name: '顧客管理', href: '/customers', icon: 'bi-buildings-fill' },
+        { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
+        { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
+        { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
+      ]
+    },
+    {
+      title: 'ORGANIZATION',
+      items: [
+        { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
+        { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
+        { name: '支店管理', href: '/branches', icon: 'bi-shop' },
+        { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
+      ]
+    }
   ];
 
   return (
-    <nav className="w-[260px] h-screen bg-[#0f172a] text-slate-200 fixed left-0 top-0 z-[1000] flex flex-col shadow-2xl border-r border-white/5 font-sans">
+    <nav className={`h-screen bg-[#0f172a] text-slate-200 fixed left-0 top-0 z-[1000] flex flex-col shadow-2xl border-r border-white/5 font-sans transition-all duration-300 ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}`}>
       
+      {/* 折りたたみトグルボタン */}
+      <button 
+        onClick={toggleCollapse} 
+        className="absolute -right-3 top-6 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md hover:bg-blue-500 transition-colors z-[1010]"
+      >
+        <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`}></i>
+      </button>
+
       {/* ロゴエリア */}
-      <div className="h-[80px] flex items-center justify-center border-b border-white/10 bg-[#0f172a]">
-        <div className="relative w-[180px] h-[40px]">
-          <Image 
-            src="/logo/logo_dark_transparent.png" 
-            alt="PMS Pro Logo" 
-            fill
-            className="object-contain" // アスペクト比を維持して枠内に収める
-            priority // 優先的に読み込む
-          />
-        </div>
+      <div className="h-[80px] flex items-center justify-center border-b border-white/10 bg-[#0f172a] shrink-0">
+        <Link href="/" className="flex items-center gap-3">
+          <div className="relative w-[32px] h-[32px] shrink-0">
+            <Image src="/logo/logo_Icon_transparent.png" alt="Icon" fill className="object-contain" priority />
+          </div>
+          {!isCollapsed && (
+            <div className="font-extrabold text-white text-xl tracking-wide whitespace-nowrap">
+              PMS <span className="text-blue-500">Pro</span>
+            </div>
+          )}
+        </Link>
       </div>
 
-      {/* メニューエリア */}
-      <div className="flex-1 py-6 px-3 overflow-y-auto custom-scrollbar">
-        <div className="px-4 mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-500">Main Menu</div>
-        <div className="space-y-1">
-          {navItems.map((item) => {
-            // パスが一致するか、サブパス（例: /areas/123）も含めて一致するか判定
-            // トップページ('/')の場合は完全一致のみにする（他の全パスがマッチしてしまうのを防ぐため）
-            const isActive = item.href === '/' 
-              ? pathname === '/' 
-              : pathname === item.href || pathname.startsWith(`${item.href}/`);
-              
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center px-4 py-3 rounded-lg transition-all duration-200 group relative ${
-                  isActive 
-                    ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' 
-                    : 'hover:bg-white/5 text-slate-400 hover:text-white'
-                }`}
-              >
-                {/* アクティブ時の左側の青いライン */}
-                {isActive && <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-300 rounded-r-full"></div>}
-                
-                <i className={`${item.icon} mr-3 text-lg ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'}`}></i>
-                <span className="font-medium tracking-wide text-sm">{item.name}</span>
-              </Link>
-            );
-          })}
-        </div>
+      {/* メニューエリア (専用のスクロールバークラスを適用) */}
+      <div className="flex-1 py-6 overflow-y-auto sidebar-scrollbar">
+        {menuGroups.map((group, gIdx) => (
+          <div key={gIdx} className="mb-6 px-3">
+            {!isCollapsed && (
+              <div className="px-3 mb-2 text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                {group.title}
+              </div>
+            )}
+            <div className="space-y-1">
+              {group.items.map((item) => {
+                const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                return (
+                  <Link 
+                    key={item.href} 
+                    href={item.href} 
+                    title={isCollapsed ? item.name : ''} // 折りたたみ時はホバーでツールチップ表示
+                    className={`flex items-center py-2.5 rounded-lg transition-all duration-200 group relative ${
+                      isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-white/5 text-slate-400 hover:text-white'
+                    } ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
+                  >
+                    {isActive && !isCollapsed && <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-300 rounded-r-full"></div>}
+                    <i className={`${item.icon} text-lg ${!isCollapsed && 'mr-3'} ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'}`}></i>
+                    {!isCollapsed && <span className="font-medium tracking-wide text-sm whitespace-nowrap">{item.name}</span>}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* ユーザー情報＆時計エリア */}
-      <div className="p-4 bg-black/20 border-t border-white/10 backdrop-blur-sm">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
+      <div className="p-3 bg-black/20 border-t border-white/10 backdrop-blur-sm relative">
+        
+        {/* ユーザーメニューのポップアップ */}
+        {isUserMenuOpen && (
+          <div className={`absolute z-[1020] bg-slate-800 border border-slate-700 rounded-xl shadow-xl overflow-hidden py-1 ${
+            isCollapsed ? 'bottom-3 left-full ml-3 w-48' : 'bottom-full left-3 right-3 mb-2'
+          }`}>
+            <Link href="/profile" onClick={() => setIsUserMenuOpen(false)} className="flex items-center gap-3 px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-slate-200">
+               <i className="bi bi-person-gear"></i> プロフィール編集
+            </Link>
+            <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-2 hover:bg-rose-500/20 text-rose-400 transition-colors text-sm text-left">
+               <i className="bi bi-box-arrow-right"></i> ログアウト
+            </button>
+          </div>
+        )}
+
+        <button 
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
+          className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} text-left hover:bg-white/5 p-2 rounded-lg transition-colors`}
+        >
+          <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
             <i className="bi bi-person-fill text-white text-lg"></i>
           </div>
-          <div className="flex-1 overflow-hidden">
-            <div className="font-bold text-white text-sm truncate">管理者ユーザー</div>
-            <div className="text-[10px] text-blue-300 uppercase tracking-wider font-semibold">Administrator</div>
-          </div>
-        </div>
-        
-        {/* 時計（マウントされるまで表示しないことでエラー回避） */}
-        <div className="pt-3 border-t border-white/5 text-center min-h-[44px]">
-          {mounted ? (
-            <>
-              <div className="font-mono text-xl font-bold text-white tracking-widest leading-none mb-1">{time.clock}</div>
-              <div className="text-[10px] text-slate-400 font-medium tracking-wide">{time.date}</div>
-            </>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="w-1 h-1 bg-slate-600 rounded-full animate-ping"></div>
+          {!isCollapsed && (
+            <div className="flex-1 overflow-hidden">
+              <div className="font-bold text-white text-sm truncate">管理者ユーザー</div>
+              <div className="text-[10px] text-blue-300 uppercase tracking-wider font-semibold">Administrator</div>
             </div>
           )}
-        </div>
+        </button>
+        
+        {/* 時計 */}
+        {!isCollapsed && (
+          <div className="pt-3 mt-2 border-t border-white/5 text-center min-h-[44px]">
+            {mounted ? (
+              <>
+                <div className="font-mono text-xl font-bold text-white tracking-widest leading-none mb-1">{time.clock}</div>
+                <div className="text-[10px] text-slate-400 font-medium tracking-wide">{time.date}</div>
+              </>
+            ) : (
+              <div className="h-full flex items-center justify-center">
+                <div className="w-1 h-1 bg-slate-600 rounded-full animate-ping"></div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </nav>
   );

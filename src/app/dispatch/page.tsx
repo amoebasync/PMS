@@ -27,6 +27,18 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
   return t && c ? `${t} ${c}` : (c || t); 
 };
 
+// ★ 左側固定用のCSS定義
+const thBase = "px-2 py-2 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_#e2e8f0]";
+const tdBase = "px-2 py-2 border-b border-slate-100 align-top bg-white group-hover:bg-indigo-50/40 transition-colors";
+
+const stickyClasses = {
+  date: { th: `sticky left-0 z-50 w-[100px] min-w-[100px] ${thBase}`, td: `sticky left-0 z-20 w-[100px] min-w-[100px] ${tdBase}` },
+  area: { th: `sticky left-[100px] z-50 w-[150px] min-w-[150px] ${thBase}`, td: `sticky left-[100px] z-20 w-[150px] min-w-[150px] ${tdBase}` },
+  branch: { th: `sticky left-[250px] z-50 w-[90px] min-w-[90px] ${thBase}`, td: `sticky left-[250px] z-20 w-[90px] min-w-[90px] ${tdBase}` },
+  distributor: { th: `sticky left-[340px] z-50 w-[110px] min-w-[110px] ${thBase}`, td: `sticky left-[340px] z-20 w-[110px] min-w-[110px] ${tdBase}` },
+  status: { th: `sticky left-[450px] z-50 w-[80px] min-w-[80px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${thBase}`, td: `sticky left-[450px] z-20 w-[80px] min-w-[80px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${tdBase}` },
+};
+
 export default function DispatchPage() {
   const [schedules, setSchedules] = useState<any[]>([]);
   const [unassignedItems, setUnassignedItems] = useState<any[]>([]);
@@ -81,13 +93,12 @@ export default function DispatchPage() {
       return;
     }
 
-    // ★ 重複チェック：flyerId（完全一致）または flyerCode（存在する場合）で判定
     const targetSchedule = enrichedSchedules.find(s => s.id === targetScheduleId);
     if (targetSchedule) {
       const isDuplicate = targetSchedule.items.some(i => {
-        if (data.type === 'SCHEDULED' && i.id === data.itemId) return false; // 自分自身は除外
-        if (i.flyerId === data.flyerId) return true; // 同じチラシID
-        if (data.flyerCode && i.flyerCode === data.flyerCode) return true; // 同じチラシコード
+        if (data.type === 'SCHEDULED' && i.id === data.itemId) return false; 
+        if (i.flyerId === data.flyerId) return true; 
+        if (data.flyerCode && i.flyerCode === data.flyerCode) return true; 
         return false;
       });
       if (isDuplicate) {
@@ -178,7 +189,6 @@ export default function DispatchPage() {
   const executeMoveFromModal = async () => {
     if (!movingItem || !targetMoveScheduleId) return;
 
-    // ★ モーダル移動時も重複チェック
     const targetSchedule = enrichedSchedules.find(s => s.id === parseInt(targetMoveScheduleId));
     if (targetSchedule) {
       const isDuplicate = targetSchedule.items.some(i => {
@@ -249,9 +259,7 @@ export default function DispatchPage() {
         const isOverEndDate = endTime !== null && scheduleTime > endTime;
         const isOverSpareDate = spareTime !== null && scheduleTime > spareTime;
 
-        // 赤色(エラー)
         const isDanger = isOverCount || isBeforeStart || isOverSpareDate;
-        // 黄色(警告)
         const isWarning = !isDanger && isOverEndDate;
 
         if (isDanger) scheduleHasAlert = true;
@@ -278,12 +286,18 @@ export default function DispatchPage() {
     const fromTime = getMidnightTime(dateFrom) || 0;
     const toTime = getMidnightTime(dateTo) || Number.MAX_SAFE_INTEGER;
 
-    return unassignedItems.filter(oda => {
+    let result = unassignedItems.filter(oda => {
       const od = oda.orderDistribution;
       if (!od) return false;
       const startT = od.startDate ? getMidnightTime(od.startDate) : 0;
       const endT = od.endDate ? getMidnightTime(od.endDate) : Number.MAX_SAFE_INTEGER;
       return (startT! <= toTime && endT! >= fromTime);
+    });
+
+    return result.sort((a, b) => {
+      const endA = getMidnightTime(a.orderDistribution.endDate) || Number.MAX_SAFE_INTEGER;
+      const endB = getMidnightTime(b.orderDistribution.endDate) || Number.MAX_SAFE_INTEGER;
+      return endA - endB;
     });
   }, [unassignedItems, dateFrom, dateTo]);
 
@@ -319,11 +333,12 @@ export default function DispatchPage() {
   };
 
   return (
-    // ★ 修正: LayoutWrapperのPadding (p-8 = 4rem) を考慮し、画面内にピタッと収まる絶対的なサイズを設定
-    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-[calc(100vw-260px-4rem)] overflow-hidden">
+    // ★ 修正: LayoutWrapperの p-6 を考慮し、画面の100%の高さから確実にヘッダー分だけを引いた絶対高さを設定。
+    // 親コンテナに overflow-hidden を設定して全体のスクロールを無効化。
+    <div className="flex flex-col h-[calc(100vh-3rem)] w-full overflow-hidden space-y-4 -mx-2">
       
-      {/* ヘッダー＆フィルタ (固定高) */}
-      <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+      {/* 1. ヘッダー＆フィルタエリア (高さ固定、スクロールなし) */}
+      <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200 mx-2">
         <div className="flex justify-between items-center mb-4">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <i className="bi bi-diagram-3-fill text-indigo-600"></i>ディスパッチ (スケジュール編成)
@@ -366,13 +381,13 @@ export default function DispatchPage() {
         </div>
       </div>
 
-      {/* メインの2ペイン (フレキシブル高・独立スクロール) */}
-      <div className="flex-1 flex gap-4 mt-4 min-h-0 overflow-hidden">
+      {/* 2. メインの2ペイン (残り高さをすべて使い切る、かつ内部でスクロール) */}
+      <div className="flex-1 flex gap-4 min-h-0 overflow-hidden w-full px-2 pb-2">
         
-        {/* 左側: 未手配リスト (固定幅・独立スクロール) */}
-        <div className="w-[300px] shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full">
+        {/* 左側: 未手配リスト (幅を固定、内部でのみ縦スクロール) */}
+        <div className="w-[280px] shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full z-10">
           <div className="flex-none p-3 bg-slate-800 text-white flex justify-between items-center rounded-t-xl">
-            <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> 未手配のエリア一覧</h3>
+            <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> 未手配の依頼</h3>
             <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">{filteredUnassignedItems.length}</span>
           </div>
           
@@ -394,12 +409,12 @@ export default function DispatchPage() {
                      <span className="truncate pr-1">{od.order?.customer?.name || '顧客不明'}</span>
                      <span className="shrink-0 bg-indigo-100 px-1 rounded text-indigo-800">{od.flyer?.size?.name || ''}</span>
                    </div>
-                   <div className="text-xs font-bold text-slate-800 mb-1 line-clamp-1">{od.flyer?.name}</div>
+                   <div className="text-xs font-bold text-slate-800 mb-1 line-clamp-1" title={od.flyer?.name}>{od.flyer?.name}</div>
                    <div className="font-bold text-slate-700 text-[11px] mb-2">{oda.area.city?.name} {formatAreaName(oda.area.town_name, oda.area.chome_name)}</div>
                    
                    <div className="pt-2 border-t border-slate-100 text-[10px] space-y-1">
                      <div className="text-slate-500 font-mono">
-                       {od.startDate ? new Date(od.startDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'} 〜 {od.endDate ? new Date(od.endDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'}
+                       {od.startDate ? new Date(od.startDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'} 〜 <span className="font-bold text-rose-600">{od.endDate ? new Date(od.endDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'}</span>
                      </div>
                      <div className="flex justify-between text-slate-500">
                        <span>全体依頼数:</span><span className="font-bold">{od.plannedCount?.toLocaleString()}枚</span>
@@ -425,7 +440,7 @@ export default function DispatchPage() {
           </div>
         </div>
 
-        {/* 右側: スケジュール一覧 (コンテナが広がらないよう min-w-0 を指定) */}
+        {/* 右側: スケジュール一覧 (内部でのみ横・縦にスクロール) */}
         <div className="flex-1 min-w-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full relative">
           {isLoading && (
             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-xl">
@@ -433,58 +448,61 @@ export default function DispatchPage() {
             </div>
           )}
 
-          {/* ★ テーブルの横スクロール専用領域 */}
-          <div className="flex-1 overflow-auto custom-scrollbar rounded-xl">
-            <table className="text-left text-[11px] whitespace-nowrap border-collapse min-w-[1600px] w-full">
-              <thead className="bg-slate-50 text-slate-600 sticky top-0 z-40 shadow-sm border-b border-slate-200">
+          {/* ★ テーブル表示領域。ここだけがスクロールする */}
+          <div className="flex-1 overflow-auto custom-scrollbar rounded-xl relative">
+            <table className="text-left text-[11px] whitespace-nowrap border-separate border-spacing-0 w-max min-w-full">
+              <thead>
                 <tr>
-                  <th className="px-2 py-2 cursor-pointer hover:bg-slate-100 w-[110px]" onClick={() => handleSort('date')}>日付 {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                  <th className="px-2 py-2 cursor-pointer hover:bg-slate-100 min-w-[130px]" onClick={() => handleSort('areaCode')}>エリア {sortConfig.key === 'areaCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                  <th className="px-2 py-2 cursor-pointer hover:bg-slate-100 w-[100px]" onClick={() => handleSort('branch')}>支店 {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                  <th className="px-2 py-2 w-[120px]">配布員</th>
-                  <th className="px-2 py-2 w-[80px]">状態</th>
+                  <th className={stickyClasses.date.th} onClick={() => handleSort('date')}>日付 {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                  <th className={stickyClasses.area.th} onClick={() => handleSort('areaCode')}>エリア {sortConfig.key === 'areaCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                  <th className={stickyClasses.branch.th} onClick={() => handleSort('branch')}>支店 {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                  <th className={stickyClasses.distributor.th}>配布員</th>
+                  <th className={stickyClasses.status.th}>状態</th>
                   
+                  {/* スクロールするチラシ列 */}
                   {[1, 2, 3, 4, 5, 6].map(num => (
-                    <th key={num} className="px-2 py-2 text-center bg-indigo-50 border-l border-indigo-100 min-w-[170px]">チラシ {num}</th>
+                    <th key={num} className={`z-40 min-w-[180px] text-center bg-indigo-50/50 ${thBase}`}>チラシ {num}</th>
                   ))}
-                  <th className="px-2 py-2 text-center border-l border-slate-100 w-[30px]"><i className="bi bi-trash"></i></th>
+                  <th className={`z-40 w-[30px] text-center ${thBase}`}><i className="bi bi-trash"></i></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody>
                 {processedSchedules.map(schedule => (
-                  <tr key={schedule.id} className="hover:bg-slate-50/50">
-                    <td className="px-2 py-2">
+                  <tr key={schedule.id} className="group cursor-default">
+                    {/* --- 左側固定カラム --- */}
+                    <td className={stickyClasses.date.td}>
                       <input 
                         type="date" 
                         value={new Date(schedule.date).toISOString().split('T')[0]} 
                         onChange={(e) => updateScheduleProp(schedule.id, 'date', e.target.value)}
-                        className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-full text-[11px]"
+                        className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-[90px] text-[10px]"
                       />
                     </td>
-                    <td className="px-2 py-2">
-                      <div className="font-bold text-indigo-700 truncate max-w-[150px]" title={formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}>
+                    <td className={stickyClasses.area.td}>
+                      <div className="font-bold text-indigo-700 truncate" title={formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}>
                         {formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}
                       </div>
                       <div className="text-[9px] text-slate-400">{schedule.area?.prefecture?.name} {schedule.city?.name}</div>
                     </td>
-                    <td className="px-2 py-2">
-                      <select value={schedule.branchId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'branchId', e.target.value)} className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-full text-[11px] truncate">
+                    <td className={stickyClasses.branch.td}>
+                      <select value={schedule.branchId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'branchId', e.target.value)} className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-full text-[10px] truncate cursor-pointer">
                         <option value="">未設定</option>
                         {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
                       </select>
                     </td>
-                    <td className="px-2 py-2">
-                      <select value={schedule.distributorId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'distributorId', e.target.value)} className="border border-slate-200 bg-slate-50 rounded p-1 w-full text-[11px] focus:ring-2 focus:ring-indigo-500 truncate">
+                    <td className={stickyClasses.distributor.td}>
+                      <select value={schedule.distributorId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'distributorId', e.target.value)} className="border border-slate-200 bg-slate-50 rounded p-1 w-full text-[10px] focus:ring-2 focus:ring-indigo-500 truncate cursor-pointer">
                         <option value="">未割当</option>
                         {distributors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                       </select>
                     </td>
-                    <td className="px-2 py-2">
-                      <select value={schedule.status} onChange={(e) => updateScheduleProp(schedule.id, 'status', e.target.value)} className="border-0 bg-transparent font-bold p-1 rounded w-full text-[11px]">
+                    <td className={stickyClasses.status.td}>
+                      <select value={schedule.status} onChange={(e) => updateScheduleProp(schedule.id, 'status', e.target.value)} className="border-0 bg-transparent font-bold p-1 rounded w-full text-[10px] cursor-pointer">
                         <option value="UNSTARTED">未開始</option><option value="IN_PROGRESS">配布中</option><option value="COMPLETED">完了</option>
                       </select>
                     </td>
 
+                    {/* --- スクロールするチラシ枠 --- */}
                     {[1, 2, 3, 4, 5, 6].map(slotIndex => {
                       const item = getFlyerSlot(schedule.items, slotIndex);
                       
@@ -496,14 +514,14 @@ export default function DispatchPage() {
                         if (stat && stat.isOver) {
                           excessCount = stat.totalAssigned - stat.totalPlanned;
                         }
-                        if (item.isDanger) cardClass = 'bg-rose-50 border-rose-400 shadow-md';
-                        else if (item.isWarning) cardClass = 'bg-amber-50 border-amber-400 shadow-md';
+                        if (item.isDanger) cardClass = 'bg-rose-50 border-rose-400 shadow-sm';
+                        else if (item.isWarning) cardClass = 'bg-amber-50 border-amber-400 shadow-sm';
                       }
 
                       return (
                         <td 
                           key={slotIndex} 
-                          className="px-1 py-1 border-l border-slate-100 align-top"
+                          className={tdBase}
                           onDragOver={handleDragOver}
                           onDrop={(e) => handleDrop(e, schedule.id, slotIndex, schedule.areaId)}
                         >
@@ -511,14 +529,13 @@ export default function DispatchPage() {
                             <div 
                               draggable 
                               onDragStart={(e) => handleDragStart(e, { type: 'SCHEDULED', itemId: item.id, areaId: schedule.areaId, scheduleId: schedule.id, slotIndex, flyerId: item.flyerId, flyerCode: item.flyerCode })}
-                              className={`border shadow-sm rounded p-1.5 cursor-move transition-all relative group h-full flex flex-col justify-between ${cardClass}`}
+                              className={`border rounded p-1.5 cursor-move transition-colors relative group/card h-full flex flex-col justify-between ${cardClass}`}
                             >
                               <div>
                                 <div className="font-bold text-slate-800 truncate mb-1 pr-6" title={item.flyerName}>
                                   {item.flyerName}
                                 </div>
 
-                                {/* ★ 修正: アラート理由のテキストをカード内に表示 */}
                                 {(item.isDanger || item.isWarning) && (
                                   <div className={`text-[9px] font-bold mb-1 p-1 rounded border leading-tight ${item.isDanger ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
                                     {item.isDanger && item.alertReasons.map((r:string, i:number) => <div key={i} className="flex items-start"><i className="bi bi-exclamation-triangle-fill mr-1 mt-0.5"></i><span>{r}</span></div>)}
@@ -562,7 +579,7 @@ export default function DispatchPage() {
                                 </button>
                               )}
                               
-                              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-white/95 backdrop-blur rounded px-1 shadow border border-slate-200">
+                              <div className="absolute top-0.5 right-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity flex gap-0.5 bg-white/95 backdrop-blur rounded px-1 shadow border border-slate-200">
                                 <button onClick={() => setMovingItem(item)} className="text-indigo-500 hover:text-indigo-700 p-0.5" title="移動"><i className="bi bi-arrow-left-right"></i></button>
                                 <button onClick={() => removeFlyerFromSchedule(item.id)} className="text-rose-400 hover:text-rose-600 p-0.5" title="枠から外す"><i className="bi bi-x-circle-fill"></i></button>
                               </div>
@@ -576,8 +593,8 @@ export default function DispatchPage() {
                       );
                     })}
 
-                    <td className="px-2 py-2 text-center border-l border-slate-100">
-                      <button onClick={() => deleteSchedule(schedule.id)} className="text-slate-300 hover:text-rose-600 transition-colors"><i className="bi bi-trash text-sm"></i></button>
+                    <td className={`text-center ${tdBase}`}>
+                      <button onClick={() => deleteSchedule(schedule.id)} className="text-slate-300 hover:text-rose-600 transition-colors mt-2"><i className="bi bi-trash text-sm"></i></button>
                     </td>
                   </tr>
                 ))}

@@ -2,16 +2,16 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import { useState } from 'react';
 
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-
-  // ★ここを修正しました★
-  // pathname === '/login' に完全一致する場合のみ true にする
   const isAuthPage = pathname === '/login';
+  
+  // ★ サイドバーの折りたたみ状態を管理するState
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  // --- ログイン画面の場合 ---
-  // サイドバーや余白を一切入れずに全画面表示する
+  // ログイン画面の場合
   if (isAuthPage) {
     return (
       <main className="w-full min-h-screen m-0 p-0 bg-[#0f172a]">
@@ -20,12 +20,16 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     );
   }
 
-  // --- 通常の画面（ダッシュボード、社員管理など）の場合 ---
-  // 今まで通りサイドバーを表示し、メインコンテンツエリアに余白を設ける
+  // 通常の画面の場合
   return (
-    <div className="flex">
-      <Sidebar />
-      <main className="flex-1 ml-[260px] p-8 min-h-screen bg-slate-50">
+    <div className="flex min-h-screen bg-slate-50">
+      {/* Sidebarに状態とトグル関数を渡す */}
+      <Sidebar 
+        isCollapsed={isSidebarCollapsed} 
+        toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+      />
+      {/* サイドバーが折りたたまれている時は左の余白(ml)を 80px に減らす */}
+      <main className={`flex-1 transition-all duration-300 ${isSidebarCollapsed ? 'ml-[80px]' : 'ml-[260px]'} p-8 min-h-screen`}>
         {children}
       </main>
     </div>
