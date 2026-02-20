@@ -12,9 +12,9 @@ const getTodayStr = () => {
 
 const getMidnightTime = (dString: string | Date | null) => {
   if (!dString) return null;
-  const d = new Date(dString);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  const dateStr = typeof dString === 'string' ? dString.split('T')[0] : dString.toISOString().split('T')[0];
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
 };
 
 const formatAreaName = (town?: string | null, chome?: string | null) => {
@@ -81,11 +81,17 @@ export default function DispatchPage() {
       return;
     }
 
+    // ★ 重複チェック：flyerId（完全一致）または flyerCode（存在する場合）で判定
     const targetSchedule = enrichedSchedules.find(s => s.id === targetScheduleId);
-    if (targetSchedule && data.flyerCode) {
-      const isDuplicate = targetSchedule.items.some(i => i.flyerCode === data.flyerCode && i.id !== data.itemId);
+    if (targetSchedule) {
+      const isDuplicate = targetSchedule.items.some(i => {
+        if (data.type === 'SCHEDULED' && i.id === data.itemId) return false; // 自分自身は除外
+        if (i.flyerId === data.flyerId) return true; // 同じチラシID
+        if (data.flyerCode && i.flyerCode === data.flyerCode) return true; // 同じチラシコード
+        return false;
+      });
       if (isDuplicate) {
-        alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
+        alert('エラー: このスケジュールには、すでに同じチラシ（または同一コードのチラシ）が組み込まれています。');
         return;
       }
     }
@@ -172,9 +178,15 @@ export default function DispatchPage() {
   const executeMoveFromModal = async () => {
     if (!movingItem || !targetMoveScheduleId) return;
 
+    // ★ モーダル移動時も重複チェック
     const targetSchedule = enrichedSchedules.find(s => s.id === parseInt(targetMoveScheduleId));
-    if (targetSchedule && movingItem.flyerCode) {
-      const isDuplicate = targetSchedule.items.some(i => i.flyerCode === movingItem.flyerCode && i.id !== movingItem.id);
+    if (targetSchedule) {
+      const isDuplicate = targetSchedule.items.some(i => {
+        if (i.id === movingItem.id) return false;
+        if (i.flyerId === movingItem.flyerId) return true;
+        if (movingItem.flyerCode && i.flyerCode === movingItem.flyerCode) return true;
+        return false;
+      });
       if (isDuplicate) {
         alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
         return;
@@ -221,24 +233,10 @@ export default function DispatchPage() {
     setSortConfig({ key, direction });
   };
 
-  const filteredUnassignedItems = useMemo(() => {
-    const fromTime = getMidnightTime(dateFrom) || 0;
-    const toTime = getMidnightTime(dateTo) || Number.MAX_SAFE_INTEGER;
-
-    return unassignedItems.filter(oda => {
-      const od = oda.orderDistribution;
-      if (!od) return false;
-      const startT = od.startDate ? getMidnightTime(od.startDate) : 0;
-      const endT = od.endDate ? getMidnightTime(od.endDate) : Number.MAX_SAFE_INTEGER;
-      return (startT! <= toTime && endT! >= fromTime);
-    });
-  }, [unassignedItems, dateFrom, dateTo]);
-
-  // ★ 追加: アラート判定と理由付けを精緻化
   const enrichedSchedules = useMemo(() => {
     return schedules.map(s => {
       const scheduleTime = getMidnightTime(s.date) || 0;
-      let scheduleHasAlert = false;
+      let scheduleHasAlert = false; 
       
       const items = s.items.map((item: any) => {
         const startTime = getMidnightTime(item.startDate);
@@ -251,20 +249,19 @@ export default function DispatchPage() {
         const isOverEndDate = endTime !== null && scheduleTime > endTime;
         const isOverSpareDate = spareTime !== null && scheduleTime > spareTime;
 
-        // 重大アラート（赤）
+        // 赤色(エラー)
         const isDanger = isOverCount || isBeforeStart || isOverSpareDate;
-        // 警告アラート（黄）
+        // 黄色(警告)
         const isWarning = !isDanger && isOverEndDate;
 
-        if (isDanger || isWarning) scheduleHasAlert = true;
+        if (isDanger) scheduleHasAlert = true;
 
         let alertReasons = [];
-        if (isOverCount) alertReasons.push("枚数オーバー");
+        if (isOverCount) alertReasons.push("予定枚数超過");
         if (isBeforeStart) alertReasons.push("開始日前");
         if (isOverSpareDate) alertReasons.push("予備期限超過");
-        else if (isOverEndDate) alertReasons.push("配布期限超過");
 
-        return { ...item, isOverCount, isDanger, isWarning, hasAlert: isDanger || isWarning, alertReasons };
+        return { ...item, isOverCount, isDanger, isWarning, hasAlert: isDanger, alertReasons };
       });
 
       return { ...s, items, hasAlert: scheduleHasAlert };
@@ -276,6 +273,19 @@ export default function DispatchPage() {
     enrichedSchedules.forEach(s => { s.items.forEach(i => { if (i.hasAlert) count++; }); });
     return count;
   }, [enrichedSchedules]);
+
+  const filteredUnassignedItems = useMemo(() => {
+    const fromTime = getMidnightTime(dateFrom) || 0;
+    const toTime = getMidnightTime(dateTo) || Number.MAX_SAFE_INTEGER;
+
+    return unassignedItems.filter(oda => {
+      const od = oda.orderDistribution;
+      if (!od) return false;
+      const startT = od.startDate ? getMidnightTime(od.startDate) : 0;
+      const endT = od.endDate ? getMidnightTime(od.endDate) : Number.MAX_SAFE_INTEGER;
+      return (startT! <= toTime && endT! >= fromTime);
+    });
+  }, [unassignedItems, dateFrom, dateTo]);
 
   const processedSchedules = useMemo(() => {
     let result = enrichedSchedules.filter(s => {
@@ -309,8 +319,8 @@ export default function DispatchPage() {
   };
 
   return (
-    // ★ 修正: h-fullと絶対位置のような配置で、親要素からのはみ出し・全体スクロールを完全に防止
-    <div className="flex flex-col h-[calc(100vh-64px)] w-full overflow-hidden bg-slate-50 space-y-4">
+    // ★ 修正: LayoutWrapperのPadding (p-8 = 4rem) を考慮し、画面内にピタッと収まる絶対的なサイズを設定
+    <div className="flex flex-col h-[calc(100vh-4rem)] max-w-[calc(100vw-260px-4rem)] overflow-hidden">
       
       {/* ヘッダー＆フィルタ (固定高) */}
       <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200">
@@ -320,7 +330,7 @@ export default function DispatchPage() {
           </h1>
           <button 
             onClick={() => setShowOnlyAlerts(!showOnlyAlerts)}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm transition-colors border ${showOnlyAlerts ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm transition-colors border ${showOnlyAlerts ? 'bg-rose-100 text-rose-700 border-rose-200 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
           >
             <i className={`bi ${alertCount > 0 ? 'bi-exclamation-triangle-fill text-rose-500' : 'bi-check-circle-fill text-emerald-500'}`}></i>
             アラート対象: {alertCount}件
@@ -356,17 +366,17 @@ export default function DispatchPage() {
         </div>
       </div>
 
-      {/* メインの2ペイン (フレキシブル高・スクロール制御) */}
-      <div className="flex-1 flex gap-4 min-h-0">
+      {/* メインの2ペイン (フレキシブル高・独立スクロール) */}
+      <div className="flex-1 flex gap-4 mt-4 min-h-0 overflow-hidden">
         
-        {/* 左側: 未手配リスト */}
-        <div className="w-[320px] flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full">
+        {/* 左側: 未手配リスト (固定幅・独立スクロール) */}
+        <div className="w-[300px] shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full">
           <div className="flex-none p-3 bg-slate-800 text-white flex justify-between items-center rounded-t-xl">
             <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> 未手配のエリア一覧</h3>
             <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">{filteredUnassignedItems.length}</span>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar bg-slate-50">
             {isLoading ? <div className="text-center text-slate-400 text-sm py-10">読み込み中...</div> :
              filteredUnassignedItems.length === 0 ? <div className="text-center text-slate-400 text-sm py-10">この期間の未手配依頼はありません。</div> :
              filteredUnassignedItems.map(oda => {
@@ -377,7 +387,7 @@ export default function DispatchPage() {
                  <div 
                    key={oda.id} 
                    draggable
-                   onDragStart={(e) => handleDragStart(e, { type: 'UNASSIGNED', odaId: oda.id, areaId: oda.areaId, flyerCode: od.flyer?.flyerCode })}
+                   onDragStart={(e) => handleDragStart(e, { type: 'UNASSIGNED', odaId: oda.id, areaId: oda.areaId, flyerId: od.flyerId, flyerCode: od.flyer?.flyerCode })}
                    className={`p-3 rounded-lg shadow-sm border cursor-move transition-all group relative ${stat?.isOver ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-200 hover:border-indigo-400'}`}
                  >
                    <div className="text-[10px] font-bold text-indigo-600 mb-1 flex justify-between">
@@ -415,16 +425,17 @@ export default function DispatchPage() {
           </div>
         </div>
 
-        {/* 右側: スケジュール一覧 */}
-        <div className="flex-1 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full min-w-0">
+        {/* 右側: スケジュール一覧 (コンテナが広がらないよう min-w-0 を指定) */}
+        <div className="flex-1 min-w-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full relative">
           {isLoading && (
             <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-50 flex items-center justify-center rounded-xl">
               <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
             </div>
           )}
 
+          {/* ★ テーブルの横スクロール専用領域 */}
           <div className="flex-1 overflow-auto custom-scrollbar rounded-xl">
-            <table className="w-full text-left text-[11px] whitespace-nowrap border-collapse min-w-[1600px]">
+            <table className="text-left text-[11px] whitespace-nowrap border-collapse min-w-[1600px] w-full">
               <thead className="bg-slate-50 text-slate-600 sticky top-0 z-40 shadow-sm border-b border-slate-200">
                 <tr>
                   <th className="px-2 py-2 cursor-pointer hover:bg-slate-100 w-[110px]" onClick={() => handleSort('date')}>日付 {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
@@ -434,7 +445,7 @@ export default function DispatchPage() {
                   <th className="px-2 py-2 w-[80px]">状態</th>
                   
                   {[1, 2, 3, 4, 5, 6].map(num => (
-                    <th key={num} className="px-2 py-2 text-center bg-indigo-50 border-l border-indigo-100 min-w-[160px]">チラシ {num}</th>
+                    <th key={num} className="px-2 py-2 text-center bg-indigo-50 border-l border-indigo-100 min-w-[170px]">チラシ {num}</th>
                   ))}
                   <th className="px-2 py-2 text-center border-l border-slate-100 w-[30px]"><i className="bi bi-trash"></i></th>
                 </tr>
@@ -499,7 +510,7 @@ export default function DispatchPage() {
                           {item ? (
                             <div 
                               draggable 
-                              onDragStart={(e) => handleDragStart(e, { type: 'SCHEDULED', itemId: item.id, areaId: schedule.areaId, scheduleId: schedule.id, slotIndex, flyerCode: item.flyerCode })}
+                              onDragStart={(e) => handleDragStart(e, { type: 'SCHEDULED', itemId: item.id, areaId: schedule.areaId, scheduleId: schedule.id, slotIndex, flyerId: item.flyerId, flyerCode: item.flyerCode })}
                               className={`border shadow-sm rounded p-1.5 cursor-move transition-all relative group h-full flex flex-col justify-between ${cardClass}`}
                             >
                               <div>
@@ -507,16 +518,17 @@ export default function DispatchPage() {
                                   {item.flyerName}
                                 </div>
 
-                                {/* ★ アラート理由のテキスト表示 */}
-                                {item.alertReasons && item.alertReasons.length > 0 && (
-                                  <div className={`text-[9px] font-bold mb-1 p-0.5 rounded border leading-tight ${item.isDanger ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                                    {item.alertReasons.map((r:string, i:number) => <div key={i}><i className="bi bi-exclamation-triangle-fill mr-0.5"></i>{r}</div>)}
+                                {/* ★ 修正: アラート理由のテキストをカード内に表示 */}
+                                {(item.isDanger || item.isWarning) && (
+                                  <div className={`text-[9px] font-bold mb-1 p-1 rounded border leading-tight ${item.isDanger ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                                    {item.isDanger && item.alertReasons.map((r:string, i:number) => <div key={i} className="flex items-start"><i className="bi bi-exclamation-triangle-fill mr-1 mt-0.5"></i><span>{r}</span></div>)}
+                                    {item.isWarning && <div className="flex items-start"><i className="bi bi-exclamation-triangle-fill mr-1 mt-0.5"></i><span>配布期限超過</span></div>}
                                   </div>
                                 )}
 
                                 <div className="text-[9px] text-slate-500">
                                   <div className="flex justify-between items-center border-b border-slate-100 pb-0.5 mb-0.5">
-                                    <span className="truncate max-w-[50px]">{item.method}</span>
+                                    <span className="truncate max-w-[60px]">{item.method}</span>
                                     <span className="truncate max-w-[50px] font-bold text-slate-600">{item.flyer?.size?.name || '-'}</span>
                                   </div>
                                   <div className="truncate font-mono">
@@ -550,7 +562,6 @@ export default function DispatchPage() {
                                 </button>
                               )}
                               
-                              {/* ホバー時のボタンは右上に配置（アラート表示と被らない） */}
                               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5 bg-white/95 backdrop-blur rounded px-1 shadow border border-slate-200">
                                 <button onClick={() => setMovingItem(item)} className="text-indigo-500 hover:text-indigo-700 p-0.5" title="移動"><i className="bi bi-arrow-left-right"></i></button>
                                 <button onClick={() => removeFlyerFromSchedule(item.id)} className="text-rose-400 hover:text-rose-600 p-0.5" title="枠から外す"><i className="bi bi-x-circle-fill"></i></button>
