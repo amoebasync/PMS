@@ -10,6 +10,11 @@ export async function GET() {
       include: {
         customer: true,
         salesRep: true,
+        // ★ 追加: 各依頼が紐付いているか判別するためにIDだけ取得しておく
+        distributions: { select: { id: true } },
+        printings: { select: { id: true } },
+        newspaperInserts: { select: { id: true } },
+        designs: { select: { id: true } },
       }
     });
     return NextResponse.json(orders);
