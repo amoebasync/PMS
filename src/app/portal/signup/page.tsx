@@ -22,7 +22,6 @@ export default function SignupPage() {
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // パスワードルールの検証
   const hasUpper = /[A-Z]/.test(form.password);
   const hasLower = /[a-z]/.test(form.password);
   const hasNumOrSym = /[0-9!@#$%^&*(),.?":{}|<>\-_]/.test(form.password);
@@ -59,7 +58,6 @@ export default function SignupPage() {
         throw new Error(data.error);
       }
 
-      // 成功したらそのままログイン
       const signInRes = await signIn('credentials', {
         redirect: false,
         email: form.email,
@@ -87,12 +85,19 @@ export default function SignupPage() {
   );
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 py-12">
+      
+      {/* ★ 追加: トップページへ戻るリンク */}
+      <Link href="/portal" className="mb-6 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-2">
+        <i className="bi bi-arrow-left"></i> トップページへ戻る
+      </Link>
+
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
         
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-[180px] h-[45px] mb-4">
-            <Image src="/logo/logo_dark_transparent.png" alt="Logo" fill className="object-contain" priority />
+            {/* ★ 変更: 白背景用のロゴに変更 */}
+            <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>
           <h1 className="text-xl font-bold text-slate-800">新規アカウント登録</h1>
         </div>
@@ -104,7 +109,6 @@ export default function SignupPage() {
           </div>
         )}
 
-        {/* 個人/法人切り替えタブ */}
         <div className="flex p-1 bg-slate-100 rounded-xl mb-6">
           <button 
             type="button"
@@ -151,7 +155,6 @@ export default function SignupPage() {
             <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">パスワード <span className="text-rose-500">*</span></label>
             <input type="password" required value={form.password} onChange={e => setForm({...form, password: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="••••••••" />
             
-            {/* パスワードルールの視覚的フィードバック */}
             <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-100 grid grid-cols-2 gap-2">
               <RuleIndicator isValid={isLongEnough} text="8文字以上" />
               <RuleIndicator isValid={hasUpper} text="大文字を含む" />

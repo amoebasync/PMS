@@ -77,7 +77,6 @@ const calcCenterAndSize = (feature: any) => {
   } catch(e) { return null; }
 };
 
-// ★ 重複排除用のエリア名フォーマット関数
 const formatAreaName = (town?: string | null, chome?: string | null) => {
   const t = town || '';
   const c = chome || '';
@@ -305,10 +304,21 @@ export default function NewOrderPage() {
     });
   }, []);
 
+  // ★ 変更: 配布方法に基づいたキャパシティ計算ロジック
   const getCapacity = (a: any) => {
-    if (method === '集合住宅限定') return a.multi_family_count;
-    if (method === '戸建限定') return Math.max(0, a.door_to_door_count - a.multi_family_count);
-    return a.posting_cap_with_ng;
+    const doorCount = a.door_to_door_count || 0;
+    const multiCount = a.multi_family_count || 0;
+
+    if (method === '集合住宅限定') {
+      return multiCount;
+    }
+    if (method === '戸建限定') {
+      // (総世帯 - 集合住宅) × 0.5 で計算し、端数は切り捨て
+      return Math.floor(Math.max(0, doorCount - multiCount) * 0.5);
+    }
+    
+    // 軒並み配布
+    return doorCount;
   };
 
   const selectedAreasList = useMemo(() => mapAreas.filter(a => selectedAreaIds.has(a.id)), [mapAreas, selectedAreaIds]);
@@ -414,25 +424,23 @@ export default function NewOrderPage() {
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">2</div>
               <h3 className="font-bold text-slate-800">配布期間を選択</h3>
             </div>
-            
-            {/* ★ 変更: 前々回のように縦にゆったり並べる美しいレイアウトに */}
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block mb-1">開始予定日 <span className="text-rose-500">*</span></label>
-                <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" />
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">開始予定日 <span className="text-rose-500">*</span></label>
+                  <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" />
+                </div>
+                <div className="text-slate-400 pt-4"><i className="bi bi-arrow-right"></i></div>
+                <div className="flex-1">
+                  <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
+                  <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
+                </div>
               </div>
-              
-              <div>
-                <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
-                <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
-              </div>
-              
-              <div className="pt-2 border-t border-slate-200 border-dashed">
+              <div className="pt-3 border-t border-slate-200 border-dashed">
                 <label className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1.5">
                   予備期限
                   <div className="group relative cursor-help flex items-center">
                     <i className="bi bi-question-circle text-slate-400 hover:text-indigo-500 transition-colors"></i>
-                    {/* ★ 変更: ツールチップが画面外に出ないように left-0 と調整 */}
                     <div className="absolute bottom-full left-0 mb-2 w-64 p-3 bg-slate-800 text-white text-[10px] leading-relaxed rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
                       悪天候（台風や大雪など）や不測の事態により、指定期間内に配布が完了できなかった場合の延長許容日です。
                       <div className="absolute top-full left-2 border-4 border-transparent border-t-slate-800"></div>
@@ -456,7 +464,6 @@ export default function NewOrderPage() {
                 <label className="text-[10px] font-bold text-slate-500 block">住所・半径検索</label>
                 <div className="relative">
                   <i className="bi bi-geo-alt absolute left-3 top-2.5 text-slate-400"></i>
-                  {/* ★ 変更: IMEの変換確定時(isComposing)に検索が走らないように修正 */}
                   <input 
                     type="text" 
                     placeholder="例: 渋谷区道玄坂" 
@@ -559,13 +566,11 @@ export default function NewOrderPage() {
                     
                     <div className="overflow-hidden flex-1 mr-2">
                       <div className="text-[10px] text-slate-400 leading-tight mb-0.5">{a.prefecture?.name} {a.city?.name}</div>
-                      {/* ★ 変更: formatAreaName() で「円山町 円山町」などの重複を綺麗に解消 */}
                       <div className="text-xs font-bold text-slate-700 truncate" title={`${a.prefecture?.name} ${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`}>
                         {formatAreaName(a.town_name, a.chome_name)}
                       </div>
                     </div>
                     
-                    {/* ★ 変更: Flexboxで枚数と×ボタンを並べて被りを解消 */}
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right">
                         <div className="text-sm font-black text-indigo-600">{getCapacity(a).toLocaleString()}</div>
