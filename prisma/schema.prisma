@@ -149,10 +149,17 @@ enum CustomerStatus {
   INVALID @map("無効")
 }
 
+// ★ 追加: 顧客タイプ (法人 / 個人)
+enum CustomerType {
+  COMPANY     @map("法人")
+  INDIVIDUAL  @map("個人")
+}
+
 // --- 顧客マスタ (Customers) ---
 model Customer {
   id           Int    @id @default(autoincrement())
   customerCode String @unique @map("customer_code") @db.VarChar(20)
+  customerType CustomerType @default(COMPANY) @map("customer_type")
 
   // 人・組織との紐付け
   salesRepId        Int? @map("sales_rep_id")
@@ -161,7 +168,7 @@ model Customer {
 
   // 基本情報
   name     String @db.VarChar(100)
-  nameKana String @map("name_kana") @db.VarChar(100)
+  nameKana String? @map("name_kana") @db.VarChar(100)
 
   // 請求・インボイス関連
   invoiceRegistrationNumber String? @map("invoice_registration_number") @db.VarChar(14)
@@ -216,7 +223,10 @@ model CustomerContact {
   customerId Int @map("customer_id")
 
   // 担当者個人情報
-  name        String  @db.VarChar(50)
+  lastName      String  @map("last_name") @db.VarChar(50)
+  firstName     String  @map("first_name") @db.VarChar(50)
+  lastNameKana  String? @map("last_name_kana") @db.VarChar(50)
+  firstNameKana String? @map("first_name_kana") @db.VarChar(50)
   department  String? @db.VarChar(50)
   position    String? @db.VarChar(50)
   email       String? @db.VarChar(100)

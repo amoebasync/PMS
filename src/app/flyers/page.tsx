@@ -313,13 +313,13 @@ export default function FlyerPage() {
         </table>
       </div>
 
-      {/* --- QRコード管理モーダル --- */}
+      {/* --- QRコード管理モーダル (UI刷新・インライン編集版) --- */}
       {isQrModalOpen && qrFlyer && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl flex flex-col md:flex-row max-h-[95vh] overflow-hidden">
             
             {/* 左側：新規発行フォーム */}
-            <div className="w-full md:w-[360px] bg-slate-50 p-6 border-r border-slate-200 flex flex-col shrink-0">
+            <div className="w-full md:w-[360px] bg-slate-50 p-6 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="font-bold text-slate-800"><i className="bi bi-qr-code text-indigo-600 mr-2"></i>QRコード発行</h3>
                 <button onClick={() => setIsQrModalOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
@@ -343,7 +343,6 @@ export default function FlyerPage() {
                   <input type="text" value={qrForm.memo} onChange={e => setQrForm({...qrForm, memo: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="表面 右下用 など" />
                 </div>
 
-                {/* メール通知設定 (新規) */}
                 <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg mt-3">
                   <label className="flex items-center gap-2 cursor-pointer mb-2">
                     <input type="checkbox" checked={qrForm.notifyOnScan} onChange={e => setQrForm({...qrForm, notifyOnScan: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
@@ -351,7 +350,7 @@ export default function FlyerPage() {
                   </label>
                   {qrForm.notifyOnScan && (
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">送信先メールアドレス (カンマ区切りで複数可)</label>
+                      <label className="text-[10px] text-slate-500 block mb-1">送信先メールアドレス (複数可)</label>
                       <textarea value={qrForm.notificationEmails} onChange={e => setQrForm({...qrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-xs border border-indigo-200 rounded p-2 outline-none focus:ring-1 focus:ring-indigo-500" placeholder="client@example.com, boss@example.com" />
                     </div>
                   )}
@@ -389,26 +388,16 @@ export default function FlyerPage() {
                     const dlUrlSvg = `/api/qrcodes/download?data=${encodeURIComponent(qrUrl)}&format=svg&transparent=${isTransparent}`;
 
                     return (
-                      <div key={qr.id} className={`flex gap-5 p-5 border rounded-2xl transition-all shadow-sm relative ${qr.isActive ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-200 opacity-75 grayscale-[50%]'}`}>
-                        
-                        {/* 編集・削除アクション */}
-                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => startEditQr(qr)} className="p-1.5 text-slate-400 hover:text-indigo-600 bg-white rounded shadow-sm border border-slate-100" title="編集">
-                            <i className="bi bi-pencil-square"></i>
-                          </button>
-                          <button onClick={() => deleteQrCode(qr.id)} className="p-1.5 text-slate-400 hover:text-rose-600 bg-white rounded shadow-sm border border-slate-100" title="削除">
-                            <i className="bi bi-trash"></i>
-                          </button>
-                        </div>
+                      <div key={qr.id} className={`flex flex-col sm:flex-row gap-5 p-5 border rounded-2xl transition-all shadow-sm ${qr.isActive ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-200 opacity-80 grayscale-[30%]'}`}>
                         
                         {/* 左側: QR画像とダウンロードアクション */}
-                        <div className="shrink-0 flex flex-col items-center w-[120px]">
+                        <div className="shrink-0 flex flex-col items-center w-full sm:w-[130px]">
                           <div className={`p-2 rounded-xl mb-3 ${isTransparent ? 'bg-transparent border border-slate-200' : 'bg-white border border-slate-200 shadow-sm'}`}>
-                            <img src={qrImageSrc} alt="QR Code" className="w-[100px] h-[100px]" style={{ mixBlendMode: isTransparent ? 'multiply' : 'normal' }} />
+                            <img src={qrImageSrc} alt="QR Code" className="w-[100px] h-[100px] object-contain" style={{ mixBlendMode: isTransparent ? 'multiply' : 'normal' }} />
                           </div>
                           
                           <div className="w-full space-y-2">
-                            <label className="flex items-center justify-center gap-1.5 cursor-pointer text-[10px] text-slate-600 hover:text-indigo-600 transition-colors">
+                            <label className="flex items-center justify-center gap-1.5 cursor-pointer text-[10px] text-slate-600 hover:text-indigo-600 transition-colors bg-white border border-slate-200 rounded py-1">
                               <input 
                                 type="checkbox" 
                                 checked={isTransparent} 
@@ -418,107 +407,123 @@ export default function FlyerPage() {
                               背景を透過する
                             </label>
                             
+                            {/* ★ ダウンロードボタンの表示 */}
                             <div className="flex gap-1.5 w-full">
-                              <a href={dlUrlPng} className="flex-1 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 text-[10px] font-bold py-1.5 rounded text-center transition-colors">
-                                PNG
+                              <a href={dlUrlPng} className="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-600 hover:text-white text-[10px] font-bold py-1.5 rounded text-center transition-colors shadow-sm" download={`QR_${qr.alias}.png`}>
+                                <i className="bi bi-download"></i> PNG
                               </a>
-                              <a href={dlUrlSvg} className="flex-1 bg-fuchsia-50 text-fuchsia-700 hover:bg-fuchsia-600 hover:text-white border border-fuchsia-200 text-[10px] font-bold py-1.5 rounded text-center transition-colors">
-                                SVG
+                              <a href={dlUrlSvg} className="flex-1 bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200 hover:bg-fuchsia-600 hover:text-white text-[10px] font-bold py-1.5 rounded text-center transition-colors shadow-sm" download={`QR_${qr.alias}.svg`}>
+                                <i className="bi bi-download"></i> SVG
                               </a>
                             </div>
                           </div>
                         </div>
                         
-                        {/* 右側: 情報と編集フォーム */}
-                        {editingQrId === qr.id ? (
-                          <div className="flex-1 min-w-0 flex flex-col gap-2 z-10 bg-white p-2 rounded border border-indigo-200 shadow-lg absolute inset-0 m-1 overflow-y-auto custom-scrollbar">
-                            <div className="font-bold text-xs text-indigo-700 mb-1 border-b pb-1">QRコード情報の編集</div>
-                            <div>
-                              <label className="text-[9px] text-slate-500 font-bold block mb-0.5">エイリアス (※変更不可)</label>
-                              <div className="text-xs font-mono bg-slate-100 px-2 py-1 rounded border border-slate-200 text-slate-500 cursor-not-allowed truncate">{qr.alias}</div>
+                        {/* 右側: 情報と編集フォーム (インライン展開) */}
+                        <div className="flex-1 min-w-0 flex flex-col">
+                          {editingQrId === qr.id ? (
+                            <div className="flex flex-col gap-3 h-full bg-indigo-50/30 p-4 rounded-xl border border-indigo-100">
+                              <div className="font-bold text-xs text-indigo-700 border-b border-indigo-200 pb-2 mb-1">
+                                <i className="bi bi-pencil-square mr-1"></i>QRコード情報の編集
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-500 font-bold block mb-1">転送先URL</label>
+                                <input type="url" value={editQrForm.redirectUrl} onChange={e => setEditQrForm({...editQrForm, redirectUrl: e.target.value})} className="w-full text-xs border border-indigo-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner bg-white" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] text-slate-500 font-bold block mb-1">メモ</label>
+                                <input type="text" value={editQrForm.memo} onChange={e => setEditQrForm({...editQrForm, memo: e.target.value})} className="w-full text-xs border border-indigo-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner bg-white" />
+                              </div>
+                              
+                              <div className="p-3 bg-white border border-indigo-100 rounded-lg shadow-sm">
+                                <label className="flex items-center gap-2 cursor-pointer mb-1.5">
+                                  <input type="checkbox" checked={editQrForm.notifyOnScan} onChange={e => setEditQrForm({...editQrForm, notifyOnScan: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
+                                  <span className="text-[10px] font-bold text-indigo-900">スキャン時にメール通知する</span>
+                                </label>
+                                {editQrForm.notifyOnScan && (
+                                  <div className="mt-2">
+                                    <label className="text-[9px] text-slate-500 block mb-0.5">送信先メールアドレス</label>
+                                    <textarea value={editQrForm.notificationEmails} onChange={e => setEditQrForm({...editQrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-[10px] border border-indigo-200 rounded p-1.5 outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50" placeholder="client@example.com" />
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex justify-end gap-2 mt-auto pt-3 border-t border-indigo-100">
+                                <button onClick={() => setEditingQrId(null)} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] rounded-lg font-bold hover:bg-slate-50 transition-colors">キャンセル</button>
+                                <button onClick={() => saveEditQr(qr.id)} className="px-4 py-2 bg-indigo-600 text-white text-[10px] rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors">保存する</button>
+                              </div>
                             </div>
-                            <div>
-                              <label className="text-[9px] text-slate-500 font-bold block mb-0.5">転送先URL</label>
-                              <input type="url" value={editQrForm.redirectUrl} onChange={e => setEditQrForm({...editQrForm, redirectUrl: e.target.value})} className="w-full text-xs border border-indigo-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                              <label className="text-[9px] text-slate-500 font-bold block mb-0.5">メモ</label>
-                              <input type="text" value={editQrForm.memo} onChange={e => setEditQrForm({...editQrForm, memo: e.target.value})} className="w-full text-xs border border-indigo-300 rounded p-1.5 outline-none focus:ring-1 focus:ring-indigo-500" />
-                            </div>
-                            
-                            {/* メール通知設定 (編集) */}
-                            <div className="p-2 bg-indigo-50/50 border border-indigo-100 rounded">
-                              <label className="flex items-center gap-2 cursor-pointer mb-1.5">
-                                <input type="checkbox" checked={editQrForm.notifyOnScan} onChange={e => setEditQrForm({...editQrForm, notifyOnScan: e.target.checked})} className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                                <span className="text-[10px] font-bold text-indigo-900">スキャン時にメール通知する</span>
-                              </label>
-                              {editQrForm.notifyOnScan && (
-                                <div>
-                                  <label className="text-[9px] text-slate-500 block mb-0.5">送信先メールアドレス</label>
-                                  <textarea value={editQrForm.notificationEmails} onChange={e => setEditQrForm({...editQrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-[10px] border border-indigo-200 rounded p-1.5 outline-none focus:ring-1 focus:ring-indigo-500" placeholder="client@example.com" />
+                          ) : (
+                            <>
+                              <div className="flex justify-between items-start mb-3 border-b border-slate-100 pb-3">
+                                <button 
+                                  onClick={() => toggleQrActive(qr)}
+                                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors shadow-sm border ${qr.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
+                                >
+                                  <span className={`w-2 h-2 rounded-full ${qr.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                                  {qr.isActive ? '有効 (Active)' : '無効 (Archived)'}
+                                </button>
+                                
+                                {/* ★ 常に表示される見やすいボタン */}
+                                <div className="flex gap-2">
+                                  <button onClick={() => startEditQr(qr)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title="編集">
+                                    <i className="bi bi-pencil-square"></i> 編集
+                                  </button>
+                                  <button onClick={() => deleteQrCode(qr.id)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title="削除">
+                                    <i className="bi bi-trash"></i> 削除
+                                  </button>
+                                </div>
+                              </div>
+
+                              {qr.memo && <div className="text-xs font-bold text-slate-700 mb-3 truncate bg-slate-100 inline-block px-2 py-1 rounded-md border border-slate-200" title={qr.memo}><i className="bi bi-tag-fill text-slate-400 mr-1"></i>{qr.memo}</div>}
+                              
+                              <div className="mb-3">
+                                <div className="text-[10px] text-slate-500 font-bold mb-1">印刷用URL (エイリアス):</div>
+                                <div className="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-lg truncate" title={qrUrl}>
+                                  {qrUrl}
+                                </div>
+                              </div>
+                              
+                              <div className="mb-4">
+                                <div className="text-[10px] text-slate-500 font-bold mb-1">転送先URL:</div>
+                                <a href={qr.redirectUrl} target="_blank" className="text-xs text-blue-600 hover:underline truncate block w-full" title={qr.redirectUrl}>
+                                  <i className="bi bi-link-45deg"></i> {qr.redirectUrl}
+                                </a>
+                              </div>
+
+                              {qr.notifyOnScan && (
+                                <div className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1.5 rounded-md flex items-center gap-1.5 mb-3 self-start truncate max-w-full font-medium">
+                                  <i className="bi bi-envelope-check-fill text-indigo-500"></i> 通知ON ({qr.notificationEmails?.split(',').length || 0}件)
                                 </div>
                               )}
-                            </div>
-
-                            <div className="flex gap-2 mt-auto pt-1">
-                              <button onClick={() => saveEditQr(qr.id)} className="flex-1 bg-indigo-600 text-white text-[10px] px-2 py-1.5 rounded font-bold shadow hover:bg-indigo-700 transition-colors">保存</button>
-                              <button onClick={() => setEditingQrId(null)} className="flex-1 bg-slate-200 text-slate-600 text-[10px] px-2 py-1.5 rounded font-bold hover:bg-slate-300 transition-colors">キャンセル</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex-1 min-w-0 flex flex-col">
-                            {/* 有効・無効トグル */}
-                            <div className="flex justify-between items-start mb-2">
-                              <button 
-                                onClick={() => toggleQrActive(qr)}
-                                className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-bold transition-colors ${qr.isActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
-                              >
-                                <span className={`w-2 h-2 rounded-full ${qr.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                                {qr.isActive ? '有効 (Active)' : '無効 (Archived)'}
-                              </button>
-                            </div>
-
-                            {qr.memo && <div className="text-xs font-bold text-slate-700 mb-2 truncate" title={qr.memo}>{qr.memo}</div>}
-                            
-                            <div className="mb-2">
-                              <div className="text-[9px] text-slate-400 font-bold mb-0.5">印刷用URL (エイリアス):</div>
-                              <div className="font-mono text-xs text-indigo-700 font-bold bg-indigo-50/50 border border-indigo-100 px-2 py-1.5 rounded truncate" title={qrUrl}>
-                                {qrUrl}
-                              </div>
-                            </div>
-                            
-                            <div className="mb-3">
-                              <div className="text-[9px] text-slate-400 font-bold mb-0.5">転送先URL:</div>
-                              <a href={qr.redirectUrl} target="_blank" className="text-[10px] text-blue-500 hover:underline truncate block" title={qr.redirectUrl}>
-                                {qr.redirectUrl}
-                              </a>
-                            </div>
-
-                            {qr.notifyOnScan && (
-                              <div className="text-[9px] text-indigo-600 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded flex items-center gap-1 mb-2 self-start truncate max-w-full">
-                                <i className="bi bi-envelope-check-fill"></i> 通知ON ({qr.notificationEmails?.split(',').length || 0}件)
-                              </div>
-                            )}
-                            
-                            <div className="mt-auto flex items-center justify-between pt-3 border-t border-slate-100">
-                              <div className="text-[10px] text-slate-400">作成: {new Date(qr.createdAt).toLocaleDateString()}</div>
                               
-                              <div className="flex gap-4">
-                                <div className="text-slate-600 font-black flex items-center gap-1.5" title="総スキャン回数 (延べアクセス数)">
-                                  <i className="bi bi-qr-code-scan"></i>
-                                  <span className="text-xl leading-none">{qr._count?.scanLogs || 0}</span>
-                                  <span className="text-[9px] font-bold text-slate-400 uppercase">Total</span>
-                                </div>
+                              <div className="mt-auto flex flex-wrap items-center justify-between pt-4 border-t border-slate-100 gap-4">
+                                <div className="text-[10px] text-slate-400 font-medium">作成: {new Date(qr.createdAt).toLocaleDateString()}</div>
                                 
-                                <div className="text-emerald-600 font-black flex items-center gap-1.5" title="ユニークアクセス数 (読み取った人数)">
-                                  <i className="bi bi-person-check-fill"></i>
-                                  <span className="text-xl leading-none">{qr.uniqueScans || 0}</span>
-                                  <span className="text-[9px] font-bold text-emerald-400 uppercase">Unique</span>
+                                <div className="flex gap-5">
+                                  <div className="flex flex-col items-end" title="総スキャン回数 (延べアクセス数)">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Total Scans</span>
+                                    <div className="text-slate-700 font-black flex items-center gap-1.5">
+                                      <i className="bi bi-qr-code-scan text-slate-400"></i>
+                                      <span className="text-2xl leading-none">{qr._count?.scanLogs || 0}</span>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="w-px h-8 bg-slate-200"></div>
+
+                                  <div className="flex flex-col items-end" title="ユニークアクセス数 (読み取った人数)">
+                                    <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mb-0.5">Unique</span>
+                                    <div className="text-emerald-600 font-black flex items-center gap-1.5">
+                                      <i className="bi bi-person-check-fill text-emerald-400"></i>
+                                      <span className="text-2xl leading-none">{qr.uniqueScans || 0}</span>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
+
                       </div>
                     );
                   })}
