@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
-  // ★ 変更: 発注画面とカート画面を公開パスに追加
+  // ★ 変更: API (/api/locations, /api/areas) を認証不要の公開パスに追加
   const isPublicPath = 
     path === '/login' || 
     path.startsWith('/api/auth') || 
@@ -13,8 +13,10 @@ export function middleware(request: NextRequest) {
     path === '/portal/login' ||
     path === '/portal/signup' ||
     path === '/portal' ||
-    path === '/portal/orders/new' || // 追加: 発注画面
-    path === '/portal/cart';         // 追加: カート画面
+    path === '/portal/orders/new' || 
+    path === '/portal/cart' ||
+    path.startsWith('/api/locations') || // ← 追加: 都道府県マスタ取得用
+    path.startsWith('/api/areas');       // ← 追加: 地図ポリゴン描画用
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;

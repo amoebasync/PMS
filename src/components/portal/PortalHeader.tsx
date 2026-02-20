@@ -35,7 +35,7 @@ export function PortalHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div className="flex items-center gap-8">
           <Link href="/portal" className="relative w-[140px] h-[30px]">
-            <Image src="/logo/logo_dark_transparent.png" alt="Logo" fill className="object-contain" priority />
+            <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </Link>
           
           <nav className="hidden md:flex gap-1">

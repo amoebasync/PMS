@@ -11,6 +11,10 @@ export type CartItem = {
   method: string;
   size: string;
   price: number;
+  // ★ 追加: 配布期間
+  startDate: string;
+  endDate: string;
+  spareDate: string;
 };
 
 type CartContextType = {
@@ -27,7 +31,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // 初回読み込み時にLocalStorageから復元
   useEffect(() => {
     const saved = localStorage.getItem('pms_cart');
     if (saved) {
@@ -36,7 +39,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setIsLoaded(true);
   }, []);
 
-  // itemsが更新されるたびにLocalStorageに保存
   useEffect(() => {
     if (isLoaded) {
       localStorage.setItem('pms_cart', JSON.stringify(items));
