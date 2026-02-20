@@ -27,16 +27,16 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
   return t && c ? `${t} ${c}` : (c || t); 
 };
 
-// ★ 左側固定用のCSS定義
+// ★ 左側固定カラム用のCSS定義
 const thBase = "px-2 py-2 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_#e2e8f0]";
 const tdBase = "px-2 py-2 border-b border-slate-100 align-top bg-white group-hover:bg-indigo-50/40 transition-colors";
 
 const stickyClasses = {
   date: { th: `sticky left-0 z-50 w-[100px] min-w-[100px] ${thBase}`, td: `sticky left-0 z-20 w-[100px] min-w-[100px] ${tdBase}` },
-  area: { th: `sticky left-[100px] z-50 w-[150px] min-w-[150px] ${thBase}`, td: `sticky left-[100px] z-20 w-[150px] min-w-[150px] ${tdBase}` },
-  branch: { th: `sticky left-[250px] z-50 w-[90px] min-w-[90px] ${thBase}`, td: `sticky left-[250px] z-20 w-[90px] min-w-[90px] ${tdBase}` },
-  distributor: { th: `sticky left-[340px] z-50 w-[110px] min-w-[110px] ${thBase}`, td: `sticky left-[340px] z-20 w-[110px] min-w-[110px] ${tdBase}` },
-  status: { th: `sticky left-[450px] z-50 w-[80px] min-w-[80px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${thBase}`, td: `sticky left-[450px] z-20 w-[80px] min-w-[80px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${tdBase}` },
+  area: { th: `sticky left-[100px] z-50 w-[160px] min-w-[160px] ${thBase}`, td: `sticky left-[100px] z-20 w-[160px] min-w-[160px] ${tdBase}` },
+  branch: { th: `sticky left-[260px] z-50 w-[100px] min-w-[100px] ${thBase}`, td: `sticky left-[260px] z-20 w-[100px] min-w-[100px] ${tdBase}` },
+  distributor: { th: `sticky left-[360px] z-50 w-[120px] min-w-[120px] ${thBase}`, td: `sticky left-[360px] z-20 w-[120px] min-w-[120px] ${tdBase}` },
+  status: { th: `sticky left-[480px] z-50 w-[90px] min-w-[90px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${thBase}`, td: `sticky left-[480px] z-20 w-[90px] min-w-[90px] border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] ${tdBase}` },
 };
 
 export default function DispatchPage() {
@@ -79,6 +79,17 @@ export default function DispatchPage() {
 
   useEffect(() => { fetchData(); }, [dateFrom, dateTo]);
 
+  // ★ 追加: 重複チェックの共通関数
+  const isFlyerDuplicate = (targetSchedule: any, dropData: any) => {
+    return targetSchedule.items.some((i: any) => {
+      if (dropData.type === 'SCHEDULED' && i.id === dropData.itemId) return false;
+      if (dropData.flyerId && i.flyerId === dropData.flyerId) return true; // IDでチェック
+      if (dropData.flyerCode && i.flyerCode === dropData.flyerCode) return true; // コードでチェック
+      if (dropData.flyerName && i.flyerName === dropData.flyerName) return true; // 名前でチェック
+      return false;
+    });
+  };
+
   const handleDragStart = (e: React.DragEvent, data: any) => { e.dataTransfer.setData('application/json', JSON.stringify(data)); };
   const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); };
 
@@ -94,17 +105,9 @@ export default function DispatchPage() {
     }
 
     const targetSchedule = enrichedSchedules.find(s => s.id === targetScheduleId);
-    if (targetSchedule) {
-      const isDuplicate = targetSchedule.items.some(i => {
-        if (data.type === 'SCHEDULED' && i.id === data.itemId) return false; 
-        if (i.flyerId === data.flyerId) return true; 
-        if (data.flyerCode && i.flyerCode === data.flyerCode) return true; 
-        return false;
-      });
-      if (isDuplicate) {
-        alert('エラー: このスケジュールには、すでに同じチラシ（または同一コードのチラシ）が組み込まれています。');
-        return;
-      }
+    if (targetSchedule && isFlyerDuplicate(targetSchedule, data)) {
+      alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
+      return;
     }
 
     try {
@@ -190,17 +193,9 @@ export default function DispatchPage() {
     if (!movingItem || !targetMoveScheduleId) return;
 
     const targetSchedule = enrichedSchedules.find(s => s.id === parseInt(targetMoveScheduleId));
-    if (targetSchedule) {
-      const isDuplicate = targetSchedule.items.some(i => {
-        if (i.id === movingItem.id) return false;
-        if (i.flyerId === movingItem.flyerId) return true;
-        if (movingItem.flyerCode && i.flyerCode === movingItem.flyerCode) return true;
-        return false;
-      });
-      if (isDuplicate) {
-        alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
-        return;
-      }
+    if (targetSchedule && isFlyerDuplicate(targetSchedule, { type: 'SCHEDULED', itemId: movingItem.id, flyerId: movingItem.flyerId, flyerCode: movingItem.flyerCode, flyerName: movingItem.flyerName })) {
+      alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
+      return;
     }
 
     try {
@@ -259,7 +254,9 @@ export default function DispatchPage() {
         const isOverEndDate = endTime !== null && scheduleTime > endTime;
         const isOverSpareDate = spareTime !== null && scheduleTime > spareTime;
 
+        // 赤色(エラー)
         const isDanger = isOverCount || isBeforeStart || isOverSpareDate;
+        // 黄色(警告)
         const isWarning = !isDanger && isOverEndDate;
 
         if (isDanger) scheduleHasAlert = true;
@@ -333,16 +330,19 @@ export default function DispatchPage() {
   };
 
   return (
-    // ★ 修正: LayoutWrapperの p-6 を考慮し、画面の100%の高さから確実にヘッダー分だけを引いた絶対高さを設定。
-    // 親コンテナに overflow-hidden を設定して全体のスクロールを無効化。
-    <div className="flex flex-col h-[calc(100vh-3rem)] w-full overflow-hidden space-y-4 -mx-2">
+    // ★ 修正: LayoutWrapperのPadding (p-6 = 48px * 上下 = 96px => 約3rem) を考慮し、絶対的な高さと幅を設定
+    <div 
+      className="flex flex-col w-full gap-4 overflow-hidden" 
+      style={{ height: 'calc(100vh - 3rem)', maxHeight: 'calc(100vh - 3rem)' }}
+    >
       
-      {/* 1. ヘッダー＆フィルタエリア (高さ固定、スクロールなし) */}
-      <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200 mx-2">
-        <div className="flex justify-between items-center mb-4">
+      {/* 1. ヘッダー＆フィルタエリア (固定高、スクロールなし) */}
+      <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center gap-6 mb-4">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
             <i className="bi bi-diagram-3-fill text-indigo-600"></i>ディスパッチ (スケジュール編成)
           </h1>
+          {/* ★ 修正: タイトルのすぐ横に配置し、常に視界に入るようにしました */}
           <button 
             onClick={() => setShowOnlyAlerts(!showOnlyAlerts)}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm transition-colors border ${showOnlyAlerts ? 'bg-rose-100 text-rose-700 border-rose-200 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
@@ -381,11 +381,11 @@ export default function DispatchPage() {
         </div>
       </div>
 
-      {/* 2. メインの2ペイン (残り高さをすべて使い切る、かつ内部でスクロール) */}
-      <div className="flex-1 flex gap-4 min-h-0 overflow-hidden w-full px-2 pb-2">
+      {/* 2. メインの2ペイン (残り高さを使い切る) */}
+      <div className="flex-1 flex gap-4 min-h-0 min-w-0 w-full">
         
-        {/* 左側: 未手配リスト (幅を固定、内部でのみ縦スクロール) */}
-        <div className="w-[280px] shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full z-10">
+        {/* 左側: 未手配リスト (固定幅・独立スクロール) */}
+        <div className="w-[280px] flex-none flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full overflow-hidden">
           <div className="flex-none p-3 bg-slate-800 text-white flex justify-between items-center rounded-t-xl">
             <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> 未手配の依頼</h3>
             <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">{filteredUnassignedItems.length}</span>
@@ -402,7 +402,7 @@ export default function DispatchPage() {
                  <div 
                    key={oda.id} 
                    draggable
-                   onDragStart={(e) => handleDragStart(e, { type: 'UNASSIGNED', odaId: oda.id, areaId: oda.areaId, flyerId: od.flyerId, flyerCode: od.flyer?.flyerCode })}
+                   onDragStart={(e) => handleDragStart(e, { type: 'UNASSIGNED', odaId: oda.id, areaId: oda.areaId, flyerId: od.flyerId, flyerCode: od.flyer?.flyerCode, flyerName: od.flyer?.name })}
                    className={`p-3 rounded-lg shadow-sm border cursor-move transition-all group relative ${stat?.isOver ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-200 hover:border-indigo-400'}`}
                  >
                    <div className="text-[10px] font-bold text-indigo-600 mb-1 flex justify-between">
@@ -424,12 +424,13 @@ export default function DispatchPage() {
                      </div>
                    </div>
                    
+                   {/* 常に表示される「枠を作る」ボタン */}
                    <button 
                      onClick={() => handleCreateScheduleFromUnassigned(oda.id, od.endDate)}
-                     className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-[10px] bg-indigo-50 text-indigo-600 px-2 py-1 rounded font-bold hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-200 shadow-sm"
+                     className="mt-2 w-full text-[10px] bg-indigo-50 text-indigo-600 py-1.5 rounded font-bold hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-200 shadow-sm flex items-center justify-center gap-1"
                      title="このチラシの完了期限日でスケジュールを作成します"
                    >
-                     <i className="bi bi-box-arrow-in-right"></i> 枠を作る
+                     <i className="bi bi-calendar-plus"></i> この期限日で枠を作成
                    </button>
                  </div>
                )
@@ -449,7 +450,7 @@ export default function DispatchPage() {
           )}
 
           {/* ★ テーブル表示領域。ここだけがスクロールする */}
-          <div className="flex-1 overflow-auto custom-scrollbar rounded-xl relative">
+          <div className="flex-1 min-h-0 overflow-auto custom-scrollbar rounded-xl relative">
             <table className="text-left text-[11px] whitespace-nowrap border-separate border-spacing-0 w-max min-w-full">
               <thead>
                 <tr>
@@ -528,7 +529,7 @@ export default function DispatchPage() {
                           {item ? (
                             <div 
                               draggable 
-                              onDragStart={(e) => handleDragStart(e, { type: 'SCHEDULED', itemId: item.id, areaId: schedule.areaId, scheduleId: schedule.id, slotIndex, flyerId: item.flyerId, flyerCode: item.flyerCode })}
+                              onDragStart={(e) => handleDragStart(e, { type: 'SCHEDULED', itemId: item.id, areaId: schedule.areaId, scheduleId: schedule.id, slotIndex, flyerId: item.flyerId, flyerCode: item.flyerCode, flyerName: item.flyerName })}
                               className={`border rounded p-1.5 cursor-move transition-colors relative group/card h-full flex flex-col justify-between ${cardClass}`}
                             >
                               <div>
@@ -536,6 +537,7 @@ export default function DispatchPage() {
                                   {item.flyerName}
                                 </div>
 
+                                {/* ★ アラート理由のテキストをカード内に表示 */}
                                 {(item.isDanger || item.isWarning) && (
                                   <div className={`text-[9px] font-bold mb-1 p-1 rounded border leading-tight ${item.isDanger ? 'bg-rose-100 text-rose-700 border-rose-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
                                     {item.isDanger && item.alertReasons.map((r:string, i:number) => <div key={i} className="flex items-start"><i className="bi bi-exclamation-triangle-fill mr-1 mt-0.5"></i><span>{r}</span></div>)}
