@@ -20,10 +20,7 @@ export async function POST(request: Request) {
     // 2. データベースから社員を検索 (社員コード or メールアドレス どちらでもログイン可)
     const employee = await prisma.employee.findFirst({
       where: {
-        OR: [
-          { employeeCode: accountId },
-          { email: accountId }
-        ],
+        email: accountId,   // ★ OR検索をやめ、emailのみで検索するように変更
         passwordHash: hash, // ハッシュ化したパスワードが一致するか
         isActive: true      // 退職済(false)のアカウントは弾く
       }

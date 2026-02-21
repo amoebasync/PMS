@@ -18,8 +18,11 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // ユーザーメニュー開閉用
   const [time, setTime] = useState({ clock: '00:00:00', date: '----/--/--' });
   
-  // ★ 追加: 承認待ち件数のState
+  // 承認待ち件数のState
   const [pendingCount, setPendingCount] = useState(0); 
+
+  // ★ 追加: ログインユーザーのプロフィール情報を保持するState
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -35,10 +38,18 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
     updateTime(); 
     const timer = setInterval(updateTime, 1000);
 
-    // ★ 追加: 承認待ち件数の取得 (画面遷移のたびに最新を取得)
+    // 承認待ち件数の取得
     fetch('/api/orders/pending-count')
       .then(r => r.json())
       .then(d => setPendingCount(d.count || 0))
+      .catch(() => {});
+
+    // ★ 追加: ログインユーザー情報の取得
+    fetch('/api/profile')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data) setUserProfile(data);
+      })
       .catch(() => {});
 
     return () => clearInterval(timer);
@@ -61,6 +72,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       title: 'WORKFLOW',
       items: [
         { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' }, 
+        { name: 'マイ勤怠・経費', href: '/attendance', icon: 'bi-clock-history' },
         { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' }, 
         { name: 'スケジュール照会', href: '/schedules', icon: 'bi-calendar-check' },
         { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' }, 
@@ -137,13 +149,13 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
                     <i className={`${item.icon} text-lg ${!isCollapsed && 'mr-3'} ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'}`}></i>
                     {!isCollapsed && <span className="font-medium tracking-wide text-sm whitespace-nowrap">{item.name}</span>}
                     
-                    {/* ★ バッジ表示 (開いている時) */}
+                    {/* バッジ表示 (開いている時) */}
                     {!isCollapsed && item.href === '/orders' && pendingCount > 0 && (
                       <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
                         {pendingCount}
                       </span>
                     )}
-                    {/* ★ バッジ表示 (閉じている時) */}
+                    {/* バッジ表示 (閉じている時) */}
                     {isCollapsed && item.href === '/orders' && pendingCount > 0 && (
                       <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-[#0f172a]"></div>
                     )}
@@ -172,17 +184,29 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
           </div>
         )}
 
+        {/* ★ 変更: ユーザー情報表示部分 */}
         <button 
           onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} 
           className={`w-full flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} text-left hover:bg-white/5 p-2 rounded-lg transition-colors`}
         >
-          <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
-            <i className="bi bi-person-fill text-white text-lg"></i>
-          </div>
+          {userProfile?.avatarUrl ? (
+            <div className="w-10 h-10 shrink-0 rounded-lg overflow-hidden shadow-lg border border-slate-600">
+              <img src={userProfile.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+            </div>
+          ) : (
+            <div className="w-10 h-10 shrink-0 bg-gradient-to-br from-blue-500 to-blue-700 rounded-lg flex items-center justify-center shadow-lg">
+              <i className="bi bi-person-fill text-white text-lg"></i>
+            </div>
+          )}
+
           {!isCollapsed && (
             <div className="flex-1 overflow-hidden">
-              <div className="font-bold text-white text-sm truncate">管理者ユーザー</div>
-              <div className="text-[10px] text-blue-300 uppercase tracking-wider font-semibold">Administrator</div>
+              <div className="font-bold text-white text-sm truncate">
+                {userProfile ? `${userProfile.lastNameJa} ${userProfile.firstNameJa}` : '読み込み中...'}
+              </div>
+              <div className="text-[10px] text-blue-300 uppercase tracking-wider font-semibold truncate">
+                {userProfile?.role?.name || 'ADMINISTRATOR'}
+              </div>
             </div>
           )}
         </button>

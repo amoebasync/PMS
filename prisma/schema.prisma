@@ -109,6 +109,8 @@ model Employee {
 
   // ============================
 
+  avatarUrl      String?       @map("avatar_url") @db.Text
+
   isActive       Boolean   @default(true) @map("is_active")
   joinedAt       DateTime? @map("joined_at") @db.Date
   leftAt         DateTime? @map("left_at") @db.Date
@@ -124,6 +126,9 @@ model Employee {
   flyerTransactions  FlyerTransaction[]
   financial          EmployeeFinancial?
   employmentType EmploymentType @default(FULL_TIME) @map("employment_type")
+  attendances        Attendance[]
+  expenses           Expense[]
+  approvedExpenses   Expense[]    @relation("ExpenseApprover") // 自分が承認した経費
 
   // ★ 支店のマネージャーとしての逆参照 (エラー解消のキモ)
   managedBranches1   Branch[] @relation("BranchManager1")
@@ -195,6 +200,10 @@ model EmployeeFinancial {
   baseSalary        Int?                  @map("base_salary")        // 月給
   hourlyRate        Int?                  @map("hourly_rate")        // 時給
   dailyRate         Int?                  @map("daily_rate")         // 日給
+
+  defaultStartTime  String?               @default("09:00") @map("default_start_time") @db.VarChar(5)
+  defaultEndTime    String?               @default("18:00") @map("default_end_time") @db.VarChar(5)
+  defaultBreakMins  Int?                  @default(60) @map("default_break_mins")
 
   paymentMethod     EmployeePaymentMethod @default(BANK_TRANSFER) @map("payment_method")
   paymentCycle      PaymentCycle          @default(MONTHLY) @map("payment_cycle")
@@ -1018,4 +1027,82 @@ model Payment {
   updatedAt       DateTime      @updatedAt @map("updated_at")
 
   @@map("payments")
+}
+
+// ==========================================
+// 勤怠・経費関連 Enum
+// ==========================================
+
+enum AttendanceStatus {
+  PENDING   @map("承認待ち")
+  APPROVED  @map("承認済")
+  REJECTED  @map("却下")
+}
+
+enum ExpenseType {
+  TRANSPORTATION @map("交通費")
+  OTHER          @map("その他経費")
+}
+
+enum ExpenseStatus {
+  PENDING   @map("承認待ち")
+  APPROVED  @map("承認済")
+  REJECTED  @map("却下")
+}
+
+// ==========================================
+// 勤怠管理テーブル
+// ==========================================
+model Attendance {
+  id             Int              @id @default(autoincrement())
+  
+  employeeId     Int              @map("employee_id")
+  employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date           DateTime         @db.Date // 勤務日
+  
+  startTime      String           @map("start_time") @db.VarChar(5) // 例: "09:00"
+  endTime        String           @map("end_time") @db.VarChar(5)   // 例: "18:00"
+  breakMinutes   Int              @default(60) @map("break_minutes") // 休憩時間(分)
+  
+  workHours      Float            @map("work_hours") // 実労働時間（時間単位, 例: 8.0）
+  calculatedWage Int?             @map("calculated_wage") // この日の給与（時給 * 実労働時間）
+  
+  note           String?          @db.Text
+  status         AttendanceStatus @default(PENDING)
+
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  @@unique([employeeId, date]) // ★ 同じ日に2重で打刻できないようにする制約
+  @@map("attendances")
+}
+
+// ==========================================
+// 経費精算テーブル
+// ==========================================
+model Expense {
+  id             Int           @id @default(autoincrement())
+  
+  employeeId     Int           @map("employee_id")
+  employee       Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date           DateTime      @db.Date // 発生日
+  type           ExpenseType   // 交通費 or その他
+  amount         Int           // 金額
+  description    String        @db.Text // 経路や目的（例: 新宿〜東京 往復など）
+  receiptUrl     String?       @map("receipt_url") @db.Text // 領収書の画像URL（任意）
+  
+  status         ExpenseStatus @default(PENDING)
+  
+  // ★ 承認者に関する情報
+  approverId     Int?          @map("approver_id")
+  approver       Employee?     @relation("ExpenseApprover", fields: [approverId], references: [id])
+  approvedAt     DateTime?     @map("approved_at")
+  rejectionReason String?      @map("rejection_reason") @db.Text // 却下時の理由
+  
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  @@map("expenses")
 }
