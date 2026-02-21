@@ -11,11 +11,9 @@ export async function GET(request: Request) {
     if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const empId = parseInt(sessionId);
 
-    // ★ オフセット（何週/何ヶ月 前・後か）を取得
     const { searchParams } = new URL(request.url);
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    // 社員の給与形態とデフォルト勤務時間を取得
     const emp = await prisma.employee.findUnique({ where: { id: empId }, include: { financial: true } });
     const salaryType = emp?.financial?.salaryType || 'MONTHLY';
 
@@ -23,16 +21,13 @@ export async function GET(request: Request) {
     let endDate = new Date();
     let isPast = false;
 
-    // 給与形態に応じた期間の計算
     if (salaryType === 'MONTHLY') {
-      // 月給の場合：月単位でスライド
       startDate.setMonth(startDate.getMonth() + offset, 1);
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
-      isPast = offset < 0; // 過去月かどうか
+      isPast = offset < 0; 
     } else {
-      // 日給・週給の場合：週単位(日曜始まり)でスライド
       const dayOfWeek = startDate.getDay();
       startDate.setDate(startDate.getDate() - dayOfWeek + (offset * 7));
       startDate.setHours(0, 0, 0, 0);
@@ -62,6 +57,8 @@ export async function GET(request: Request) {
       records,
       totalHours,
       totalWage,
+      employmentType: emp?.employmentType || 'FULL_TIME',      // ★ 追加: 正社員かどうかの判定用
+      paidLeaveBalance: emp?.financial?.paidLeaveBalance || 0, // ★ 追加: 有給残日数
       defaults: {
         startTime: emp?.financial?.defaultStartTime || '09:00',
         endTime: emp?.financial?.defaultEndTime || '18:00',

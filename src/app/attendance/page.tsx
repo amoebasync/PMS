@@ -8,25 +8,23 @@ export default function AttendancePage() {
 
   // --- 勤怠用State ---
   const [attendances, setAttendances] = useState<any[]>([]);
+  const [attendanceTypes, setAttendanceTypes] = useState<any[]>([]); // ★ マスタデータ
   const [summary, setSummary] = useState<any>(null);
-  const [summaryOffset, setSummaryOffset] = useState(0); // 0:今週/今月, -1:先週/先月...
+  const [summaryOffset, setSummaryOffset] = useState(0); 
   
   const [attendanceForm, setAttendanceForm] = useState({
     date: new Date().toLocaleDateString('sv-SE'),
+    attendanceTypeId: '', // ★ マスタのIDをセット
     startTime: '09:00',
     endTime: '18:00',
     breakMinutes: 60,
     note: '',
-    saveAsDefault: false // ★ デフォルト保存フラグ
+    saveAsDefault: false
   });
 
-  // --- 経費用State ---
   const [expenses, setExpenses] = useState<any[]>([]);
   const [expenseForm, setExpenseForm] = useState({
-    date: new Date().toLocaleDateString('sv-SE'),
-    type: 'TRANSPORTATION',
-    amount: '',
-    description: ''
+    date: new Date().toLocaleDateString('sv-SE'), type: 'TRANSPORTATION', amount: '', description: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,25 +32,34 @@ export default function AttendancePage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [attRes, sumRes, expRes] = await Promise.all([
+      const [attRes, sumRes, expRes, typesRes] = await Promise.all([
         fetch('/api/attendance'),
-        fetch(`/api/attendance/summary?offset=${summaryOffset}`), // ★ オフセット付き
-        fetch('/api/expenses')
+        fetch(`/api/attendance/summary?offset=${summaryOffset}`),
+        fetch('/api/expenses'),
+        fetch('/api/attendance/types') // ★ マスタ取得
       ]);
       
       if (attRes.ok) setAttendances(await attRes.json());
       if (expRes.ok) setExpenses(await expRes.json());
       
+      let defaultTypeId = '';
+      if (typesRes.ok) {
+        const types = await typesRes.json();
+        setAttendanceTypes(types);
+        const workType = types.find((t: any) => t.code === 'WORK');
+        if (workType) defaultTypeId = workType.id.toString();
+      }
+
       if (sumRes.ok) {
         const sumData = await sumRes.json();
         setSummary(sumData);
-        // 初回ロード時のみ、フォームにデフォルト時間をセット
-        if (summaryOffset === 0 && attendanceForm.startTime === '09:00' && sumData.defaults) {
+        if (summaryOffset === 0) {
           setAttendanceForm(prev => ({
             ...prev,
-            startTime: sumData.defaults.startTime,
-            endTime: sumData.defaults.endTime,
-            breakMinutes: sumData.defaults.breakMinutes
+            attendanceTypeId: defaultTypeId,
+            startTime: sumData.defaults?.startTime || '09:00',
+            endTime: sumData.defaults?.endTime || '18:00',
+            breakMinutes: sumData.defaults?.breakMinutes ?? 60
           }));
         }
       }
@@ -62,7 +69,6 @@ export default function AttendancePage() {
 
   useEffect(() => { fetchData(); }, [summaryOffset]);
 
-  // ★ 打刻処理（新規＆編集 共通）
   const handleAttendanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -74,18 +80,20 @@ export default function AttendancePage() {
       });
       if (res.ok) {
         alert('勤怠を記録しました！');
-        setAttendanceForm(prev => ({ ...prev, note: '', saveAsDefault: false }));
+        // 登録後はデフォルト(WORK)に戻す
+        const workType = attendanceTypes.find((t: any) => t.code === 'WORK');
+        setAttendanceForm(prev => ({ ...prev, note: '', saveAsDefault: false, attendanceTypeId: workType?.id?.toString() || '' }));
         fetchData();
       } else {
-        alert('打刻に失敗しました');
+        const data = await res.json();
+        alert(`打刻エラー: ${data.error || '失敗しました'}`);
       }
     } catch (err) { alert('通信エラーが発生しました'); }
     setIsSubmitting(false);
   };
 
-  // ★ 追加: 申請の取り下げ（削除）
   const handleDeleteAttendance = async (dateStr: string) => {
-    if (!confirm(`${new Date(dateStr).toLocaleDateString()} の申請を取り下げますか？`)) return;
+    if (!confirm(`${new Date(dateStr).toLocaleDateString()} の申請を取り下げますか？\n（※有給休暇の場合は残日数が返還されます）`)) return;
     try {
       const res = await fetch(`/api/attendance?date=${dateStr.split('T')[0]}`, { method: 'DELETE' });
       if (res.ok) {
@@ -97,46 +105,50 @@ export default function AttendancePage() {
     } catch (e) { alert('エラーが発生しました。'); }
   };
 
-  // ★ 追加: 編集ボタンを押した時（フォームにセット）
   const handleEditAttendance = (att: any) => {
     setAttendanceForm({
       date: att.date.split('T')[0],
-      startTime: att.startTime,
-      endTime: att.endTime,
-      breakMinutes: att.breakMinutes,
+      attendanceTypeId: att.attendanceTypeId.toString(),
+      startTime: att.startTime || '09:00',
+      endTime: att.endTime || '18:00',
+      breakMinutes: att.breakMinutes || 60,
       note: att.note || '',
       saveAsDefault: false
     });
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // フォームまでスクロール
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // 経費の申請処理
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/expenses', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(expenseForm)
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(expenseForm)
       });
       if (res.ok) {
         alert('経費を申請しました！');
         setExpenseForm(prev => ({ ...prev, amount: '', description: '' }));
         fetchData();
-      } else {
-        alert('申請に失敗しました');
-      }
+      } else { alert('申請に失敗しました'); }
     } catch (err) { alert('通信エラーが発生しました'); }
     setIsSubmitting(false);
   };
 
-  // ★ サマリーの動的タイトル生成
   const getSummaryTitle = () => {
     if (!summary) return '給与見込み';
     const period = summary.salaryType === 'MONTHLY' ? '月給' : '週給';
     return summary.isPast ? `${period} 支給額` : `今${period === '月給' ? '月' : '週'}の${period}見込み`;
   };
+
+  // 選択されている勤怠マスタの詳細を取得
+  const selectedType = attendanceTypes.find(t => t.id.toString() === attendanceForm.attendanceTypeId);
+  const isWorking = selectedType?.isWorking || false;
+
+  // フルタイムかどうかでプルダウンの選択肢をフィルタリング
+  const availableTypes = attendanceTypes.filter(t => {
+    if (summary?.employmentType === 'FULL_TIME') return true; 
+    return t.code === 'WORK' || t.code === 'ABSENCE'; // フルタイム以外は出勤と欠勤のみ
+  });
 
   if (isLoading && !summary) return <div className="p-10 text-center text-slate-500">読み込み中...</div>;
 
@@ -148,7 +160,7 @@ export default function AttendancePage() {
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
             <i className="bi bi-clock-history text-indigo-600"></i> マイ勤怠・経費
           </h1>
-          <p className="text-slate-500 text-sm mt-1">日々の打刻、給与の確認、経費の申請を行います。</p>
+          <p className="text-slate-500 text-sm mt-1">日々の打刻、給与・有給の確認、経費の申請を行います。</p>
         </div>
       </div>
 
@@ -162,85 +174,97 @@ export default function AttendancePage() {
           
           <div className="space-y-6">
             
-            {/* ★ 改修: サマリーカード (はみ出し防止・コンパクトUI) */}
+            {/* サマリーカード */}
             <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between">
-              
-              {/* タイトルと日付コントローラーを「上下」に配置してスッキリさせる */}
               <div className="flex flex-col gap-3 mb-4 border-b border-white/20 pb-4">
                 <h3 className="font-bold text-lg leading-none mt-1">
                   <i className="bi bi-wallet2 mr-2"></i> {getSummaryTitle()}
                 </h3>
-                
-                {/* スライドコントローラー (カードの幅いっぱいに広げてボタンを両端に配置) */}
                 <div className="flex items-center justify-between bg-black/20 p-1.5 rounded-lg w-full shadow-inner">
-                  <button onClick={() => setSummaryOffset(o => o - 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0">
-                    <i className="bi bi-chevron-left text-xs"></i>
-                  </button>
+                  <button onClick={() => setSummaryOffset(o => o - 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-left text-xs"></i></button>
                   <span className="text-[11px] font-mono tracking-tighter sm:tracking-normal px-2 truncate text-indigo-50 font-semibold">
                     {summary?.startDate?.replace(/-/g, '/')} ~ {summary?.endDate?.replace(/-/g, '/')}
                   </span>
-                  <button onClick={() => setSummaryOffset(o => o + 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0">
-                    <i className="bi bi-chevron-right text-xs"></i>
-                  </button>
+                  <button onClick={() => setSummaryOffset(o => o + 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-right text-xs"></i></button>
                 </div>
               </div>
-
               <div className="mb-4">
                 <div className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">合計金額</div>
-                <div className="text-4xl font-black font-mono mt-1 drop-shadow-sm">
-                  ¥{summary?.totalWage?.toLocaleString() || 0}
-                </div>
+                <div className="text-4xl font-black font-mono mt-1 drop-shadow-sm">¥{summary?.totalWage?.toLocaleString() || 0}</div>
               </div>
-              <div className="flex justify-between text-sm bg-black/20 p-3 rounded-xl shadow-inner">
-                <div>
-                  <span className="text-indigo-200 text-xs">実労働時間</span> <br/>
-                  <span className="font-bold">{summary?.totalHours || 0} h</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-indigo-200 text-xs">出勤日数</span> <br/>
-                  <span className="font-bold">{summary?.records?.length || 0} 日</span>
-                </div>
+              
+              <div className="flex justify-between text-sm bg-black/20 p-3 rounded-xl shadow-inner mb-3">
+                <div><span className="text-indigo-200 text-xs">実労働時間</span> <br/><span className="font-bold">{summary?.totalHours || 0} h</span></div>
+                <div className="text-right"><span className="text-indigo-200 text-xs">出勤日数</span> <br/><span className="font-bold">{summary?.records?.length || 0} 日</span></div>
               </div>
+
+              {/* ★ 追加: 正社員の場合のみ有給残日数を表示 */}
+              {summary?.employmentType === 'FULL_TIME' && (
+                <div className="bg-white/20 rounded-xl p-3 flex justify-between items-center text-sm shadow-sm border border-white/10 backdrop-blur-sm">
+                  <span className="font-bold text-indigo-50"><i className="bi bi-cup-hot-fill mr-1"></i> 有給残日数</span>
+                  <span className="font-black text-xl">{summary?.paidLeaveBalance || 0} <span className="text-xs font-medium">日</span></span>
+                </div>
+              )}
             </div>
 
             {/* 打刻フォーム */}
-            <form onSubmit={handleAttendanceSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-              <h3 className="font-bold text-slate-800 border-b pb-2"><i className="bi bi-pencil-square mr-2 text-indigo-600"></i> 打刻・勤怠入力</h3>
+            <form onSubmit={handleAttendanceSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+              <h3 className="font-bold text-slate-800 border-b pb-2 flex items-center gap-2"><i className="bi bi-pencil-square text-indigo-600"></i> 打刻・勤怠入力</h3>
               
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">勤務日</label>
                 <input type="date" required value={attendanceForm.date} onChange={e => setAttendanceForm({...attendanceForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">出勤時間</label>
-                  <input type="time" required value={attendanceForm.startTime} onChange={e => setAttendanceForm({...attendanceForm, startTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">退勤時間</label>
-                  <input type="time" required value={attendanceForm.endTime} onChange={e => setAttendanceForm({...attendanceForm, endTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">勤怠の種類</label>
+                <select required value={attendanceForm.attendanceTypeId} onChange={e => setAttendanceForm({...attendanceForm, attendanceTypeId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
+                  <option value="">選択してください</option>
+                  {availableTypes.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+                {selectedType?.isDeducting && <p className="text-[10px] text-emerald-600 mt-1 font-bold">※ 有給休暇を1日分消化します。</p>}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">休憩時間 (分)</label>
-                <input type="number" required min="0" value={attendanceForm.breakMinutes} onChange={e => setAttendanceForm({...attendanceForm, breakMinutes: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-              </div>
+              {/* 出勤の時だけ時間を入力させる */}
+              {isWorking ? (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">出勤時間</label>
+                      <input type="time" required value={attendanceForm.startTime} onChange={e => setAttendanceForm({...attendanceForm, startTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">退勤時間</label>
+                      <input type="time" required value={attendanceForm.endTime} onChange={e => setAttendanceForm({...attendanceForm, endTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">休憩時間 (分)</label>
+                    <input type="number" required min="0" value={attendanceForm.breakMinutes} onChange={e => setAttendanceForm({...attendanceForm, breakMinutes: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                  </div>
+                </>
+              ) : (
+                <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 text-center border border-dashed border-slate-200">
+                  <i className="bi bi-info-circle mr-1"></i> 休暇のため時間の入力は不要です
+                </div>
+              )}
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">備考 (遅刻・早退理由など)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">備考 (遅刻・早退・休暇理由など)</label>
                 <textarea rows={2} value={attendanceForm.note} onChange={e => setAttendanceForm({...attendanceForm, note: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
               </div>
 
-              {/* ★ 追加: デフォルト設定のチェックボックス */}
-              <label className="flex items-center gap-2 cursor-pointer mt-2 bg-slate-50 p-2 rounded-lg border border-slate-100">
-                <input type="checkbox" checked={attendanceForm.saveAsDefault} onChange={e => setAttendanceForm({...attendanceForm, saveAsDefault: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
-                <span className="text-[11px] font-bold text-slate-600">この時間をデフォルト(テンプレート)として保存する</span>
-              </label>
+              {isWorking && (
+                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded-lg border border-slate-100">
+                  <input type="checkbox" checked={attendanceForm.saveAsDefault} onChange={e => setAttendanceForm({...attendanceForm, saveAsDefault: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                  <span className="text-[11px] font-bold text-slate-600">この時間をデフォルト(テンプレート)として保存する</span>
+                </label>
+              )}
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 mt-2">
-                {isSubmitting ? '保存中...' : '勤怠を記録する'}
+              <button type="submit" disabled={isSubmitting || !attendanceForm.attendanceTypeId} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 mt-2">
+                {isSubmitting ? '保存中...' : '記録を送信する'}
               </button>
             </form>
           </div>
@@ -254,9 +278,9 @@ export default function AttendancePage() {
                 <thead>
                   <tr className="text-slate-500 border-b border-slate-200">
                     <th className="pb-3 font-bold">日付</th>
-                    <th className="pb-3 font-bold">時間</th>
+                    <th className="pb-3 font-bold">内容</th>
                     <th className="pb-3 font-bold text-center">実働</th>
-                    <th className="pb-3 font-bold text-right">日給</th>
+                    <th className="pb-3 font-bold text-right">日給(計算)</th>
                     <th className="pb-3 font-bold text-center">状態</th>
                     <th className="pb-3 font-bold text-center">操作</th>
                   </tr>
@@ -266,10 +290,18 @@ export default function AttendancePage() {
                     <tr><td colSpan={6} className="py-8 text-center text-slate-400">履歴がありません</td></tr>
                   )}
                   {attendances.map((att: any) => (
-                    <tr key={att.id} className="hover:bg-slate-50 transition-colors group">
-                      <td className="py-3 font-mono font-bold text-slate-700">{new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}</td>
-                      <td className="py-3 text-[11px] sm:text-sm">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}分休)</span></td>
-                      <td className="py-3 font-bold text-center">{att.workHours}h</td>
+                    <tr key={att.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="py-3 font-mono font-bold text-slate-700">
+                        {new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
+                      </td>
+                      <td className="py-3">
+                        {att.attendanceType?.isWorking ? (
+                          <span className="text-[11px] sm:text-sm font-medium">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}分休)</span></span>
+                        ) : (
+                          <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || '休暇'}</span>
+                        )}
+                      </td>
+                      <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${att.workHours}h` : '-'}</td>
                       <td className="py-3 text-right font-mono font-bold text-indigo-600">¥{(att.calculatedWage || 0).toLocaleString()}</td>
                       <td className="py-3 text-center">
                         <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${att.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : att.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -277,11 +309,11 @@ export default function AttendancePage() {
                         </span>
                       </td>
                       <td className="py-3 text-center">
-                        {/* ★ PENDINGの時のみ編集・削除ボタンを表示 */}
+                        {/* 常に表示 */}
                         {att.status === 'PENDING' ? (
-                          <div className="flex justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-100 text-blue-600 rounded flex items-center justify-center hover:bg-blue-200" title="編集"><i className="bi bi-pencil"></i></button>
-                            <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-100 text-rose-600 rounded flex items-center justify-center hover:bg-rose-200" title="取り下げ(削除)"><i className="bi bi-trash3"></i></button>
+                          <div className="flex justify-center gap-2">
+                            <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center hover:bg-blue-100 shadow-sm" title="編集"><i className="bi bi-pencil"></i></button>
+                            <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-50 text-rose-600 border border-rose-200 rounded flex items-center justify-center hover:bg-rose-100 shadow-sm" title="取り下げ(削除)"><i className="bi bi-trash3"></i></button>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-300">-</span>
@@ -296,7 +328,7 @@ export default function AttendancePage() {
         </div>
       )}
 
-      {/* 経費タブ (変更なし) */}
+      {/* 経費タブは省略 */}
       {activeTab === 'EXPENSE' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <form onSubmit={handleExpenseSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">

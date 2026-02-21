@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto'; // パスワードハッシュ用（簡易）
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -12,7 +12,8 @@ export async function GET() {
       include: {
         department: true,
         role: true,
-        country: true, // ★国情報も含める
+        country: true,
+        financial: true, // ★ 追加: 財務・給与情報も含めて取得
       }
     });
     return NextResponse.json(employees);
@@ -28,27 +29,47 @@ export async function POST(request: Request) {
     const body = await request.json();
     const hash = crypto.createHash('sha256').update(body.password || 'password123').digest('hex');
 
-    const newEmployee = await prisma.employee.create({
-      data: {
-        // ... (これまでのフィールドはそのまま) ...
-        employeeCode: body.employeeCode,
-        lastNameJa: body.lastNameJa,
-        firstNameJa: body.firstNameJa,
-        lastNameKana: body.lastNameKana,
-        firstNameKana: body.firstNameKana,
-        email: body.email,
-        passwordHash: hash,
-        hireDate: new Date(body.hireDate), 
-        birthday: body.birthday ? new Date(body.birthday) : null,
-        gender: body.gender || 'unknown',
-        isActive: true,
-        
-        // 外部キー登録処理 (IDをIntに変換)
-        departmentId: body.departmentId ? parseInt(body.departmentId) : null,
-        roleId: body.roleId ? parseInt(body.roleId) : null,
-        countryId: body.countryId ? parseInt(body.countryId) : null, // ★追加
-      },
+    // ★ トランザクションで Employee と EmployeeFinancial を同時に作成
+    const newEmployee = await prisma.$transaction(async (tx) => {
+      const emp = await tx.employee.create({
+        data: {
+          employeeCode: body.employeeCode,
+          lastNameJa: body.lastNameJa,
+          firstNameJa: body.firstNameJa,
+          lastNameKana: body.lastNameKana,
+          firstNameKana: body.firstNameKana,
+          lastNameEn: body.lastNameEn || null,
+          firstNameEn: body.firstNameEn || null,
+          email: body.email,
+          passwordHash: hash,
+          hireDate: new Date(body.hireDate), 
+          birthday: body.birthday ? new Date(body.birthday) : null,
+          gender: body.gender || 'unknown',
+          isActive: true,
+          employmentType: body.employmentType || 'FULL_TIME', // ★ 雇用形態
+          departmentId: body.departmentId ? parseInt(body.departmentId) : null,
+          roleId: body.roleId ? parseInt(body.roleId) : null,
+          countryId: body.countryId ? parseInt(body.countryId) : null,
+        },
+      });
+
+      // 財務・給与情報の作成
+      if (body.salaryType) {
+        await tx.employeeFinancial.create({
+          data: {
+            employeeId: emp.id,
+            salaryType: body.salaryType || 'MONTHLY',
+            baseSalary: body.baseSalary ? parseInt(body.baseSalary) : null,
+            hourlyRate: body.hourlyRate ? parseInt(body.hourlyRate) : null,
+            dailyRate: body.dailyRate ? parseInt(body.dailyRate) : null,
+            paymentMethod: body.paymentMethod || 'BANK_TRANSFER',
+            paymentCycle: body.paymentCycle || 'MONTHLY',
+          }
+        });
+      }
+      return emp;
     });
+
     return NextResponse.json(newEmployee);
   } catch (error) {
     console.error('Create Error:', error);
@@ -58,36 +79,17 @@ export async function POST(request: Request) {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } } // Next.js 15系の場合は await params が必要ですが、14系ならこれでOK
+  { params }: { params: { id: string } }
 ) {
   try {
     const id = parseInt(params.id);
-
-    console.log(`Attempting to delete employee ID: ${id}`); // ログ出力
-
-    // 【修正】物理削除（delete）ではなく、論理削除（update）にする
     const deletedEmployee = await prisma.employee.update({
       where: { id },
-      data: { 
-        isActive: false, // 退職済フラグを立てる
-        // 必要なら退職日も今日にする
-        resignationDate: new Date(),
-      },
+      data: { isActive: false, resignationDate: new Date() },
     });
-
-    console.log('Delete (Logical) successful:', deletedEmployee); // 成功ログ
-
     return NextResponse.json({ message: 'Deleted successfully (Logical)' });
   } catch (error: any) {
-    // 【重要】エラーの詳細をコンソールに出す
     console.error('Delete API Error Detail:', error);
-
-    return NextResponse.json(
-      { 
-        error: 'Failed to delete', 
-        details: error.message // フロントエンドにも詳細を返す
-      }, 
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to delete', details: error.message }, { status: 500 });
   }
 }

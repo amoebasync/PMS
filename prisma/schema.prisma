@@ -72,11 +72,21 @@ enum EmployeeRank {
 model Employee {
   id             Int       @id @default(autoincrement())
   passwordHash   String    @map("password_hash") @db.VarChar(255)
+
+  // ★ 追加: 社員コード
+  employeeCode   String?   @unique @map("employee_code") @db.VarChar(50)
   
   lastNameJa     String    @map("last_name_ja") @db.VarChar(50)
   firstNameJa    String    @map("first_name_ja") @db.VarChar(50)
   lastNameEn     String?   @map("last_name_en") @db.VarChar(50)
   firstNameEn    String?   @map("first_name_en") @db.VarChar(50)
+  // ★ 追加: カナ氏名
+  lastNameKana   String?   @map("last_name_kana") @db.VarChar(50)
+  firstNameKana  String?   @map("first_name_kana") @db.VarChar(50)
+
+  // ★ 追加: 誕生日と性別
+  birthday       DateTime? @db.Date
+  gender         Gender    @default(unknown)
   
   email          String    @unique @db.VarChar(100)
   phone          String?   @db.VarChar(20)
@@ -112,8 +122,8 @@ model Employee {
   avatarUrl      String?       @map("avatar_url") @db.Text
 
   isActive       Boolean   @default(true) @map("is_active")
-  joinedAt       DateTime? @map("joined_at") @db.Date
-  leftAt         DateTime? @map("left_at") @db.Date
+  hireDate       DateTime? @map("hire_date") @db.Date
+  resignationDate DateTime? @map("resignation_date") @db.Date
   
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
@@ -129,6 +139,7 @@ model Employee {
   attendances        Attendance[]
   expenses           Expense[]
   approvedExpenses   Expense[]    @relation("ExpenseApprover") // 自分が承認した経費
+  paidLeaveLedgers   PaidLeaveLedger[]
 
   // ★ 支店のマネージャーとしての逆参照 (エラー解消のキモ)
   managedBranches1   Branch[] @relation("BranchManager1")
@@ -1053,6 +1064,27 @@ enum ExpenseStatus {
 // ==========================================
 // 勤怠管理テーブル
 // ==========================================
+
+model AttendanceType {
+  id              Int      @id @default(autoincrement())
+  code            String   @unique @db.VarChar(50) // プログラム判定用 (例: 'WORK', 'HOLIDAY_WORK', 'PAID_LEAVE')
+  name            String   @db.VarChar(50)         // 画面表示用 (例: '通常出勤', '休日出勤', '有給休暇')
+  
+  // ★ 追加: 給与の割増倍率 (通常は 1.0、休日出勤なら 1.25 や 1.35)
+  wageMultiplier  Float    @default(1.0) @map("wage_multiplier")
+  
+  // 制御フラグ
+  isWorking       Boolean  @default(false) @map("is_working")   // 出勤扱いか（時間を入力させるか）
+  isPaid          Boolean  @default(false) @map("is_paid")      // 有給扱いか（みなし給与を発生させるか）
+  isDeducting     Boolean  @default(false) @map("is_deducting") // 有給残日数を減らす対象か
+  
+  isActive        Boolean  @default(true) @map("is_active")
+
+  attendances     Attendance[]
+
+  @@map("attendance_types")
+}
+
 model Attendance {
   id             Int              @id @default(autoincrement())
   
@@ -1060,10 +1092,14 @@ model Attendance {
   employee       Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
   date           DateTime         @db.Date // 勤務日
+
+  // ★ 変更: EnumをやめてマスタテーブルのIDを保存する
+  attendanceTypeId Int              @map("attendance_type_id")
+  attendanceType   AttendanceType   @relation(fields: [attendanceTypeId], references: [id])
   
-  startTime      String           @map("start_time") @db.VarChar(5) // 例: "09:00"
-  endTime        String           @map("end_time") @db.VarChar(5)   // 例: "18:00"
-  breakMinutes   Int              @default(60) @map("break_minutes") // 休憩時間(分)
+  startTime      String?          @map("start_time") @db.VarChar(5)
+  endTime        String?          @map("end_time") @db.VarChar(5)
+  breakMinutes   Int?             @default(60) @map("break_minutes")
   
   workHours      Float            @map("work_hours") // 実労働時間（時間単位, 例: 8.0）
   calculatedWage Int?             @map("calculated_wage") // この日の給与（時給 * 実労働時間）
@@ -1105,4 +1141,33 @@ model Expense {
   updatedAt      DateTime      @updatedAt @map("updated_at")
 
   @@map("expenses")
+}
+
+// --- 有給休暇のトランザクション種別 ---
+enum LeaveTransactionType {
+  GRANTED  @map("付与")
+  USED     @map("消化")
+  EXPIRED  @map("期限切れ消滅")
+  ADJUSTED @map("手動調整") // 管理者による直接修正用
+}
+
+// --- 有給休暇台帳テーブル ---
+model PaidLeaveLedger {
+  id          Int                  @id @default(autoincrement())
+  
+  employeeId  Int                  @map("employee_id")
+  employee    Employee             @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date        DateTime             @db.Date // 発生日（付与された日、休んだ日など）
+  type        LeaveTransactionType // 付与 or 消化 or 消滅
+  
+  days        Float                // 日数 (半休があるため Float。付与ならプラス、消化ならマイナスの値を入れる)
+  
+  validUntil  DateTime?            @db.Date // ★ 付与(GRANTED)の場合のみ、この有給の「有効期限（通常2年後）」をセット
+  
+  note        String?              @db.Text // 「入社半年付与」「10/12 体調不良による有給」などのメモ
+
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@map("paid_leave_ledgers")
 }
