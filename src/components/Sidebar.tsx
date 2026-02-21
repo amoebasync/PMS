@@ -93,6 +93,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       items: [
         { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
         { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
+        { name: '人事・経費承認', href: '/approvals', icon: 'bi-check2-square' },
         { name: '支店管理', href: '/branches', icon: 'bi-shop' },
         { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
       ]
