@@ -122,6 +122,9 @@ model Employee {
   manager        Employee?     @relation("EmployeeToManager", fields: [managerId], references: [id])
   subordinates   Employee[]    @relation("EmployeeToManager")
 
+  // ★ 以下の1行を追加 (勤怠の承認者としての逆参照)
+  approvedAttendances Attendance[] @relation("AttendanceApprover")
+
   avatarUrl      String?       @map("avatar_url") @db.Text
 
   isActive       Boolean   @default(true) @map("is_active")
@@ -1122,6 +1125,12 @@ model Attendance {
   
   workHours      Float            @map("work_hours") // 実労働時間（時間単位, 例: 8.0）
   calculatedWage Int?             @map("calculated_wage") // この日の給与（時給 * 実労働時間）
+
+  // ★ 以下の4行を追加 (承認した人と日時、却下理由を記録する枠)
+  approverId     Int?             @map("approver_id")
+  approver       Employee?        @relation("AttendanceApprover", fields: [approverId], references: [id])
+  approvedAt     DateTime?        @map("approved_at")
+  rejectionReason String?         @map("rejection_reason") @db.Text
   
   note           String?          @db.Text
   status         AttendanceStatus @default(PENDING)

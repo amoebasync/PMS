@@ -18,6 +18,8 @@ export async function GET(request: Request) {
         department: true,
         roles: { include: { role: true } }, 
         financial: true, 
+        manager: { select: { lastNameJa: true, firstNameJa: true, jobTitle: true } },
+        _count: { select: { subordinates: true } } // ★追加: 部下の人数を取得
       }
     });
 
@@ -26,7 +28,6 @@ export async function GET(request: Request) {
     const { passwordHash, ...safeData } = employee; 
     return NextResponse.json(safeData);
   } catch (error) {
-    console.error('Fetch Profile Error:', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
   }
 }
