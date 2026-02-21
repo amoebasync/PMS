@@ -597,11 +597,18 @@ model PartnerType {
 
 // --- 受注全体ステータス ---
 enum OrderStatus {
-  PLANNING    // 提案中・見積中
-  CONFIRMED   // 受注確定
-  IN_PROGRESS // 作業中
-  COMPLETED   // 完了
-  CANCELED    // キャンセル
+  DRAFT         // 一時保存・カート内
+  PENDING_REVIEW// 審査中・調整中
+  CONFIRMED     // 受注確定
+  IN_PROGRESS   // 作業中
+  COMPLETED     // 完了
+  CANCELED      // キャンセル
+}
+
+// ★ 追加: 受注経路
+enum OrderSource {
+  WEB_EC
+  SALES_INTERNAL
 }
 
 // --- 受注ヘッダ (親) ---
@@ -609,6 +616,11 @@ model Order {
   id           Int         @id @default(autoincrement())
   orderNo      String      @unique @map("order_no") @db.VarChar(50) // 受注番号 (ORD-202602-001など)
   
+// ★ 追加: 案件名と経路、決済方法
+  title        String?     @db.VarChar(200) // 案件名
+  orderSource  OrderSource? @default(WEB_EC) @map("order_source")
+  paymentMethod String?    @map("payment_method") @db.VarChar(50) // クレジットカード or 請求書
+
   customerId   Int         @map("customer_id")
   customer     Customer    @relation(fields: [customerId], references: [id])
   
@@ -617,7 +629,7 @@ model Order {
 
   orderDate    DateTime    @map("order_date") @db.Date // 受注日
   totalAmount  Int?        @map("total_amount") // 受注総額
-  status       OrderStatus @default(PLANNING)
+  status       OrderStatus @default(DRAFT)
   remarks      String?     @db.Text
 
   // リレーション (子テーブル)
@@ -626,6 +638,7 @@ model Order {
   printings          OrderPrinting[]
   newspaperInserts   OrderNewspaperInsert[]
   designs            OrderDesign[]
+  payments           Payment[]
 
   @@map("orders")
 }
@@ -800,4 +813,42 @@ model QrScanLog {
   visitorId   String?  @map("visitor_id") @db.VarChar(100)
 
   @@map("qr_scan_logs")
+}
+
+// --- 決済方法 ---
+enum PaymentMethod {
+  CREDIT_CARD     @map("クレジットカード")
+  INVOICE         @map("請求書払い")
+  BANK_TRANSFER   @map("銀行振込")
+}
+
+// --- 決済ステータス ---
+enum PaymentStatus {
+  PENDING     @map("未決済(請求待ち)")
+  AUTHORIZED  @map("与信枠確保")
+  COMPLETED   @map("決済完了(入金済)")
+  FAILED      @map("決済失敗")
+  REFUNDED    @map("返金済")
+}
+
+// --- 決済履歴テーブル ---
+model Payment {
+  id              Int           @id @default(autoincrement())
+  
+  orderId         Int           @map("order_id")
+  order           Order         @relation(fields: [orderId], references: [id])
+  
+  amount          Int           // 決済または請求された金額
+  method          PaymentMethod // 決済方法
+  status          PaymentStatus @default(PENDING) // 決済ステータス
+  
+  transactionId   String?       @map("transaction_id") @db.VarChar(100) // Stripeの決済IDや、発行した請求書の番号など
+  paidAt          DateTime?     @map("paid_at") @db.DateTime(0) // 実際の入金・決済完了日時
+  
+  note            String?       @db.Text // エラー内容や経理用メモ
+  
+  createdAt       DateTime      @default(now()) @map("created_at")
+  updatedAt       DateTime      @updatedAt @map("updated_at")
+
+  @@map("payments")
 }

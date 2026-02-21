@@ -11,15 +11,18 @@ export type CartItem = {
   method: string;
   size: string;
   price: number;
-  // ★ 追加: 配布期間
   startDate: string;
   endDate: string;
   spareDate: string;
+  // ★ 追加
+  projectName?: string; 
+  flyerId?: string;
 };
 
 type CartContextType = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'id'>) => void;
+  updateItem: (id: string, updates: Partial<CartItem>) => void; // ★ 追加
   removeItem: (id: string) => void;
   clearCart: () => void;
   totalAmount: number;
@@ -33,21 +36,21 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const saved = localStorage.getItem('pms_cart');
-    if (saved) {
-      try { setItems(JSON.parse(saved)); } catch (e) {}
-    }
+    if (saved) { try { setItems(JSON.parse(saved)); } catch (e) {} }
     setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem('pms_cart', JSON.stringify(items));
-    }
+    if (isLoaded) localStorage.setItem('pms_cart', JSON.stringify(items));
   }, [items, isLoaded]);
 
   const addItem = (item: Omit<CartItem, 'id'>) => {
     const newItem = { ...item, id: crypto.randomUUID() };
     setItems(prev => [...prev, newItem]);
+  };
+
+  const updateItem = (id: string, updates: Partial<CartItem>) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
   const removeItem = (id: string) => {
@@ -59,7 +62,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const totalAmount = items.reduce((sum, item) => sum + item.price, 0);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, clearCart, totalAmount }}>
+    <CartContext.Provider value={{ items, addItem, updateItem, removeItem, clearCart, totalAmount }}>
       {children}
     </CartContext.Provider>
   );
