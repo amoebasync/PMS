@@ -4,16 +4,17 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
+// 一覧取得
 export async function GET() {
   try {
     const employees = await prisma.employee.findMany({
       orderBy: { id: 'desc' },
       include: {
         department: true,
-        branch: true,  // ★ 追加: 支店情報も含める
-        role: true,
+        branch: true, 
+        roles: { include: { role: true } },
         country: true,
-        financial: true,
+        financial: true, 
       }
     });
     return NextResponse.json(employees);
@@ -23,15 +24,20 @@ export async function GET() {
   }
 }
 
+// 新規登録 (POST)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const hash = crypto.createHash('sha256').update(body.password || 'password123').digest('hex');
 
+    // ★ 社員コードが空欄の場合は自動採番する (EMP + 年月日 + 4桁のランダム数字)
+    const generatedCode = `EMP${new Date().toISOString().slice(0,10).replace(/-/g, '')}${Math.floor(1000 + Math.random() * 9000)}`;
+    const empCode = body.employeeCode || generatedCode;
+
     const newEmployee = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.create({
         data: {
-          employeeCode: body.employeeCode,
+          employeeCode: empCode,
           lastNameJa: body.lastNameJa,
           firstNameJa: body.firstNameJa,
           lastNameKana: body.lastNameKana,
@@ -39,6 +45,7 @@ export async function POST(request: Request) {
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
+          phone: body.phone || null, // ★ 電話番号の追加
           passwordHash: hash,
           hireDate: body.hireDate ? new Date(body.hireDate) : null, 
           birthday: body.birthday ? new Date(body.birthday) : null,
@@ -46,14 +53,25 @@ export async function POST(request: Request) {
           isActive: true,
           employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
-          branchId: body.branchId ? parseInt(body.branchId) : null, // ★ 追加
-          roleId: body.roleId ? parseInt(body.roleId) : null,
+          branchId: body.branchId ? parseInt(body.branchId) : null, 
           countryId: body.countryId ? parseInt(body.countryId) : null,
-          rank: body.rank || 'ASSOCIATE', // ★ 追加
-          jobTitle: body.jobTitle || null, // ★ 追加
+          rank: body.rank || 'ASSOCIATE', 
+          jobTitle: body.jobTitle || null, 
         },
       });
 
+      // 複数ロールの保存処理
+      if (body.roleIds && Array.isArray(body.roleIds)) {
+        const roleData = body.roleIds.map((rId: string) => ({
+          employeeId: emp.id,
+          roleId: parseInt(rId)
+        }));
+        if (roleData.length > 0) {
+          await tx.employeeRole.createMany({ data: roleData });
+        }
+      }
+
+      // 財務・給与情報の作成
       if (body.salaryType) {
         await tx.employeeFinancial.create({
           data: {
@@ -74,22 +92,5 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Create Error:', error);
     return NextResponse.json({ error: 'Failed to create' }, { status: 500 });
-  }
-}
-
-export async function DELETE(
-  request: Request,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const id = parseInt(params.id);
-    const deletedEmployee = await prisma.employee.update({
-      where: { id },
-      data: { isActive: false, resignationDate: new Date() },
-    });
-    return NextResponse.json({ message: 'Deleted successfully (Logical)' });
-  } catch (error: any) {
-    console.error('Delete API Error Detail:', error);
-    return NextResponse.json({ error: 'Failed to delete', details: error.message }, { status: 500 });
   }
 }

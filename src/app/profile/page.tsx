@@ -8,7 +8,6 @@ const RANK_MAP: Record<string, string> = {
   EXECUTIVE: '役員', DIRECTOR: '本部長・事業部長', MANAGER: 'マネージャー', LEADER: 'リーダー', ASSOCIATE: 'アソシエイト(一般)',
 };
 
-// ★ 追加: 全角カタカナ→半角カタカナ変換マップ
 const KANA_MAP: Record<string, string> = {
   'ガ': 'ｶﾞ', 'ギ': 'ｷﾞ', 'グ': 'ｸﾞ', 'ゲ': 'ｹﾞ', 'ゴ': 'ｺﾞ',
   'ザ': 'ｻﾞ', 'ジ': 'ｼﾞ', 'ズ': 'ｽﾞ', 'ゼ': 'ｾﾞ', 'ゾ': 'ｿﾞ',
@@ -31,24 +30,17 @@ const KANA_MAP: Record<string, string> = {
   'ー': 'ｰ', '、': '､', '。': '｡', '・': '･', '　': ' '
 };
 
-// ★ 追加: 半角カナ自動変換ロジック
 const formatToHalfWidthKana = (str: string) => {
   if (!str) return '';
-  // 1. ひらがなを全角カタカナに変換
   let converted = str.replace(/[ぁ-ん]/g, (s) => String.fromCharCode(s.charCodeAt(0) + 0x60));
-  // 2. 全角英数字を半角に変換
   converted = converted.replace(/[Ａ-Ｚａ-ｚ０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
-  // 3. 全角カタカナを半角カタカナに変換
   const reg = new RegExp('(' + Object.keys(KANA_MAP).join('|') + ')', 'g');
   converted = converted.replace(reg, (match) => KANA_MAP[match] || match);
-  // 小文字英字も許可するため大文字に統一
   return converted.toUpperCase();
 };
 
-// ★ 追加: 半角数字・自動抽出ロジック
 const formatToHalfWidthNumber = (str: string) => {
   if (!str) return '';
-  // 全角数字を半角に変換してから、数字以外を消去
   return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[^0-9]/g, '');
 };
 
@@ -94,8 +86,25 @@ export default function ProfilePage() {
     lastNameJa: '', firstNameJa: '', lastNameEn: '', firstNameEn: '',
     email: '', phone: '', avatarUrl: '',
     bankId: '', branchName: '', branchCode: '', accountType: 'ORDINARY',
-    accountNumber: '', accountName: '', accountNameKana: ''
+    accountNumber: '', accountName: '', accountNameKana: '',
+    password: '', confirmPassword: '' 
   });
+
+  // ★ パスワードのバリデーションチェック
+  const hasUpper = /[A-Z]/.test(formData.password);
+  const hasLower = /[a-z]/.test(formData.password);
+  const hasNumOrSym = /[0-9!@#$%^&*(),.?":{}|<>\-_]/.test(formData.password);
+  const isLongEnough = formData.password.length >= 8;
+  const passwordsMatch = formData.password === formData.confirmPassword && formData.password !== '';
+  const isPasswordValid = hasUpper && hasLower && hasNumOrSym && isLongEnough;
+
+  // ★ パスワードルールインジケーターコンポーネント
+  const RuleIndicator = ({ isValid, text }: { isValid: boolean, text: string }) => (
+    <div className={`flex items-center gap-1.5 text-xs transition-colors duration-300 ${isValid ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+      <i className={`bi ${isValid ? 'bi-check-circle-fill' : 'bi-circle'}`}></i>
+      <span>{text}</span>
+    </div>
+  );
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -121,6 +130,7 @@ export default function ProfilePage() {
           accountNumber: data.financial?.accountNumber || '',
           accountName: data.financial?.accountName || '',
           accountNameKana: data.financial?.accountNameKana || '',
+          password: '', confirmPassword: '' 
         });
       }
     } catch (e) { console.error(e); }
@@ -134,18 +144,16 @@ export default function ProfilePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // ★ 追加: フォーカスが外れた（onBlur）時に自動フォーマットする処理
   const handleBlurFormat = (e: React.FocusEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     let formattedValue = value;
 
     if (name === 'branchCode' || name === 'accountNumber') {
-      formattedValue = formatToHalfWidthNumber(value); // 全角数字→半角数字（数字以外は消去）
+      formattedValue = formatToHalfWidthNumber(value);
     } else if (name === 'accountNameKana') {
-      formattedValue = formatToHalfWidthKana(value); // ひらがな・全角カナ→半角カナ
+      formattedValue = formatToHalfWidthKana(value);
     }
 
-    // フォーマット後の値でStateを上書き
     if (formattedValue !== value) {
       setFormData(prev => ({ ...prev, [name]: formattedValue }));
     }
@@ -195,6 +203,17 @@ export default function ProfilePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (formData.password && !isPasswordValid) {
+      alert('新しいパスワードが要件を満たしていません。');
+      return;
+    }
+
+    if (formData.password && !passwordsMatch) {
+      alert('新しいパスワードと確認用パスワードが一致しません。');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch('/api/profile', {
@@ -204,6 +223,7 @@ export default function ProfilePage() {
       });
       if (res.ok) {
         alert('プロフィール情報を保存しました！');
+        setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         fetchData();
       } else {
         alert('保存に失敗しました');
@@ -255,7 +275,23 @@ export default function ProfilePage() {
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属部署</div><div className="font-bold text-slate-800">{profile.department?.name || '未設定'}</div></div>
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属支店</div><div className="font-bold text-slate-800">{profile.branch?.nameJa || '未設定'}</div></div>
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">階級 (等級)</div><div className="font-bold text-slate-800">{RANK_MAP[profile.rank] || profile.rank}</div></div>
-            <div><div className="text-[10px] font-bold text-slate-400 uppercase">システム権限</div><div className="inline-block mt-1 px-2 py-1 bg-indigo-100 text-indigo-700 text-xs font-bold rounded">{profile.role?.name || '一般権限'}</div></div>
+            
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">システム権限</div>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {profile.roles && profile.roles.length > 0 ? (
+                  profile.roles.map((r: any) => (
+                    <span key={r.id} className="px-2 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">
+                      {r.role?.name}
+                    </span>
+                  ))
+                ) : (
+                  <span className="px-2 py-1 bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-bold rounded">
+                    一般ユーザー
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -277,6 +313,52 @@ export default function ProfilePage() {
               <div className="md:col-span-2">
                 <label className="block text-xs font-bold text-slate-600 mb-2">電話番号</label>
                 <div className="relative"><i className="bi bi-telephone absolute left-3 top-2.5 text-slate-400"></i><input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="090-1234-5678" /></div>
+              </div>
+            </div>
+
+            {/* --- ★ パスワード変更セクション --- */}
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
+              <i className="bi bi-shield-lock text-slate-400"></i> パスワードの変更
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
+              <div className="md:col-span-2">
+                <p className="text-xs text-slate-500 mb-2">
+                  <i className="bi bi-info-circle mr-1"></i>
+                  パスワードを変更する場合のみ入力してください。変更しない場合は空欄のままで構いません。
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">新しいパスワード</label>
+                <div className="relative">
+                  <i className="bi bi-key absolute left-3 top-2.5 text-slate-400"></i>
+                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="新しいパスワード" />
+                </div>
+                {/* ★ 条件インジケーター（入力がある時のみ表示） */}
+                {formData.password && (
+                  <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200 grid grid-cols-2 gap-2 shadow-sm">
+                    <RuleIndicator isValid={isLongEnough} text="8文字以上" />
+                    <RuleIndicator isValid={hasUpper} text="大文字を含む" />
+                    <RuleIndicator isValid={hasLower} text="小文字を含む" />
+                    <RuleIndicator isValid={hasNumOrSym} text="数字/記号を含む" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">新しいパスワード (確認用)</label>
+                <div className="relative">
+                  <i className="bi bi-key-fill absolute left-3 top-2.5 text-slate-400"></i>
+                  <input 
+                    type="password" 
+                    name="confirmPassword" 
+                    value={formData.confirmPassword} 
+                    onChange={handleInputChange} 
+                    className={`w-full border py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono outline-none bg-white transition-all ${formData.confirmPassword ? (passwordsMatch ? 'border-emerald-500 focus:ring-2 focus:ring-emerald-500' : 'border-rose-500 focus:ring-2 focus:ring-rose-500') : 'border-slate-300 focus:ring-2 focus:ring-indigo-500'}`} 
+                    placeholder="もう一度入力" 
+                  />
+                  {formData.confirmPassword && (
+                    <i className={`bi absolute right-3 top-2.5 text-lg ${passwordsMatch ? 'bi-check-circle-fill text-emerald-500' : 'bi-x-circle-fill text-rose-500'}`}></i>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -306,7 +388,7 @@ export default function ProfilePage() {
                     name="branchCode" 
                     value={formData.branchCode} 
                     onChange={handleInputChange}
-                    onBlur={handleBlurFormat} // ★ 離れたときに半角数字化
+                    onBlur={handleBlurFormat}
                     className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
                     placeholder="123" 
                   />
@@ -329,7 +411,7 @@ export default function ProfilePage() {
                   name="accountNumber" 
                   value={formData.accountNumber} 
                   onChange={handleInputChange}
-                  onBlur={handleBlurFormat} // ★ 離れたときに半角数字化
+                  onBlur={handleBlurFormat}
                   className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
                   placeholder="1234567" 
                 />
@@ -347,7 +429,7 @@ export default function ProfilePage() {
                   name="accountNameKana" 
                   value={formData.accountNameKana} 
                   onChange={handleInputChange} 
-                  onBlur={handleBlurFormat} // ★ 離れたときに半角カナ化
+                  onBlur={handleBlurFormat}
                   className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
                   placeholder="ﾔﾏﾀﾞ ﾀﾛｳ" 
                 />
@@ -356,7 +438,12 @@ export default function ProfilePage() {
             </div>
 
             <div className="pt-6 mt-6 border-t border-slate-200 flex justify-end">
-              <button type="submit" disabled={isSaving} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 flex items-center gap-2">
+              {/* ★ 変更: パスワード入力時、要件を満たさないとボタンを押せなくする */}
+              <button 
+                type="submit" 
+                disabled={isSaving || (formData.password !== '' && (!isPasswordValid || !passwordsMatch))} 
+                className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
                 {isSaving ? '保存中...' : <><i className="bi bi-cloud-arrow-up-fill"></i> すべての情報を保存する</>}
               </button>
             </div>
@@ -364,6 +451,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* --- 画像トリミングモーダル --- */}
       {isUploadModalOpen && tempImageSrc && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-lg md:max-w-2xl m-4">

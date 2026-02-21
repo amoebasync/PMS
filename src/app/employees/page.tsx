@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 
 // --- 型定義 ---
 type Department = { id: number; code: string; name: string };
-type Role = { id: number; name: string; permissionLevel: string };
+type Role = { id: number; code: string; name: string; permissionLevel: string };
 type Country = { id: number; code: string; name: string; nameEn: string };
 type Branch = { id: number; nameJa: string; nameEn: string };
 
@@ -18,6 +18,7 @@ type Employee = {
   lastNameEn: string | null;
   firstNameEn: string | null;
   email: string;
+  phone: string | null; // ★ 追加
   hireDate: string;
   birthday: string | null;
   gender: 'male' | 'female' | 'other' | 'unknown';
@@ -29,7 +30,7 @@ type Employee = {
   branch?: Branch;
   rank?: string;
   jobTitle?: string | null;
-  role?: Role;
+  roles?: any[]; 
   country?: Country;
   financial?: any; 
 };
@@ -75,7 +76,11 @@ export default function EmployeePage() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]); 
   
+  const [currentUser, setCurrentUser] = useState<any>(null);
+
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(''); // ★ 検索用State
+
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -92,12 +97,11 @@ export default function EmployeePage() {
 
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
-    lastNameEn: '', firstNameEn: '', email: '', password: 'password123',
+    lastNameEn: '', firstNameEn: '', email: '', phone: '', password: 'password123', // ★ phone追加
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as const,
-    
-    branchId: '', departmentId: '', roleId: '', countryId: '', status: 'ACTIVE',
+    branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
     rank: 'ASSOCIATE', jobTitle: '',
-    
+    roleIds: [] as string[],
     employmentType: 'FULL_TIME', salaryType: 'MONTHLY',
     baseSalary: '', hourlyRate: '', dailyRate: '',
     paymentMethod: 'BANK_TRANSFER', paymentCycle: 'MONTHLY'
@@ -108,30 +112,49 @@ export default function EmployeePage() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const [empRes, masterRes, branchRes] = await Promise.all([ 
+      const [empRes, masterRes, branchRes, profileRes] = await Promise.all([ 
         fetch('/api/employees'), 
         fetch('/api/masters'),
-        fetch('/api/branches') 
+        fetch('/api/branches'),
+        fetch('/api/profile') 
       ]);
       const empData = await empRes.json();
       const masterData = await masterRes.json();
       const branchData = await branchRes.json();
+      const profileData = await profileRes.json();
 
-      if (Array.isArray(empData)) { setEmployees(empData); } else { setEmployees([]); }
-
+      if (Array.isArray(empData)) setEmployees(empData);
       setDepartments(masterData.departments || []);
       setRoles(masterData.roles || []);
       setCountries(masterData.countries || []);
-      if (Array.isArray(branchData)) { setBranches(branchData); }
-    } catch (error) { setEmployees([]); } 
+      if (Array.isArray(branchData)) setBranches(branchData);
+      if (profileData && profileData.id) setCurrentUser(profileData);
+
+    } catch (error) { console.error(error); } 
     finally { setIsLoading(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
 
+  const currentUserRoles = currentUser?.roles?.map((r: any) => r.role?.code) || [];
+  const isSuperAdmin = currentUserRoles.includes('SUPER_ADMIN');
+  const isHrAdmin = isSuperAdmin || currentUserRoles.includes('HR_ADMIN');
+  const isHrViewer = isHrAdmin || currentUserRoles.includes('HR_VIEWER');
+  const canEdit = isHrAdmin; 
+  const canViewSensitiveInfo = isHrViewer; 
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleRoleChange = (roleIdStr: string, checked: boolean) => {
+    setFormData(prev => {
+      const newRoleIds = new Set(prev.roleIds);
+      if (checked) newRoleIds.add(roleIdStr);
+      else newRoleIds.delete(roleIdStr);
+      return { ...prev, roleIds: Array.from(newRoleIds) };
+    });
   };
 
   const openFormModal = (employee?: Employee) => {
@@ -142,7 +165,7 @@ export default function EmployeePage() {
         lastNameJa: employee.lastNameJa, firstNameJa: employee.firstNameJa,
         lastNameKana: employee.lastNameKana || '', firstNameKana: employee.firstNameKana || '',
         lastNameEn: employee.lastNameEn || '', firstNameEn: employee.firstNameEn || '',
-        email: employee.email, password: '', 
+        email: employee.email, phone: employee.phone || '', password: '', 
         hireDate: employee.hireDate && !isNaN(new Date(employee.hireDate).getTime()) ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
         birthday: employee.birthday && !isNaN(new Date(employee.birthday).getTime()) ? new Date(employee.birthday).toISOString().split('T')[0] : '', 
         gender: employee.gender || 'unknown',
@@ -150,10 +173,11 @@ export default function EmployeePage() {
 
         branchId: employee.branchId?.toString() || '',
         departmentId: employee.department?.id.toString() || '',
-        roleId: employee.role?.id.toString() || '',
         countryId: employee.country?.id.toString() || '',
         rank: employee.rank || 'ASSOCIATE',
         jobTitle: employee.jobTitle || '',
+        
+        roleIds: employee.roles?.map(r => r.roleId.toString()) || [],
 
         employmentType: employee.employmentType || 'FULL_TIME',
         salaryType: employee.financial?.salaryType || 'MONTHLY',
@@ -175,7 +199,7 @@ export default function EmployeePage() {
     setIsDetailModalOpen(true);
     setIsLeaveFormOpen(false);
 
-    if (employee.employmentType === 'FULL_TIME') {
+    if (canViewSensitiveInfo && employee.employmentType === 'FULL_TIME') {
       try {
         const res = await fetch(`/api/employees/${employee.id}/leave`);
         if (res.ok) setLeaveLedgers(await res.json());
@@ -202,6 +226,9 @@ export default function EmployeePage() {
       birthday: formData.birthday || null,
       lastNameEn: formData.lastNameEn || null,
       firstNameEn: formData.firstNameEn || null,
+      phone: formData.phone || null,
+      // API側で空欄の場合は自動採番されるので、ここではそのまま送る
+      employeeCode: formData.employeeCode || null,
     };
 
     try {
@@ -260,6 +287,14 @@ export default function EmployeePage() {
     } catch (error) { alert('削除に失敗しました'); }
   };
 
+  // --- ★ 検索フィルター処理 ---
+  const filteredEmployees = employees.filter(emp => {
+    if (!searchTerm) return true;
+    const q = searchTerm.toLowerCase();
+    const target = `${emp.employeeCode || ''} ${emp.lastNameJa}${emp.firstNameJa} ${emp.lastNameKana || ''}${emp.firstNameKana || ''} ${emp.email} ${emp.phone || ''}`.toLowerCase();
+    return target.includes(q);
+  });
+
   // --- モーダル用共通スタイル ---
   const sectionClass = "bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4";
   const sectionHeaderClass = "text-sm font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2";
@@ -276,9 +311,26 @@ export default function EmployeePage() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">人事マスタ、アカウント情報および契約・給与情報の管理。</p>
         </div>
-        <button onClick={() => openFormModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
-          <i className="bi bi-plus-lg"></i> 新規社員登録
-        </button>
+        
+        {canEdit && (
+          <button onClick={() => openFormModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
+            <i className="bi bi-plus-lg"></i> 新規社員登録
+          </button>
+        )}
+      </div>
+
+      {/* ★ 追加: 検索バー */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
+        <div className="relative max-w-md">
+          <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input 
+            type="text" 
+            placeholder="氏名、社員コード、メールアドレス等で検索..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
+          />
+        </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -286,7 +338,7 @@ export default function EmployeePage() {
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
               <th className="px-6 py-4 font-semibold">社員番号 / 氏名</th>
-              <th className="px-6 py-4 font-semibold">雇用形態 / 役職</th>
+              <th className="px-6 py-4 font-semibold">雇用形態 / 役職・権限</th>
               <th className="px-6 py-4 font-semibold">所属 / 国籍</th>
               <th className="px-6 py-4 font-semibold">ステータス</th>
               <th className="px-6 py-4 font-semibold text-right">操作</th>
@@ -294,8 +346,8 @@ export default function EmployeePage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (<tr><td colSpan={5} className="p-8 text-center text-slate-400">読み込み中...</td></tr>) : 
-             employees.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-400">データがありません</td></tr>) : (
-              employees.map((emp) => (
+             filteredEmployees.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-400">該当するデータが見つかりません</td></tr>) : (
+              filteredEmployees.map((emp) => (
                 <tr key={emp.id} onClick={() => openDetailModal(emp)} className="hover:bg-blue-50/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -303,7 +355,7 @@ export default function EmployeePage() {
                       <div>
                         <div className="text-xs font-mono text-slate-400 mb-0.5">{emp.employeeCode || '-'}</div>
                         <div className="font-bold text-slate-800">{emp.lastNameJa} {emp.firstNameJa}</div>
-                        <div className="text-xs text-slate-400 uppercase tracking-wide">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-wide">
                           {emp.lastNameEn || emp.firstNameEn 
                             ? [emp.firstNameEn, emp.lastNameEn].filter(Boolean).join(' ') 
                             : [emp.lastNameKana, emp.firstNameKana].filter(Boolean).join(' ')}
@@ -311,11 +363,25 @@ export default function EmployeePage() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm">
+                  <td className="px-6 py-4">
                     <div className="text-blue-700 font-bold text-xs bg-blue-50 border border-blue-100 px-2 py-0.5 rounded inline-block mb-1">
                       {EMP_TYPE_MAP[emp.employmentType] || '未設定'}
                     </div>
-                    <div className="text-xs text-slate-500 font-bold">{emp.jobTitle || '役職未設定'}</div>
+                    <div className="text-xs text-slate-500 font-bold mb-1">{emp.jobTitle || '役職未設定'}</div>
+                    
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {emp.roles && emp.roles.length > 0 ? (
+                        emp.roles.map((r: any) => (
+                          <span key={r.id} className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 text-[9px] font-bold rounded">
+                            {r.role?.name}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-bold rounded">
+                          一般ユーザー
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-slate-800 font-medium">
@@ -336,13 +402,20 @@ export default function EmployeePage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    <button onClick={(e) => { e.stopPropagation(); openFormModal(emp); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
-                      <i className="bi bi-pencil-square text-lg"></i>
-                    </button>
-                    <button onClick={(e) => confirmDelete(e, emp.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
-                      <i className="bi bi-trash text-lg"></i>
-                    </button>
+                  
+                  <td className="px-6 py-4 text-right">
+                    {canEdit ? (
+                      <div className="space-x-2">
+                        <button onClick={(e) => { e.stopPropagation(); openFormModal(emp); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                          <i className="bi bi-pencil-square text-lg"></i>
+                        </button>
+                        <button onClick={(e) => confirmDelete(e, emp.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
+                          <i className="bi bi-trash text-lg"></i>
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-slate-300 text-xs">-</span>
+                    )}
                   </td>
                 </tr>
               ))
@@ -399,163 +472,177 @@ export default function EmployeePage() {
             <div className="flex-1 bg-slate-50 p-8 overflow-y-auto custom-scrollbar relative">
               <div className="flex justify-between items-center mb-6 hidden md:flex">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <span className="w-2 h-6 bg-blue-600 rounded-full"></span>詳細・契約ステータス
+                  <span className="w-2 h-6 bg-blue-600 rounded-full"></span>社員詳細データ
                 </h3>
                 <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-800 transition-colors"><i className="bi bi-x-lg text-xl"></i></button>
               </div>
 
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 mt-2"><i className="bi bi-cash-stack mr-1 text-indigo-500"></i> 契約・給与情報 (機密)</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">給与形態</div>
-                  <div className="text-sm font-bold text-slate-700 mt-1">{SALARY_TYPE_MAP[selectedEmployee.financial?.salaryType] || '-'}</div>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">給与単価</div>
-                  <div className="text-lg font-mono font-black text-indigo-600 mt-1">
-                    ¥{selectedEmployee.financial?.salaryType === 'MONTHLY' ? (selectedEmployee.financial?.baseSalary?.toLocaleString() || 0) : 
-                      selectedEmployee.financial?.salaryType === 'DAILY' ? (selectedEmployee.financial?.dailyRate?.toLocaleString() || 0) : 
-                      (selectedEmployee.financial?.hourlyRate?.toLocaleString() || 0)}
-                  </div>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                  <div className="text-[10px] font-bold text-slate-400 uppercase">支払方法・サイクル</div>
-                  <div className="text-sm font-bold text-slate-700 mt-1">{PAY_METHOD_MAP[selectedEmployee.financial?.paymentMethod] || '-'} / {PAY_CYCLE_MAP[selectedEmployee.financial?.paymentCycle] || '-'}</div>
-                </div>
-              </div>
-
+              {/* ★ 変更: 誕生日と電話番号を含めて見やすく配置 */}
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-person-lines-fill mr-1 text-blue-500"></i> 個人情報</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HIRE DATE</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-calendar-event text-blue-500"></i>{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString('ja-JP') : '-'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BIRTHDAY</div><div className="text-sm font-bold text-slate-700">{selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString('ja-JP') : '-'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BIRTHDAY</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-cake text-rose-400"></i>{selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString('ja-JP') : '-'}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GENDER</div><div className="text-sm font-bold text-slate-700 capitalize">{selectedEmployee.gender === 'male' ? 'Male (男性)' : selectedEmployee.gender === 'female' ? 'Female (女性)' : 'Other / Unknown'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : '未設定'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PHONE NUMBER</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-telephone text-emerald-500"></i>{selectedEmployee.phone || '未設定'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-2"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : '未設定'}</div></div>
               </div>
 
-              {selectedEmployee.employmentType === 'FULL_TIME' && (
-                <div className="mt-10 border-t border-slate-200 pt-8">
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                      <span className="w-2 h-6 bg-emerald-500 rounded-full"></span>
-                      有給休暇の管理
-                    </h3>
-                    <div className="text-sm font-bold text-slate-700 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
-                      現在の残日数: <span className="text-2xl text-emerald-600 font-black">{selectedEmployee.financial?.paidLeaveBalance || 0}</span> 日
+              {canViewSensitiveInfo ? (
+                <>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-cash-stack mr-1 text-indigo-500"></i> 契約・給与情報 (機密)</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">給与形態</div>
+                      <div className="text-sm font-bold text-slate-700 mt-1">{SALARY_TYPE_MAP[selectedEmployee.financial?.salaryType] || '-'}</div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">給与単価</div>
+                      <div className="text-lg font-mono font-black text-indigo-600 mt-1">
+                        ¥{selectedEmployee.financial?.salaryType === 'MONTHLY' ? (selectedEmployee.financial?.baseSalary?.toLocaleString() || 0) : 
+                          selectedEmployee.financial?.salaryType === 'DAILY' ? (selectedEmployee.financial?.dailyRate?.toLocaleString() || 0) : 
+                          (selectedEmployee.financial?.hourlyRate?.toLocaleString() || 0)}
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">支払方法・サイクル</div>
+                      <div className="text-sm font-bold text-slate-700 mt-1">{PAY_METHOD_MAP[selectedEmployee.financial?.paymentMethod] || '-'} / {PAY_CYCLE_MAP[selectedEmployee.financial?.paymentCycle] || '-'}</div>
                     </div>
                   </div>
 
-                  {isLeaveFormOpen ? (
-                    <form onSubmit={handleLeaveSubmit} className="bg-emerald-50 p-5 rounded-xl border border-emerald-100 mb-6 space-y-4 animate-in fade-in slide-in-from-top-2">
-                      <h4 className="font-bold text-emerald-800 text-sm border-b border-emerald-200 pb-2 flex items-center gap-2"><i className="bi bi-plus-circle-fill"></i> 有給日数の付与・手動調整</h4>
-                      
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-emerald-700 mb-1">発生日</label>
-                          <input type="date" required value={leaveForm.date} onChange={e => setLeaveForm({...leaveForm, date: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                  {selectedEmployee.employmentType === 'FULL_TIME' && (
+                    <div className="mt-10 border-t border-slate-200 pt-8">
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                          <span className="w-2 h-6 bg-emerald-500 rounded-full"></span>
+                          有給休暇の管理
+                        </h3>
+                        <div className="text-sm font-bold text-slate-700 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
+                          現在の残日数: <span className="text-2xl text-emerald-600 font-black">{selectedEmployee.financial?.paidLeaveBalance || 0}</span> 日
                         </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-emerald-700 mb-1">処理種別</label>
-                          <select required value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
-                            <option value="GRANTED">付与する (+)</option>
-                            <option value="ADJUSTED">手動で調整する (+/-)</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-emerald-700 mb-1">日数 (半休は0.5) <span className="text-rose-500">*</span></label>
-                          <input type="number" step="0.5" required value={leaveForm.days} onChange={e => setLeaveForm({...leaveForm, days: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold" placeholder="例: 10" />
-                        </div>
-                        {leaveForm.type === 'GRANTED' && (
-                          <div>
-                            <label className="block text-[10px] font-bold text-emerald-700 mb-1">有効期限 (原則2年後)</label>
-                            <input type="date" required value={leaveForm.validUntil} onChange={e => setLeaveForm({...leaveForm, validUntil: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label className="block text-[10px] font-bold text-emerald-700 mb-1">備考</label>
-                        <input type="text" value={leaveForm.note} onChange={e => setLeaveForm({...leaveForm, note: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例: 入社半年経過による法定付与" />
                       </div>
 
-                      <div className="flex justify-end gap-2 pt-2">
-                        <button type="button" onClick={() => setIsLeaveFormOpen(false)} className="px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors">キャンセル</button>
-                        <button type="submit" disabled={isLeaveSubmitting} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
-                          {isLeaveSubmitting ? '登録中...' : '登録を確定する'}
-                        </button>
+                      {canEdit ? (
+                        isLeaveFormOpen ? (
+                          <form onSubmit={handleLeaveSubmit} className="bg-emerald-50 p-5 rounded-xl border border-emerald-100 mb-6 space-y-4 animate-in fade-in slide-in-from-top-2">
+                            <h4 className="font-bold text-emerald-800 text-sm border-b border-emerald-200 pb-2 flex items-center gap-2"><i className="bi bi-plus-circle-fill"></i> 有給日数の付与・手動調整</h4>
+                            
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                              <div>
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">発生日</label>
+                                <input type="date" required value={leaveForm.date} onChange={e => setLeaveForm({...leaveForm, date: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">処理種別</label>
+                                <select required value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
+                                  <option value="GRANTED">付与する (+)</option>
+                                  <option value="ADJUSTED">手動で調整する (+/-)</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">日数 (半休は0.5) <span className="text-rose-500">*</span></label>
+                                <input type="number" step="0.5" required value={leaveForm.days} onChange={e => setLeaveForm({...leaveForm, days: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold" placeholder="例: 10" />
+                              </div>
+                              {leaveForm.type === 'GRANTED' && (
+                                <div>
+                                  <label className="block text-[10px] font-bold text-emerald-700 mb-1">有効期限 (原則2年後)</label>
+                                  <input type="date" required value={leaveForm.validUntil} onChange={e => setLeaveForm({...leaveForm, validUntil: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div>
+                              <label className="block text-[10px] font-bold text-emerald-700 mb-1">備考</label>
+                              <input type="text" value={leaveForm.note} onChange={e => setLeaveForm({...leaveForm, note: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例: 入社半年経過による法定付与" />
+                            </div>
+
+                            <div className="flex justify-end gap-2 pt-2">
+                              <button type="button" onClick={() => setIsLeaveFormOpen(false)} className="px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors">キャンセル</button>
+                              <button type="submit" disabled={isLeaveSubmitting} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
+                                {isLeaveSubmitting ? '登録中...' : '登録を確定する'}
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <div className="mb-4">
+                            <button onClick={() => setIsLeaveFormOpen(true)} className="px-4 py-2.5 bg-white border border-emerald-200 text-emerald-600 font-bold text-xs rounded-xl hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-1.5">
+                              <i className="bi bi-plus-lg"></i> 新しく有給を付与・調整する
+                            </button>
+                          </div>
+                        )
+                      ) : null}
+
+                      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                            <tr>
+                              <th className="px-4 py-3 font-semibold">発生日</th>
+                              <th className="px-4 py-3 font-semibold text-center">処理内容</th>
+                              <th className="px-4 py-3 font-semibold text-right">増減日数</th>
+                              <th className="px-4 py-3 font-semibold">備考 / 有効期限</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {leaveLedgers.length === 0 ? (
+                              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">有給休暇の履歴がありません</td></tr>
+                            ) : (
+                              leaveLedgers.map((l: any) => (
+                                <tr key={l.id} className="hover:bg-slate-50 transition-colors">
+                                  <td className="px-4 py-3 font-mono font-bold text-slate-600">{new Date(l.date).toLocaleDateString('ja-JP')}</td>
+                                  <td className="px-4 py-3 text-center">
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${LEAVE_TYPE_MAP[l.type]?.color || 'bg-slate-100 border-slate-200'}`}>
+                                      {LEAVE_TYPE_MAP[l.type]?.label || l.type}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className={`font-black text-base ${l.days > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
+                                      {l.days > 0 ? `+${l.days}` : l.days}
+                                    </span> 
+                                    <span className="text-[10px] text-slate-400 ml-1">日</span>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs text-slate-500">
+                                    <div className="truncate max-w-[250px] font-medium text-slate-700" title={l.note}>{l.note || '-'}</div>
+                                    {l.type === 'GRANTED' && l.validUntil && (
+                                      <div className="text-[10px] text-emerald-600 font-mono mt-1 font-bold">
+                                        <i className="bi bi-clock-history"></i> 有効期限: {new Date(l.validUntil).toLocaleDateString('ja-JP')}
+                                      </div>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
                       </div>
-                    </form>
-                  ) : (
-                    <div className="mb-4">
-                      <button onClick={() => setIsLeaveFormOpen(true)} className="px-4 py-2.5 bg-white border border-emerald-200 text-emerald-600 font-bold text-xs rounded-xl hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-1.5">
-                        <i className="bi bi-plus-lg"></i> 新しく有給を付与・調整する
-                      </button>
                     </div>
                   )}
-
-                  <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
-                        <tr>
-                          <th className="px-4 py-3 font-semibold">発生日</th>
-                          <th className="px-4 py-3 font-semibold text-center">処理内容</th>
-                          <th className="px-4 py-3 font-semibold text-right">増減日数</th>
-                          <th className="px-4 py-3 font-semibold">備考 / 有効期限</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {leaveLedgers.length === 0 ? (
-                          <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">有給休暇の履歴がありません</td></tr>
-                        ) : (
-                          leaveLedgers.map((l: any) => (
-                            <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                              <td className="px-4 py-3 font-mono font-bold text-slate-600">{new Date(l.date).toLocaleDateString('ja-JP')}</td>
-                              <td className="px-4 py-3 text-center">
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${LEAVE_TYPE_MAP[l.type]?.color || 'bg-slate-100 border-slate-200'}`}>
-                                  {LEAVE_TYPE_MAP[l.type]?.label || l.type}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <span className={`font-black text-base ${l.days > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
-                                  {l.days > 0 ? `+${l.days}` : l.days}
-                                </span> 
-                                <span className="text-[10px] text-slate-400 ml-1">日</span>
-                              </td>
-                              <td className="px-4 py-3 text-xs text-slate-500">
-                                <div className="truncate max-w-[250px] font-medium text-slate-700" title={l.note}>{l.note || '-'}</div>
-                                {l.type === 'GRANTED' && l.validUntil && (
-                                  <div className="text-[10px] text-emerald-600 font-mono mt-1 font-bold">
-                                    <i className="bi bi-clock-history"></i> 有効期限: {new Date(l.validUntil).toLocaleDateString('ja-JP')}
-                                  </div>
-                                )}
-                              </td>
-                            </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                </>
+              ) : (
+                <div className="mt-8 p-6 bg-slate-100 border border-slate-200 rounded-xl text-center text-sm font-bold text-slate-500">
+                  <i className="bi bi-lock-fill text-2xl block mb-2 opacity-50"></i>
+                  この社員の契約・給与情報を閲覧する権限がありません。<br/>（人事閲覧者以上の権限が必要です）
                 </div>
               )}
 
-              <div className="mt-8 flex justify-end">
-                <button 
-                  onClick={() => { setIsDetailModalOpen(false); openFormModal(selectedEmployee); }}
-                  className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
-                >
-                  <i className="bi bi-pencil-square"></i> 編集する
-                </button>
-              </div>
+              {canEdit && (
+                <div className="mt-8 flex justify-end">
+                  <button 
+                    onClick={() => { setIsDetailModalOpen(false); openFormModal(selectedEmployee); }}
+                    className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
+                  >
+                    <i className="bi bi-pencil-square"></i> 編集する
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {/* --- ★ 登録・編集モーダル (デザイン改善版) --- */}
+      {/* --- ★ 登録・編集モーダル --- */}
       {isFormModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200">
           <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh] overflow-hidden">
             
-            {/* モーダルヘッダー */}
             <div className="px-6 py-5 border-b border-slate-200 bg-white flex justify-between items-center shrink-0 z-10 shadow-sm">
               <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
                 <i className="bi bi-person-vcard text-blue-600"></i>
@@ -566,16 +653,15 @@ export default function EmployeePage() {
               </button>
             </div>
             
-            {/* スクロールするフォームエリア */}
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
               
-              {/* --- 1. アカウント情報 --- */}
               <div className={sectionClass}>
                 <h4 className={sectionHeaderClass}><i className="bi bi-shield-lock text-blue-600"></i> アカウント＆ステータス</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className={labelClass}>社員コード</label>
-                    <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder="EMP-001" />
+                    {/* ★ 変更: placeholderで自動採番される旨を案内 */}
+                    <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder="(空欄で自動採番)" />
                   </div>
                   <div className="lg:col-span-2">
                     <label className={labelClass}>ログイン用メールアドレス <span className="text-rose-500">*</span></label>
@@ -591,7 +677,6 @@ export default function EmployeePage() {
                 </div>
               </div>
 
-              {/* --- 2. プロフィール情報 --- */}
               <div className={sectionClass}>
                 <h4 className={sectionHeaderClass}><i className="bi bi-person text-blue-600"></i> プロフィール情報</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
@@ -616,10 +701,17 @@ export default function EmployeePage() {
                       </select>
                     </div>
                   </div>
+                  {/* ★ 変更: 電話番号の入力欄を追加 */}
+                  <div className="md:col-span-2">
+                    <label className={labelClass}>電話番号</label>
+                    <div className="relative">
+                      <i className="bi bi-telephone absolute left-3 top-3 text-slate-400"></i>
+                      <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className={`${inputClass} pl-9`} placeholder="090-1234-5678" />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              {/* --- 3. 組織・権限情報 --- */}
               <div className={sectionClass}>
                 <h4 className={sectionHeaderClass}><i className="bi bi-diagram-3 text-blue-600"></i> 組織・権限情報</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -652,18 +744,30 @@ export default function EmployeePage() {
                       {countries.map(country => <option key={country.id} value={country.id}>{country.name} ({country.code})</option>)}
                     </select>
                   </div>
+                  
                   <div className="md:col-span-3 pt-4 border-t border-slate-100">
-                    <label className={labelClass}>システム権限</label>
-                    <select name="roleId" value={formData.roleId} onChange={handleInputChange} className={`${inputClass} max-w-xs font-bold text-slate-700`}>
-                      <option value="">一般ユーザー</option>
-                      {roles.map(role => <option key={role.id} value={role.id}>{role.name}</option>)}
-                    </select>
-                    <p className="text-[10px] text-slate-400 mt-1.5">※システムでアクセスできるメニューや操作権限を制御します。</p>
+                    <label className={labelClass}>システム権限（複数付与可）</label>
+                    <div className="flex flex-wrap gap-3 mt-2">
+                      {roles.map(role => (
+                        <label key={role.id} className={`flex items-center gap-2 cursor-pointer border px-4 py-2.5 rounded-xl transition-all ${formData.roleIds.includes(role.id.toString()) ? 'bg-indigo-50 border-indigo-400 shadow-sm' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
+                          <input 
+                            type="checkbox" 
+                            checked={formData.roleIds.includes(role.id.toString())}
+                            onChange={(e) => handleRoleChange(role.id.toString(), e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 accent-indigo-600"
+                          />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-slate-800">{role.name}</span>
+                            <span className="text-[10px] text-slate-400 font-mono">{role.code}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-2">※ 1つも選択しない場合は「一般ユーザー（閲覧のみ）」の権限になります。</p>
                   </div>
                 </div>
               </div>
 
-              {/* --- 4. 契約・給与情報 --- */}
               <div className="bg-indigo-50/40 p-6 rounded-2xl border border-indigo-100 shadow-sm space-y-4">
                 <h4 className="text-sm font-black text-indigo-900 border-b border-indigo-100 pb-3 mb-4 flex items-center gap-2">
                   <i className="bi bi-cash-stack text-indigo-600"></i> 契約・給与情報 <span className="text-[10px] text-indigo-500/70 font-medium ml-2">(管理者のみ閲覧・編集可)</span>
@@ -712,7 +816,6 @@ export default function EmployeePage() {
                 </div>
               </div>
 
-              {/* --- パスワードリセット領域 --- */}
               {currentId ? (
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center shadow-sm">
                   <button type="button" onClick={handlePasswordReset} className="text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 mx-auto">
@@ -729,7 +832,6 @@ export default function EmployeePage() {
 
             </form>
 
-            {/* モーダルフッター (固定) */}
             <div className="px-6 py-4 bg-white border-t border-slate-200 flex justify-end gap-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
               <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">キャンセル</button>
               <button onClick={handleSave} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
@@ -741,7 +843,6 @@ export default function EmployeePage() {
         </div>
       )}
 
-      {/* --- 削除確認モーダル --- */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-in fade-in zoom-in-95 duration-200">

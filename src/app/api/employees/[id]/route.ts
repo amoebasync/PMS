@@ -25,6 +25,7 @@ export async function PUT(
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
+          phone: body.phone || null, // ★ 電話番号の追加
           hireDate: body.hireDate ? new Date(body.hireDate) : null,
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender,
@@ -38,7 +39,7 @@ export async function PUT(
         },
       });
 
-      // ★ 追加: 複数ロールの更新 (一度消して作り直す)
+      // 複数ロールの更新
       if (body.roleIds && Array.isArray(body.roleIds)) {
         await tx.employeeRole.deleteMany({ where: { employeeId } });
         const roleData = body.roleIds.map((rId: string) => ({
@@ -50,7 +51,6 @@ export async function PUT(
         }
       }
 
-      // 財務・給与情報の更新 (Upsert)
       const financialData = {
         salaryType: body.salaryType || 'MONTHLY',
         baseSalary: body.baseSalary ? parseInt(body.baseSalary) : null,
@@ -79,7 +79,6 @@ export async function PUT(
   }
 }
 
-// 削除 (DELETE) - 論理削除
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
