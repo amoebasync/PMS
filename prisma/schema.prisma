@@ -60,48 +60,175 @@ enum Gender {
   unknown
 }
 
+// --- 新規: 社員の階級 (等級) ---
+enum EmployeeRank {
+  EXECUTIVE   @map("役員")
+  DIRECTOR    @map("本部長・事業部長")
+  MANAGER     @map("マネージャー")
+  LEADER      @map("リーダー")
+  ASSOCIATE   @map("アソシエイト(一般)")
+}
+
 model Employee {
-  id           Int     @id @default(autoincrement())
-  departmentId Int?    @map("department_id")
-  roleId       Int?    @map("role_id")
-  countryId    Int?    @map("country_id")
-  employeeCode String? @unique @map("employee_code") @db.VarChar(20)
+  id             Int       @id @default(autoincrement())
+  passwordHash   String    @map("password_hash") @db.VarChar(255)
+  
+  lastNameJa     String    @map("last_name_ja") @db.VarChar(50)
+  firstNameJa    String    @map("first_name_ja") @db.VarChar(50)
+  lastNameEn     String?   @map("last_name_en") @db.VarChar(50)
+  firstNameEn    String?   @map("first_name_en") @db.VarChar(50)
+  
+  email          String    @unique @db.VarChar(100)
+  phone          String?   @db.VarChar(20)
+  
+  // ============================
+  // ★ 新規追加: 組織・役職・権限情報
+  // ============================
+  
+  // 1. 支店 (既存のBranchテーブルと紐付け)
+  branchId       Int?          @map("branch_id")
+  branch         Branch?       @relation("BranchEmployees", fields: [branchId], references: [id])
+  
+  // 2. 部署
+  departmentId   Int?          @map("department_id")
+  department     Department?   @relation(fields: [departmentId], references: [id])
+  
+  // 3. 階級 (Enum)
+  rank           EmployeeRank  @default(ASSOCIATE)
+  
+  // 4. 職種 (テキスト)
+  jobTitle       String?       @map("job_title") @db.VarChar(100)
+  
+  // 5. システム権限
+  roleId         Int?          @map("role_id")
+  role           Role?         @relation(fields: [roleId], references: [id])
 
-  // 氏名情報
-  lastNameJa    String  @map("last_name_ja") @db.VarChar(50)
-  firstNameJa   String  @map("first_name_ja") @db.VarChar(50)
-  lastNameKana  String  @map("last_name_kana") @db.VarChar(50)
-  firstNameKana String  @map("first_name_kana") @db.VarChar(50)
-  lastNameEn    String? @map("last_name_en") @db.VarChar(50)
-  firstNameEn   String? @map("first_name_en") @db.VarChar(50)
+  // ★ 追加: 国マスタとの紐付け
+  countryId      Int?          @map("country_id")
+  country        Country?      @relation(fields: [countryId], references: [id])
 
-  gender       Gender    @default(unknown)
-  birthday     DateTime? @db.Date
-  email        String    @unique @db.VarChar(100)
-  passwordHash String    @map("password_hash") @db.VarChar(255)
+  // ============================
 
-  hireDate        DateTime  @map("hire_date") @db.Date
-  resignationDate DateTime? @map("resignation_date") @db.Date
+  isActive       Boolean   @default(true) @map("is_active")
+  joinedAt       DateTime? @map("joined_at") @db.Date
+  leftAt         DateTime? @map("left_at") @db.Date
+  
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  isActive    Boolean   @default(true) @map("is_active") // tinyint(1) は Boolean に変換されます
-  lastLoginAt DateTime? @map("last_login_at") @db.DateTime(0)
+  // 各種リレーション (既存のものそのまま残す)
+  customers          Customer[]
+  orders             Order[]
+  approvals          OrderApproval[]
+  designs            OrderDesign[]
+  flyerTransactions  FlyerTransaction[]
+  financial          EmployeeFinancial?
+  employmentType EmploymentType @default(FULL_TIME) @map("employment_type")
 
-  // リレーション（外部キー設定）
-  department Department? @relation(fields: [departmentId], references: [id])
-  role       Role?       @relation(fields: [roleId], references: [id])
-  country    Country?    @relation(fields: [countryId], references: [id])
-  orders          Order[]       // 担当した受注
-  designOrders    OrderDesign[] // 担当したデザイン案件
-  approvals OrderApproval[]
-  flyerTransactions FlyerTransaction[]
+  // ★ 支店のマネージャーとしての逆参照 (エラー解消のキモ)
+  managedBranches1   Branch[] @relation("BranchManager1")
+  managedBranches2   Branch[] @relation("BranchManager2")
+  managedBranches3   Branch[] @relation("BranchManager3")
+  managedBranches4   Branch[] @relation("BranchManager4")
 
-  customers        Customer[] // 担当している顧客リスト
-  managedBranches1 Branch[]   @relation("BranchManager1")
-  managedBranches2 Branch[]   @relation("BranchManager2")
-  managedBranches3 Branch[]   @relation("BranchManager3")
-  managedBranches4 Branch[]   @relation("BranchManager4")
+  @@map("employees")
+}
 
-  @@map("employees") // 実際のテーブル名
+// --- 雇用形態 ---
+enum EmploymentType {
+  FULL_TIME   @map("正社員")
+  PART_TIME   @map("アルバイト・パート")
+  OUTSOURCE   @map("業務委託")
+}
+
+// --- 給与形態 ---
+enum SalaryType {
+  HOURLY      @map("時給")
+  DAILY       @map("日給")
+  MONTHLY     @map("月給")
+}
+
+// --- 社員向け支払方法 ---
+enum EmployeePaymentMethod {
+  CASH          @map("現金手渡し")
+  BANK_TRANSFER @map("銀行振込")
+}
+
+// --- 支払サイクル ---
+enum PaymentCycle {
+  DAILY       @map("日払い")
+  WEEKLY      @map("週払い")
+  MONTHLY     @map("月払い")
+}
+
+// --- 銀行マスタ ---
+model Bank {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique @db.VarChar(20)    // 銀行コード (例: 0001)
+  name      String   @db.VarChar(100)           // 銀行名 (例: みずほ銀行)
+  nameKana  String?  @map("name_kana") @db.VarChar(100)
+  
+  financials EmployeeFinancial[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("banks")
+}
+
+enum BankAccountType {
+  ORDINARY  @map("普通")
+  CURRENT   @map("当座")
+  SAVINGS   @map("貯蓄")
+}
+
+model EmployeeFinancial {
+  id                Int              @id @default(autoincrement())
+  
+  // Employeeとの1対1の紐付け
+  employeeId        Int              @unique @map("employee_id")
+  employee          Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  // --- 給与・契約関連 ---
+  salaryType        SalaryType            @default(MONTHLY) @map("salary_type")
+  
+  baseSalary        Int?                  @map("base_salary")        // 月給
+  hourlyRate        Int?                  @map("hourly_rate")        // 時給
+  dailyRate         Int?                  @map("daily_rate")         // 日給
+
+  paymentMethod     EmployeePaymentMethod @default(BANK_TRANSFER) @map("payment_method")
+  paymentCycle      PaymentCycle          @default(MONTHLY) @map("payment_cycle")
+  paymentDay        Int?                  @map("payment_day")        // 月払いの場合の支払日 (例: 25。月末なら99などルール決め)
+
+  transportationFee String?               @map("transportation_fee") // 交通費の規定
+  allowance         Int?                  @default(0)                // 役職手当などの固定手当
+  
+  // --- 控除・保険関連 (給与計算用) ---
+  healthInsurance   Int?                  @default(0) @map("health_insurance")       // 健康保険料
+  pensionInsurance  Int?                  @default(0) @map("pension_insurance")      // 厚生年金保険料
+  employmentInsurance Int?                @default(0) @map("employment_insurance")   // 雇用保険料
+  workerAccidentInsurance Int?            @default(0) @map("worker_accident_insurance") // 労災保険料(基本は会社負担ですが一応)
+  residentTax       Int?                  @default(0) @map("resident_tax")           // 住民税
+  incomeTax         Int?                  @default(0) @map("income_tax")             // 所得税(固定の場合など)
+
+  // --- 銀行口座情報 ---
+  // ★ 文字列入力から、Bankマスタへの紐付けに変更
+  bankId            Int?                  @map("bank_id")
+  bank              Bank?                 @relation(fields: [bankId], references: [id])
+  
+  branchName        String?               @map("branch_name") @db.VarChar(100)      // 支店名
+  branchCode        String?               @map("branch_code") @db.VarChar(20)       // 支店コード
+  accountType       BankAccountType?      @map("account_type")                      // 口座種別(普通/当座)
+  accountNumber     String?               @map("account_number") @db.VarChar(20)    // 口座番号
+  accountName       String?               @map("account_name") @db.VarChar(100)     // 口座名義
+  accountNameKana   String?               @map("account_name_kana") @db.VarChar(100)// 口座名義(カナ)
+
+  note              String?               @db.Text                                  // 備考
+
+  createdAt         DateTime              @default(now()) @map("created_at")
+  updatedAt         DateTime              @default(now()) @updatedAt @map("updated_at")
+
+  @@map("employee_financials")
 }
 
 model Country {
@@ -361,6 +488,7 @@ model Branch {
   // リレーション（この支店に所属する配布員）
   distributors FlyerDistributor[]
   schedules    DistributionSchedule[]
+  employees   Employee[] @relation("BranchEmployees")
 
   @@map("branches")
 }
