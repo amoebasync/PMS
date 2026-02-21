@@ -3,6 +3,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// 更新 (PUT)
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -29,15 +30,27 @@ export async function PUT(
           gender: body.gender,
           employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
-          branchId: body.branchId ? parseInt(body.branchId) : null, // ★ 追加
-          roleId: body.roleId ? parseInt(body.roleId) : null,
+          branchId: body.branchId ? parseInt(body.branchId) : null, 
           countryId: body.countryId ? parseInt(body.countryId) : null,
-          rank: body.rank || 'ASSOCIATE', // ★ 追加
-          jobTitle: body.jobTitle || null, // ★ 追加
+          rank: body.rank || 'ASSOCIATE', 
+          jobTitle: body.jobTitle || null, 
           isActive: body.isActive,
         },
       });
 
+      // ★ 追加: 複数ロールの更新 (一度消して作り直す)
+      if (body.roleIds && Array.isArray(body.roleIds)) {
+        await tx.employeeRole.deleteMany({ where: { employeeId } });
+        const roleData = body.roleIds.map((rId: string) => ({
+          employeeId,
+          roleId: parseInt(rId)
+        }));
+        if (roleData.length > 0) {
+          await tx.employeeRole.createMany({ data: roleData });
+        }
+      }
+
+      // 財務・給与情報の更新 (Upsert)
       const financialData = {
         salaryType: body.salaryType || 'MONTHLY',
         baseSalary: body.baseSalary ? parseInt(body.baseSalary) : null,
@@ -66,6 +79,7 @@ export async function PUT(
   }
 }
 
+// 削除 (DELETE) - 論理削除
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

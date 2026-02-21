@@ -15,8 +15,8 @@ export async function GET(request: Request) {
       include: {
         branch: true,
         department: true,
-        role: true,
-        financial: true, // ★ 追加: DBから口座情報も引っ張ってくる
+        roles: { include: { role: true } }, // ★ 変更: 中間テーブル経由でロール情報を取得
+        financial: true, 
       }
     });
 
@@ -39,10 +39,7 @@ export async function PUT(request: Request) {
     const body = await request.json();
     const empId = parseInt(sessionId);
 
-    // ★ 変更: トランザクションを使って Employee と EmployeeFinancial を同時に更新
     const result = await prisma.$transaction(async (tx) => {
-      
-      // 1. Employee (基本情報) の更新
       const updatedEmp = await tx.employee.update({
         where: { id: empId },
         data: {
@@ -56,7 +53,6 @@ export async function PUT(request: Request) {
         }
       });
 
-      // 2. 登録する口座情報のデータを整形
       const financialData: any = {
         bankId: body.bankId ? parseInt(body.bankId, 10) : null,
         branchName: body.branchName || null,
@@ -67,14 +63,10 @@ export async function PUT(request: Request) {
         accountNameKana: body.accountNameKana || null,
       };
 
-      // 3. EmployeeFinancial (口座情報) の更新または新規作成 (upsert)
       await tx.employeeFinancial.upsert({
         where: { employeeId: empId },
-        update: financialData,      // すでにデータがあれば上書き
-        create: {                   // データがなければ新規作成
-          employeeId: empId,
-          ...financialData,
-        }
+        update: financialData,     
+        create: { employeeId: empId, ...financialData }
       });
 
       return updatedEmp;

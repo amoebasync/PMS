@@ -5,11 +5,22 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // 部署、役職、国 をまとめて取得
+    // ★ 追加: ロールマスタの初期データ自動投入
+    const roleCount = await prisma.role.count();
+    if (roleCount === 0) {
+      await prisma.role.createMany({
+        data: [
+          { code: 'SUPER_ADMIN', name: 'スーパー管理者', permissionLevel: 'ALL' },
+          { code: 'HR_ADMIN', name: '人事管理者', permissionLevel: 'HR_ALL' },
+          { code: 'HR_VIEWER', name: '人事閲覧者', permissionLevel: 'HR_READ' },
+        ]
+      });
+    }
+
     const [departments, roles, countries] = await Promise.all([
       prisma.department.findMany({ orderBy: { id: 'asc' } }),
       prisma.role.findMany({ orderBy: { id: 'asc' } }),
-      prisma.country.findMany({ orderBy: { id: 'asc' } }) // ★これが重要
+      prisma.country.findMany({ orderBy: { id: 'asc' } }) 
     ]);
 
     return NextResponse.json({ departments, roles, countries });
