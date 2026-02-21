@@ -18,7 +18,7 @@ type Employee = {
   lastNameEn: string | null;
   firstNameEn: string | null;
   email: string;
-  phone: string | null; // ★ 追加
+  phone: string | null; 
   hireDate: string;
   birthday: string | null;
   gender: 'male' | 'female' | 'other' | 'unknown';
@@ -31,6 +31,8 @@ type Employee = {
   rank?: string;
   jobTitle?: string | null;
   roles?: any[]; 
+  managerId?: number | null;
+  manager?: { id: number; lastNameJa: string; firstNameJa: string };
   country?: Country;
   financial?: any; 
 };
@@ -79,7 +81,7 @@ export default function EmployeePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(''); // ★ 検索用State
+  const [searchTerm, setSearchTerm] = useState(''); 
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -97,10 +99,10 @@ export default function EmployeePage() {
 
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
-    lastNameEn: '', firstNameEn: '', email: '', phone: '', password: 'password123', // ★ phone追加
+    lastNameEn: '', firstNameEn: '', email: '', phone: '', password: 'password123', 
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as const,
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
-    rank: 'ASSOCIATE', jobTitle: '',
+    rank: 'ASSOCIATE', jobTitle: '', managerId: '',
     roleIds: [] as string[],
     employmentType: 'FULL_TIME', salaryType: 'MONTHLY',
     baseSalary: '', hourlyRate: '', dailyRate: '',
@@ -176,6 +178,7 @@ export default function EmployeePage() {
         countryId: employee.country?.id.toString() || '',
         rank: employee.rank || 'ASSOCIATE',
         jobTitle: employee.jobTitle || '',
+        managerId: employee.managerId?.toString() || '', // ★ 上司情報を復元
         
         roleIds: employee.roles?.map(r => r.roleId.toString()) || [],
 
@@ -227,8 +230,8 @@ export default function EmployeePage() {
       lastNameEn: formData.lastNameEn || null,
       firstNameEn: formData.firstNameEn || null,
       phone: formData.phone || null,
-      // API側で空欄の場合は自動採番されるので、ここではそのまま送る
       employeeCode: formData.employeeCode || null,
+      managerId: formData.managerId || null, // ★ 空欄の場合はnullとして安全に送信
     };
 
     try {
@@ -287,7 +290,6 @@ export default function EmployeePage() {
     } catch (error) { alert('削除に失敗しました'); }
   };
 
-  // --- ★ 検索フィルター処理 ---
   const filteredEmployees = employees.filter(emp => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
@@ -295,7 +297,6 @@ export default function EmployeePage() {
     return target.includes(q);
   });
 
-  // --- モーダル用共通スタイル ---
   const sectionClass = "bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4";
   const sectionHeaderClass = "text-sm font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2";
   const labelClass = "block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5";
@@ -319,7 +320,6 @@ export default function EmployeePage() {
         )}
       </div>
 
-      {/* ★ 追加: 検索バー */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
         <div className="relative max-w-md">
           <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -447,6 +447,10 @@ export default function EmployeePage() {
 
               <div className="w-full space-y-3 pt-6 border-t border-white/10 text-left">
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
+                  <i className="bi bi-person-up text-blue-200"></i>
+                  <span className="font-semibold">上司: {selectedEmployee.manager ? `${selectedEmployee.manager.lastNameJa} ${selectedEmployee.manager.firstNameJa}` : '未設定'}</span>
+                </div>
+                <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-shop text-blue-200"></i>
                   <span className="font-semibold">{selectedEmployee.branch?.nameJa ? `${selectedEmployee.branch.nameJa}支店` : '支店未設定'}</span>
                 </div>
@@ -477,7 +481,6 @@ export default function EmployeePage() {
                 <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-800 transition-colors"><i className="bi bi-x-lg text-xl"></i></button>
               </div>
 
-              {/* ★ 変更: 誕生日と電話番号を含めて見やすく配置 */}
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-person-lines-fill mr-1 text-blue-500"></i> 個人情報</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HIRE DATE</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-calendar-event text-blue-500"></i>{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString('ja-JP') : '-'}</div></div>
@@ -660,7 +663,6 @@ export default function EmployeePage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
                     <label className={labelClass}>社員コード</label>
-                    {/* ★ 変更: placeholderで自動採番される旨を案内 */}
                     <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder="(空欄で自動採番)" />
                   </div>
                   <div className="lg:col-span-2">
@@ -701,7 +703,6 @@ export default function EmployeePage() {
                       </select>
                     </div>
                   </div>
-                  {/* ★ 変更: 電話番号の入力欄を追加 */}
                   <div className="md:col-span-2">
                     <label className={labelClass}>電話番号</label>
                     <div className="relative">
@@ -716,6 +717,17 @@ export default function EmployeePage() {
                 <h4 className={sectionHeaderClass}><i className="bi bi-diagram-3 text-blue-600"></i> 組織・権限情報</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div><label className={labelClass}>入社日 <span className="text-rose-500">*</span></label><input type="date" required name="hireDate" value={formData.hireDate} onChange={handleInputChange} className={inputClass} /></div>
+                  
+                  <div className="md:col-span-2">
+                    <label className={labelClass}>直属の上司 (マネージャー)</label>
+                    <select name="managerId" value={formData.managerId} onChange={handleInputChange} className={inputClass}>
+                      <option value="">未設定</option>
+                      {employees.filter(e => e.id !== currentId && e.isActive).map(e => (
+                        <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa} ({e.jobTitle || '役職なし'})</option>
+                      ))}
+                    </select>
+                  </div>
+
                   <div>
                     <label className={labelClass}>所属支店</label>
                     <select name="branchId" value={formData.branchId} onChange={handleInputChange} className={inputClass}>
@@ -730,13 +742,15 @@ export default function EmployeePage() {
                       {departments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
                     </select>
                   </div>
-                  <div><label className={labelClass}>職種</label><input name="jobTitle" value={formData.jobTitle} onChange={handleInputChange} className={inputClass} placeholder="例: セールス" /></div>
                   <div>
                     <label className={labelClass}>階級 (等級)</label>
                     <select name="rank" value={formData.rank} onChange={handleInputChange} className={inputClass}>
                       {Object.entries(RANK_MAP).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
                     </select>
                   </div>
+                  
+                  <div><label className={labelClass}>職種</label><input name="jobTitle" value={formData.jobTitle} onChange={handleInputChange} className={inputClass} placeholder="例: セールス" /></div>
+                  
                   <div>
                     <label className={labelClass}>国籍</label>
                     <select name="countryId" value={formData.countryId} onChange={handleInputChange} className={inputClass}>

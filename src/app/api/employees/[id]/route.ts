@@ -25,7 +25,7 @@ export async function PUT(
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
-          phone: body.phone || null, // ★ 電話番号の追加
+          phone: body.phone || null, // 電話番号
           hireDate: body.hireDate ? new Date(body.hireDate) : null,
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender,
@@ -33,6 +33,7 @@ export async function PUT(
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
           branchId: body.branchId ? parseInt(body.branchId) : null, 
           countryId: body.countryId ? parseInt(body.countryId) : null,
+          managerId: body.managerId ? parseInt(body.managerId) : null, // ★ 追加: 上司IDの保存
           rank: body.rank || 'ASSOCIATE', 
           jobTitle: body.jobTitle || null, 
           isActive: body.isActive,

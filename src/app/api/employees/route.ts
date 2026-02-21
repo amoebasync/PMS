@@ -15,6 +15,8 @@ export async function GET() {
         roles: { include: { role: true } },
         country: true,
         financial: true, 
+        // ★ 追加: 上司の基本情報を取得
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } } 
       }
     });
     return NextResponse.json(employees);
@@ -45,7 +47,7 @@ export async function POST(request: Request) {
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
-          phone: body.phone || null, // ★ 電話番号の追加
+          phone: body.phone || null, // 電話番号
           passwordHash: hash,
           hireDate: body.hireDate ? new Date(body.hireDate) : null, 
           birthday: body.birthday ? new Date(body.birthday) : null,
@@ -55,6 +57,7 @@ export async function POST(request: Request) {
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
           branchId: body.branchId ? parseInt(body.branchId) : null, 
           countryId: body.countryId ? parseInt(body.countryId) : null,
+          managerId: body.managerId ? parseInt(body.managerId) : null, // ★ 追加: 上司IDの保存
           rank: body.rank || 'ASSOCIATE', 
           jobTitle: body.jobTitle || null, 
         },

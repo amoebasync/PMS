@@ -115,6 +115,13 @@ model Employee {
 
   // ============================
 
+  // ------------------------------------------------
+  // ★ ここに追加: 直属の上司 (自己参照リレーション)
+  // ------------------------------------------------
+  managerId      Int?          @map("manager_id")
+  manager        Employee?     @relation("EmployeeToManager", fields: [managerId], references: [id])
+  subordinates   Employee[]    @relation("EmployeeToManager")
+
   avatarUrl      String?       @map("avatar_url") @db.Text
 
   isActive       Boolean   @default(true) @map("is_active")
