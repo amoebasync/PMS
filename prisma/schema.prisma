@@ -222,6 +222,7 @@ model EmployeeFinancial {
 
   transportationFee String?               @map("transportation_fee") // 交通費の規定
   allowance         Int?                  @default(0)                // 役職手当などの固定手当
+  paidLeaveBalance  Float?                @default(0) @map("paid_leave_balance")
   
   // --- 控除・保険関連 (給与計算用) ---
   healthInsurance   Int?                  @default(0) @map("health_insurance")       // 健康保険料

@@ -3,7 +3,6 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// 更新 (PUT)
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -13,7 +12,6 @@ export async function PUT(
     const employeeId = parseInt(id);
     const body = await request.json();
 
-    // ★ トランザクションで Employee と EmployeeFinancial を同時に更新
     const updated = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.update({
         where: { id: employeeId },
@@ -26,18 +24,20 @@ export async function PUT(
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
-          hireDate: new Date(body.hireDate),
+          hireDate: body.hireDate ? new Date(body.hireDate) : null,
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender,
-          employmentType: body.employmentType || 'FULL_TIME', // ★ 雇用形態
+          employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
+          branchId: body.branchId ? parseInt(body.branchId) : null, // ★ 追加
           roleId: body.roleId ? parseInt(body.roleId) : null,
           countryId: body.countryId ? parseInt(body.countryId) : null,
+          rank: body.rank || 'ASSOCIATE', // ★ 追加
+          jobTitle: body.jobTitle || null, // ★ 追加
           isActive: body.isActive,
         },
       });
 
-      // 財務・給与情報の更新 (Upsert)
       const financialData = {
         salaryType: body.salaryType || 'MONTHLY',
         baseSalary: body.baseSalary ? parseInt(body.baseSalary) : null,
@@ -66,7 +66,6 @@ export async function PUT(
   }
 }
 
-// 削除 (DELETE) - 論理削除
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }

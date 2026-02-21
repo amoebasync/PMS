@@ -2,6 +2,13 @@
 
 import React, { useState, useEffect } from 'react';
 
+const ATTENDANCE_TYPE_MAP: Record<string, { label: string, color: string }> = {
+  WORK: { label: '出勤', color: 'bg-blue-100 text-blue-700' },
+  PAID_LEAVE: { label: '有給休暇', color: 'bg-emerald-100 text-emerald-700' },
+  UNPAID_LEAVE: { label: '無給休暇', color: 'bg-slate-100 text-slate-600' },
+  ABSENCE: { label: '欠勤', color: 'bg-rose-100 text-rose-700' },
+};
+
 export default function AttendancePage() {
   const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'EXPENSE'>('ATTENDANCE');
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +63,7 @@ export default function AttendancePage() {
         if (summaryOffset === 0) {
           setAttendanceForm(prev => ({
             ...prev,
-            attendanceTypeId: defaultTypeId,
+            attendanceTypeId: defaultTypeId, // 取得したIDを初期セット
             startTime: sumData.defaults?.startTime || '09:00',
             endTime: sumData.defaults?.endTime || '18:00',
             breakMinutes: sumData.defaults?.breakMinutes ?? 60
@@ -170,165 +177,178 @@ export default function AttendancePage() {
       </div>
 
       {activeTab === 'ATTENDANCE' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="space-y-6">
           
-          <div className="space-y-6">
+          {/* ★ 改修: サマリーカードを上部に横長で配置 */}
+          <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg p-5 text-white flex flex-col md:flex-row items-center justify-between gap-6">
             
-            {/* サマリーカード */}
-            <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-2xl shadow-lg p-5 text-white flex flex-col justify-between">
-              <div className="flex flex-col gap-3 mb-4 border-b border-white/20 pb-4">
-                <h3 className="font-bold text-lg leading-none mt-1">
-                  <i className="bi bi-wallet2 mr-2"></i> {getSummaryTitle()}
-                </h3>
-                <div className="flex items-center justify-between bg-black/20 p-1.5 rounded-lg w-full shadow-inner">
-                  <button onClick={() => setSummaryOffset(o => o - 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-left text-xs"></i></button>
-                  <span className="text-[11px] font-mono tracking-tighter sm:tracking-normal px-2 truncate text-indigo-50 font-semibold">
-                    {summary?.startDate?.replace(/-/g, '/')} ~ {summary?.endDate?.replace(/-/g, '/')}
-                  </span>
-                  <button onClick={() => setSummaryOffset(o => o + 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-right text-xs"></i></button>
-                </div>
+            {/* 左側: タイトルと期間スライダー */}
+            <div className="w-full md:w-auto flex-1">
+              <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+                <i className="bi bi-wallet2"></i> {getSummaryTitle()}
+              </h3>
+              <div className="flex items-center justify-between bg-black/20 p-1.5 rounded-lg max-w-sm shadow-inner">
+                <button onClick={() => setSummaryOffset(o => o - 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-left text-xs"></i></button>
+                <span className="text-xs font-mono tracking-tighter sm:tracking-normal px-2 truncate text-indigo-50 font-semibold">
+                  {summary?.startDate?.replace(/-/g, '/')} ~ {summary?.endDate?.replace(/-/g, '/')}
+                </span>
+                <button onClick={() => setSummaryOffset(o => o + 1)} className="hover:bg-white/20 rounded w-7 h-7 flex items-center justify-center transition-colors shrink-0"><i className="bi bi-chevron-right text-xs"></i></button>
               </div>
-              <div className="mb-4">
-                <div className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">合計金額</div>
-                <div className="text-4xl font-black font-mono mt-1 drop-shadow-sm">¥{summary?.totalWage?.toLocaleString() || 0}</div>
-              </div>
-              
-              <div className="flex justify-between text-sm bg-black/20 p-3 rounded-xl shadow-inner mb-3">
-                <div><span className="text-indigo-200 text-xs">実労働時間</span> <br/><span className="font-bold">{summary?.totalHours || 0} h</span></div>
-                <div className="text-right"><span className="text-indigo-200 text-xs">出勤日数</span> <br/><span className="font-bold">{summary?.records?.length || 0} 日</span></div>
-              </div>
-
-              {/* ★ 追加: 正社員の場合のみ有給残日数を表示 */}
-              {summary?.employmentType === 'FULL_TIME' && (
-                <div className="bg-white/20 rounded-xl p-3 flex justify-between items-center text-sm shadow-sm border border-white/10 backdrop-blur-sm">
-                  <span className="font-bold text-indigo-50"><i className="bi bi-cup-hot-fill mr-1"></i> 有給残日数</span>
-                  <span className="font-black text-xl">{summary?.paidLeaveBalance || 0} <span className="text-xs font-medium">日</span></span>
-                </div>
-              )}
             </div>
 
-            {/* 打刻フォーム */}
-            <form onSubmit={handleAttendanceSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
-              <h3 className="font-bold text-slate-800 border-b pb-2 flex items-center gap-2"><i className="bi bi-pencil-square text-indigo-600"></i> 打刻・勤怠入力</h3>
+            {/* 右側: 金額と統計情報 */}
+            <div className="w-full md:w-auto flex flex-wrap md:flex-nowrap items-center gap-4">
+              <div className="pr-4 md:border-r border-white/20">
+                <div className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">合計金額</div>
+                <div className="text-3xl font-black font-mono mt-1 drop-shadow-sm">¥{summary?.totalWage?.toLocaleString() || 0}</div>
+              </div>
               
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">勤務日</label>
-                <input type="date" required value={attendanceForm.date} onChange={e => setAttendanceForm({...attendanceForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">勤怠の種類</label>
-                <select required value={attendanceForm.attendanceTypeId} onChange={e => setAttendanceForm({...attendanceForm, attendanceTypeId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
-                  <option value="">選択してください</option>
-                  {availableTypes.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
-                {selectedType?.isDeducting && <p className="text-[10px] text-emerald-600 mt-1 font-bold">※ 有給休暇を1日分消化します。</p>}
-              </div>
-
-              {/* 出勤の時だけ時間を入力させる */}
-              {isWorking ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">出勤時間</label>
-                      <input type="time" required value={attendanceForm.startTime} onChange={e => setAttendanceForm({...attendanceForm, startTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">退勤時間</label>
-                      <input type="time" required value={attendanceForm.endTime} onChange={e => setAttendanceForm({...attendanceForm, endTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">休憩時間 (分)</label>
-                    <input type="number" required min="0" value={attendanceForm.breakMinutes} onChange={e => setAttendanceForm({...attendanceForm, breakMinutes: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
-                  </div>
-                </>
-              ) : (
-                <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 text-center border border-dashed border-slate-200">
-                  <i className="bi bi-info-circle mr-1"></i> 休暇のため時間の入力は不要です
+              <div className="flex gap-3 text-sm">
+                <div className="bg-black/20 px-4 py-2 rounded-xl shadow-inner text-center min-w-[70px]">
+                  <div className="text-indigo-200 text-[10px]">実労働</div>
+                  <div className="font-bold mt-0.5">{summary?.totalHours || 0} h</div>
                 </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">備考 (遅刻・早退・休暇理由など)</label>
-                <textarea rows={2} value={attendanceForm.note} onChange={e => setAttendanceForm({...attendanceForm, note: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                <div className="bg-black/20 px-4 py-2 rounded-xl shadow-inner text-center min-w-[70px]">
+                  <div className="text-indigo-200 text-[10px]">出勤</div>
+                  <div className="font-bold mt-0.5">{summary?.records?.length || 0} 日</div>
+                </div>
+                {summary?.employmentType === 'FULL_TIME' && (
+                  <div className="bg-white/20 px-4 py-2 rounded-xl shadow-sm border border-white/10 backdrop-blur-sm text-center min-w-[70px]">
+                    <div className="text-indigo-50 text-[10px] whitespace-nowrap"><i className="bi bi-cup-hot-fill mr-1"></i>有給残</div>
+                    <div className="font-bold mt-0.5">{summary?.paidLeaveBalance || 0} 日</div>
+                  </div>
+                )}
               </div>
-
-              {isWorking && (
-                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded-lg border border-slate-100">
-                  <input type="checkbox" checked={attendanceForm.saveAsDefault} onChange={e => setAttendanceForm({...attendanceForm, saveAsDefault: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
-                  <span className="text-[11px] font-bold text-slate-600">この時間をデフォルト(テンプレート)として保存する</span>
-                </label>
-              )}
-
-              <button type="submit" disabled={isSubmitting || !attendanceForm.attendanceTypeId} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 mt-2">
-                {isSubmitting ? '保存中...' : '記録を送信する'}
-              </button>
-            </form>
+            </div>
           </div>
 
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
-              <h3 className="font-bold text-slate-800"><i className="bi bi-list-ul mr-2"></i> 直近の勤怠履歴</h3>
+          {/* ★ 改修: 打刻フォームと履歴テーブルを並べる */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            {/* 左側: 打刻フォーム */}
+            <div className="space-y-6">
+              <form onSubmit={handleAttendanceSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-5">
+                <h3 className="font-bold text-slate-800 border-b pb-2 flex items-center gap-2"><i className="bi bi-pencil-square text-indigo-600"></i> 打刻・勤怠入力</h3>
+                
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">勤務日</label>
+                  <input type="date" required value={attendanceForm.date} onChange={e => setAttendanceForm({...attendanceForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">勤怠の種類</label>
+                  <select required value={attendanceForm.attendanceTypeId} onChange={e => setAttendanceForm({...attendanceForm, attendanceTypeId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
+                    <option value="">選択してください</option>
+                    {availableTypes.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  {selectedType?.isDeducting && <p className="text-[10px] text-emerald-600 mt-1 font-bold">※ 有給休暇を1日分消化します。</p>}
+                </div>
+
+                {/* 出勤の時だけ時間を入力させる */}
+                {isWorking ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">出勤時間</label>
+                        <input type="time" required value={attendanceForm.startTime} onChange={e => setAttendanceForm({...attendanceForm, startTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">退勤時間</label>
+                        <input type="time" required value={attendanceForm.endTime} onChange={e => setAttendanceForm({...attendanceForm, endTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">休憩時間 (分)</label>
+                      <input type="number" required min="0" value={attendanceForm.breakMinutes} onChange={e => setAttendanceForm({...attendanceForm, breakMinutes: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 text-center border border-dashed border-slate-200">
+                    <i className="bi bi-info-circle mr-1"></i> 休暇のため時間の入力は不要です
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">備考 (遅刻・早退・休暇理由など)</label>
+                  <textarea rows={2} value={attendanceForm.note} onChange={e => setAttendanceForm({...attendanceForm, note: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                </div>
+
+                {isWorking && (
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded-lg border border-slate-100">
+                    <input type="checkbox" checked={attendanceForm.saveAsDefault} onChange={e => setAttendanceForm({...attendanceForm, saveAsDefault: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
+                    <span className="text-[11px] font-bold text-slate-600">この時間をデフォルトとして保存</span>
+                  </label>
+                )}
+
+                <button type="submit" disabled={isSubmitting || !attendanceForm.attendanceTypeId} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 mt-2">
+                  {isSubmitting ? '保存中...' : '記録を送信する'}
+                </button>
+              </form>
             </div>
-            <div className="overflow-x-auto flex-1 p-5">
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead>
-                  <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="pb-3 font-bold">日付</th>
-                    <th className="pb-3 font-bold">内容</th>
-                    <th className="pb-3 font-bold text-center">実働</th>
-                    <th className="pb-3 font-bold text-right">日給(計算)</th>
-                    <th className="pb-3 font-bold text-center">状態</th>
-                    <th className="pb-3 font-bold text-center">操作</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {attendances.length === 0 && (
-                    <tr><td colSpan={6} className="py-8 text-center text-slate-400">履歴がありません</td></tr>
-                  )}
-                  {attendances.map((att: any) => (
-                    <tr key={att.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 font-mono font-bold text-slate-700">
-                        {new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
-                      </td>
-                      <td className="py-3">
-                        {att.attendanceType?.isWorking ? (
-                          <span className="text-[11px] sm:text-sm font-medium">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}分休)</span></span>
-                        ) : (
-                          <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || '休暇'}</span>
-                        )}
-                      </td>
-                      <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${att.workHours}h` : '-'}</td>
-                      <td className="py-3 text-right font-mono font-bold text-indigo-600">¥{(att.calculatedWage || 0).toLocaleString()}</td>
-                      <td className="py-3 text-center">
-                        <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${att.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : att.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {att.status}
-                        </span>
-                      </td>
-                      <td className="py-3 text-center">
-                        {/* 常に表示 */}
-                        {att.status === 'PENDING' ? (
-                          <div className="flex justify-center gap-2">
-                            <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center hover:bg-blue-100 shadow-sm" title="編集"><i className="bi bi-pencil"></i></button>
-                            <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-50 text-rose-600 border border-rose-200 rounded flex items-center justify-center hover:bg-rose-100 shadow-sm" title="取り下げ(削除)"><i className="bi bi-trash3"></i></button>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-slate-300">-</span>
-                        )}
-                      </td>
+
+            {/* 右側: 履歴テーブル */}
+            <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+              <div className="p-5 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                <h3 className="font-bold text-slate-800"><i className="bi bi-list-ul mr-2"></i> 直近の勤怠履歴</h3>
+              </div>
+              <div className="overflow-x-auto flex-1 p-5">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="text-slate-500 border-b border-slate-200">
+                      <th className="pb-3 font-bold">日付</th>
+                      <th className="pb-3 font-bold">内容</th>
+                      <th className="pb-3 font-bold text-center">実働</th>
+                      <th className="pb-3 font-bold text-right">日給(計算)</th>
+                      <th className="pb-3 font-bold text-center">状態</th>
+                      <th className="pb-3 font-bold text-center">操作</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {attendances.length === 0 && (
+                      <tr><td colSpan={6} className="py-8 text-center text-slate-400">履歴がありません</td></tr>
+                    )}
+                    {attendances.map((att: any) => (
+                      <tr key={att.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="py-3 font-mono font-bold text-slate-700">
+                          {new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
+                        </td>
+                        <td className="py-3">
+                          {att.attendanceType?.isWorking ? (
+                            <span className="text-[11px] sm:text-sm font-medium">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}分休)</span></span>
+                          ) : (
+                            <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || '休暇'}</span>
+                          )}
+                        </td>
+                        <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${att.workHours}h` : '-'}</td>
+                        <td className="py-3 text-right font-mono font-bold text-indigo-600">¥{(att.calculatedWage || 0).toLocaleString()}</td>
+                        <td className="py-3 text-center">
+                          <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${att.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : att.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {att.status}
+                          </span>
+                        </td>
+                        <td className="py-3 text-center">
+                          {att.status === 'PENDING' ? (
+                            <div className="flex justify-center gap-2">
+                              <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center hover:bg-blue-100 shadow-sm" title="編集"><i className="bi bi-pencil"></i></button>
+                              <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-50 text-rose-600 border border-rose-200 rounded flex items-center justify-center hover:bg-rose-100 shadow-sm" title="取り下げ(削除)"><i className="bi bi-trash3"></i></button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-300">-</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* 経費タブは省略 */}
+      {/* 経費タブは変更なしのため省略 */}
       {activeTab === 'EXPENSE' && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <form onSubmit={handleExpenseSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">

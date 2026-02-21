@@ -4,16 +4,16 @@ import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
-// 一覧取得
 export async function GET() {
   try {
     const employees = await prisma.employee.findMany({
       orderBy: { id: 'desc' },
       include: {
         department: true,
+        branch: true,  // ★ 追加: 支店情報も含める
         role: true,
         country: true,
-        financial: true, // ★ 追加: 財務・給与情報も含めて取得
+        financial: true,
       }
     });
     return NextResponse.json(employees);
@@ -23,13 +23,11 @@ export async function GET() {
   }
 }
 
-// 新規登録 (POST)
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const hash = crypto.createHash('sha256').update(body.password || 'password123').digest('hex');
 
-    // ★ トランザクションで Employee と EmployeeFinancial を同時に作成
     const newEmployee = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.create({
         data: {
@@ -42,18 +40,20 @@ export async function POST(request: Request) {
           firstNameEn: body.firstNameEn || null,
           email: body.email,
           passwordHash: hash,
-          hireDate: new Date(body.hireDate), 
+          hireDate: body.hireDate ? new Date(body.hireDate) : null, 
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender || 'unknown',
           isActive: true,
-          employmentType: body.employmentType || 'FULL_TIME', // ★ 雇用形態
+          employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
+          branchId: body.branchId ? parseInt(body.branchId) : null, // ★ 追加
           roleId: body.roleId ? parseInt(body.roleId) : null,
           countryId: body.countryId ? parseInt(body.countryId) : null,
+          rank: body.rank || 'ASSOCIATE', // ★ 追加
+          jobTitle: body.jobTitle || null, // ★ 追加
         },
       });
 
-      // 財務・給与情報の作成
       if (body.salaryType) {
         await tx.employeeFinancial.create({
           data: {
