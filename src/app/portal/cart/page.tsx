@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { useCart } from '@/components/portal/CartContext';
+import { useCart, CartItem } from '@/components/portal/CartContext';
 
 export default function CartPage() {
   const router = useRouter();
@@ -12,10 +12,13 @@ export default function CartPage() {
   const { items, updateItem, removeItem, totalAmount, clearCart } = useCart();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingItemId, setProcessingItemId] = useState<string | null>(null);
   const [myFlyers, setMyFlyers] = useState<any[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState('CREDIT'); // 決済方法
+  const [paymentMethod, setPaymentMethod] = useState('CREDIT'); 
+  
+  // 全エリア表示モーダル用のState
+  const [viewAreasItem, setViewAreasItem] = useState<CartItem | null>(null);
 
-  // チラシ一覧を取得
   useEffect(() => {
     if (status === 'authenticated') {
       fetch('/api/portal/flyers').then(res => res.json()).then(data => {
@@ -24,13 +27,13 @@ export default function CartPage() {
     }
   }, [status]);
 
+  // 発注を確定する (一括決済)
   const handleCheckout = async () => {
     if (status !== 'authenticated') {
       router.push('/portal/login?callbackUrl=/portal/cart');
       return;
     }
 
-    // 全アイテムに案件名とチラシが設定されているかチェック
     const isReady = items.every(item => item.projectName && item.flyerId);
     if (!isReady) {
       alert('すべての発注アイテムに対して、「案件名」の入力と「チラシ」の選択を行ってください。');
@@ -42,7 +45,7 @@ export default function CartPage() {
       const res = await fetch('/api/portal/orders/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items, paymentMethod })
+        body: JSON.stringify({ items, paymentMethod, isDraft: false })
       });
       
       if (res.ok) {
@@ -57,6 +60,40 @@ export default function CartPage() {
       alert('通信エラーが発生しました。');
       setIsProcessing(false);
     }
+  };
+
+  // 各アイテム毎の一時保存（下書き）する
+  const handleSaveDraftItem = async (item: CartItem) => {
+    if (!item.projectName || !item.flyerId) {
+      alert('「案件名」を入力し、「使用するチラシ」を選択してから保存してください。');
+      return;
+    }
+
+    setProcessingItemId(item.id);
+    try {
+      // paymentMethod は一時保存時は CREDIT 固定（あとで変更可能にするため影響なし）
+      const res = await fetch('/api/portal/orders/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: [item], paymentMethod: 'CREDIT', isDraft: true })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        // APIから返ってきた orderId を保存しておく（二重作成防止用）
+        const savedData = data.orderIds?.find((o: any) => o.cartItemId === item.id);
+        if (savedData) {
+          updateItem(item.id, { savedOrderId: savedData.orderId });
+        }
+        alert('一時保存しました。発注履歴画面からも確認できます。');
+      } else {
+        const data = await res.json();
+        alert(`エラー: ${data.error || '保存に失敗しました。'}`);
+      }
+    } catch (e) {
+      alert('通信エラーが発生しました。');
+    }
+    setProcessingItemId(null);
   };
 
   if (items.length === 0) {
@@ -75,7 +112,7 @@ export default function CartPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300 pt-4 pb-20">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300 pt-4 pb-20 relative">
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
           <i className="bi bi-cart3 text-indigo-600"></i> ショッピングカート
@@ -90,9 +127,8 @@ export default function CartPage() {
         {/* 左側: 商品一覧 */}
         <div className="lg:col-span-2 space-y-6">
           {items.map((item, index) => (
-            <div key={item.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col gap-6 hover:shadow-md transition-shadow">
+            <div key={item.id} className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 flex flex-col gap-5 hover:shadow-md transition-shadow">
               
-              {/* アイテムヘッダー */}
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-4">
                   <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 text-2xl shadow-inner ${item.type === 'PRINT_AND_POSTING' ? 'bg-indigo-50 text-indigo-500' : 'bg-fuchsia-50 text-fuchsia-500'}`}>
@@ -105,62 +141,108 @@ export default function CartPage() {
                     <h3 className="font-bold text-slate-800">{item.title}</h3>
                   </div>
                 </div>
-                <button onClick={() => removeItem(item.id)} className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 flex items-center justify-center rounded-lg transition-colors shrink-0" title="削除">
-                  <i className="bi bi-trash3-fill text-lg"></i>
+                
+                <div className="flex items-center gap-2 shrink-0">
+                  <button 
+                    onClick={() => router.push(`/portal/orders/new?editItemId=${item.id}`)} 
+                    className="text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors text-xs font-bold border border-transparent hover:border-indigo-200 flex items-center gap-1.5" 
+                    title="発注画面に戻って内容を編集"
+                  >
+                    <i className="bi bi-pencil-square text-sm"></i> 内容を修正
+                  </button>
+                  <button 
+                    onClick={() => removeItem(item.id)} 
+                    className="text-slate-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 flex items-center justify-center rounded-lg transition-colors" 
+                    title="削除"
+                  >
+                    <i className="bi bi-trash3-fill text-base"></i>
+                  </button>
+                </div>
+              </div>
+
+              {/* ログイン時のみ表示される「案件名」と「チラシ」 */}
+              {status === 'authenticated' && (
+                <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1.5">案件名 (必須) <span className="text-rose-500">*</span></label>
+                    <input 
+                      type="text" 
+                      placeholder="例: 春のキャンペーン第1弾" 
+                      value={item.projectName || ''} 
+                      onChange={e => updateItem(item.id, { projectName: e.target.value })}
+                      className="w-full border border-slate-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1.5">使用するチラシ (必須) <span className="text-rose-500">*</span></label>
+                    <div className="flex gap-2">
+                      <select 
+                        value={item.flyerId || ''} 
+                        onChange={e => updateItem(item.id, { flyerId: e.target.value })}
+                        className="flex-1 border border-slate-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer"
+                      >
+                        <option value="">選択してください</option>
+                        {myFlyers.map(f => <option key={f.id} value={f.id}>{f.name} (在庫: {f.stockCount})</option>)}
+                        <option value="NEW">✨ 新しくチラシを入稿・登録する</option>
+                      </select>
+                    </div>
+                    {item.flyerId === 'NEW' && <p className="text-[10px] text-fuchsia-600 font-bold mt-1.5"><i className="bi bi-info-circle-fill"></i> 決済完了後に入稿画面へご案内します。</p>}
+                  </div>
+                </div>
+              )}
+
+              {/* 詳細情報 (表示専用) */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div>
+                  <div className="text-[10px] font-bold text-slate-500 mb-1">希望配布枚数</div>
+                  <div className="text-sm font-black text-indigo-600">{item.totalCount.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span></div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-500 mb-1">開始予定日</div>
+                  <div className="text-sm font-bold text-slate-700">{item.startDate ? item.startDate.replace(/-/g, '/') : '未定'}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-500 mb-1">完了期限日</div>
+                  <div className="text-sm font-bold text-indigo-700">{item.endDate ? item.endDate.replace(/-/g, '/') : '未定'}</div>
+                </div>
+                <div>
+                  <div className="text-[10px] font-bold text-slate-500 mb-1">予備期限</div>
+                  <div className="text-sm font-bold text-slate-700">{item.spareDate ? item.spareDate.replace(/-/g, '/') : 'なし'}</div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 text-xs text-slate-600 font-medium px-2">
+                <div className="w-5 text-center"><i className="bi bi-geo-alt-fill text-slate-400"></i></div>
+                <span className="truncate" title={item.selectedAreas.map(a => a.name).join(', ')}>
+                  エリア: {item.selectedAreas[0]?.name || '未指定'} <span className="text-[10px] text-slate-400">他 計{item.selectedAreas.length}ヶ所</span>
+                </span>
+                
+                <button 
+                  onClick={() => setViewAreasItem(item)}
+                  className="ml-auto text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded transition-colors border border-indigo-100 shrink-0 flex items-center gap-1.5"
+                >
+                  <i className="bi bi-list-ul"></i> 全てのエリアを表示
                 </button>
               </div>
 
-              {/* ★ 追加: 案件名とチラシの選択フォーム */}
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1.5">案件名 (必須) <span className="text-rose-500">*</span></label>
-                  <input 
-                    type="text" 
-                    placeholder="例: 春のキャンペーン第1弾" 
-                    value={item.projectName || ''} 
-                    onChange={e => updateItem(item.id, { projectName: e.target.value })}
-                    className="w-full border border-slate-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1.5">使用するチラシ (必須) <span className="text-rose-500">*</span></label>
-                  <div className="flex gap-2">
-                    <select 
-                      value={item.flyerId || ''} 
-                      onChange={e => updateItem(item.id, { flyerId: e.target.value })}
-                      className="flex-1 border border-slate-300 p-2.5 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer"
-                    >
-                      <option value="">選択してください</option>
-                      {myFlyers.map(f => <option key={f.id} value={f.id}>{f.name} (在庫: {f.stockCount})</option>)}
-                      <option value="NEW">✨ 新しくチラシを入稿・登録する</option>
-                    </select>
-                  </div>
-                  {item.flyerId === 'NEW' && <p className="text-[10px] text-fuchsia-600 font-bold mt-1.5"><i className="bi bi-info-circle-fill"></i> 決済完了後に入稿画面へご案内します。</p>}
+              <div className="pt-4 border-t border-slate-100 flex justify-between items-center gap-3">
+                {status === 'authenticated' ? (
+                  <button 
+                    onClick={() => handleSaveDraftItem(item)} 
+                    disabled={processingItemId === item.id}
+                    className="text-[11px] font-bold text-slate-600 hover:text-indigo-600 bg-white border border-slate-300 px-4 py-2 rounded-lg transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                  >
+                    {processingItemId === item.id ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-floppy"></i>}
+                    {item.savedOrderId ? '一時保存を更新' : 'この発注を一時保存'}
+                  </button>
+                ) : <div></div>}
+                
+                <div className="flex items-baseline gap-3 ml-auto">
+                  <span className="text-xs font-bold text-slate-400">小計 (税抜)</span>
+                  <span className="text-2xl font-black text-slate-800 tracking-tight">¥{item.price.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* 詳細情報 */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs text-slate-600 font-medium px-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 text-center"><i className="bi bi-calendar-event text-slate-400"></i></div>
-                  <span className="truncate">{item.startDate ? item.startDate.replace(/-/g, '/') : '未定'} 〜 {item.endDate ? item.endDate.replace(/-/g, '/') : '未定'}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 text-center"><i className="bi bi-geo-alt-fill text-slate-400"></i></div>
-                  <span className="truncate" title={item.selectedAreas.map(a => a.name).join(', ')}>
-                    {item.selectedAreas[0]?.name || '未指定'} <span className="text-[10px] text-slate-400">他 計{item.selectedAreas.length}ヶ所</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 text-center"><i className="bi bi-files text-slate-400"></i></div>
-                  <span className="font-bold">{item.totalCount.toLocaleString()} 枚</span>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end items-baseline gap-3">
-                <span className="text-xs font-bold text-slate-400">小計 (税抜)</span>
-                <span className="text-2xl font-black text-slate-800 tracking-tight">¥{item.price.toLocaleString()}</span>
-              </div>
             </div>
           ))}
         </div>
@@ -190,7 +272,6 @@ export default function CartPage() {
             <div className="text-[10px] text-right font-bold text-slate-400">税込</div>
           </div>
 
-          {/* ★ 追加: 決済方法の選択 */}
           <div className="mb-8">
              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-3">お支払い方法</label>
              <div className="space-y-2">
@@ -201,11 +282,11 @@ export default function CartPage() {
                    <div className="text-[10px] text-slate-500 mt-0.5">即時で発注が確定します</div>
                  </div>
                </label>
-               <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'INVOICE' ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600' : 'border-slate-200 hover:bg-slate-50'}`}>
-                 <input type="radio" name="payment" value="INVOICE" checked={paymentMethod === 'INVOICE'} onChange={() => setPaymentMethod('INVOICE')} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500" />
+               <label className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition-all ${paymentMethod === 'BANK_TRANSFER' ? 'border-indigo-600 bg-indigo-50/50 ring-1 ring-indigo-600' : 'border-slate-200 hover:bg-slate-50'}`}>
+                 <input type="radio" name="payment" value="BANK_TRANSFER" checked={paymentMethod === 'BANK_TRANSFER'} onChange={() => setPaymentMethod('BANK_TRANSFER')} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500" />
                  <div className="flex-1">
-                   <div className="text-sm font-bold text-slate-800 flex items-center gap-2"><i className="bi bi-file-earmark-text text-amber-600"></i>請求書払い (掛け払い)</div>
-                   <div className="text-[10px] text-slate-500 mt-0.5">与信審査後に発注確定となります</div>
+                   <div className="text-sm font-bold text-slate-800 flex items-center gap-2"><i className="bi bi-bank text-amber-600"></i>銀行振込 (前払)</div>
+                   <div className="text-[10px] text-slate-500 mt-0.5">入金確認後に発注確定となります</div>
                  </div>
                </label>
              </div>
@@ -224,9 +305,49 @@ export default function CartPage() {
               <>ログインしてレジに進む <i className="bi bi-box-arrow-in-right"></i></>
             )}
           </button>
+          
+          {!session && (
+            <p className="text-[10px] text-slate-500 text-center mt-4 leading-relaxed font-medium">
+              ※購入にはアカウントが必要です。<br/>まだお持ちでない方はログイン画面から<br/>「無料で登録する」へお進みください。
+            </p>
+          )}
         </div>
-
       </div>
+
+      {/* 全エリア表示用モーダル */}
+      {viewAreasItem && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg">選択中の全エリア</h3>
+                <p className="text-xs text-slate-500 mt-1">合計: <span className="font-bold text-indigo-600">{viewAreasItem.selectedAreas.length}</span> ヶ所</p>
+              </div>
+              <button onClick={() => setViewAreasItem(null)} className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200 rounded-full transition-colors"><i className="bi bi-x-lg"></i></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-3 custom-scrollbar space-y-1.5">
+              {viewAreasItem.selectedAreas.map((a, i) => (
+                <div key={i} className="flex justify-between items-center p-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-indigo-300 transition-colors">
+                  <div>
+                    <div className="text-[10px] text-slate-400 font-medium mb-0.5">{a.prefName} {a.cityName}</div>
+                    <div className="text-sm font-bold text-slate-700">{a.name.replace(`${a.cityName} `, '')}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-base font-black text-indigo-600">{a.count.toLocaleString()}</div>
+                    <div className="text-[9px] text-slate-400 font-bold uppercase">枚</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-white text-right">
+              <button onClick={() => setViewAreasItem(null)} className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm shadow-md transition-all">閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

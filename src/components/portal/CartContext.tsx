@@ -11,18 +11,19 @@ export type CartItem = {
   method: string;
   size: string;
   price: number;
+  unitPrice: number;
   startDate: string;
   endDate: string;
   spareDate: string;
-  // ★ 追加
   projectName?: string; 
   flyerId?: string;
+  savedOrderId?: number; // ★ 追加: 一時保存時のDBのIDを保持
 };
 
 type CartContextType = {
   items: CartItem[];
   addItem: (item: Omit<CartItem, 'id'>) => void;
-  updateItem: (id: string, updates: Partial<CartItem>) => void; // ★ 追加
+  updateItem: (id: string, updates: Partial<CartItem>) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
   totalAmount: number;

@@ -6,12 +6,20 @@ const prisma = new PrismaClient();
 export async function GET() {
   try {
     const orderDistAreas = await prisma.orderDistributionArea.findMany({
+      where: {
+        orderDistribution: {
+          order: {
+            // ★ 修正: 発注が「確定」または「作業中」の案件のみを抽出する
+            status: { in: ['CONFIRMED', 'IN_PROGRESS'] }
+          }
+        }
+      },
       include: {
         area: { include: { city: true, prefecture: true } },
         orderDistribution: {
           include: { 
-            order: { include: { customer: true } }, // ★ 顧客情報を追加
-            flyer: { include: { size: true } }      // ★ サイズ情報を追加
+            order: { include: { customer: true } }, 
+            flyer: { include: { size: true } }      
           }
         }
       }

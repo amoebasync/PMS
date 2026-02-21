@@ -27,7 +27,6 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
   return t && c ? `${t} ${c}` : (c || t); 
 };
 
-// ★ テーブルセルのベーススタイルと固定用スタイル関数
 const thBaseClass = "px-2 py-2 font-bold text-slate-600 bg-slate-50 border-b border-slate-200 shadow-[0_1px_0_0_#e2e8f0]";
 const tdBaseClass = "px-2 py-2 border-b border-slate-100 align-top bg-white group-hover:bg-indigo-50 transition-colors";
 
@@ -77,6 +76,15 @@ export default function DispatchPage() {
   };
 
   useEffect(() => { fetchData(); }, [dateFrom, dateTo]);
+
+  // ★ 追加: From日付変更時に、ToがFromより前になれば自動的に揃えるロジック
+  const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newFrom = e.target.value;
+    setDateFrom(newFrom);
+    if (newFrom > dateTo) {
+      setDateTo(newFrom);
+    }
+  };
 
   const isFlyerDuplicate = (targetSchedule: any, dropData: any) => {
     return targetSchedule.items.some((i: any) => {
@@ -252,21 +260,17 @@ export default function DispatchPage() {
         const isOverEndDate = endTime !== null && scheduleTime > endTime;
         const isOverSpareDate = spareTime !== null && scheduleTime > spareTime;
 
-        // 赤色(エラー)
         const isDanger = isOverCount || isBeforeStart || isOverSpareDate;
-        // 黄色(警告)
         const isWarning = !isDanger && isOverEndDate;
 
         if (isDanger) scheduleHasAlert = true;
 
-        // ツールチップ用詳細理由
         let alertReasons = [];
         if (isOverCount) alertReasons.push("予定枚数超過");
         if (isBeforeStart) alertReasons.push("開始日前");
         if (isOverSpareDate) alertReasons.push("予備期限超過");
         if (isWarning) alertReasons.push("配布期限超過");
 
-        // UI表示用の4文字バッジ
         let shortAlert = null;
         if (isOverCount) shortAlert = { text: "枚数超過", color: "bg-rose-100 text-rose-700 border-rose-300" };
         else if (isOverSpareDate) shortAlert = { text: "予備超過", color: "bg-rose-100 text-rose-700 border-rose-300" };
@@ -358,7 +362,8 @@ export default function DispatchPage() {
         <div className="flex flex-wrap gap-4 items-end">
           <div>
             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (FROM)</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+            {/* ★ 変更: handleDateFromChange を設定 */}
+            <input type="date" value={dateFrom} onChange={handleDateFromChange} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           <div>
             <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (TO)</label>
@@ -451,19 +456,16 @@ export default function DispatchPage() {
               </div>
             )}
 
-            {/* ★ テーブル表示領域。ここだけがスクロールする */}
             <div className="flex-1 overflow-auto custom-scrollbar rounded-xl relative">
               <table className="text-left text-[11px] whitespace-nowrap border-separate border-spacing-0 w-max min-w-full">
                 <thead>
                   <tr>
-                    {/* ★ 修正: classNameを正しく定義し直したものに置換 */}
                     <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(0, true)} onClick={() => handleSort('date')}>日付 {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                     <th className={`min-w-[160px] w-[160px] ${thBaseClass}`} style={getStickyStyle(100, true)} onClick={() => handleSort('areaCode')}>エリア {sortConfig.key === 'areaCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                     <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(260, true)} onClick={() => handleSort('branch')}>支店 {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
                     <th className={`min-w-[120px] w-[120px] ${thBaseClass}`} style={getStickyStyle(360, true)}>配布員</th>
                     <th className={`min-w-[90px] w-[90px] ${thBaseClass} border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={getStickyStyle(480, true)}>状態</th>
                     
-                    {/* スクロールするチラシ列 */}
                     {[1, 2, 3, 4, 5, 6].map(num => (
                       <th key={num} className={`sticky top-0 z-40 min-w-[180px] text-center bg-indigo-50/50 ${thBaseClass}`}>チラシ {num}</th>
                     ))}

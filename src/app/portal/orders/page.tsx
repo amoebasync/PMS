@@ -4,11 +4,15 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
-  PLANNING: { label: 'お見積り中', color: 'bg-slate-100 text-slate-600', icon: 'bi-file-text' },
-  CONFIRMED: { label: '手配中 (決済済)', color: 'bg-blue-100 text-blue-700', icon: 'bi-check-circle-fill' },
-  IN_PROGRESS: { label: '作業・配布中', color: 'bg-amber-100 text-amber-700', icon: 'bi-truck' },
+  DRAFT: { label: '下書き', color: 'bg-slate-100 text-slate-500', icon: 'bi-pencil' },
+  PLANNING: { label: '提案中', color: 'bg-slate-100 text-slate-500', icon: 'bi-chat-dots' },
+  PENDING_PAYMENT: { label: '入金待ち', color: 'bg-orange-100 text-orange-700', icon: 'bi-coin' },
+  PENDING_REVIEW: { label: '審査待ち', color: 'bg-yellow-100 text-yellow-700', icon: 'bi-hourglass-split' },
+  ADJUSTING: { label: '要調整・修正', color: 'bg-rose-100 text-rose-700', icon: 'bi-exclamation-triangle-fill' },
+  CONFIRMED: { label: '手配中(確定)', color: 'bg-blue-100 text-blue-700', icon: 'bi-check-circle-fill' },
+  IN_PROGRESS: { label: '作業・配布中', color: 'bg-indigo-100 text-indigo-700', icon: 'bi-truck' },
   COMPLETED: { label: '完了', color: 'bg-emerald-100 text-emerald-700', icon: 'bi-flag-fill' },
-  CANCELED: { label: 'キャンセル', color: 'bg-rose-100 text-rose-700', icon: 'bi-x-circle-fill' },
+  CANCELED: { label: 'キャンセル', color: 'bg-slate-200 text-slate-500', icon: 'bi-x-circle-fill' },
 };
 
 export default function PortalOrdersPage() {

@@ -6,24 +6,50 @@ const prisma = new PrismaClient();
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    
     if (id === 'new') return NextResponse.json({});
 
+    if (id === 'pending-count') {
+      const count = await prisma.order.count({
+        where: { status: 'PENDING_REVIEW' }
+      });
+      return NextResponse.json({ count });
+    }
+
+    const orderId = parseInt(id);
+    if (isNaN(orderId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
+
     const order = await prisma.order.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: orderId },
       include: {
-        customer: true,
+        customer: true, 
         salesRep: true,
-        // ★ areas: true を追加して、マップの選択状態を復元できるようにしました
-        distributions: { include: { flyer: true, areas: true } },
+        // ★ 修正: areasの中の「実際のエリア情報 (都道府県・市区町村)」まで深く取得する
+        distributions: { 
+          include: { 
+            flyer: true, 
+            areas: { 
+              include: { 
+                area: { 
+                  include: { prefecture: true, city: true } 
+                } 
+              } 
+            } 
+          } 
+        },
         printings: { include: { flyer: true, partner: true } },
         newspaperInserts: { include: { partner: true } },
         designs: { include: { partner: true, employee: true } },
+        payments: true, 
+        approvals: { orderBy: { createdAt: 'desc' } } 
       }
     });
     return NextResponse.json(order);
-  } catch (error) {
+  } catch (error) { 
     console.error('Fetch Order Detail Error:', error);
-    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 });
+    return NextResponse.json({ error: 'Failed to fetch order' }, { status: 500 }); 
   }
 }
 
@@ -31,15 +57,42 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   try {
     const { id } = await params;
     const body = await request.json();
+    
     const orderId = parseInt(id);
-    const tab = body.tab || 'BASIC'; // どのタブからの保存リクエストかを判定
+    if (isNaN(orderId)) {
+      return NextResponse.json({ error: 'Invalid ID' }, { status: 400 });
+    }
 
-    // --- 基本情報の保存 ---
+    const tab = body.tab || 'BASIC'; 
+
+    if (tab === 'STATUS') {
+      const { status: newStatus, action, comment } = body;
+
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({ where: { id: orderId }, data: { status: newStatus } });
+
+        if (action === 'PAYMENT_CONFIRMED') {
+          await tx.payment.updateMany({
+            where: { orderId: orderId, status: 'PENDING' },
+            data: { status: 'COMPLETED', paidAt: new Date() }
+          });
+        }
+        else if (action === 'APPROVE') {
+          await tx.orderApproval.create({ data: { orderId, status: 'APPROVED' } });
+        }
+        else if (action === 'REJECT') {
+          await tx.orderApproval.create({ data: { orderId, status: 'REJECTED', comment } });
+        }
+      });
+      return NextResponse.json({ success: true });
+    }
+
     if (tab === 'BASIC') {
       const updatedOrder = await prisma.order.update({
         where: { id: orderId },
         data: {
           orderNo: body.orderNo,
+          title: body.title || null,
           customerId: parseInt(body.customerId),
           salesRepId: body.salesRepId ? parseInt(body.salesRepId) : null,
           orderDate: new Date(body.orderDate),
@@ -51,7 +104,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json(updatedOrder);
     } 
     
-    // --- 配布(ポスティング)の保存 ---
     else if (tab === 'DIST') {
       const distId = body.id ? parseInt(body.id) : null;
       const data = {
@@ -62,18 +114,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         startDate: body.startDate ? new Date(body.startDate) : null,
         endDate: body.endDate ? new Date(body.endDate) : null,
         spareDate: body.spareDate ? new Date(body.spareDate) : null,
+        status: body.status || 'UNSTARTED',
+        remarks: body.remarks || null,
       };
       
       let distribution;
       if (distId) {
         distribution = await prisma.orderDistribution.update({ where: { id: distId }, data });
-        // 既存のエリア紐付けを一旦クリア
         await prisma.orderDistributionArea.deleteMany({ where: { orderDistributionId: distId } });
       } else {
         distribution = await prisma.orderDistribution.create({ data });
       }
       
-      // 新しいエリア紐付けを保存
       if (body.areaIds && body.areaIds.length > 0) {
         const areaData = body.areaIds.map((aid: number) => ({ orderDistributionId: distribution.id, areaId: aid }));
         await prisma.orderDistributionArea.createMany({ data: areaData });
@@ -81,7 +133,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json(distribution);
     }
     
-    // --- 印刷手配の保存 ---
     else if (tab === 'PRINT') {
       const printId = body.id ? parseInt(body.id) : null;
       const data = {
@@ -100,7 +151,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       else return NextResponse.json(await prisma.orderPrinting.create({ data }));
     }
     
-    // --- 新聞折込の保存 ---
     else if (tab === 'NEWS') {
       const newsId = body.id ? parseInt(body.id) : null;
       const data = {
@@ -116,7 +166,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       else return NextResponse.json(await prisma.orderNewspaperInsert.create({ data }));
     }
     
-    // --- デザイン制作の保存 ---
     else if (tab === 'DESIGN') {
       const designId = body.id ? parseInt(body.id) : null;
       const data = {

@@ -92,6 +92,8 @@ model Employee {
   country    Country?    @relation(fields: [countryId], references: [id])
   orders          Order[]       // 担当した受注
   designOrders    OrderDesign[] // 担当したデザイン案件
+  approvals OrderApproval[]
+  flyerTransactions FlyerTransaction[]
 
   customers        Customer[] // 担当している顧客リスト
   managedBranches1 Branch[]   @relation("BranchManager1")
@@ -518,7 +520,7 @@ model Flyer {
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
 
-  deliveries        FlyerDelivery[]
+  transactions FlyerTransaction[]
   // DistributionItem(スケジュール明細)との紐付けも後ほど追加します
   distributionItems DistributionItem[]
   orderDistributions OrderDistribution[]
@@ -528,33 +530,46 @@ model Flyer {
   @@map("flyers")
 }
 
-// --- 納品ステータス (Enum) ---
-enum DeliveryStatus {
-  PENDING   // 未納品 (予定)
-  COMPLETED // 完了 (納品済み)
-  CANCELED  // キャンセル
+// --- 入出庫種類 (Enum) ---
+enum TransactionType {
+  RECEIVE   @map("納品(入庫)")
+  PICKUP    @map("引取(出庫)")
+  TRANSFER  @map("移動")
+  DISPOSE   @map("廃棄・調整")
 }
 
-// --- 納品予定＆実績 (FlyerDelivery) ---
-model FlyerDelivery {
-  id           Int            @id @default(autoincrement())
-  flyerId      Int            @map("flyer_id")
-  flyer        Flyer          @relation(fields: [flyerId], references: [id], onDelete: Cascade)
+// --- 入出庫ステータス (Enum) ---
+enum TransactionStatus {
+  PENDING   @map("予定")
+  COMPLETED @map("完了")
+  CANCELED  @map("キャンセル")
+}
 
-  // ★ 日付だけでなく「時間」も管理できるように DateTime 型に変更
-  expectedAt   DateTime       @map("expected_at") @db.DateTime(0) // 納品予定日時
-  actualAt     DateTime?      @map("actual_at") @db.DateTime(0)   // 実際の納品日時
+// --- 入出庫履歴テーブル (FlyerTransaction) ---
+model FlyerTransaction {
+  id              Int               @id @default(autoincrement())
+  flyerId         Int               @map("flyer_id")
+  flyer           Flyer             @relation(fields: [flyerId], references: [id], onDelete: Cascade)
 
-  count        Int            // 納品(予定)枚数
+  transactionType TransactionType   @map("transaction_type")
+  
+  expectedAt      DateTime          @map("expected_at") @db.DateTime(0)
+  actualAt        DateTime?         @map("actual_at") @db.DateTime(0)
+  
+  count           Int               // 常に絶対値で入れ、種類に応じてプラスマイナスを計算する
 
-  status       DeliveryStatus @default(PENDING)
-  isDelayed    Boolean        @default(false) @map("is_delayed") // 遅延アラート用
+  status          TransactionStatus @default(PENDING)
+  isDelayed       Boolean           @default(false) @map("is_delayed") 
 
-  note         String?        @db.Text
-  createdAt    DateTime       @default(now()) @map("created_at")
-  updatedAt    DateTime       @updatedAt @map("updated_at")
+  // 担当者 (ドライバーや検品者)
+  employeeId      Int?              @map("employee_id")
+  employee        Employee?         @relation(fields: [employeeId], references: [id])
 
-  @@map("flyer_deliveries")
+  note            String?           @db.Text
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@map("flyer_transactions")
 }
 
 // ==========================================
@@ -597,12 +612,37 @@ model PartnerType {
 
 // --- 受注全体ステータス ---
 enum OrderStatus {
-  DRAFT         // 一時保存・カート内
-  PENDING_REVIEW// 審査中・調整中
-  CONFIRMED     // 受注確定
-  IN_PROGRESS   // 作業中
-  COMPLETED     // 完了
-  CANCELED      // キャンセル
+  DRAFT             @map("一時保存")
+  PLANNING          @map("提案中")
+  PENDING_PAYMENT   @map("入金待ち")
+  PENDING_REVIEW    @map("審査待ち")
+  ADJUSTING         @map("調整中")
+  CONFIRMED         @map("受注確定")
+  IN_PROGRESS       @map("作業中")
+  COMPLETED         @map("完了")
+  CANCELED          @map("キャンセル")
+}
+
+// --- 追加: 承認・審査ステータス ---
+enum ApprovalStatus {
+  APPROVED    @map("承認済")
+  REJECTED    @map("不承認")
+}
+
+// --- 審査履歴テーブル ---
+model OrderApproval {
+  id          Int            @id @default(autoincrement())
+  orderId     Int            @map("order_id")
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  approverId  Int?           @map("approver_id")
+  approver    Employee?      @relation(fields: [approverId], references: [id])
+  
+  status      ApprovalStatus
+  comment     String?        @db.Text
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@map("order_approvals")
 }
 
 // ★ 追加: 受注経路
@@ -614,31 +654,30 @@ enum OrderSource {
 // --- 受注ヘッダ (親) ---
 model Order {
   id           Int         @id @default(autoincrement())
-  orderNo      String      @unique @map("order_no") @db.VarChar(50) // 受注番号 (ORD-202602-001など)
+  orderNo      String      @unique @map("order_no") @db.VarChar(50) 
   
-// ★ 追加: 案件名と経路、決済方法
-  title        String?     @db.VarChar(200) // 案件名
-  orderSource  OrderSource? @default(WEB_EC) @map("order_source")
-  paymentMethod String?    @map("payment_method") @db.VarChar(50) // クレジットカード or 請求書
-
+  title        String?     @db.VarChar(200)
+  orderSource  OrderSource @default(WEB_EC) @map("order_source")
+  paymentMethod String?    @map("payment_method") @db.VarChar(50) 
+  
   customerId   Int         @map("customer_id")
   customer     Customer    @relation(fields: [customerId], references: [id])
   
   salesRepId   Int?        @map("sales_rep_id")
-  salesRep     Employee?   @relation(fields: [salesRepId], references: [id]) // 担当営業
+  salesRep     Employee?   @relation(fields: [salesRepId], references: [id]) 
 
-  orderDate    DateTime    @map("order_date") @db.Date // 受注日
-  totalAmount  Int?        @map("total_amount") // 受注総額
+  orderDate    DateTime    @map("order_date") @db.Date 
+  totalAmount  Int?        @map("total_amount") 
   status       OrderStatus @default(DRAFT)
   remarks      String?     @db.Text
 
-  // リレーション (子テーブル)
-  contacts           OrderContact[] // 顧客担当者 (1:N)
+  contacts           OrderContact[] 
   distributions      OrderDistribution[]
   printings          OrderPrinting[]
   newspaperInserts   OrderNewspaperInsert[]
   designs            OrderDesign[]
-  payments           Payment[]
+  payments           Payment[] 
+  approvals          OrderApproval[] // ★ 追加: 審査履歴
 
   @@map("orders")
 }
@@ -824,9 +863,9 @@ enum PaymentMethod {
 
 // --- 決済ステータス ---
 enum PaymentStatus {
-  PENDING     @map("未決済(請求待ち)")
+  PENDING     @map("未決済")
   AUTHORIZED  @map("与信枠確保")
-  COMPLETED   @map("決済完了(入金済)")
+  COMPLETED   @map("入金済")
   FAILED      @map("決済失敗")
   REFUNDED    @map("返金済")
 }
@@ -838,14 +877,14 @@ model Payment {
   orderId         Int           @map("order_id")
   order           Order         @relation(fields: [orderId], references: [id])
   
-  amount          Int           // 決済または請求された金額
-  method          PaymentMethod // 決済方法
-  status          PaymentStatus @default(PENDING) // 決済ステータス
+  amount          Int           
+  method          PaymentMethod 
+  status          PaymentStatus @default(PENDING) 
   
-  transactionId   String?       @map("transaction_id") @db.VarChar(100) // Stripeの決済IDや、発行した請求書の番号など
-  paidAt          DateTime?     @map("paid_at") @db.DateTime(0) // 実際の入金・決済完了日時
+  transactionId   String?       @map("transaction_id") @db.VarChar(100) 
+  paidAt          DateTime?     @map("paid_at") @db.DateTime(0) 
   
-  note            String?       @db.Text // エラー内容や経理用メモ
+  note            String?       @db.Text 
   
   createdAt       DateTime      @default(now()) @map("created_at")
   updatedAt       DateTime      @updatedAt @map("updated_at")

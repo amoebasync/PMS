@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+// ★ 変更: useSearchParams と Suspense のインポート追加
+import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '@/components/portal/CartContext';
 import { GoogleMap, useJsApiLoader, Polygon, Circle, Marker } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
 
-const initialCenter = { lat: 35.6580, lng: 139.7016 }; // 渋谷駅
+const initialCenter = { lat: 35.6580, lng: 139.7016 }; 
 const mapContainerStyle = { width: '100%', height: '100%' };
 const LIBRARIES: ("geometry")[] = ["geometry"];
 
@@ -26,7 +27,6 @@ const PRICES = {
   printingBase: { 'A4': 3.0, 'B4': 4.5, 'A3': 6.0, 'ハガキ': 2.5 } as Record<string, number>
 };
 
-// --- GeoJSON / ポリゴンパース用関数群 ---
 const extractPaths = (geojsonStr: string) => {
   if (!geojsonStr) return [];
   const trimmed = geojsonStr.trim();
@@ -120,15 +120,19 @@ const MemoizedArea = React.memo(({ area, isSelected, currentZoom, onClick }: { a
 }, (prev, next) => prev.isSelected === next.isSelected && (prev.currentZoom >= 14) === (next.currentZoom >= 14));
 
 
-export default function NewOrderPage() {
+// ★ 追加: Suspenseで囲むための中身コンポーネント
+function NewOrderContent() {
   const router = useRouter();
-  const { addItem } = useCart();
+  const searchParams = useSearchParams();
+  const editItemId = searchParams.get('editItemId'); // URLからの編集ID取得
+
+  const { items, addItem, updateItem } = useCart();
   
+  const [projectName, setProjectName] = useState('');
   const [orderType, setOrderType] = useState<'POSTING_ONLY' | 'PRINT_AND_POSTING'>('PRINT_AND_POSTING');
   const [size, setSize] = useState('A4');
   const [method, setMethod] = useState('軒並み配布');
   const [plannedCount, setPlannedCount] = useState<number | ''>(''); 
-  
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [spareDate, setSpareDate] = useState('');
@@ -150,6 +154,7 @@ export default function NewOrderPage() {
   const [mapCenter, setMapCenter] = useState(initialCenter);
   const [searchMarker, setSearchMarker] = useState<{lat: number, lng: number} | null>(null);
   const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
+  const [isEditLoaded, setIsEditLoaded] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -162,7 +167,7 @@ export default function NewOrderPage() {
     fetch('/api/locations')
       .then(r => r.json())
       .then(d => { if (Array.isArray(d)) setLocations(d); })
-      .catch(e => console.error("Locations fetch error:", e));
+      .catch(e => console.error(e));
   }, []);
 
   const loadCityAreas = async (prefName: string, cityName: string) => {
@@ -221,6 +226,38 @@ export default function NewOrderPage() {
       loadCityAreas('東京都', '世田谷区');
     } 
   }, [isLoaded, mapAreas.length]);
+
+  // ★ 追加: 編集モード時のデータ復元処理
+  useEffect(() => {
+    if (editItemId && items.length > 0 && !isEditLoaded) {
+      const editTarget = items.find(i => i.id === editItemId);
+      if (editTarget) {
+        setProjectName(editTarget.projectName || '');
+        setOrderType(editTarget.type as any);
+        setSize(editTarget.size);
+        setMethod(editTarget.method);
+        setPlannedCount(editTarget.totalCount);
+        setStartDate(editTarget.startDate || '');
+        setEndDate(editTarget.endDate || '');
+        setSpareDate(editTarget.spareDate || '');
+        
+        // エリアの選択状態を復元
+        setSelectedAreaIds(new Set(editTarget.selectedAreas.map(a => a.id)));
+
+        // 必要なポリゴンをロード（カートのアイテムはprefName, cityNameを持っている）
+        const citySet = new Set<string>();
+        editTarget.selectedAreas.forEach(a => {
+           if (a.prefName && a.cityName) citySet.add(`${a.prefName}_${a.cityName}`);
+        });
+        citySet.forEach(key => {
+           const [p, c] = key.split('_');
+           if (p && c) loadCityAreas(p, c);
+        });
+
+        setIsEditLoaded(true);
+      }
+    }
+  }, [editItemId, items, isEditLoaded]);
 
   const handleMapIdle = () => {
     if (mapRef) {
@@ -304,20 +341,11 @@ export default function NewOrderPage() {
     });
   }, []);
 
-  // ★ 変更: 配布方法に基づいたキャパシティ計算ロジック
   const getCapacity = (a: any) => {
     const doorCount = a.door_to_door_count || 0;
     const multiCount = a.multi_family_count || 0;
-
-    if (method === '集合住宅限定') {
-      return multiCount;
-    }
-    if (method === '戸建限定') {
-      // (総世帯 - 集合住宅) × 0.5 で計算し、端数は切り捨て
-      return Math.floor(Math.max(0, doorCount - multiCount) * 0.5);
-    }
-    
-    // 軒並み配布
+    if (method === '集合住宅限定') return multiCount;
+    if (method === '戸建限定') return Math.floor(Math.max(0, doorCount - multiCount) * 0.5);
     return doorCount;
   };
 
@@ -344,14 +372,30 @@ export default function NewOrderPage() {
       return;
     }
 
-    addItem({
+    const newTarget = {
       type: orderType,
       title: `${size}サイズ ${orderType === 'PRINT_AND_POSTING' ? '印刷＋ポスティング' : 'ポスティングのみ'} (${method})`,
-      selectedAreas: selectedAreasList.map(a => ({ id: a.id, name: `${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`, count: getCapacity(a) })),
+      selectedAreas: selectedAreasList.map(a => ({ 
+        id: a.id, 
+        name: `${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`, 
+        count: getCapacity(a),
+        prefName: a.prefecture?.name,
+        cityName: a.city?.name
+      })),
       totalCount: pCount, 
       method, size, price: totalPrice,
-      startDate, endDate, spareDate
-    });
+      unitPrice, 
+      startDate, endDate, spareDate,
+      projectName 
+    };
+
+    // ★ 変更: 編集時は既存のアイテムを更新、新規時は追加
+    if (editItemId) {
+      updateItem(editItemId, newTarget);
+    } else {
+      addItem(newTarget);
+    }
+    
     router.push('/portal/cart');
   };
 
@@ -374,7 +418,17 @@ export default function NewOrderPage() {
         
         <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
           
-          {/* 1. プランの選択 */}
+          <section>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black"><i className="bi bi-tag-fill"></i></div>
+              <h3 className="font-bold text-slate-800">基本情報</h3>
+            </div>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <label className="text-[10px] font-bold text-slate-500 block mb-1">案件名</label>
+              <input type="text" value={projectName} onChange={e => setProjectName(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 transition-shadow" placeholder="例: 春のキャンペーン配布" />
+            </div>
+          </section>
+
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">1</div>
@@ -418,7 +472,6 @@ export default function NewOrderPage() {
             </div>
           </section>
 
-          {/* 2. 配布期間を選択 */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">2</div>
@@ -452,7 +505,6 @@ export default function NewOrderPage() {
             </div>
           </section>
 
-          {/* 3. 配布エリアを選択 */}
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">3</div>
@@ -617,13 +669,17 @@ export default function NewOrderPage() {
                 <span className="text-3xl font-black text-indigo-600 tracking-tighter">¥{totalPrice.toLocaleString()}</span>
               </div>
 
+              {/* ★ 変更: 編集時は「更新」、新規時は「カートへ」のテキストに */}
               <button 
                 onClick={handleAddToCart} 
                 disabled={pCount === 0 || !isCapacityEnough}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                <i className="bi bi-cart-plus-fill text-lg"></i>
-                カートに入れる
+                {editItemId ? (
+                  <><i className="bi bi-arrow-repeat text-lg"></i> カート内容を更新</>
+                ) : (
+                  <><i className="bi bi-cart-plus-fill text-lg"></i> カートに入れる</>
+                )}
               </button>
             </div>
             
@@ -632,5 +688,19 @@ export default function NewOrderPage() {
 
       </div>
     </div>
+  );
+}
+
+// ★ 追加: Next.js 15+ で useSearchParams を使うためのラップコンポーネント
+export default function NewOrderPageWrapper() {
+  return (
+    <Suspense fallback={
+      <div className="w-full h-screen flex flex-col items-center justify-center bg-slate-50">
+        <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-500 font-bold">読み込み中...</p>
+      </div>
+    }>
+      <NewOrderContent />
+    </Suspense>
   );
 }

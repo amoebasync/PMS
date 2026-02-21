@@ -17,9 +17,13 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const [mounted, setMounted] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false); // ユーザーメニュー開閉用
   const [time, setTime] = useState({ clock: '00:00:00', date: '----/--/--' });
+  
+  // ★ 追加: 承認待ち件数のState
+  const [pendingCount, setPendingCount] = useState(0); 
 
   useEffect(() => {
     setMounted(true);
+    
     const updateTime = () => {
       const now = new Date();
       setTime({
@@ -30,8 +34,15 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
 
     updateTime(); 
     const timer = setInterval(updateTime, 1000);
+
+    // ★ 追加: 承認待ち件数の取得 (画面遷移のたびに最新を取得)
+    fetch('/api/orders/pending-count')
+      .then(r => r.json())
+      .then(d => setPendingCount(d.count || 0))
+      .catch(() => {});
+
     return () => clearInterval(timer);
-  }, []);
+  }, [pathname]);
 
   if (pathname === '/login') return null;
 
@@ -45,7 +56,6 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
     }
   };
 
-  // ★ 変更: メニューを見やすくグループ化
   const menuGroups = [
     {
       title: 'WORKFLOW',
@@ -62,6 +72,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         { name: '顧客管理', href: '/customers', icon: 'bi-buildings-fill' },
         { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
         { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
+        { name: '入出庫・納品管理', href: '/transactions', icon: 'bi-box-seam' },
         { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
       ]
     },
@@ -101,7 +112,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         </Link>
       </div>
 
-      {/* メニューエリア (専用のスクロールバークラスを適用) */}
+      {/* メニューエリア */}
       <div className="flex-1 py-6 overflow-y-auto sidebar-scrollbar">
         {menuGroups.map((group, gIdx) => (
           <div key={gIdx} className="mb-6 px-3">
@@ -117,7 +128,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
                   <Link 
                     key={item.href} 
                     href={item.href} 
-                    title={isCollapsed ? item.name : ''} // 折りたたみ時はホバーでツールチップ表示
+                    title={isCollapsed ? item.name : ''}
                     className={`flex items-center py-2.5 rounded-lg transition-all duration-200 group relative ${
                       isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'hover:bg-white/5 text-slate-400 hover:text-white'
                     } ${isCollapsed ? 'justify-center px-0' : 'px-3'}`}
@@ -125,6 +136,17 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
                     {isActive && !isCollapsed && <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-300 rounded-r-full"></div>}
                     <i className={`${item.icon} text-lg ${!isCollapsed && 'mr-3'} ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-white transition-colors'}`}></i>
                     {!isCollapsed && <span className="font-medium tracking-wide text-sm whitespace-nowrap">{item.name}</span>}
+                    
+                    {/* ★ バッジ表示 (開いている時) */}
+                    {!isCollapsed && item.href === '/orders' && pendingCount > 0 && (
+                      <span className="ml-auto bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
+                        {pendingCount}
+                      </span>
+                    )}
+                    {/* ★ バッジ表示 (閉じている時) */}
+                    {isCollapsed && item.href === '/orders' && pendingCount > 0 && (
+                      <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-[#0f172a]"></div>
+                    )}
                   </Link>
                 );
               })}

@@ -12,10 +12,21 @@ const initialCenter = { lat: 35.6581, lng: 139.7414 }; // 東京タワー
 
 const LIBRARIES: ("geometry" | "drawing" | "places")[] = ["geometry"];
 
+const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
+  DRAFT: { label: '下書き', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: 'bi-pencil' },
+  PLANNING: { label: '提案中', color: 'bg-slate-100 text-slate-500 border-slate-200', icon: 'bi-chat-dots' },
+  PENDING_PAYMENT: { label: '入金待ち', color: 'bg-orange-100 text-orange-700 border-orange-200', icon: 'bi-coin' },
+  PENDING_REVIEW: { label: '審査待ち', color: 'bg-yellow-100 text-yellow-700 border-yellow-200', icon: 'bi-hourglass-split' },
+  ADJUSTING: { label: '要調整・修正', color: 'bg-rose-100 text-rose-700 border-rose-200', icon: 'bi-exclamation-triangle-fill' },
+  CONFIRMED: { label: '手配中(確定)', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: 'bi-check-circle-fill' },
+  IN_PROGRESS: { label: '作業・配布中', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', icon: 'bi-truck' },
+  COMPLETED: { label: '完了', color: 'bg-emerald-100 text-emerald-700 border-emerald-200', icon: 'bi-flag-fill' },
+  CANCELED: { label: 'キャンセル', color: 'bg-slate-200 text-slate-500 border-slate-200', icon: 'bi-x-circle-fill' },
+};
+
 const extractPaths = (geojsonStr: string, areaName: string = '') => {
   if (!geojsonStr) return [];
   const trimmed = geojsonStr.trim();
-  
   if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
     try {
       const parsed = JSON.parse(trimmed);
@@ -35,28 +46,6 @@ const extractPaths = (geojsonStr: string, areaName: string = '') => {
       return paths.length > 0 ? paths : [];
     } catch (e) {}
   }
-  
-  if (trimmed.includes('|') && !/[a-zA-Z]/.test(trimmed)) {
-    try {
-      const paths = trimmed.split('|').map(point => {
-        const parts = point.split(/[,\s]+/).filter(Boolean);
-        if (parts.length >= 2) return { lat: parseFloat(parts[0]), lng: parseFloat(parts[1]) };
-        return null;
-      }).filter(p => p !== null) as {lat: number, lng: number}[];
-      return paths.length > 0 ? [paths.map(p => ({ lat: p.lat < 90 ? p.lat : p.lng, lng: p.lat > 90 ? p.lat : p.lng }))] : [];
-    } catch(e) { return []; }
-  }
-
-  try {
-    const sanitizedStr = trimmed.replace(/\t/g, '\\t').replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\f/g, '\\f');
-    if (typeof window !== 'undefined' && window.google && window.google.maps && window.google.maps.geometry) {
-      try {
-        return [window.google.maps.geometry.encoding.decodePath(trimmed).map(p => ({ lat: p.lat(), lng: p.lng() }))];
-      } catch (err) {
-        return [window.google.maps.geometry.encoding.decodePath(sanitizedStr).map(p => ({ lat: p.lat(), lng: p.lng() }))];
-      }
-    }
-  } catch (e) {}
   return [];
 };
 
@@ -83,6 +72,16 @@ const calcCenterAndSize = (feature: any) => {
     else fontSize = '14px';
     return { lat: center.geometry.coordinates[1], lng: center.geometry.coordinates[0], fontSize };
   } catch(e) { return null; }
+};
+
+const formatAreaName = (town?: string | null, chome?: string | null) => {
+  const t = town || ''; const c = chome || '';
+  if (!t && !c) return '-';
+  if (t === c) return c; 
+  if (c.includes(t)) return c; 
+  const baseTown = t.replace(/[一二三四五六七八九十]+丁目$/, ''); 
+  if (baseTown && c.includes(baseTown)) return c;
+  return t && c ? `${t} ${c}` : (c || t); 
 };
 
 const MemoizedArea = React.memo(({ area, isSelected, currentZoom, onClick }: { area: any, isSelected: boolean, currentZoom: number, onClick: (id: number) => void }) => {
@@ -131,11 +130,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [customerFlyers, setCustomerFlyers] = useState<any[]>([]);
   const [partners, setPartners] = useState<any[]>([]);
 
+  const [orderFullData, setOrderFullData] = useState<any>(null);
+
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedPref, setSelectedPref] = useState<number | null>(13); 
   const [selectedPanelCities, setSelectedPanelCities] = useState<Set<string>>(new Set());
 
-  // ★ 追加: チラシ登録モーダル用のState
   const [isFlyerModalOpen, setIsFlyerModalOpen] = useState(false);
   const [flyerMasters, setFlyerMasters] = useState({ industries: [], sizes: [] });
   const [newFlyerForm, setNewFlyerForm] = useState({
@@ -146,12 +146,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   // --- 各タブのフォームState ---
   const [formData, setFormData] = useState({
-    orderNo: '', customerId: '', salesRepId: '', orderDate: new Date().toISOString().split('T')[0],
+    orderNo: '', title: '', customerId: '', salesRepId: '', orderDate: new Date().toISOString().split('T')[0],
     totalAmount: '', status: 'PLANNING', remarks: ''
   });
 
   const [distForm, setDistForm] = useState({
-    id: '', flyerId: '', method: '軒並み配布', plannedCount: '', startDate: '', endDate: '', spareDate: '', remarks: ''
+    id: '', flyerId: '', method: '軒並み配布', plannedCount: '', startDate: '', endDate: '', spareDate: '', status: 'UNSTARTED', remarks: ''
   });
 
   const [printForm, setPrintForm] = useState({
@@ -187,11 +187,42 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     region: 'JP',
   });
 
+  // ★ 追加: 既存のエリアポリゴンを読み込むための関数
+  const loadCityAreas = async (prefName: string, cityName: string) => {
+    if (!cityName) return;
+    const cacheKey = `${prefName}_${cityName}`;
+    if (loadedCities.has(cacheKey)) return;
+    
+    setLoadedCities(prev => new Set(prev).add(cacheKey));
+    try {
+      const query = new URLSearchParams();
+      if (prefName) query.append('prefName', prefName);
+      if (cityName) query.append('cityName', cityName);
+      
+      const res = await fetch(`/api/areas/map?${query.toString()}`);
+      const data = await res.json();
+      
+      if (Array.isArray(data)) {
+        const enrichedData = data.map((a: any) => {
+          const paths = extractPaths(a.boundary_geojson, a.town_name);
+          const feature = createTurfFeature(paths);
+          return { ...a, parsedPaths: paths, turfFeature: feature, centerLabel: calcCenterAndSize(feature) };
+        }).filter((a: any) => a.parsedPaths && a.parsedPaths.length > 0);
+        
+        setMapAreas(prev => {
+          const existingIds = new Set(prev.map(a => a.id));
+          const newAreas = enrichedData.filter((a: any) => !existingIds.has(a.id));
+          return [...prev, ...newAreas];
+        });
+      }
+    } catch (e) {}
+  };
+
+
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
       try {
-        // ★ 修正: fetch('/api/flyers/masters') もここで一緒に呼び出す
         const [custRes, empRes, locRes, partRes, flyerMasterRes] = await Promise.all([ 
           fetch('/api/customers'), 
           fetch('/api/employees'),
@@ -212,8 +243,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           const orderRes = await fetch(`/api/orders/${id}`);
           if (orderRes.ok) {
             const order = await orderRes.json();
+            setOrderFullData(order);
+            
             setFormData({
-              orderNo: order.orderNo, customerId: order.customerId?.toString() || '', salesRepId: order.salesRepId?.toString() || '',
+              orderNo: order.orderNo, title: order.title || '', customerId: order.customerId?.toString() || '', salesRepId: order.salesRepId?.toString() || '',
               orderDate: order.orderDate ? order.orderDate.split('T')[0] : '', totalAmount: order.totalAmount?.toString() || '',
               status: order.status, remarks: order.remarks || ''
             });
@@ -225,13 +258,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             if (order.distributions && order.distributions.length > 0) {
               const dist = order.distributions[0];
               setDistForm({
-                id: dist.id?.toString() || '',
-                flyerId: dist.flyerId?.toString() || '', method: dist.method, plannedCount: dist.plannedCount?.toString() || '',
+                id: dist.id?.toString() || '', flyerId: dist.flyerId?.toString() || '', method: dist.method, plannedCount: dist.plannedCount?.toString() || '',
                 startDate: dist.startDate ? dist.startDate.split('T')[0] : '', endDate: dist.endDate ? dist.endDate.split('T')[0] : '',
-                spareDate: dist.spareDate ? dist.spareDate.split('T')[0] : '', remarks: dist.remarks || ''
+                spareDate: dist.spareDate ? dist.spareDate.split('T')[0] : '', status: dist.status || 'UNSTARTED', remarks: dist.remarks || ''
               });
+              
               if (dist.areas && dist.areas.length > 0) {
                 setSelectedAreaIds(new Set(dist.areas.map((a:any) => a.areaId)));
+
+                // ★ 追加: 既存の選択エリアのポリゴンを地図上に表示するために、該当する市区町村のデータをロード
+                const citySet = new Set<string>();
+                dist.areas.forEach((a: any) => {
+                  if (a.area && a.area.prefecture && a.area.city) {
+                    citySet.add(`${a.area.prefecture.name}_${a.area.city.name}`);
+                  }
+                });
+                
+                citySet.forEach(key => {
+                  const [p, c] = key.split('_');
+                  if (p && c) loadCityAreas(p, c);
+                });
               }
             }
             if (order.printings && order.printings.length > 0) {
@@ -265,7 +311,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     fetchInitialData();
   }, [id, isNew]);
 
-  // ★ 追加: 新規チラシの保存＆自動選択ロジック
+  const updateOrderStatus = async (newStatus: string, action?: string) => {
+    let comment = '';
+    if (action === 'REJECT') {
+      const reason = prompt('不承認の理由（クライアントへの伝達事項や修正依頼）を入力してください:');
+      if (!reason) return; 
+      comment = reason;
+    } else {
+      if (!confirm(`ステータスを「${STATUS_MAP[newStatus]?.label || newStatus}」に更新しますか？`)) return;
+    }
+
+    try {
+      const res = await fetch(`/api/orders/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tab: 'STATUS', status: newStatus, action, comment })
+      });
+      if (res.ok) {
+        setFormData(prev => ({ ...prev, status: newStatus }));
+        setOrderFullData((prev: any) => ({ ...prev, status: newStatus }));
+        window.location.reload(); 
+      } else {
+        alert('更新に失敗しました。');
+      }
+    } catch (e) {
+      alert('通信エラーが発生しました。');
+    }
+  };
+
   const saveNewFlyer = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingFlyer(true);
@@ -277,32 +350,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         body: JSON.stringify(payload),
       });
       
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        throw new Error(errData?.error || 'チラシの登録に失敗しました。');
-      }
+      if (!res.ok) throw new Error('チラシの登録に失敗しました。');
       
       const newFlyer = await res.json();
-      
-      // 顧客のチラシリストを再取得
       const flyerRes = await fetch(`/api/flyers/customer/${formData.customerId}`);
       if (flyerRes.ok) setCustomerFlyers(await flyerRes.json());
       
-      // 呼び出し元のプルダウンに即座にセット
-      if (activeFlyerSelectTab === 'DIST') {
-        setDistForm(prev => ({ ...prev, flyerId: newFlyer.id.toString() }));
-      } else if (activeFlyerSelectTab === 'PRINT') {
-        setPrintForm(prev => ({ ...prev, flyerId: newFlyer.id.toString() }));
-      }
+      if (activeFlyerSelectTab === 'DIST') setDistForm(p => ({ ...p, flyerId: newFlyer.id.toString() }));
+      else if (activeFlyerSelectTab === 'PRINT') setPrintForm(p => ({ ...p, flyerId: newFlyer.id.toString() }));
 
       setIsFlyerModalOpen(false);
       setNewFlyerForm({ name: '', flyerCode: '', bundleCount: '', industryId: '', sizeId: '', foldStatus: 'NO_FOLDING_REQUIRED', remarks: '' });
       
-    } catch (err: any) {
-      alert(err.message);
-    } finally {
-      setIsSavingFlyer(false);
-    }
+    } catch (err: any) { alert(err.message); } 
+    finally { setIsSavingFlyer(false); }
   };
 
   const fetchAreasForLocation = useCallback((lat: number, lng: number, onFetched?: (newAreas: any[], pref: string, city: string) => void) => {
@@ -407,6 +468,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     const address = `${prefName}${cityName}`;
     const cacheKey = `${prefName}_${cityName}`;
     setRadiusKm('ALL'); setSearchMarker(null); setSearchAddress(''); setMapZoom(12);
+    
     const isCurrentlySelected = selectedPanelCities.has(cacheKey);
     setSelectedPanelCities(prev => {
       const next = new Set(prev);
@@ -421,36 +483,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       });
     }
 
-    let targetAreas = mapAreas;
-    if (!loadedCities.has(cacheKey)) {
-      setLoadedCities(prev => new Set(prev).add(cacheKey));
-      try {
-        const query = new URLSearchParams();
-        if (prefName) query.append('prefName', prefName);
-        if (cityName) query.append('cityName', cityName);
-        const res = await fetch(`/api/areas/map?${query.toString()}`);
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          const enrichedData = data.map(a => {
-            const paths = extractPaths(a.boundary_geojson, a.town_name);
-            const feature = createTurfFeature(paths);
-            return { ...a, parsedPaths: paths, turfFeature: feature, centerLabel: calcCenterAndSize(feature) };
-          }).filter(a => a.parsedPaths && a.parsedPaths.length > 0);
-          setMapAreas(prev => {
-            const existingIds = new Set(prev.map(a => a.id));
-            const newAreas = enrichedData.filter(a => !existingIds.has(a.id));
-            targetAreas = [...prev, ...newAreas];
-            return targetAreas;
-          });
-        }
-      } catch (e) {}
-    }
+    await loadCityAreas(prefName, cityName);
 
     const cleanPrefName = prefName.replace(/(都|道|府|県)$/gi, '');
     const cleanCityName = cityName.replace(/(区|市|町|村)$/gi, '');
     setSelectedAreaIds(prev => {
       const next = new Set(prev);
-      targetAreas.forEach(area => {
+      mapAreas.forEach(area => {
         if ((area.prefecture?.name && area.prefecture.name.includes(cleanPrefName)) && (area.city?.name && area.city.name.includes(cleanCityName))) {
           if (isCurrentlySelected) next.delete(area.id); else next.add(area.id);
         }
@@ -522,15 +561,90 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   if (isLoading) return <div className="p-10 text-center">読み込み中...</div>;
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 pb-20">
+      
+      <div className="flex justify-between items-center mb-2">
         <div>
           <Link href="/orders" className="text-sm text-indigo-600 hover:underline mb-2 inline-block"><i className="bi bi-arrow-left"></i> 戻る</Link>
-          <h1 className="text-2xl font-bold text-slate-800">
-            {isNew ? '新規受注の登録' : `受注詳細: ${formData.orderNo}`}
-          </h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl font-bold text-slate-800">
+              {isNew ? '新規受注の登録' : `受注詳細: ${formData.orderNo}`}
+            </h1>
+            {!isNew && orderFullData && (
+              <span className={`px-2 py-0.5 rounded text-xs font-bold ${orderFullData.orderSource === 'WEB_EC' ? 'bg-fuchsia-100 text-fuchsia-700' : 'bg-slate-200 text-slate-700'}`}>
+                {orderFullData.orderSource === 'WEB_EC' ? 'WEB (EC経由)' : '営業 (社内入力)'}
+              </span>
+            )}
+          </div>
         </div>
       </div>
+
+      {!isNew && orderFullData && (
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          
+          <div className="flex flex-col md:flex-row md:items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="text-xs font-bold text-slate-500 uppercase">Status</div>
+              <div className={`px-4 py-2 rounded-xl text-sm font-bold border shadow-sm flex items-center gap-2 ${STATUS_MAP[formData.status]?.color}`}>
+                <i className={`bi ${STATUS_MAP[formData.status]?.icon}`}></i>
+                {STATUS_MAP[formData.status]?.label}
+              </div>
+            </div>
+
+            {orderFullData.payments && orderFullData.payments.length > 0 && (
+              <div className="flex items-center gap-3 pl-0 md:pl-6 border-l-0 md:border-l border-slate-200">
+                <div className="text-xs font-bold text-slate-500 uppercase">Payment</div>
+                <div className="text-sm font-bold text-slate-700 flex flex-col leading-tight">
+                  <span>
+                    {orderFullData.payments[0].method === 'CREDIT_CARD' ? 'クレジットカード' : 
+                     orderFullData.payments[0].method === 'BANK_TRANSFER' ? '銀行振込 (前払)' : '請求書払い'}
+                  </span>
+                  <span className={`text-[10px] ${orderFullData.payments[0].status === 'COMPLETED' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                    {orderFullData.payments[0].status === 'COMPLETED' ? '入金済' : '未入金(請求待ち)'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="flex flex-col gap-2 items-end">
+             {formData.status === 'ADJUSTING' && orderFullData.approvals?.[0] && (
+               <div className="text-[10px] text-rose-600 bg-rose-50 px-2 py-1 rounded border border-rose-200 flex items-start gap-1 max-w-sm">
+                 <i className="bi bi-exclamation-circle-fill mt-0.5"></i>
+                 <span>不承認理由: {orderFullData.approvals[0].comment}</span>
+               </div>
+             )}
+             
+             <div className="flex flex-wrap gap-2">
+               {formData.status === 'PENDING_PAYMENT' && (
+                  <button type="button" onClick={() => updateOrderStatus('PENDING_REVIEW', 'PAYMENT_CONFIRMED')} className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2">
+                    <i className="bi bi-coin"></i> 入金を確認し、審査待ちへ進める
+                  </button>
+               )}
+               {formData.status === 'PENDING_REVIEW' && (
+                  <>
+                    <button type="button" onClick={() => updateOrderStatus('CONFIRMED', 'APPROVE')} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2">
+                      <i className="bi bi-check-circle-fill"></i> 審査を承認し、発注を確定する
+                    </button>
+                    <button type="button" onClick={() => updateOrderStatus('ADJUSTING', 'REJECT')} className="bg-white border-2 border-rose-200 text-rose-600 hover:bg-rose-50 px-4 py-2.5 rounded-xl font-bold shadow-sm transition-colors flex items-center gap-2">
+                      <i className="bi bi-arrow-return-left"></i> 差し戻す (不承認)
+                    </button>
+                  </>
+               )}
+               {formData.status === 'CONFIRMED' && (
+                  <button type="button" onClick={() => updateOrderStatus('IN_PROGRESS', 'START')} className="bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2">
+                    <i className="bi bi-truck"></i> 作業(手配)開始にする
+                  </button>
+               )}
+               {formData.status === 'IN_PROGRESS' && (
+                  <button type="button" onClick={() => updateOrderStatus('COMPLETED', 'COMPLETE')} className="bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-colors flex items-center gap-2">
+                    <i className="bi bi-flag-fill"></i> すべて完了にする
+                  </button>
+               )}
+             </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex border-b border-slate-200 overflow-x-auto">
         {TABS.map(tab => {
@@ -551,7 +665,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         
-        {/* --- 基本情報タブ --- */}
         {activeTab === 'BASIC' && (
           <form onSubmit={(e) => { e.preventDefault(); saveTabInfo('BASIC', formData); }} className="space-y-6 max-w-4xl">
             <div className="grid grid-cols-2 gap-6">
@@ -559,6 +672,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">受注番号</label><input name="orderNo" value={formData.orderNo} onChange={e => setFormData({...formData, orderNo: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-slate-50 font-mono" readOnly /></div>
               )}
               <div className={isNew ? 'col-span-2' : ''}>
+                <label className="text-xs font-bold text-slate-600 block mb-1">案件名</label>
+                <input name="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500" placeholder="案件名" />
+              </div>
+
+              <div className="col-span-2">
                 <label className="text-xs font-bold text-slate-600 block mb-1">顧客 (クライアント) *</label>
                 <select required value={formData.customerId} onChange={e => setFormData({...formData, customerId: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
                   <option value="">選択してください</option>
@@ -572,8 +690,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
                 </select>
               </div>
+              
               <div><label className="text-xs font-bold text-slate-600 block mb-1">受注日 *</label><input type="date" required value={formData.orderDate} onChange={e => setFormData({...formData, orderDate: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" /></div>
-              <div><label className="text-xs font-bold text-slate-600 block mb-1">受注総額 (円)</label><input type="number" value={formData.totalAmount} onChange={e => setFormData({...formData, totalAmount: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" placeholder="例: 150000" /></div>
+              <div><label className="text-xs font-bold text-slate-600 block mb-1">受注総額 (円)</label><input type="number" value={formData.totalAmount} onChange={e => setFormData({...formData, totalAmount: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm font-bold text-slate-800 bg-slate-50" placeholder="例: 150000" /></div>
+              
+              <div className="col-span-2">
+                <label className="text-xs font-bold text-slate-600 block mb-1">内部用ステータス（手動調整用）</label>
+                <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
+                  {Object.entries(STATUS_MAP).map(([k, v]) => (
+                    <option key={k} value={k}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="pt-4 border-t flex justify-end">
               <button type="submit" className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg">{isNew ? '基本情報を登録して次へ' : '基本情報を更新する'}</button>
@@ -581,7 +709,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </form>
         )}
 
-        {/* --- 配布タブ --- */}
         {activeTab === 'DIST' && (
           <div className="space-y-6">
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
@@ -589,7 +716,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div className="lg:col-span-2">
                   <label className="text-xs font-bold text-slate-600 block mb-1">配布するチラシ *</label>
-                  {/* ★ 変更: 新規作成ボタンをインライン(モーダル起動)に変更 */}
                   <div className="flex gap-2">
                     <select required value={distForm.flyerId} onChange={e => setDistForm({...distForm, flyerId: e.target.value})} className="flex-1 border p-2.5 rounded-lg text-sm bg-white font-bold text-slate-700">
                       <option value="">-- この顧客のチラシから選択 --</option>
@@ -623,11 +749,20 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="flex-1"><label className="text-xs font-bold text-slate-600 block mb-1">完了期限日 *</label><input type="date" required value={distForm.endDate} onChange={e => setDistForm({...distForm, endDate: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" /></div>
                   <div className="flex-1"><label className="text-xs font-bold text-rose-500 block mb-1">予備期限 (雨天順延など)</label><input type="date" value={distForm.spareDate} onChange={e => setDistForm({...distForm, spareDate: e.target.value})} className="w-full border border-rose-200 p-2.5 rounded-lg text-sm bg-rose-50" /></div>
                 </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">手配進行ステータス</label>
+                  <select value={distForm.status} onChange={e => setDistForm({...distForm, status: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
+                    <option value="UNSTARTED">未手配</option>
+                    <option value="ORDERED">手配済 (ディスパッチ完了)</option>
+                    <option value="IN_PROGRESS">配布作業中</option>
+                    <option value="COMPLETED">配布完了</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="border border-slate-200 rounded-xl overflow-hidden shadow-sm flex flex-col">
-              {/* マップ操作部分 */}
               <div className="bg-slate-800 p-4 text-white flex flex-wrap gap-4 justify-between items-center">
                 <h3 className="font-bold flex items-center gap-2 whitespace-nowrap"><i className="bi bi-2-circle-fill"></i> マップによるエリア選択</h3>
                 <div className="flex flex-wrap items-center gap-2">
@@ -643,7 +778,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
               
-              {/* マップ描画部分 */}
               <div className="h-[600px] w-full bg-slate-100 relative">
                 {!isLoaded ? (
                   <div className="w-full h-full flex items-center justify-center text-slate-500 font-bold"><i className="bi bi-arrow-repeat animate-spin mr-2"></i>地図を読み込んでいます...</div>
@@ -685,7 +819,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
-              {/* 市区町村クイック選択パネル */}
               <div className="bg-white p-4 flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 pb-3">
                   <div className="flex items-center text-indigo-600 mr-2"><i className="bi bi-geo-fill text-lg mr-1"></i><span className="text-sm font-bold whitespace-nowrap">対象エリアの<br/>クイック全域選択:</span></div>
@@ -710,13 +843,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* --- 印刷手配タブ --- */}
         {activeTab === 'PRINT' && (
           <div className="space-y-6 max-w-4xl">
             <div className="grid grid-cols-2 gap-6">
               <div className="col-span-2 md:col-span-1">
                 <label className="text-xs font-bold text-slate-600 block mb-1">印刷するチラシ *</label>
-                {/* ★ 変更: 新規作成ボタンを追加 */}
                 <div className="flex gap-2">
                   <select value={printForm.flyerId} onChange={e => setPrintForm({...printForm, flyerId: e.target.value})} className="flex-1 border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
                     <option value="">選択してください</option>
@@ -777,7 +908,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* --- 新聞折込タブ --- */}
         {activeTab === 'NEWS' && (
           <div className="space-y-6 max-w-4xl">
             <div className="grid grid-cols-2 gap-6">
@@ -810,7 +940,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         )}
 
-        {/* --- デザイン制作タブ --- */}
         {activeTab === 'DESIGN' && (
           <div className="space-y-6 max-w-4xl">
             <div className="grid grid-cols-2 gap-6">
@@ -852,7 +981,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       </div>
 
-      {/* --- ★追加: チラシ新規登録モーダル --- */}
+      {/* チラシ新規登録モーダル */}
       {isFlyerModalOpen && (
         <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">

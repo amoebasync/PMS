@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link'; // ★ 追加: これがないとエラーになります
 
 const FOLD_STATUS_MAP: Record<string, { label: string, color: string }> = {
   NEEDS_FOLDING: { label: '要折', color: 'bg-rose-100 text-rose-700 border-rose-200' },
@@ -17,12 +18,6 @@ export default function FlyerPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
 
-  const [isDeliveryOpen, setIsDeliveryOpen] = useState(false);
-  const [selectedFlyer, setSelectedFlyer] = useState<any>(null);
-  const [deliveries, setDeliveries] = useState<any[]>([]);
-  const [deliveryForm, setDeliveryForm] = useState({ expectedAt: '', count: '', status: 'COMPLETED', note: '' });
-  const [isDeliverySaving, setIsDeliverySaving] = useState(false);
-
   // QRコード管理用State
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [qrFlyer, setQrFlyer] = useState<any>(null);
@@ -33,7 +28,6 @@ export default function FlyerPage() {
   // QRコード編集用State
   const [editingQrId, setEditingQrId] = useState<number | null>(null);
   const [editQrForm, setEditQrForm] = useState({ redirectUrl: '', memo: '', notifyOnScan: false, notificationEmails: '' });
-  // ダウンロードオプション用 (QR IDをキーに透過設定を保持)
   const [qrOptions, setQrOptions] = useState<Record<number, { transparent: boolean }>>({});
 
   const initialForm = {
@@ -113,38 +107,6 @@ export default function FlyerPage() {
       if (!res.ok) throw new Error();
       fetchData();
     } catch (e) { alert('削除に失敗しました。関連データが存在する可能性があります。'); }
-  };
-
-  const openDeliveryModal = async (flyer: any) => {
-    setSelectedFlyer(flyer);
-    setDeliveries([]);
-    setIsDeliveryOpen(true);
-
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    setDeliveryForm({ expectedAt: now.toISOString().slice(0, 16), count: '', status: 'COMPLETED', note: '' });
-
-    try {
-      const res = await fetch(`/api/flyers/${flyer.id}/deliveries`);
-      if (res.ok) setDeliveries(await res.json());
-    } catch (e) { console.error(e); }
-  };
-
-  const saveDelivery = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedFlyer) return;
-    setIsDeliverySaving(true);
-    try {
-      const res = await fetch(`/api/flyers/${selectedFlyer.id}/deliveries`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deliveryForm),
-      });
-      if (!res.ok) throw new Error();
-      setIsDeliveryOpen(false);
-      fetchData();
-    } catch (e) { alert('納品登録に失敗しました'); }
-    setIsDeliverySaving(false);
   };
 
   const openQrModal = async (flyer: any) => {
@@ -242,9 +204,9 @@ export default function FlyerPage() {
       <div className="flex justify-between items-center border-b border-slate-200 pb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-file-earmark-richtext text-fuchsia-600"></i> チラシ案件・在庫管理
+            <i className="bi bi-file-earmark-richtext text-fuchsia-600"></i> チラシ案件管理
           </h1>
-          <p className="text-slate-500 text-sm mt-1">配布するチラシ情報の登録と、納品履歴・現在庫の管理を行います。</p>
+          <p className="text-slate-500 text-sm mt-1">配布するチラシ情報の登録と、現在庫の確認を行います。</p>
         </div>
         <button onClick={() => openForm()} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2 rounded-lg font-bold shadow-md">
           <i className="bi bi-plus-lg"></i> 新規チラシ登録
@@ -300,7 +262,7 @@ export default function FlyerPage() {
                 </td>
                 <td className="px-6 py-4 text-right bg-slate-50">
                   <div className="font-bold text-lg text-fuchsia-600">{f.stockCount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">枚</span></div>
-                  <button onClick={() => openDeliveryModal(f)} className="text-[10px] font-bold text-blue-600 hover:underline mt-1">納品履歴・追加 &gt;</button>
+                  <Link href="/transactions" className="text-[10px] font-bold text-blue-600 hover:underline mt-1 block">入出庫の管理 &gt;</Link>
                 </td>
                 <td className="px-6 py-4 text-center space-x-1">
                   <button onClick={() => openQrModal(f)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="QRコード発行・管理"><i className="bi bi-qr-code text-lg"></i></button>
@@ -313,7 +275,7 @@ export default function FlyerPage() {
         </table>
       </div>
 
-      {/* --- QRコード管理モーダル (UI刷新・インライン編集版) --- */}
+      {/* --- QRコード管理モーダル --- */}
       {isQrModalOpen && qrFlyer && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl flex flex-col md:flex-row max-h-[95vh] overflow-hidden">
@@ -407,7 +369,6 @@ export default function FlyerPage() {
                               背景を透過する
                             </label>
                             
-                            {/* ★ ダウンロードボタンの表示 */}
                             <div className="flex gap-1.5 w-full">
                               <a href={dlUrlPng} className="flex-1 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-600 hover:text-white text-[10px] font-bold py-1.5 rounded text-center transition-colors shadow-sm" download={`QR_${qr.alias}.png`}>
                                 <i className="bi bi-download"></i> PNG
@@ -419,7 +380,7 @@ export default function FlyerPage() {
                           </div>
                         </div>
                         
-                        {/* 右側: 情報と編集フォーム (インライン展開) */}
+                        {/* 右側: 情報と編集フォーム */}
                         <div className="flex-1 min-w-0 flex flex-col">
                           {editingQrId === qr.id ? (
                             <div className="flex flex-col gap-3 h-full bg-indigo-50/30 p-4 rounded-xl border border-indigo-100">
@@ -464,7 +425,6 @@ export default function FlyerPage() {
                                   {qr.isActive ? '有効 (Active)' : '無効 (Archived)'}
                                 </button>
                                 
-                                {/* ★ 常に表示される見やすいボタン */}
                                 <div className="flex gap-2">
                                   <button onClick={() => startEditQr(qr)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title="編集">
                                     <i className="bi bi-pencil-square"></i> 編集
@@ -534,86 +494,7 @@ export default function FlyerPage() {
         </div>
       )}
 
-      {/* 納品履歴モーダルはそのまま... */}
-      {isDeliveryOpen && selectedFlyer && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl flex flex-col md:flex-row max-h-[90vh] overflow-hidden">
-            <div className="w-full md:w-1/3 bg-slate-50 p-6 border-r border-slate-200">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-slate-800"><i className="bi bi-box-seam-fill text-blue-600 mr-2"></i>納品の追加</h3>
-                <button onClick={() => setIsDeliveryOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
-              </div>
-
-              <form onSubmit={saveDelivery} className="space-y-4">
-                <div>
-                  <label className="text-xs font-bold text-slate-600">納品日時 (予定/実績) *</label>
-                  <input type="datetime-local" required value={deliveryForm.expectedAt} onChange={e => setDeliveryForm({...deliveryForm, expectedAt: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white" />
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-600">納品枚数 *</label>
-                  <div className="relative">
-                    <input type="number" required min="1" value={deliveryForm.count} onChange={e => setDeliveryForm({...deliveryForm, count: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white pr-8 text-right font-bold text-lg text-fuchsia-600" placeholder="10000" />
-                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">枚</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-600">ステータス *</label>
-                  <select required value={deliveryForm.status} onChange={e => setDeliveryForm({...deliveryForm, status: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white">
-                    <option value="COMPLETED">納品完了 (すぐ在庫に追加)</option>
-                    <option value="PENDING">納品予定 (まだ在庫にしない)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-bold text-slate-600">備考メモ</label>
-                  <input type="text" value={deliveryForm.note} onChange={e => setDeliveryForm({...deliveryForm, note: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-white" placeholder="例: 段ボール10箱" />
-                </div>
-                <button type="submit" disabled={isDeliverySaving} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all mt-4 disabled:opacity-50">
-                  {isDeliverySaving ? '処理中...' : '在庫に追加する'}
-                </button>
-              </form>
-            </div>
-
-            <div className="flex-1 bg-white p-6 overflow-y-auto">
-              <div className="flex justify-between items-center mb-6 hidden md:flex">
-                <div>
-                  <h3 className="font-bold text-slate-800 text-lg">{selectedFlyer.name}</h3>
-                  <p className="text-sm text-slate-500">現在の有効在庫: <span className="font-bold text-fuchsia-600">{selectedFlyer.stockCount.toLocaleString()} 枚</span></p>
-                </div>
-                <button onClick={() => setIsDeliveryOpen(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg text-xl"></i></button>
-              </div>
-
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b pb-2 mb-4">納品履歴</h4>
-              {deliveries.length === 0 ? (
-                <div className="text-center py-10 text-slate-400">納品履歴がありません。左のフォームから追加してください。</div>
-              ) : (
-                <div className="space-y-3">
-                  {deliveries.map(d => (
-                    <div key={d.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-xl bg-slate-50">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl ${d.status === 'COMPLETED' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}>
-                          <i className={`bi ${d.status === 'COMPLETED' ? 'bi-check-lg' : 'bi-clock-history'}`}></i>
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-700">{new Date(d.expectedAt).toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}</div>
-                          <div className="text-xs text-slate-500">{d.note || '備考なし'}</div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-lg text-slate-800">+{d.count.toLocaleString()} <span className="text-xs font-normal text-slate-500">枚</span></div>
-                        <div className={`text-[10px] font-bold ${d.status === 'COMPLETED' ? 'text-blue-600' : 'text-amber-600'}`}>
-                          {d.status === 'COMPLETED' ? '在庫反映済' : '入荷待ち'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* チラシ登録・編集モーダルはそのまま... */}
+      {/* チラシ登録・編集モーダル */}
       {isFormOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
