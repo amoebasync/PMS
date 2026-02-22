@@ -1,17 +1,80 @@
+// src/components/portal/PortalHeader.tsx
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef } from 'react';
+import { useCart } from './CartContext';
 import { signOut, useSession } from 'next-auth/react';
-import { useCart } from '@/components/portal/CartContext'; // ★ 追加
 
 export function PortalHeader() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session, status } = useSession();
-  const { items } = useCart(); // ★ 追加
+  
+  // ★ 修正1: useCartがエラー等でundefinedを返しても落ちないように安全に取得
+  const cartContext = useCart();
+  const cartItems = cartContext?.items || [];
+  
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // ★ 修正2: すべての useEffect などのHookを early return の前に配置する（Reactのルール）
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    
+    // 通知を取得
+    const fetchNotifications = async () => {
+      try {
+        const res = await fetch('/api/portal/notifications');
+        if (res.ok) {
+          const data = await res.json();
+          setNotifications(data.notifications || []);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchNotifications();
+  }, [status]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
+        setIsNotifOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleOpenNotifications = async () => {
+    setIsNotifOpen(!isNotifOpen);
+    // 開いた瞬間に既読化 (ACTION_REQUIRED以外)
+    if (!isNotifOpen && unreadCount > 0) {
+      try {
+        await fetch('/api/portal/notifications/read', { method: 'POST' });
+        // フロントエンドのStateも更新（ACTION_REQUIREDは未読のまま残す）
+        setNotifications(prev => prev.map(n => n.type === 'ACTION_REQUIRED' ? n : { ...n, isRead: true }));
+      } catch (e) { console.error(e); }
+    }
+  };
+
+  const handleNotificationClick = (orderId: number | null) => {
+    setIsNotifOpen(false);
+    if (orderId) {
+      // 発注履歴ページへ、特定のorderIdを指定して遷移
+      router.push(`/portal/orders?orderId=${orderId}`);
+    } else {
+      router.push('/portal/orders');
+    }
+  };
+
+  // ★ 修正3: Hookの呼び出しが全て終わった後に return null の判定をする
   const isAuthPage = pathname === '/portal/login' || pathname === '/portal/signup';
   if (isAuthPage) return null;
 
@@ -31,8 +94,9 @@ export function PortalHeader() {
   const navItems = session ? authNavItems : publicNavItems;
 
   return (
-    <header className="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-50">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-[100] shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        
         <div className="flex items-center gap-8">
           <Link href="/portal" className="relative w-[140px] h-[30px]">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
@@ -52,15 +116,71 @@ export function PortalHeader() {
 
         <div className="flex items-center gap-4">
           
-          {/* ★ 追加: カートアイコン (常時表示) */}
+          {/* --- 通知アイコン --- */}
+          {session && (
+            <div className="relative mr-2" ref={notifRef}>
+              <button 
+                onClick={handleOpenNotifications}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors relative"
+              >
+                <i className="bi bi-bell text-xl"></i>
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1.5 w-4 h-4 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {/* 通知ポップオーバー */}
+              {isNotifOpen && (
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                    <h3 className="font-bold text-slate-800 text-sm">お知らせ</h3>
+                  </div>
+                  <div className="max-h-80 overflow-y-auto custom-scrollbar divide-y divide-slate-100">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-sm text-slate-500">新しいお知らせはありません。</div>
+                    ) : (
+                      notifications.map((notif) => (
+                        <div 
+                          key={notif.id}
+                          onClick={() => handleNotificationClick(notif.orderId)}
+                          className={`p-4 cursor-pointer transition-colors hover:bg-slate-50 ${notif.isRead ? 'opacity-70' : 'bg-indigo-50/30'}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`mt-0.5 shrink-0 ${notif.type === 'ACTION_REQUIRED' ? 'text-rose-500' : 'text-indigo-500'}`}>
+                              {notif.type === 'ACTION_REQUIRED' ? <i className="bi bi-exclamation-triangle-fill"></i> : <i className="bi bi-info-circle-fill"></i>}
+                            </div>
+                            <div>
+                              <div className={`text-sm font-bold ${notif.type === 'ACTION_REQUIRED' ? 'text-rose-700' : 'text-slate-800'}`}>
+                                {notif.title}
+                              </div>
+                              <div className="text-xs text-slate-600 mt-1 leading-relaxed">{notif.message}</div>
+                              {notif.orderNo && (
+                                <div className="text-[10px] font-mono text-slate-400 mt-2">{notif.orderNo}</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* カートアイコン */}
           <Link href="/portal/cart" className="relative p-2 text-slate-600 hover:text-indigo-600 transition-colors mr-2">
             <i className="bi bi-cart3 text-2xl"></i>
-            {items.length > 0 && (
+            {cartItems && cartItems.length > 0 && (
               <span className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm transform translate-x-1 -translate-y-1">
-                {items.length}
+                {cartItems.length}
               </span>
             )}
           </Link>
+
+          <div className="h-8 w-px bg-slate-200 hidden md:block"></div>
 
           {status === 'loading' ? (
             <div className="w-20 h-6 bg-slate-100 animate-pulse rounded"></div>

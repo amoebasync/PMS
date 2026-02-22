@@ -1,9 +1,9 @@
 // src/app/portal/orders/page.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 // ステータス定義
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
@@ -33,8 +33,11 @@ const FILTER_TABS = [
 
 const CANCELABLE_STATUSES = ['DRAFT', 'PLANNING', 'PENDING_PAYMENT', 'PENDING_SUBMISSION', 'PENDING_REVIEW', 'ADJUSTING'];
 
-export default function PortalOrdersPage() {
+function PortalOrdersContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetOrderId = searchParams.get('orderId');
+
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
@@ -92,9 +95,12 @@ export default function PortalOrdersPage() {
     setInquiryText('');
   };
 
-  // フィルタリング処理
+  // フィルタリング処理（URLパラメータ targetOrderId も考慮）
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
+      // 通知から飛んできた場合はその案件のみ表示
+      if (targetOrderId && o.id.toString() !== targetOrderId) return false;
+      
       if (filterStatus !== 'ALL' && o.status !== filterStatus) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
@@ -103,7 +109,7 @@ export default function PortalOrdersPage() {
       }
       return true;
     });
-  }, [orders, filterStatus, searchQuery]);
+  }, [orders, filterStatus, searchQuery, targetOrderId]);
 
   // アラート用カウント
   const pendingSubmissionCount = orders.filter(o => o.status === 'PENDING_SUBMISSION').length;
@@ -115,6 +121,29 @@ export default function PortalOrdersPage() {
   const countByStatus = (status: string | string[]) => {
     if (Array.isArray(status)) return orders.filter(o => status.includes(o.status)).length;
     return orders.filter(o => o.status === status).length;
+  };
+
+  // ★ 左カラムステータスフィルターの共通コンポーネント化
+  const renderStatusFilterItem = (id: string, icon: string, label: string, count: number) => {
+    const isActive = filterStatus === id;
+    return (
+      <div 
+        className={`flex justify-between items-center text-sm p-3 rounded-lg cursor-pointer transition-colors border ${
+          isActive 
+            ? 'bg-indigo-50 border-indigo-200 shadow-sm' 
+            : 'border-transparent hover:bg-slate-50'
+        }`}
+        onClick={() => setFilterStatus(id)}
+      >
+        <span className={`font-bold flex items-center ${isActive ? 'text-indigo-700' : 'text-slate-600'}`}>
+          <i className={`bi ${icon} mr-2 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`}></i>
+          {label}
+        </span>
+        <span className={`font-bold ${isActive ? 'text-indigo-700' : 'text-slate-700'}`}>
+          {count} <span className="text-[10px] font-normal text-slate-400">件</span>
+        </span>
+      </div>
+    );
   };
 
   if (isLoading) return <div className="p-20 text-center text-slate-500"><div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>データを読み込んでいます...</div>;
@@ -135,45 +164,46 @@ export default function PortalOrdersPage() {
         </Link>
       </div>
 
-      {/* 要対応アクションアラート */}
-      {needsActionCount > 0 && (
-        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 shadow-sm">
-          <div className="font-bold mb-4 flex items-center gap-2 text-rose-800 text-base">
+      {/* 通知からの絞り込み解除ボタン */}
+      {targetOrderId && (
+        <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center text-indigo-800 text-sm font-bold shadow-sm">
+          <span><i className="bi bi-funnel-fill mr-2"></i> 通知された案件のみを表示しています</span>
+          <button onClick={() => router.push('/portal/orders')} className="px-4 py-1.5 bg-white rounded-lg border border-indigo-200 hover:bg-indigo-100 transition-colors text-xs">
+            すべて表示に戻す
+          </button>
+        </div>
+      )}
+
+      {/* 要対応アクションアラート (絞り込みされていない時だけ表示) */}
+      {!targetOrderId && needsActionCount > 0 && (
+        <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 shadow-sm">
+          <div className="font-bold mb-3 flex items-center gap-2 text-rose-800 text-sm">
             <i className="bi bi-exclamation-triangle-fill"></i> 要対応アクションがあります。
           </div>
-          <ul className="space-y-3 ml-2">
+          <ul className="space-y-2 ml-1 text-sm">
             {pendingPaymentCount > 0 && (
               <li>
-                <button 
-                  onClick={() => setFilterStatus('PENDING_PAYMENT')} 
-                  className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1"
-                >
+                <button onClick={() => setFilterStatus('PENDING_PAYMENT')} className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  入金待ちの案件が <span className="font-black text-lg mx-1">{pendingPaymentCount}</span> 件あります。
+                  入金待ちの案件が <span className="font-bold mx-0.5">{pendingPaymentCount}</span> 件あります。
                   <i className="bi bi-chevron-right text-[10px] opacity-50 ml-1"></i>
                 </button>
               </li>
             )}
             {pendingSubmissionCount > 0 && (
               <li>
-                <button 
-                  onClick={() => setFilterStatus('PENDING_SUBMISSION')} 
-                  className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1"
-                >
+                <button onClick={() => setFilterStatus('PENDING_SUBMISSION')} className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  入稿待ちの案件が <span className="font-black text-lg mx-1">{pendingSubmissionCount}</span> 件あります。
+                  入稿待ちの案件が <span className="font-bold mx-0.5">{pendingSubmissionCount}</span> 件あります。
                   <i className="bi bi-chevron-right text-[10px] opacity-50 ml-1"></i>
                 </button>
               </li>
             )}
             {adjustingCount > 0 && (
               <li>
-                <button 
-                  onClick={() => setFilterStatus('ADJUSTING')} 
-                  className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1"
-                >
+                <button onClick={() => setFilterStatus('ADJUSTING')} className="flex items-center gap-2 hover:underline text-rose-600 font-medium transition-all hover:translate-x-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                  調整中の案件が <span className="font-black text-lg mx-1">{adjustingCount}</span> 件あります。
+                  調整中の案件が <span className="font-bold mx-0.5">{adjustingCount}</span> 件あります。
                   <i className="bi bi-chevron-right text-[10px] opacity-50 ml-1"></i>
                 </button>
               </li>
@@ -188,59 +218,18 @@ export default function PortalOrdersPage() {
         {/* 左カラム：ステータスサマリー */}
         {/* ========================================================= */}
         <div className="w-full lg:w-1/4 shrink-0 space-y-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
             <h3 className="text-sm font-black text-slate-800 mb-4 flex items-center gap-2">
               <i className="bi bi-pie-chart-fill text-indigo-500"></i> ステータス別件数
             </h3>
             
             <div className="space-y-1">
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'PENDING_PAYMENT' ? 'bg-amber-50 border border-amber-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('PENDING_PAYMENT')}
-              >
-                <span className="text-amber-700 font-bold"><i className="bi bi-wallet2 mr-2"></i>入金待ち</span>
-                <span className="font-black text-slate-800">{pendingPaymentCount} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
-
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'PENDING_SUBMISSION' ? 'bg-fuchsia-50 border border-fuchsia-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('PENDING_SUBMISSION')}
-              >
-                <span className="text-fuchsia-700 font-bold"><i className="bi bi-cloud-arrow-up mr-2"></i>入稿待ち</span>
-                <span className="font-black text-slate-800">{pendingSubmissionCount} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
-
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'PENDING_REVIEW' ? 'bg-orange-50 border border-orange-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('PENDING_REVIEW')}
-              >
-                <span className="text-orange-700 font-bold"><i className="bi bi-hourglass-split mr-2"></i>審査中</span>
-                <span className="font-black text-slate-800">{countByStatus('PENDING_REVIEW')} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
-
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'ADJUSTING' ? 'bg-indigo-50 border border-indigo-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('ADJUSTING')}
-              >
-                <span className="text-indigo-700 font-bold"><i className="bi bi-tools mr-2"></i>調整中</span>
-                <span className="font-black text-slate-800">{adjustingCount} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
-
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'CONFIRMED' ? 'bg-emerald-50 border border-emerald-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('CONFIRMED')}
-              >
-                <span className="text-emerald-700 font-bold"><i className="bi bi-box-seam mr-2"></i>手配中</span>
-                <span className="font-black text-slate-800">{countByStatus('CONFIRMED')} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
-
-              <div 
-                className={`flex justify-between items-center text-sm p-3 rounded-xl cursor-pointer transition-colors ${filterStatus === 'IN_PROGRESS' ? 'bg-blue-50 border border-blue-200' : 'hover:bg-slate-50 border border-transparent'}`}
-                onClick={() => setFilterStatus('IN_PROGRESS')}
-              >
-                <span className="text-blue-700 font-bold"><i className="bi bi-bicycle mr-2"></i>作業中</span>
-                <span className="font-black text-slate-800">{countByStatus('IN_PROGRESS')} <span className="text-[10px] font-normal text-slate-500">件</span></span>
-              </div>
+              {renderStatusFilterItem('PENDING_PAYMENT', 'bi-wallet2', '入金待ち', pendingPaymentCount)}
+              {renderStatusFilterItem('PENDING_SUBMISSION', 'bi-cloud-arrow-up', '入稿待ち', pendingSubmissionCount)}
+              {renderStatusFilterItem('PENDING_REVIEW', 'bi-hourglass-split', '審査中', countByStatus('PENDING_REVIEW'))}
+              {renderStatusFilterItem('ADJUSTING', 'bi-tools', '調整中', adjustingCount)}
+              {renderStatusFilterItem('CONFIRMED', 'bi-box-seam', '手配中', countByStatus('CONFIRMED'))}
+              {renderStatusFilterItem('IN_PROGRESS', 'bi-bicycle', '作業中', countByStatus('IN_PROGRESS'))}
             </div>
           </div>
           
@@ -252,7 +241,7 @@ export default function PortalOrdersPage() {
         </div>
 
         {/* ========================================================= */}
-        {/* 右カラム：発注一覧 (スッキリしたリストビュー) */}
+        {/* 右カラム：発注一覧 */}
         {/* ========================================================= */}
         <div className="w-full lg:w-3/4 space-y-4">
           
@@ -274,7 +263,7 @@ export default function PortalOrdersPage() {
                 <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
                 <input 
                   type="text" 
-                  placeholder="案件名、発注番号などで検索..." 
+                  placeholder="案件名などで検索..." 
                   value={searchQuery} 
                   onChange={(e) => setSearchQuery(e.target.value)} 
                   className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
@@ -289,7 +278,7 @@ export default function PortalOrdersPage() {
           {/* リスト表示部 */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             
-            {/* デスクトップ用 テーブルヘッダー (幅とgapを調整) */}
+            {/* デスクトップ用 テーブルヘッダー */}
             <div className="hidden lg:flex items-center px-6 py-3 bg-white border-b border-slate-200 text-xs font-bold text-slate-500 gap-6">
               <div className="w-24 shrink-0 text-center">ステータス</div>
               <div className="flex-1 min-w-0 pr-2">案件名 / 発注日</div>
@@ -320,12 +309,16 @@ export default function PortalOrdersPage() {
                   }
 
                   return (
-                    <div key={order.id} className="flex flex-col lg:flex-row lg:items-center px-5 lg:px-6 py-4 gap-6 hover:bg-indigo-50/30 transition-colors group">
+                    <div 
+                      key={order.id} 
+                      onClick={() => setSelectedOrder(order)}
+                      className="flex flex-col lg:flex-row lg:items-center px-5 lg:px-6 py-4 gap-6 hover:bg-blue-50/50 transition-colors cursor-pointer"
+                    >
                       
                       {/* モバイルレイアウト */}
                       <div className="lg:hidden flex flex-col gap-2 w-full">
                         <div className="flex justify-between items-center">
-                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 ${statusInfo.color}`}>
+                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 border ${statusInfo.color}`}>
                             {statusInfo.label}
                           </span>
                         </div>
@@ -346,7 +339,7 @@ export default function PortalOrdersPage() {
 
                       {/* PCレイアウト */}
                       <div className="hidden lg:flex w-24 shrink-0 justify-center">
-                        <span className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold flex items-center justify-center text-center gap-1.5 w-full ${statusInfo.color}`}>
+                        <span className={`px-2.5 py-1.5 rounded-md text-[11px] font-bold flex items-center justify-center text-center gap-1.5 w-full border ${statusInfo.color}`}>
                           {statusInfo.label}
                         </span>
                       </div>
@@ -378,11 +371,18 @@ export default function PortalOrdersPage() {
                       {/* アクションボタン */}
                       <div className="w-full lg:w-24 shrink-0 flex justify-end mt-2 lg:mt-0">
                         {order.status === 'PENDING_SUBMISSION' ? (
-                          <Link href={`/portal/orders/${order.id}/submit`} className="w-full lg:w-full px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold shadow-sm transition-all text-center flex items-center justify-center gap-1.5">
+                          <Link 
+                            href={`/portal/orders/${order.id}/submit`} 
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full lg:w-full px-4 py-2 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-md text-xs font-bold shadow-sm transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
                             入稿
                           </Link>
                         ) : (
-                          <button onClick={() => setSelectedOrder(order)} className="w-full lg:w-full px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-md text-xs font-bold border border-slate-300 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedOrder(order); }} 
+                            className="w-full lg:w-full px-4 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-md text-xs font-bold border border-slate-300 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                          >
                             <i className="bi bi-list-ul"></i> 詳細
                           </button>
                         )}
@@ -401,8 +401,8 @@ export default function PortalOrdersPage() {
       {/* 詳細モーダル */}
       {/* ========================================================= */}
       {selectedOrder && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden">
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setSelectedOrder(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             
             <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
               <div>
@@ -507,8 +507,8 @@ export default function PortalOrdersPage() {
 
       {/* --- キャンセル確認モーダル --- */}
       {isCancelModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsCancelModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
             </div>
@@ -530,8 +530,8 @@ export default function PortalOrdersPage() {
 
       {/* --- お問い合わせモーダル --- */}
       {isInquiryModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsInquiryModalOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="bg-slate-50 p-5 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
                 <i className="bi bi-chat-dots-fill text-blue-600"></i>
@@ -586,5 +586,14 @@ export default function PortalOrdersPage() {
       )}
 
     </div>
+  );
+}
+
+// Next.js の仕様により、useSearchParams を使用するコンポーネントは Suspense で囲む必要があります。
+export default function PortalOrdersPage() {
+  return (
+    <Suspense fallback={<div className="p-20 text-center text-slate-500"><div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>データを読み込んでいます...</div>}>
+      <PortalOrdersContent />
+    </Suspense>
   );
 }

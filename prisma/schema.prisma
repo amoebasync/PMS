@@ -384,6 +384,7 @@ model Customer {
 
   flyers Flyer[]
   orders   Order[]
+  notifications   Notification[] // ★これを追加
 
   @@map("customers")
 }
@@ -849,6 +850,7 @@ model Order {
   designs            OrderDesign[]
   payments           Payment[] 
   approvals          OrderApproval[] // ★ 追加: 審査履歴
+  notifications   Notification[]
 
   @@map("orders")
 }
@@ -1210,4 +1212,24 @@ model PaidLeaveLedger {
   createdAt   DateTime             @default(now()) @map("created_at")
 
   @@map("paid_leave_ledgers")
+}
+
+model Notification {
+  id         Int      @id @default(autoincrement())
+  
+  customerId Int      @map("customer_id")
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  orderId    Int?     @map("order_id")
+  order      Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  title      String   @db.VarChar(200)
+  message    String   @db.Text
+  type       String   @default("INFO") @db.VarChar(50) // INFO, ACTION_REQUIRED, SUCCESS など
+  isRead     Boolean  @default(false) @map("is_read")
+
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("notifications")
 }
