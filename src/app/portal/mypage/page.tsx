@@ -1,276 +1,393 @@
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { PrismaClient } from "@prisma/client";
+'use client';
 
-const prisma = new PrismaClient();
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
-  DRAFT: { label: '下書き', color: 'bg-slate-100 text-slate-500', icon: 'bi-pencil' },
-  PLANNING: { label: '提案中', color: 'bg-slate-100 text-slate-500', icon: 'bi-chat-dots' },
-  PENDING_PAYMENT: { label: '入金待ち', color: 'bg-orange-100 text-orange-700', icon: 'bi-coin' },
-  PENDING_REVIEW: { label: '審査待ち', color: 'bg-yellow-100 text-yellow-700', icon: 'bi-hourglass-split' },
-  ADJUSTING: { label: '要調整・修正', color: 'bg-rose-100 text-rose-700', icon: 'bi-exclamation-triangle-fill' },
-  CONFIRMED: { label: '手配中(確定)', color: 'bg-blue-100 text-blue-700', icon: 'bi-check-circle-fill' },
-  IN_PROGRESS: { label: '作業・配布中', color: 'bg-indigo-100 text-indigo-700', icon: 'bi-truck' },
-  COMPLETED: { label: '完了', color: 'bg-emerald-100 text-emerald-700', icon: 'bi-flag-fill' },
-  CANCELED: { label: 'キャンセル', color: 'bg-slate-200 text-slate-500', icon: 'bi-x-circle-fill' },
+  DRAFT: { label: '一時保存', color: 'bg-slate-100 text-slate-600', icon: 'bi-save' },
+  PLANNING: { label: '提案中', color: 'bg-blue-100 text-blue-700', icon: 'bi-lightbulb' },
+  PENDING_PAYMENT: { label: '入金待ち', color: 'bg-amber-100 text-amber-700', icon: 'bi-wallet2' },
+  PENDING_SUBMISSION: { label: 'データ入稿待ち', color: 'bg-fuchsia-100 text-fuchsia-700', icon: 'bi-cloud-arrow-up' }, // ★ 新規追加
+  PENDING_REVIEW: { label: '審査待ち', color: 'bg-orange-100 text-orange-700', icon: 'bi-hourglass-split' },
+  ADJUSTING: { label: '調整中', color: 'bg-indigo-100 text-indigo-700', icon: 'bi-tools' },
+  CONFIRMED: { label: '受注確定', color: 'bg-emerald-100 text-emerald-700', icon: 'bi-check-circle' },
+  IN_PROGRESS: { label: '作業中/配布中', color: 'bg-blue-100 text-blue-700', icon: 'bi-bicycle' },
+  COMPLETED: { label: '完了', color: 'bg-slate-800 text-white', icon: 'bi-flag-fill' },
+  CANCELED: { label: 'キャンセル', color: 'bg-rose-100 text-rose-700', icon: 'bi-x-circle' },
 };
 
-function getTimeAgo(date: Date) {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  if (seconds < 60) return `${seconds}秒前`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}分前`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}時間前`;
-  return `${Math.floor(hours / 24)}日前`;
-}
+// 選択肢の定義
+const PAPER_TYPES = ['コート紙', 'マット紙', '上質紙'];
+const PAPER_WEIGHTS = ['73kg (標準)', '90kg (少し厚め)', '110kg (厚手)', '135kg (カード・ハガキ厚)'];
+const COLOR_TYPES = ['両面カラー', '片面カラー (裏面白紙)', '両面モノクロ', '片面モノクロ'];
+const FOLDING_OPTIONS = ['なし', '2つ折り', '3つ折り (巻き)', '3つ折り (Z)', '十字折り', 'ずらし折り', 'その他 (備考欄へ)'];
 
-export default async function PortalDashboard() {
-  const session = await getServerSession(authOptions);
-  
-  if (!session || !session.user) {
-    redirect('/portal/login');
-  }
+export default function PortalMyPage() {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const contactId = parseInt((session.user as any).id);
-  const contact = await prisma.customerContact.findUnique({ where: { id: contactId }, include: { customer: true } });
-  
-  if (!contact) {
-    redirect('/portal/login');
-  }
+  // --- 入稿モーダル用 State ---
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [activeOrderId, setActiveOrderId] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const customerId = contact.customerId;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [submitForm, setSubmitForm] = useState({
+    designFileUrl: '',
+    paperType: 'コート紙',
+    paperWeight: '73kg (標準)',
+    colorType: '両面カラー',
+    printCount: 0,
+    foldingOption: 'なし',
+    sampleRequired: false,
+    sampleShippingAddress: '',
+    remarks: ''
+  });
 
-  // --- KPIとリストデータの並行取得 ---
-  const [
-    activeOrdersCount,
-    pendingPayments,
-    monthQrScans,
-    todayQrScans,
-    activeDistributions,
-    recentOrders,
-    recentScans
-  ] = await Promise.all([
-    // 1. 進行中の発注数
-    prisma.order.count({
-      where: { customerId, status: { in: ['CONFIRMED', 'IN_PROGRESS', 'PENDING_REVIEW'] } }
-    }),
-    // 2. 未払いの請求額合計
-    prisma.payment.aggregate({
-      _sum: { amount: true },
-      where: { order: { customerId }, status: 'PENDING' }
-    }),
-    // 3. 今月のQRスキャン数
-    prisma.qrScanLog.count({
-      where: { qrCode: { flyer: { customerId } }, scannedAt: { gte: startOfMonth } }
-    }),
-    // 4. 本日のQRスキャン数
-    prisma.qrScanLog.count({
-      where: { qrCode: { flyer: { customerId } }, scannedAt: { gte: today } }
-    }),
-    // 5. 現在配布期間中のチラシ総枚数
-    prisma.orderDistribution.aggregate({
-      _sum: { plannedCount: true },
-      where: { 
-        order: { customerId }, 
-        startDate: { lte: new Date() }, 
-        endDate: { gte: new Date() },
-        status: { in: ['UNSTARTED', 'IN_PROGRESS', 'CONFIRMED'] }
+  const fetchData = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/portal/orders');
+      if (res.status === 401) {
+        router.push('/portal/login');
+        return;
       }
-    }),
-    // 6. 最近の受注履歴（直近5件）
-    // ★ 修正箇所: createdAt を id に変更しました
-    prisma.order.findMany({
-      where: { customerId },
-      orderBy: { id: 'desc' }, 
-      take: 5,
-    }),
-    // 7. 最新のQRスキャン履歴（直近6件）
-    prisma.qrScanLog.findMany({
-      where: { qrCode: { flyer: { customerId } } },
-      orderBy: { scannedAt: 'desc' },
-      include: { qrCode: { include: { flyer: true } } },
-      take: 6,
-    })
-  ]);
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.customer);
+        setOrders(data.orders || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setIsLoading(false);
+  };
 
-  const billingAmount = pendingPayments._sum.amount || 0;
-  const currentlyDistributingCount = activeDistributions._sum.plannedCount || 0;
+  useEffect(() => { fetchData(); }, [router]);
+
+  const openSubmitModal = (order: any) => {
+    setActiveOrderId(order.id);
+    // 配布枚数の合計をデフォルトの印刷部数に設定（少し多めに設定してもらう前提）
+    const totalDist = order.distributions?.reduce((sum: number, d: any) => sum + d.plannedCount, 0) || 0;
+    setSubmitForm(prev => ({ ...prev, printCount: totalDist + (Math.floor(totalDist * 0.05)) })); // 予備として+5%
+    setIsSubmitModalOpen(true);
+  };
+
+  // ファイルアップロード処理
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) { // 10MB以上
+      alert('ファイルサイズが大きすぎます。10MB以上のデータは、GigaFile便などのURLを備考欄に貼り付けてください。');
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setSubmitForm(prev => ({ ...prev, designFileUrl: data.url }));
+        alert('アップロードが完了しました。');
+      } else {
+        alert('アップロードに失敗しました。');
+      }
+    } catch (err) { alert('通信エラーが発生しました。'); }
+    setIsUploading(false);
+  };
+
+  const handleSubmitData = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeOrderId) return;
+    
+    // URLもファイルもない場合は警告
+    if (!submitForm.designFileUrl && !submitForm.remarks.includes('http')) {
+      if (!confirm('入稿データが添付されていません。備考欄のURLから入稿しますか？\n(データがない場合は後からメール等で送付をお願いします)')) return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/portal/orders/${activeOrderId}/submit-data`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(submitForm)
+      });
+      if (res.ok) {
+        alert('データを入稿しました！審査へ進みます。');
+        setIsSubmitModalOpen(false);
+        fetchData();
+      } else {
+        alert('エラーが発生しました');
+      }
+    } catch (err) { alert('通信エラーが発生しました'); }
+    setIsSubmitting(false);
+  };
+
+  const handleLogout = async () => {
+    await fetch('/api/portal/auth/login', { method: 'DELETE' });
+    router.push('/portal/login');
+  };
+
+  if (isLoading) return <div className="p-20 text-center text-slate-500">読み込み中...</div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 pb-10">
+    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in">
       
-      {/* ヒーローセクション */}
-      <div className="relative bg-slate-800 rounded-3xl p-8 sm:p-10 shadow-xl overflow-hidden">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500 rounded-full blur-[100px] opacity-20 -mr-20 -mt-20 pointer-events-none"></div>
-        <div className="absolute bottom-0 right-60 w-[300px] h-[300px] bg-fuchsia-500 rounded-full blur-[80px] opacity-20 -mb-20 pointer-events-none"></div>
-        
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <div className="text-indigo-300 font-bold tracking-widest text-xs mb-2 uppercase">Dashboard</div>
-            <h1 className="text-3xl sm:text-4xl font-black text-white mb-3 tracking-tight">
-              ようこそ、{contact.customer.name} 様
-            </h1>
-            <p className="text-slate-400 text-sm max-w-xl leading-relaxed">
-              PMSプラットフォームへようこそ。ポスティングの発注から反響分析まで、すべてを一元管理し、プロモーションの費用対効果を最大化します。
-            </p>
-          </div>
-          <Link href="/portal/orders/new" className="shrink-0 bg-indigo-500 hover:bg-indigo-400 text-white px-8 py-4 rounded-2xl font-bold shadow-lg shadow-indigo-500/30 transition-all flex items-center justify-center gap-3 group">
-            <i className="bi bi-map-fill text-xl group-hover:scale-110 transition-transform"></i> 
-            新しい発注を作成する
-          </Link>
+      <div className="bg-white rounded-2xl p-6 md:p-8 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-50 rounded-full blur-3xl -mr-10 -mt-10"></div>
+        <div className="relative z-10">
+          <div className="text-sm font-bold text-blue-600 mb-1">Welcome Back</div>
+          <h1 className="text-2xl font-black text-slate-800">{user?.name} 様</h1>
+          <p className="text-slate-500 text-sm mt-1 flex items-center gap-2">
+            <i className="bi bi-envelope"></i> {user?.email}
+          </p>
         </div>
+        <button onClick={handleLogout} className="relative z-10 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl text-sm transition-colors flex items-center gap-2">
+          <i className="bi bi-box-arrow-right"></i> ログアウト
+        </button>
       </div>
 
-      {/* KPIカード群 */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors">
-          <div className="text-slate-500 font-bold text-[11px] mb-2 flex items-center gap-2"><i className="bi bi-truck text-indigo-500 text-base"></i> 進行中の発注</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-800">{activeOrdersCount}</span>
-            <span className="text-xs font-bold text-slate-400">件</span>
-          </div>
-        </div>
-        
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors">
-          <div className="text-slate-500 font-bold text-[11px] mb-2 flex items-center gap-2"><i className="bi bi-send-fill text-fuchsia-500 text-base"></i> 現在の配布予定数</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-800">{currentlyDistributingCount.toLocaleString()}</span>
-            <span className="text-xs font-bold text-slate-400">枚</span>
-          </div>
-        </div>
+      <div>
+        <h2 className="text-lg font-black text-slate-800 mb-4 flex items-center gap-2">
+          <i className="bi bi-card-list text-blue-600"></i> 発注履歴・ステータス
+        </h2>
 
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors">
-          <div className="text-slate-500 font-bold text-[11px] mb-2 flex items-center gap-2"><i className="bi bi-qr-code-scan text-emerald-500 text-base"></i> 本日のQR反響</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-800">{todayQrScans.toLocaleString()}</span>
-            <span className="text-xs font-bold text-slate-400">回</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors">
-          <div className="text-slate-500 font-bold text-[11px] mb-2 flex items-center gap-2"><i className="bi bi-graph-up-arrow text-emerald-500 text-base"></i> 今月の累計反響</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-800">{monthQrScans.toLocaleString()}</span>
-            <span className="text-xs font-bold text-slate-400">回</span>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors col-span-2 lg:col-span-1">
-          <div className="text-slate-500 font-bold text-[11px] mb-2 flex items-center gap-2"><i className="bi bi-receipt-cutoff text-amber-500 text-base"></i> 未払いご請求額</div>
-          <div className="flex items-baseline gap-1">
-            <span className="text-3xl font-black text-slate-800">¥{billingAmount.toLocaleString()}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* メインコンテンツ2カラム */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* 左側: 最近の発注 */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <i className="bi bi-clock-history text-indigo-600"></i> 最近の発注履歴
-            </h3>
-            <Link href="/portal/orders" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors">
-              すべて見る <i className="bi bi-chevron-right"></i>
-            </Link>
-          </div>
-          <div className="flex-1 p-2">
-            {recentOrders.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 text-sm">
-                発注履歴はまだありません
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {recentOrders.map(order => {
-                  const status = STATUS_MAP[order.status] || STATUS_MAP.PLANNING;
-                  return (
-                    <Link key={order.id} href="/portal/orders" className="flex items-center justify-between p-4 hover:bg-slate-50 rounded-2xl transition-colors group">
-                      <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 ${status.color}`}>
-                            <i className={`bi ${status.icon}`}></i> {status.label}
-                          </span>
-                          <span className="text-xs text-slate-400 font-mono">{order.orderNo}</span>
-                        </div>
-                        <div className="font-bold text-slate-700 text-sm group-hover:text-indigo-700 transition-colors">
-                          {order.title || '案件名未設定'}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-black text-slate-800">¥{order.totalAmount?.toLocaleString() || '-'}</div>
-                        <div className="text-[10px] text-slate-400">{new Date(order.orderDate).toLocaleDateString('ja-JP')}</div>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* 右側: 最新のQRスキャン履歴 */}
-        <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
-          <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <i className="bi bi-phone-vibrate text-emerald-600"></i> リアルタイム反響 (QR)
-            </h3>
-            <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-md">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-              Live
-            </span>
-          </div>
-          <div className="flex-1 p-2">
-            {recentScans.length === 0 ? (
-              <div className="text-center py-16 text-slate-400 text-sm">
-                QRコードのスキャン履歴はまだありません
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {recentScans.map(scan => (
-                  <div key={scan.id} className="flex items-start gap-4 p-4 hover:bg-slate-50 rounded-2xl transition-colors">
-                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                      <i className={`bi ${scan.deviceType === 'Mobile' ? 'bi-phone' : 'bi-pc-display'}`}></i>
+        <div className="space-y-4">
+          {orders.length === 0 ? (
+            <div className="bg-white rounded-2xl p-16 text-center border border-slate-200">
+              <i className="bi bi-inbox text-4xl text-slate-300 mb-3 block"></i>
+              <p className="text-slate-500 font-bold">まだ発注履歴がありません。</p>
+              <Link href="/portal/orders/new" className="inline-block mt-4 text-blue-600 hover:underline font-bold text-sm">新しい発注を作成する</Link>
+            </div>
+          ) : (
+            orders.map(order => {
+              const statusInfo = STATUS_MAP[order.status] || { label: order.status, color: 'bg-slate-100 text-slate-600', icon: 'bi-circle' };
+              
+              return (
+                <div key={order.id} className="bg-white rounded-2xl p-5 md:p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                  <div className="space-y-3 flex-1">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="font-mono text-slate-400 text-xs font-bold bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                        {order.orderNo}
+                      </span>
+                      <span className={`px-3 py-1 text-xs font-black rounded-full flex items-center gap-1.5 shadow-sm ${statusInfo.color}`}>
+                        <i className={`bi ${statusInfo.icon}`}></i> {statusInfo.label}
+                      </span>
+                      {order.status === 'PENDING_SUBMISSION' && (
+                         <span className="text-[10px] text-fuchsia-600 font-bold animate-pulse">※印刷データの入稿が必要です</span>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="font-bold text-sm text-slate-800 truncate pr-2">
-                          {scan.qrCode.flyer?.name}
+                    
+                    <div>
+                      <h3 className="font-black text-slate-800 text-lg">{order.title || '無題の案件'}</h3>
+                      <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
+                        <i className="bi bi-calendar-event"></i> 発注日: {new Date(order.orderDate).toLocaleDateString('ja-JP')}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {order.distributions?.map((d: any, idx: number) => (
+                        <div key={idx} className="bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-blue-100 flex items-center gap-1.5">
+                          <i className="bi bi-send-fill"></i> {d.method} : {d.plannedCount.toLocaleString()} 枚
                         </div>
-                        <div className="text-[10px] text-slate-400 font-bold shrink-0 whitespace-nowrap">
-                          {getTimeAgo(new Date(scan.scannedAt))}
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                        <span className="flex items-center gap-1" title="推定エリア">
-                          <i className="bi bi-geo-alt-fill text-slate-400"></i> {scan.location || 'エリア不明'}
-                        </span>
-                        <span className="flex items-center gap-1" title="ブラウザ/OS">
-                          <i className="bi bi-browser-chrome text-slate-400"></i> {scan.browser} / {scan.os}
-                        </span>
-                        {scan.qrCode.memo && (
-                          <span className="bg-slate-100 px-1.5 rounded text-slate-600 font-medium">
-                            {scan.qrCode.memo}
-                          </span>
-                        )}
-                      </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+
+                  <div className="flex flex-col items-start md:items-end justify-between border-t md:border-t-0 md:border-l border-slate-100 pt-4 md:pt-0 md:pl-6 min-w-[200px]">
+                    <div className="mb-4">
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">合計金額 (税込)</div>
+                      <div className="text-2xl font-black text-slate-800 tracking-tight">
+                        ¥{order.totalAmount?.toLocaleString() || '---'}
+                      </div>
+                    </div>
+                    
+                    {/* ★ 入稿待ちステータスの場合は目立つ入稿ボタンを表示 */}
+                    {order.status === 'PENDING_SUBMISSION' ? (
+                      <button onClick={() => openSubmitModal(order)} className="w-full px-5 py-3 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 group">
+                        <i className="bi bi-cloud-arrow-up-fill group-hover:-translate-y-1 transition-transform"></i> データを入稿する
+                      </button>
+                    ) : (
+                      <Link href={`/portal/orders/${order.id}`} className="w-full text-center px-5 py-2.5 bg-slate-50 hover:bg-blue-50 text-blue-600 font-bold border border-slate-200 hover:border-blue-200 rounded-xl text-sm transition-colors">
+                        詳細を確認
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+      </div>
+
+      {/* ========================================== */}
+      {/* ★ 新規追加: データ入稿・印刷オプション設定モーダル */}
+      {/* ========================================== */}
+      {isSubmitModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            
+            {/* ヘッダー */}
+            <div className="px-6 py-5 border-b border-slate-100 bg-slate-50 flex justify-between items-center shrink-0">
+              <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                <i className="bi bi-printer-fill text-fuchsia-600"></i> 印刷データ入稿 ＆ オプション設定
+              </h3>
+              <button onClick={() => setIsSubmitModalOpen(false)} className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center hover:bg-slate-300 transition-colors">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            {/* スクロールエリア */}
+            <form onSubmit={handleSubmitData} className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8 custom-scrollbar">
+              
+              {/* 1. ファイルアップロード */}
+              <div className="space-y-3">
+                <label className="block text-sm font-black text-slate-800 border-l-4 border-fuchsia-500 pl-2">
+                  1. デザインデータのアップロード
+                </label>
+                <div className="border-2 border-dashed border-slate-300 rounded-2xl p-8 text-center bg-slate-50 hover:bg-fuchsia-50 hover:border-fuchsia-300 transition-colors relative group">
+                  <input 
+                    type="file" 
+                    accept=".pdf,.ai,.psd,.jpg,.jpeg,.png,.zip" 
+                    onChange={handleFileUpload} 
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                  />
+                  <div className="space-y-3 pointer-events-none">
+                    <div className="w-16 h-16 bg-white rounded-full shadow-sm flex items-center justify-center mx-auto text-fuchsia-500 text-3xl group-hover:scale-110 transition-transform">
+                      {isUploading ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-cloud-arrow-up"></i>}
+                    </div>
+                    <p className="font-bold text-slate-700">
+                      {submitForm.designFileUrl ? '✓ ファイル添付済み' : isUploading ? 'アップロード中...' : 'クリックまたはドラッグ＆ドロップでファイルを選択'}
+                    </p>
+                    <p className="text-xs text-slate-500">対応形式: PDF, AI, PSD, JPG, PNG, ZIP (上限10MB)</p>
+                  </div>
+                </div>
+                
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800 flex gap-3 mt-2">
+                  <i className="bi bi-info-circle-fill text-amber-500 text-base"></i>
+                  <p>10MBを超える大容量データ（Illustrator等）の場合は、このフォームでのアップロードをスキップし、<br/>
+                  <span className="font-bold border-b border-amber-400">GigaFile便やGoogle Driveなどの共有URLを発行して、最下部の「備考欄」に貼り付けてください。</span></p>
+                </div>
               </div>
-            )}
+
+              {/* 2. 用紙・カラー指定 */}
+              <div className="space-y-5">
+                <label className="block text-sm font-black text-slate-800 border-l-4 border-fuchsia-500 pl-2">
+                  2. 印刷の仕様設定
+                </label>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-2xl border border-slate-100">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-600">用紙の種類</label>
+                    <select value={submitForm.paperType} onChange={e => setSubmitForm({...submitForm, paperType: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none font-bold text-sm bg-white">
+                      {PAPER_TYPES.map(pt => <option key={pt} value={pt}>{pt}</option>)}
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-600">用紙の厚さ</label>
+                    <select value={submitForm.paperWeight} onChange={e => setSubmitForm({...submitForm, paperWeight: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none font-bold text-sm bg-white">
+                      {PAPER_WEIGHTS.map(pw => <option key={pw} value={pw}>{pw}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-600">印刷カラー</label>
+                    <select value={submitForm.colorType} onChange={e => setSubmitForm({...submitForm, colorType: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none font-bold text-sm bg-white">
+                      {COLOR_TYPES.map(ct => <option key={ct} value={ct}>{ct}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-bold text-slate-600">印刷部数 (枚)</label>
+                    <input type="number" required min="100" step="100" value={submitForm.printCount} onChange={e => setSubmitForm({...submitForm, printCount: parseInt(e.target.value)})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none font-mono font-black text-lg bg-white" />
+                    <p className="text-[10px] text-slate-400">※配布枚数に対して少し多め（予備）の部数を設定してください。</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. 加工・オプション */}
+              <div className="space-y-5">
+                <label className="block text-sm font-black text-slate-800 border-l-4 border-fuchsia-500 pl-2">
+                  3. 折り加工・その他オプション
+                </label>
+                
+                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-6">
+                  
+                  {/* 特殊折りラジオボタン */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-3">特殊折り加工</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {FOLDING_OPTIONS.map(opt => (
+                        <label key={opt} className={`cursor-pointer border-2 rounded-xl p-3 text-center transition-all ${submitForm.foldingOption === opt ? 'bg-fuchsia-50 border-fuchsia-500 text-fuchsia-700 shadow-sm' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'}`}>
+                          <input type="radio" name="folding" className="hidden" checked={submitForm.foldingOption === opt} onChange={() => setSubmitForm({...submitForm, foldingOption: opt})} />
+                          <div className="font-bold text-xs">{opt}</div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <hr className="border-slate-200" />
+
+                  {/* サンプル要否 */}
+                  <div>
+                    <label className="flex items-start gap-3 cursor-pointer group">
+                      <div className="relative flex items-center justify-center mt-0.5">
+                        <input type="checkbox" className="peer w-5 h-5 appearance-none border-2 border-slate-300 rounded focus:ring-2 focus:ring-fuchsia-500 checked:bg-fuchsia-600 checked:border-fuchsia-600 transition-colors" checked={submitForm.sampleRequired} onChange={e => setSubmitForm({...submitForm, sampleRequired: e.target.checked})} />
+                        <i className="bi bi-check text-white absolute pointer-events-none opacity-0 peer-checked:opacity-100 text-lg"></i>
+                      </div>
+                      <div>
+                        <div className="font-bold text-slate-800 group-hover:text-fuchsia-700 transition-colors">印刷見本（サンプル）の送付を希望する</div>
+                        <div className="text-xs text-slate-500 mt-1">印刷完了後、ご指定の住所へ約50枚を無料でお送りします。</div>
+                      </div>
+                    </label>
+
+                    {submitForm.sampleRequired && (
+                      <div className="mt-4 pl-8 animate-in slide-in-from-top-2">
+                        <label className="block text-xs font-bold text-slate-600 mb-2">サンプル送付先住所・宛名 <span className="text-rose-500">*</span></label>
+                        <textarea required value={submitForm.sampleShippingAddress} onChange={e => setSubmitForm({...submitForm, sampleShippingAddress: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none text-sm bg-white" rows={3} placeholder="〒000-0000 東京都...&#10;株式会社〇〇 ご担当者様名"></textarea>
+                      </div>
+                    )}
+                  </div>
+
+                  <hr className="border-slate-200" />
+
+                  {/* 備考欄 */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-2">その他 備考・特記事項 (データ共有URLもこちらへ)</label>
+                    <textarea value={submitForm.remarks} onChange={e => setSubmitForm({...submitForm, remarks: e.target.value})} className="w-full p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-fuchsia-500 outline-none text-sm bg-white" rows={4} placeholder="・GigaFile便のURL: https://...&#10;・〇〇の部分は少し明るめで印刷希望、など"></textarea>
+                  </div>
+
+                </div>
+              </div>
+
+            </form>
+
+            {/* フッターアクション */}
+            <div className="p-6 bg-white border-t border-slate-200 flex justify-end gap-3 shrink-0">
+              <button type="button" onClick={() => setIsSubmitModalOpen(false)} className="px-6 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                キャンセル
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSubmitting || isUploading || (!submitForm.designFileUrl && submitForm.remarks.length === 0)}
+                onClick={handleSubmitData}
+                className="px-8 py-3 font-bold text-white bg-fuchsia-600 hover:bg-fuchsia-700 rounded-xl shadow-lg shadow-fuchsia-200 transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSubmitting ? '送信中...' : <><i className="bi bi-send-fill"></i> データを入稿して審査へ</>}
+              </button>
+            </div>
+
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 }

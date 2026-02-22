@@ -785,6 +785,7 @@ enum OrderStatus {
   DRAFT             @map("一時保存")
   PLANNING          @map("提案中")
   PENDING_PAYMENT   @map("入金待ち")
+  PENDING_SUBMISSION @map("入稿待ち")
   PENDING_REVIEW    @map("審査待ち")
   ADJUSTING         @map("調整中")
   CONFIRMED         @map("受注確定")
@@ -852,6 +853,8 @@ model Order {
   @@map("orders")
 }
 
+
+
 // --- 受注と顧客担当者の中間テーブル (1受注 : N担当者) ---
 model OrderContact {
   id                Int             @id @default(autoincrement())
@@ -902,28 +905,37 @@ model OrderDistributionArea {
   @@map("order_distribution_areas")
 }
 
-// --- 2. 印刷依頼 ---
 model OrderPrinting {
   id                   Int       @id @default(autoincrement())
   orderId              Int       @map("order_id")
   order                Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  // ★ 印刷するチラシ(すでに登録済みの枠として)
   flyerId              Int?      @map("flyer_id")
   flyer                Flyer?    @relation(fields: [flyerId], references: [id])
 
   partnerId            Int?      @map("partner_id")
   partner              Partner?  @relation(fields: [partnerId], references: [id]) // 印刷発注先
 
-  printCount           Int       @map("print_count") // 印刷枚数 (配布数+折込数から自動計算等)
+  printCount           Int       @map("print_count") // 印刷枚数
   paperSizeId          Int?      @map("paper_size_id")
-  // paperSize            FlyerSize? @relation(fields: [paperSizeId], references: [id])
   
   paperType            String?   @map("paper_type") @db.VarChar(50) // コート, マット等
   paperWeight          String?   @map("paper_weight") @db.VarChar(20) // 73kg, 90kg等
   colorType            String?   @map("color_type") @db.VarChar(20) // 両面カラー等
   
+  // ==========================================
+  // ★ ここから追加：入稿・印刷オプション
+  foldingOption        String?   @map("folding_option") @db.VarChar(100) // 3つ折り、二つ折り等
+  sampleRequired       Boolean   @default(false) @map("sample_required") // サンプルが必要か
+  sampleShippingAddress String?  @map("sample_shipping_address") @db.Text // サンプル配送先
+  remarks              String?   @db.Text // その他備考・指示
+  // ==========================================
+
   designFileUrl        String?   @map("design_file_url") @db.Text // 原稿データのURL
+
+  // ★ 今回追加: 表面と裏面のプレビュー用URL
+  frontDesignUrl       String?   @map("front_design_url") @db.Text
+  backDesignUrl        String?   @map("back_design_url") @db.Text
 
   orderDate            DateTime? @map("order_date") @db.Date // 印刷発注日
   expectedDeliveryDate DateTime? @map("expected_delivery_date") @db.Date // 納品予定日

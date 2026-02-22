@@ -24,24 +24,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    // 2. ステータスとマスタの準備
-    // 下書き(DRAFT) または、決済方法に応じて PENDING_REVIEW(審査待ち:クレカ) か PENDING_PAYMENT(入金待ち:振込) に振り分け
-    const initialStatus = isDraft ? 'DRAFT' : (paymentMethod === 'CREDIT' ? 'PENDING_REVIEW' : 'PENDING_PAYMENT');
-    const defaultIndustry = await prisma.industry.findFirst();
+    // 2. ステータスの判定
+    // 印刷が必要なアイテムが含まれているかチェック
+    const requiresPrinting = items.some((item: any) => item.type === 'PRINT_AND_POSTING' || item.isPrintingRequested);
+    
+    let initialStatus = 'PENDING_PAYMENT'; // デフォルトは銀行振込(入金待ち)
+    
+    if (isDraft) {
+      initialStatus = 'DRAFT';
+    } else if (paymentMethod === 'CREDIT' || paymentMethod === 'CREDIT_CARD') {
+      // 決済がカードの場合、印刷ありなら「入稿待ち」、配布のみなら「審査待ち」
+      initialStatus = requiresPrinting ? 'PENDING_SUBMISSION' : 'PENDING_REVIEW';
+    }
 
+    const defaultIndustry = await prisma.industry.findFirst();
     const orderIds: { cartItemId: string, orderId: number }[] = [];
 
     // 3. トランザクションによる一括保存処理
     await prisma.$transaction(async (tx) => {
       for (const item of items) {
         
-        // ★ すでに一時保存されていた場合は、古い関連データを安全に削除して上書きする
+        // すでに一時保存されていた場合は、古い関連データを安全に削除して上書きする
         if (item.savedOrderId) {
-          // Paymentは安全のためCascade Deleteを外しているので手動で消す
           await tx.payment.deleteMany({ where: { orderId: item.savedOrderId } });
           await tx.orderDistribution.deleteMany({ where: { orderId: item.savedOrderId } });
           await tx.orderPrinting.deleteMany({ where: { orderId: item.savedOrderId } });
-          // Order本体を削除
           await tx.order.delete({ where: { id: item.savedOrderId } });
         }
 
@@ -58,10 +65,10 @@ export async function POST(request: Request) {
             title: pName,
             customerId,
             orderSource: 'WEB_EC',
-            paymentMethod: paymentMethod === 'CREDIT' ? 'クレジットカード' : '銀行振込',
+            paymentMethod: paymentMethod === 'CREDIT' || paymentMethod === 'CREDIT_CARD' ? 'クレジットカード' : '銀行振込',
             orderDate: new Date(),
             totalAmount: orderTotalAmount,
-            status: initialStatus,
+            status: initialStatus as any,
             remarks: isDraft ? 'カートからの下書き保存' : 'ECサイトからの発注',
           }
         });
@@ -69,14 +76,14 @@ export async function POST(request: Request) {
         orderIds.push({ cartItemId: item.id, orderId: order.id });
 
         // 3-B. 決済データの作成
+        const isCredit = paymentMethod === 'CREDIT' || paymentMethod === 'CREDIT_CARD';
         await tx.payment.create({
           data: {
             orderId: order.id,
             amount: orderTotalAmount,
-            method: paymentMethod === 'CREDIT' ? 'CREDIT_CARD' : 'BANK_TRANSFER',
-            // 一時保存ならPENDING。確定時、クレカならCOMPLETED(入金済)、振込ならPENDING(未入金)
-            status: isDraft ? 'PENDING' : (paymentMethod === 'CREDIT' ? 'COMPLETED' : 'PENDING'),
-            paidAt: (!isDraft && paymentMethod === 'CREDIT') ? new Date() : null,
+            method: isCredit ? 'CREDIT_CARD' : 'BANK_TRANSFER',
+            status: isDraft ? 'PENDING' : (isCredit ? 'COMPLETED' : 'PENDING'),
+            paidAt: (!isDraft && isCredit) ? new Date() : null,
           }
         });
 
@@ -124,7 +131,7 @@ export async function POST(request: Request) {
         }
 
         // 3-F. 印刷ありプランの場合は印刷手配データも作成
-        if (item.type === 'PRINT_AND_POSTING') {
+        if (item.type === 'PRINT_AND_POSTING' || item.isPrintingRequested) {
           await tx.orderPrinting.create({
             data: {
               orderId: order.id,
