@@ -15,7 +15,9 @@ export function middleware(request: NextRequest) {
     path === '/portal/orders/new' || 
     path === '/portal/cart' ||
     path.startsWith('/api/locations') || 
-    path.startsWith('/api/areas');       
+    path.startsWith('/api/areas') ||
+    path.startsWith('/api/upload') ||
+    path.startsWith('/uploads/'); // ★ ここを追加 (アップロードされたファイルの閲覧を許可)
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;

@@ -39,6 +39,8 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
   const orderId = parseInt(resolvedParams.id);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,14 +58,15 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     back: { rotate: 0 }
   });
 
-  const [pdfSetupModal, setPdfSetupModal] = useState<{ url: string, side: 'front'|'back', filename: string } | null>(null);
-
   const [submitForm, setSubmitForm] = useState({
     frontDesignUrl: '', backDesignUrl: '',
     frontPageNum: 1, backPageNum: 2,
     paperType: 'コート紙', paperWeight: '73kg (標準)', colorType: '両面カラー',
     printCount: 0, foldingOption: 'なし', sampleRequired: false, sampleShippingAddress: '', remarks: ''
   });
+
+  // ★ 両面かどうかの判定用
+  const isDoubleSided = submitForm.colorType.includes('両面');
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -89,6 +92,7 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
   }, [orderId, router]);
 
   const processFile = async (file: File, side: 'front' | 'back') => {
+    // 50MB制限
     if (file.size > 50 * 1024 * 1024) { 
       alert('50MB以上のファイルはアップロードできません。GigaFile便等のURLを備考欄へ貼り付けてください。');
       return;
@@ -97,6 +101,11 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     setIsUploading(side);
     const formData = new FormData();
     formData.append('file', file);
+    
+    // 案件情報を追加して送信する
+    if (order?.orderNo) formData.append('orderNo', order.orderNo);
+    if (order?.title) formData.append('title', order.title);
+    formData.append('sideName', side === 'front' ? '表面' : '裏面');
 
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
@@ -107,6 +116,7 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
         } else {
           setSubmitForm(prev => ({ ...prev, backDesignUrl: data.url }));
         }
+        // 新規アップロード時にその面の回転をリセット
         setPreviewSettings(prev => ({ ...prev, [side]: { rotate: 0 } }));
       } else { alert('アップロードに失敗しました。'); }
     } catch (err) { alert('通信エラーが発生しました。'); }
@@ -143,6 +153,12 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     setPreviewSettings(prev => ({ front: prev.back, back: prev.front }));
   };
 
+  const rotatePreview = () => {
+    setPreviewSettings(prev => ({
+      ...prev, [activeSide]: { rotate: (prev[activeSide].rotate + 90) % 360 }
+    }));
+  };
+
   const clearSide = (side: 'front' | 'back') => {
     setSubmitForm(prev => ({ ...prev, [side === 'front' ? 'frontDesignUrl' : 'backDesignUrl']: '' }));
     setPreviewSettings(prev => ({ ...prev, [side]: { rotate: 0 } }));
@@ -150,9 +166,29 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
   const handleSubmitData = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!submitForm.frontDesignUrl && !submitForm.remarks.includes('http')) {
-      if (!confirm('データが添付されていません。備考欄のURL等で手配済みですか？')) return;
+    const hasExternalUrl = submitForm.remarks.includes('http');
+
+    // ★ 1. 表面のチェック
+    if (!submitForm.frontDesignUrl && !hasExternalUrl) {
+      alert('表面のデータが添付されていません。\nファイルをアップロードするか、大容量の場合は備考欄にGigaFile便などのURLを記載してください。');
+      setActiveSide('front');
+      return;
     }
+
+    // ★ 2. 裏面のチェック（両面印刷の場合のみ）
+    if (isDoubleSided && !submitForm.backDesignUrl && !hasExternalUrl) {
+      alert('「両面」印刷が選択されていますが、裏面のデータが未入稿です。\n裏面のデータをアップロードするか、仕様設定から「片面」に変更してください。');
+      setActiveSide('back');
+      return;
+    }
+
+    // ★ 3. 外部URLでの申告確認
+    if (!submitForm.frontDesignUrl && hasExternalUrl) {
+       if (!confirm('表面のデータがシステムに添付されていません。\n備考欄のURLにて手配済みとして入稿を進めますか？')) return;
+    } else if (isDoubleSided && !submitForm.backDesignUrl && hasExternalUrl) {
+       if (!confirm('「両面」印刷ですが、裏面のデータがシステムに添付されていません。\n備考欄のURLに裏面のデータも含まれているとして入稿を進めますか？')) return;
+    }
+
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/portal/orders/${orderId}/submit-data`, {
@@ -166,21 +202,32 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     setIsSubmitting(false);
   };
 
-  // ★ 完璧な数学的計算に基づくプレビュー要素 (縦横のズレ解消版)
-  const PreviewElement = ({ url, pageNum, orientation, rotate }: { url: string, pageNum: number, orientation: string, rotate: number }) => {
-    if (!url) return null;
+  // プレビューコンポーネント
+  const PreviewElement = ({ url, pageNum, orientation, rotate, containerRef }: { url: string, pageNum: number, orientation: string, rotate: number, containerRef: React.RefObject<HTMLDivElement> }) => {
+    const [dim, setDim] = useState({ w: 0, h: 0 });
+
+    useEffect(() => {
+      if (!containerRef.current) return;
+      const observer = new ResizeObserver((entries) => {
+        if (entries[0]) {
+          setDim({ w: entries[0].contentRect.width, h: entries[0].contentRect.height });
+        }
+      });
+      observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }, [containerRef]);
+
+    if (!url || dim.w === 0) return null;
     const lower = url.toLowerCase();
     
     const isPortrait = orientation === 'portrait';
-    // 横長(landscape)の時はベースとして-90度回転させる
     const baseRotate = isPortrait ? 0 : -90;
     const totalRotate = baseRotate + rotate;
+    const isRotated = totalRotate % 180 !== 0;
 
-    // ★ 縦横比が逆転する場合、はみ出さないようにサイズを調整する計算
     let innerWidth = '100%';
     let innerHeight = '100%';
 
-    // 横向き(-90度)の時は、100cqh / 100cqw を使って親枠にピッタリフィットさせる
     if (!isPortrait) {
       innerWidth = '100cqh';
       innerHeight = '100cqw';
@@ -195,27 +242,33 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
       transform: `translate(-50%, -50%) rotate(${totalRotate}deg)`,
       transformOrigin: 'center center',
       transition: 'transform 0.3s ease-in-out, width 0.3s, height 0.3s',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
     };
     
     if (lower.match(/\.(jpeg|jpg|png|webp|gif)$/)) {
       return (
-        <div className="pointer-events-none overflow-hidden" style={innerStyle}>
-          <img src={url} alt="Preview" className="w-full h-full object-fill" />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div style={innerStyle}>
+            <img src={url} alt="Preview" className="w-full h-full object-fill" />
+          </div>
         </div>
       );
     }
     
     if (lower.endsWith('.pdf')) {
       return (
-        <div className="pointer-events-none overflow-hidden bg-white" style={innerStyle}>
-          {/* iframe自体を106%に拡大してスクロールバーを隠す (clip-pathは親枠に適用される) */}
-          <iframe 
-            src={`${url}#page=${pageNum}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} 
-            className="absolute border-none pointer-events-none"
-            style={{ width: '106%', height: '106%', top: '-3%', left: '-3%' }}
-            scrolling="no"
-            tabIndex={-1}
-          />
+        <div className="absolute inset-0 overflow-hidden pointer-events-none bg-white">
+          <div style={innerStyle}>
+            <iframe 
+              src={`${url}#page=${pageNum}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`} 
+              className="absolute border-none pointer-events-none"
+              style={{ width: '104%', height: '104%', top: '-2%', left: '-2%' }}
+              scrolling="no"
+              tabIndex={-1}
+            />
+          </div>
         </div>
       );
     }
@@ -231,7 +284,6 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
   if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="w-10 h-10 border-4 border-fuchsia-200 border-t-fuchsia-600 rounded-full animate-spin"></div></div>;
   
-  const isDoubleSided = submitForm.colorType.includes('両面');
   const currentUrl = activeSide === 'front' ? submitForm.frontDesignUrl : submitForm.backDesignUrl;
   const currentSettings = previewSettings[activeSide];
 
@@ -283,11 +335,18 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           <div className="h-16 px-6 flex justify-between items-center bg-white/50 backdrop-blur-md border-b border-slate-300 z-30 shrink-0">
             <div className="flex items-center gap-2">
               <div className="bg-slate-200 p-1 rounded-xl flex gap-1 shadow-inner">
-                <button type="button" onClick={() => setActiveSide('front')} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                {/* ★ バッジ表示用の relative を追加 */}
+                <button type="button" onClick={() => setActiveSide('front')} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   表面
+                  {!submitForm.frontDesignUrl && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm"></span>
+                  )}
                 </button>
-                <button type="button" onClick={() => setActiveSide('back')} disabled={!isDoubleSided} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all disabled:opacity-30 ${activeSide === 'back' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button type="button" onClick={() => setActiveSide('back')} disabled={!isDoubleSided} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative disabled:opacity-30 ${activeSide === 'back' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   裏面
+                  {isDoubleSided && !submitForm.backDesignUrl && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm"></span>
+                  )}
                 </button>
               </div>
               
@@ -300,25 +359,24 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
             <div className="bg-slate-200 p-1 rounded-xl flex gap-1 shadow-inner">
               <button type="button" onClick={() => setOrientation('portrait')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${orientation === 'portrait' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                <i className="bi bi-file-earmark"></i> 縦向き
+                <i className="bi bi-file-earmark"></i> 縦長仕上がり
               </button>
               <button type="button" onClick={() => setOrientation('landscape')} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${orientation === 'landscape' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
-                <i className="bi bi-file-earmark rotate-90"></i> 横向き
+                <i className="bi bi-file-earmark rotate-90"></i> 横長仕上がり
               </button>
             </div>
           </div>
 
-          {/* ★ 中央：プレビューキャンバス (アスペクト比固定 ＆ スクロール排除) */}
+          {/* 中央：プレビューキャンバス */}
           <div className="flex-1 min-h-0 p-8 flex items-center justify-center relative overflow-hidden">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
             
-            {/* 仕上がりサイズのアスペクト比コンテナ */}
             <div 
+              ref={previewContainerRef}
               className={`relative bg-white shadow-2xl flex items-center justify-center z-10 transition-all duration-300 overflow-hidden ${!currentUrl && 'border-4 border-dashed border-slate-300 bg-slate-100/50'}`}
               style={{
-                containerType: 'size', // 子要素のCQ計算に必須
-                aspectRatio: orientation === 'portrait' ? '1 / 1.414' : '1.414 / 1',
-                // Flexbox内で画面に収まる最大サイズになるようにする
+                containerType: 'size',
+                aspectRatio: orientation === 'portrait' ? '1 / 1.4142' : '1.4142 / 1',
                 maxHeight: '100%',
                 maxWidth: '100%',
                 height: orientation === 'portrait' ? '100%' : 'auto',
@@ -337,14 +395,15 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
                      pageNum={activeSide === 'front' ? submitForm.frontPageNum : submitForm.backPageNum} 
                      orientation={orientation}
                      rotate={currentSettings.rotate}
+                     containerRef={previewContainerRef}
                    />
                    
                    {/* 断裁線＆安全圏ガイド */}
                    <div className="absolute top-[2%] bottom-[2%] left-[2%] right-[2%] border-[1.5px] border-rose-500/80 pointer-events-none z-20">
-                      <span className="absolute -top-[18px] left-0 text-rose-500 text-[9px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">仕上がり位置 (断裁線)</span>
+                      <span className="absolute -top-[18px] left-0 text-rose-500 text-[10px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">仕上がり位置 (断裁線)</span>
                    </div>
                    <div className="absolute top-[4%] bottom-[4%] left-[4%] right-[4%] border-[1px] border-blue-500/80 border-dashed pointer-events-none z-20">
-                      <span className="absolute -top-[18px] left-24 text-blue-500 text-[9px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">文字切れ安全圏</span>
+                      <span className="absolute -top-[18px] left-28 text-blue-500 text-[10px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">文字切れ安全圏</span>
                    </div>
                  </>
               ) : (
@@ -364,7 +423,6 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
                      </div>
                    </div>
 
-                   {/* 裏面が空で、表面にPDF/AIがある場合のショートカットボタン */}
                    {activeSide === 'back' && submitForm.frontDesignUrl && submitForm.frontDesignUrl.match(/\.(pdf|ai)$/i) && (
                      <button 
                        type="button" 
@@ -403,6 +461,10 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
                   </div>
                 )}
                 
+                <button type="button" onClick={rotatePreview} className="hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
+                  <i className="bi bi-arrow-clockwise text-sm"></i> 原稿を回転
+                </button>
+                
                 <button type="button" onClick={() => clearSide(activeSide)} className="hover:bg-rose-100 text-rose-500 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5">
                   <i className="bi bi-trash-fill text-sm"></i> 削除
                 </button>
@@ -416,7 +478,6 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
         {/* ==================================================== */}
         <div className="w-[45%] bg-white flex flex-col border-l border-slate-200 overflow-hidden">
           
-          {/* 設定フォーム本体 (スクロール領域) */}
           <div className="flex-1 overflow-y-auto custom-scrollbar p-8 lg:p-10 space-y-12 pb-10">
             
             {/* 1. 印刷カラー */}
@@ -539,16 +600,16 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           {/* ★ 送信ボタンエリア */}
           <div className="bg-slate-50 border-t border-slate-200 p-5 shrink-0 z-20 flex justify-end gap-3 items-center shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
             <span className="text-[10px] font-bold text-slate-400 hidden lg:block mr-auto">内容に問題がなければ入稿してください。</span>
-            <button type="button" onClick={() => router.back()} className="px-5 py-2.5 font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors text-sm shadow-sm">
+            <button type="button" onClick={() => router.back()} className="px-6 py-3 font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg transition-colors text-sm shadow-sm">
               キャンセル
             </button>
             <button 
               type="button" 
               onClick={handleSubmitData}
-              disabled={isSubmitting || !!isUploading || (!submitForm.frontDesignUrl && submitForm.remarks.length === 0)}
-              className="px-8 py-2.5 font-black text-white bg-fuchsia-600 hover:bg-fuchsia-700 rounded-lg shadow-md shadow-fuchsia-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm whitespace-nowrap"
+              disabled={isSubmitting || !!isUploading}
+              className="px-10 py-3 font-black text-white bg-fuchsia-600 hover:bg-fuchsia-700 rounded-xl shadow-md shadow-fuchsia-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm whitespace-nowrap"
             >
-              {isSubmitting ? '送信中...' : <><i className="bi bi-send-fill text-lg"></i> この内容で入稿を完了する</>}
+              {isSubmitting ? '送信中...' : <><i className="bi bi-send-fill text-lg"></i> この内容で入稿する</>}
             </button>
           </div>
 
