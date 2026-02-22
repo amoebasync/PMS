@@ -7,13 +7,11 @@ const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   try {
-    // ★ NextAuth のセッションを取得するように修正
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // 顧客担当者IDから所属顧客IDを取得
     const contactId = parseInt((session.user as any).id);
     const contact = await prisma.customerContact.findUnique({ where: { id: contactId } });
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
@@ -22,14 +20,26 @@ export async function GET(request: Request) {
 
     const orders = await prisma.order.findMany({
       where: { customerId },
+      // ★ 修正: エリア情報を最深部まで取得するように変更
       include: {
-        distributions: true,
+        distributions: {
+          include: {
+            flyer: { include: { size: true } },
+            areas: {
+              include: {
+                area: {
+                  include: { city: true, prefecture: true }
+                }
+              }
+            }
+          }
+        },
         printings: true, 
+        payments: true,
       },
       orderBy: { orderDate: 'desc' },
     });
 
-    // ★ マイページ表示用に顧客情報も返す
     return NextResponse.json({ 
       orders,
       customer: { 
@@ -45,7 +55,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    // ★ NextAuth のセッションを取得するように修正
     const session = await getServerSession(authOptions);
     if (!session || !session.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
