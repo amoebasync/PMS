@@ -147,6 +147,7 @@ model Employee {
   approvedExpenses   Expense[]    @relation("ExpenseApprover") // 自分が承認した経費
   paidLeaveLedgers   PaidLeaveLedger[]
   roles EmployeeRole[]
+  payrollRecords     PayrollRecord[]
 
   // ★ 支店のマネージャーとしての逆参照 (エラー解消のキモ)
   managedBranches1   Branch[] @relation("BranchManager1")
@@ -222,6 +223,8 @@ model EmployeeFinancial {
   defaultStartTime  String?               @default("09:00") @map("default_start_time") @db.VarChar(5)
   defaultEndTime    String?               @default("18:00") @map("default_end_time") @db.VarChar(5)
   defaultBreakMins  Int?                  @default(60) @map("default_break_mins")
+  // 通常出勤曜日 例: "1,2,3,4,5" = 月〜金 (1=月, 2=火, ... 7=日)
+  workingWeekdays   String?               @default("1,2,3,4,5") @map("working_weekdays") @db.VarChar(20)
 
   paymentMethod     EmployeePaymentMethod @default(BANK_TRANSFER) @map("payment_method")
   paymentCycle      PaymentCycle          @default(MONTHLY) @map("payment_cycle")
@@ -1213,6 +1216,50 @@ model PaidLeaveLedger {
   createdAt   DateTime             @default(now()) @map("created_at")
 
   @@map("paid_leave_ledgers")
+}
+
+// --- 給与計算ステータス ---
+enum PayrollStatus {
+  DRAFT      @map("下書き")
+  CONFIRMED  @map("確定済")
+  PAID       @map("支払済")
+}
+
+// --- 給与明細テーブル ---
+model PayrollRecord {
+  id                   Int            @id @default(autoincrement())
+  employeeId           Int            @map("employee_id")
+  employee             Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employmentType       EmploymentType @map("employment_type")
+  periodStart          DateTime       @map("period_start") @db.Date
+  periodEnd            DateTime       @map("period_end") @db.Date
+  paymentCycle         PaymentCycle   @map("payment_cycle")
+  // 正社員用
+  baseSalary           Int            @default(0) @map("base_salary")
+  allowance            Int            @default(0)
+  workingDaysInPeriod  Int            @default(0) @map("working_days_in_period")
+  absentDays           Float          @default(0) @map("absent_days")
+  absentDeduction      Int            @default(0) @map("absent_deduction")
+  holidayWorkDays      Int            @default(0) @map("holiday_work_days")
+  // アルバイト・業務委託用
+  totalWorkHours       Float          @default(0) @map("total_work_hours")
+  // 共通控除
+  healthInsurance      Int            @default(0) @map("health_insurance")
+  pensionInsurance     Int            @default(0) @map("pension_insurance")
+  employmentInsurance  Int            @default(0) @map("employment_insurance")
+  incomeTax            Int            @default(0) @map("income_tax")
+  residentTax          Int            @default(0) @map("resident_tax")
+  // 合計
+  grossPay             Int            @map("gross_pay")
+  totalDeductions      Int            @map("total_deductions")
+  netPay               Int            @map("net_pay")
+  status               PayrollStatus  @default(DRAFT)
+  note                 String?        @db.Text
+  createdAt            DateTime       @default(now()) @map("created_at")
+  updatedAt            DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([employeeId, periodStart, periodEnd])
+  @@map("payroll_records")
 }
 
 model Notification {

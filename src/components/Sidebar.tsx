@@ -96,6 +96,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
         { name: '支店管理', href: '/branches', icon: 'bi-shop' },
         { name: '人事・経費承認', href: '/approvals', icon: 'bi-check2-square' },
+        { name: '給与計算', href: '/payroll', icon: 'bi-cash-stack' },
         { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
       ]
     }

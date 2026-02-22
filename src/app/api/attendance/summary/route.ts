@@ -11,10 +11,20 @@ export async function GET(request: Request) {
     if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     const empId = parseInt(sessionId);
 
+    // ロール確認
+    const currentUser = await prisma.employee.findUnique({
+      where: { id: empId },
+      include: { roles: { include: { role: true } } },
+    });
+    const roles = currentUser?.roles?.map((r: any) => r.role?.code) || [];
+    const isAdmin = roles.includes('SUPER_ADMIN') || roles.includes('HR_ADMIN');
+
     const { searchParams } = new URL(request.url);
+    const targetIdParam = searchParams.get('employeeId');
+    const targetId = (isAdmin && targetIdParam) ? parseInt(targetIdParam) : empId;
     const offset = parseInt(searchParams.get('offset') || '0');
 
-    const emp = await prisma.employee.findUnique({ where: { id: empId }, include: { financial: true } });
+    const emp = await prisma.employee.findUnique({ where: { id: targetId }, include: { financial: true } });
     const salaryType = emp?.financial?.salaryType || 'MONTHLY';
 
     let startDate = new Date();
@@ -26,7 +36,7 @@ export async function GET(request: Request) {
       startDate.setHours(0, 0, 0, 0);
       endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
-      isPast = offset < 0; 
+      isPast = offset < 0;
     } else {
       const dayOfWeek = startDate.getDay();
       startDate.setDate(startDate.getDate() - dayOfWeek + (offset * 7));
@@ -38,7 +48,7 @@ export async function GET(request: Request) {
     }
 
     const records = await prisma.attendance.findMany({
-      where: { employeeId: empId, date: { gte: startDate, lte: endDate } },
+      where: { employeeId: targetId, date: { gte: startDate, lte: endDate } },
       orderBy: { date: 'asc' }
     });
 
@@ -57,8 +67,8 @@ export async function GET(request: Request) {
       records,
       totalHours,
       totalWage,
-      employmentType: emp?.employmentType || 'FULL_TIME',      // ★ 追加: 正社員かどうかの判定用
-      paidLeaveBalance: emp?.financial?.paidLeaveBalance || 0, // ★ 追加: 有給残日数
+      employmentType: emp?.employmentType || 'FULL_TIME',
+      paidLeaveBalance: emp?.financial?.paidLeaveBalance || 0,
       defaults: {
         startTime: emp?.financial?.defaultStartTime || '09:00',
         endTime: emp?.financial?.defaultEndTime || '18:00',

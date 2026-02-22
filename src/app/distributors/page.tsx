@@ -12,6 +12,8 @@ export default function DistributorPage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+  const [filterBranchId, setFilterBranchId] = useState('');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -55,11 +57,17 @@ export default function DistributorPage() {
   useEffect(() => { fetchData(); }, []);
 
   const filteredDistributors = useMemo(() => {
-    return distributors.filter(d => 
-      (d.name && d.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
-      (d.staffId && d.staffId.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
-  }, [distributors, searchTerm]);
+    return distributors.filter(d => {
+      if (filterStatus === 'ACTIVE' && d.leaveDate) return false;
+      if (filterStatus === 'INACTIVE' && !d.leaveDate) return false;
+      if (filterBranchId && d.branchId?.toString() !== filterBranchId) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        if (!(d.name?.toLowerCase().includes(q) || d.staffId?.toLowerCase().includes(q))) return false;
+      }
+      return true;
+    });
+  }, [distributors, searchTerm, filterStatus, filterBranchId]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const target = e.target as HTMLInputElement;
@@ -127,10 +135,44 @@ export default function DistributorPage() {
         </button>
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-        <div className="relative max-w-md">
-          <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input type="text" placeholder="名前 または スタッフID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" />
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
+        <div className="flex-1 min-w-[250px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <div className="relative">
+            <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
+            <input
+              type="text"
+              placeholder="名前 または スタッフID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as 'ACTIVE' | 'INACTIVE' | 'ALL')}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="ACTIVE">在籍中</option>
+            <option value="INACTIVE">退社済</option>
+            <option value="ALL">すべて</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">支店</label>
+          <select
+            value={filterBranchId}
+            onChange={(e) => setFilterBranchId(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="">すべて</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.nameJa}</option>
+            ))}
+          </select>
         </div>
       </div>
 

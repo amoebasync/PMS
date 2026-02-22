@@ -81,7 +81,10 @@ export default function EmployeePage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const [isLoading, setIsLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
+  const [filterBranchId, setFilterBranchId] = useState('');
+  const [filterDepartmentId, setFilterDepartmentId] = useState('');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -100,13 +103,14 @@ export default function EmployeePage() {
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
     lastNameEn: '', firstNameEn: '', email: '', phone: '', password: 'password123', 
-    hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as const,
+    hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as 'male' | 'female' | 'other' | 'unknown',
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
     rank: 'ASSOCIATE', jobTitle: '', managerId: '',
     roleIds: [] as string[],
     employmentType: 'FULL_TIME', salaryType: 'MONTHLY',
     baseSalary: '', hourlyRate: '', dailyRate: '',
-    paymentMethod: 'BANK_TRANSFER', paymentCycle: 'MONTHLY'
+    paymentMethod: 'BANK_TRANSFER', paymentCycle: 'MONTHLY',
+    workingWeekdays: '1,2,3,4,5'
   };
   
   const [formData, setFormData] = useState(initialForm);
@@ -189,6 +193,7 @@ export default function EmployeePage() {
         dailyRate: employee.financial?.dailyRate?.toString() || '',
         paymentMethod: employee.financial?.paymentMethod || 'BANK_TRANSFER',
         paymentCycle: employee.financial?.paymentCycle || 'MONTHLY',
+        workingWeekdays: employee.financial?.workingWeekdays || '1,2,3,4,5',
       });
     } else {
       setCurrentId(null);
@@ -291,10 +296,16 @@ export default function EmployeePage() {
   };
 
   const filteredEmployees = employees.filter(emp => {
-    if (!searchTerm) return true;
-    const q = searchTerm.toLowerCase();
-    const target = `${emp.employeeCode || ''} ${emp.lastNameJa}${emp.firstNameJa} ${emp.lastNameKana || ''}${emp.firstNameKana || ''} ${emp.email} ${emp.phone || ''}`.toLowerCase();
-    return target.includes(q);
+    if (filterStatus === 'ACTIVE' && !emp.isActive) return false;
+    if (filterStatus === 'INACTIVE' && emp.isActive) return false;
+    if (filterBranchId && emp.branchId?.toString() !== filterBranchId) return false;
+    if (filterDepartmentId && emp.department?.id.toString() !== filterDepartmentId) return false;
+    if (searchTerm) {
+      const q = searchTerm.toLowerCase();
+      const target = `${emp.employeeCode || ''} ${emp.lastNameJa}${emp.firstNameJa} ${emp.lastNameKana || ''}${emp.firstNameKana || ''} ${emp.email} ${emp.phone || ''}`.toLowerCase();
+      if (!target.includes(q)) return false;
+    }
+    return true;
   });
 
   const sectionClass = "bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4";
@@ -320,16 +331,57 @@ export default function EmployeePage() {
         )}
       </div>
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-4">
-        <div className="relative max-w-md">
-          <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input 
-            type="text" 
-            placeholder="氏名、社員コード、メールアドレス等で検索..." 
-            value={searchTerm} 
-            onChange={(e) => setSearchTerm(e.target.value)} 
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-sm" 
-          />
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
+        <div className="flex-1 min-w-[250px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <div className="relative">
+            <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
+            <input
+              type="text"
+              placeholder="氏名、社員コード、メールアドレス等で検索..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value as 'ACTIVE' | 'INACTIVE' | 'ALL')}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="ACTIVE">在職中</option>
+            <option value="INACTIVE">退職済</option>
+            <option value="ALL">すべて</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">支店</label>
+          <select
+            value={filterBranchId}
+            onChange={(e) => setFilterBranchId(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="">すべて</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.nameJa}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">部署</label>
+          <select
+            value={filterDepartmentId}
+            onChange={(e) => setFilterDepartmentId(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="">すべて</option>
+            {departments.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -827,6 +879,33 @@ export default function EmployeePage() {
                       <option value="BANK_TRANSFER">銀行振込</option><option value="CASH">現金手渡し</option>
                     </select>
                   </div>
+                  {formData.employmentType === 'FULL_TIME' && (
+                    <div className="col-span-2">
+                      <label className={labelClass}>通常出勤曜日</label>
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {[{d:1,l:'月'},{d:2,l:'火'},{d:3,l:'水'},{d:4,l:'木'},{d:5,l:'金'},{d:6,l:'土'},{d:7,l:'日'}].map(({d,l}) => {
+                          const days = (formData.workingWeekdays || '').split(',').filter(Boolean);
+                          const checked = days.includes(String(d));
+                          return (
+                            <label key={d} className={`flex items-center gap-1 px-3 py-1.5 rounded-lg border cursor-pointer text-sm font-bold transition-colors ${checked ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-300 hover:border-blue-400'}`}>
+                              <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={checked}
+                                onChange={(e) => {
+                                  const cur = (formData.workingWeekdays || '').split(',').filter(Boolean);
+                                  const next = e.target.checked ? [...cur, String(d)] : cur.filter(x => x !== String(d));
+                                  next.sort((a,b) => Number(a)-Number(b));
+                                  setFormData(prev => ({ ...prev, workingWeekdays: next.join(',') }));
+                                }}
+                              />
+                              {l}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

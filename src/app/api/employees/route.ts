@@ -85,6 +85,7 @@ export async function POST(request: Request) {
             dailyRate: body.dailyRate ? parseInt(body.dailyRate) : null,
             paymentMethod: body.paymentMethod || 'BANK_TRANSFER',
             paymentCycle: body.paymentCycle || 'MONTHLY',
+            workingWeekdays: body.workingWeekdays || '1,2,3,4,5',
           }
         });
       }

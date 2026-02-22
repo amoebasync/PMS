@@ -4,16 +4,16 @@ import React from 'react';
 import { usePathname } from 'next/navigation';
 import { PortalProviders } from '@/components/portal/PortalProviders';
 import { PortalHeader } from '@/components/portal/PortalHeader';
-import { PortalFooter } from '@/components/portal/PortalFooter'; // ★ インポート
+import { PortalFooter } from '@/components/portal/PortalFooter';
 import { CartProvider } from '@/components/portal/CartContext';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
-  // ★ フルスクリーンで表示するページ（余白ゼロにするページ）を判定
-  const isFullScreenPage = pathname === '/portal/orders/new';
+  // ★ 変更: トップページ ('/portal') もフルスクリーンで表示するように条件を追加
+  const isFullScreenPage = pathname === '/portal/orders/new' || pathname === '/portal';
 
-  // ★ フッターを非表示にするページを判定（地図画面や入稿画面など）
+  // フッターを非表示にするページを判定（地図画面や入稿画面など）
   const hideFooter = 
     pathname === '/portal/orders/new' || 
     pathname?.match(/^\/portal\/orders\/\d+\/submit$/);
@@ -29,7 +29,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             {children}
           </main>
 
-          {/* ★ フッターの表示制御 */}
+          {/* フッターの表示制御 */}
           {!hideFooter && <PortalFooter />}
           
         </div>

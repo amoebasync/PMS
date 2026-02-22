@@ -255,21 +255,21 @@ export default function OrdersListPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">受注番号 / 受注日</th>
-              <th className="px-6 py-4">顧客名 / 案件名</th>
-              <th className="px-6 py-4">担当営業</th>
-              <th className="px-6 py-4">依頼内訳</th>
-              <th className="px-6 py-4 text-right">受注総額</th>
-              <th className="px-6 py-4 text-center">ステータス <span className="font-normal lowercase">(Click to Action)</span></th>
-              <th className="px-6 py-4 text-right">操作</th>
+              <th className="px-3 py-3 whitespace-nowrap">受注番号 / 受注日</th>
+              <th className="px-3 py-3">顧客名 / 案件名</th>
+              <th className="px-3 py-3 whitespace-nowrap">担当営業</th>
+              <th className="px-3 py-3 whitespace-nowrap">依頼内訳</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">受注総額</th>
+              <th className="px-3 py-3 text-center whitespace-nowrap">ステータス</th>
+              <th className="px-3 py-3 text-right w-px whitespace-nowrap">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">読み込み中...</td></tr> : 
+            {isLoading ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">読み込み中...</td></tr> :
              filteredOrders.length === 0 ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">該当する受注データがありません</td></tr> :
              filteredOrders.map(o => {
                const status = STATUS_MAP[o.status] || STATUS_MAP['PLANNING'];
-               
+
                const hasDist = o.distributions?.length > 0;
                const hasPrint = o.printings?.length > 0;
                const hasNews = o.newspaperInserts?.length > 0;
@@ -280,58 +280,57 @@ export default function OrdersListPage() {
 
                return (
                 <tr key={o.id} className="hover:bg-indigo-50/30 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <Link href={`/orders/${o.id}`} className="font-mono font-bold text-indigo-600 hover:underline">{o.orderNo}</Link>
+                  <td className="px-3 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/orders/${o.id}`} className="font-mono font-bold text-xs text-indigo-600 hover:underline">{o.orderNo}</Link>
                       {o.orderSource === 'WEB_EC' ? (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200" title="ECサイト経由の発注">EC経由</span>
+                        <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200" title="ECサイト経由の発注">EC経由</span>
                       ) : (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="社内システムでの発注">営業経由</span>
+                        <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="社内システムでの発注">営業経由</span>
                       )}
                     </div>
-                    <div className="text-xs text-slate-400 mt-1">{new Date(o.orderDate).toLocaleDateString()}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{new Date(o.orderDate).toLocaleDateString()}</div>
                   </td>
-                  
-                  <td className="px-6 py-4">
-                    <div className="font-bold text-slate-700 truncate max-w-[200px]" title={o.customer?.name}>{o.customer?.name}</div>
-                    {o.title && <div className="text-[11px] text-slate-500 mt-0.5 truncate max-w-[200px]" title={o.title}>{o.title}</div>}
+
+                  <td className="px-3 py-3 max-w-[160px]">
+                    <div className="font-bold text-slate-700 text-xs truncate" title={o.customer?.name}>{o.customer?.name}</div>
+                    {o.title && <div className="text-[11px] text-slate-500 mt-0.5 truncate" title={o.title}>{o.title}</div>}
                   </td>
-                  
-                  <td className="px-6 py-4 text-slate-600">{o.salesRep ? `${o.salesRep.lastNameJa} ${o.salesRep.firstNameJa}` : '未定'}</td>
-                  
-                  <td className="px-6 py-4">
-                    <div className="flex gap-1.5">
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${hasDist ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="ポスティング">ポス</span>
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${hasPrint ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="印刷手配">印刷</span>
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${hasNews ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="新聞折込">折込</span>
-                      <span className={`px-2 py-0.5 text-[10px] font-bold rounded border ${hasDesign ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="デザイン">デザ</span>
+
+                  <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">{o.salesRep ? `${o.salesRep.lastNameJa} ${o.salesRep.firstNameJa}` : '未定'}</td>
+
+                  <td className="px-3 py-3">
+                    <div className="flex gap-1">
+                      <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDist ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="ポスティング">ポス</span>
+                      <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasPrint ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="印刷手配">印刷</span>
+                      <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasNews ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="新聞折込">折込</span>
+                      <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDesign ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="デザイン">デザ</span>
                     </div>
                   </td>
 
-                  <td className="px-6 py-4 text-right font-bold text-slate-800">
+                  <td className="px-3 py-3 text-right font-bold text-xs text-slate-800 whitespace-nowrap">
                     {o.totalAmount ? `¥${o.totalAmount.toLocaleString()}` : '-'}
                   </td>
 
-                  {/* ★ 変更: ステータスをアクションボタン化 */}
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-3 py-3 text-center">
                     {isClickableStatus ? (
-                      <button 
+                      <button
                         onClick={() => o.status === 'PENDING_PAYMENT' ? handlePaymentConfirm(o) : openReviewModal(o.id)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${status.color}`}
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all whitespace-nowrap ${status.color}`}
                         title="クリックして処理を進める"
                       >
-                        <i className={`bi ${status.icon}`}></i> {status.label} <i className="bi bi-chevron-right ml-1 opacity-50"></i>
+                        <i className={`bi ${status.icon}`}></i> {status.label} <i className="bi bi-chevron-right opacity-50"></i>
                       </button>
                     ) : (
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${status.color}`}>
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${status.color}`}>
                         <i className={`bi ${status.icon}`}></i> {status.label}
                       </span>
                     )}
                   </td>
 
-                  <td className="px-6 py-4 text-right">
-                    <Link href={`/orders/${o.id}`} className="p-2 text-slate-400 hover:text-indigo-600"><i className="bi bi-pencil-square text-lg"></i></Link>
-                    <button onClick={(e) => del(e, o.id)} className="p-2 text-slate-400 hover:text-rose-600"><i className="bi bi-trash text-lg"></i></button>
+                  <td className="px-3 py-3 text-right whitespace-nowrap">
+                    <Link href={`/orders/${o.id}`} className="p-1.5 text-slate-400 hover:text-indigo-600 inline-block"><i className="bi bi-pencil-square"></i></Link>
+                    <button onClick={(e) => del(e, o.id)} className="p-1.5 text-slate-400 hover:text-rose-600"><i className="bi bi-trash"></i></button>
                   </td>
                 </tr>
                )
