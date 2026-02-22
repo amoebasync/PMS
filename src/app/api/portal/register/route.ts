@@ -6,7 +6,8 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { accountType, companyName, lastName, firstName, email, password } = await request.json();
+    // ★ wantsNewsletter を受け取る
+    const { accountType, companyName, lastName, firstName, email, password, wantsNewsletter } = await request.json();
 
     if (!lastName || !firstName || !email || !password) {
       return NextResponse.json({ error: '必須項目が入力されていません' }, { status: 400 });
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
         customerCode,
         customerType: custType,
         name: custName,
-        nameKana: null, // ★ 空欄で保存
+        nameKana: null,
         contacts: {
           create: {
             lastName: lastName,
@@ -41,6 +42,9 @@ export async function POST(request: Request) {
             email: email,
             passwordHash: hash,
             isPrimary: true,
+            // ★ もし schema.prisma の CustomerContact モデルに wantsNewsletter などの
+            // boolean型カラムを追加した場合は、以下のように保存できます。
+            // wantsNewsletter: wantsNewsletter,
           }
         }
       }

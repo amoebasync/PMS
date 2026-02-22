@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import TermsContent from '@/components/portal/TermsContent'; // ★インポート
+import PrivacyContent from '@/components/portal/PrivacyContent'; // ★インポート
 
 export default function SignupPage() {
   const router = useRouter();
@@ -19,6 +21,12 @@ export default function SignupPage() {
     confirmPassword: '' 
   });
   
+  const [agreeTerms, setAgreeTerms] = useState(false);
+  const [wantsNewsletter, setWantsNewsletter] = useState(true);
+  
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -28,6 +36,15 @@ export default function SignupPage() {
   const isLongEnough = form.password.length >= 8;
   const passwordsMatch = form.password === form.confirmPassword && form.password !== '';
   const isPasswordValid = hasUpper && hasLower && hasNumOrSym && isLongEnough;
+
+  useEffect(() => {
+    if (showTermsModal || showPrivacyModal) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+    return () => { document.body.style.overflow = 'unset'; }
+  }, [showTermsModal, showPrivacyModal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,11 +63,17 @@ export default function SignupPage() {
       return;
     }
 
+    if (!agreeTerms) {
+      setErrorMsg('利用規約およびプライバシーポリシーへの同意が必要です。');
+      setLoading(false);
+      return;
+    }
+
     try {
       const res = await fetch('/api/portal/register', {
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, accountType })
+        body: JSON.stringify({ ...form, accountType, wantsNewsletter })
       });
 
       if (!res.ok) {
@@ -85,9 +108,8 @@ export default function SignupPage() {
   );
 
   return (
-    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 py-12">
+    <div className="min-h-[80vh] flex flex-col items-center justify-center p-4 py-12 relative">
       
-      {/* ★ 追加: トップページへ戻るリンク */}
       <Link href="/portal" className="mb-6 text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-2">
         <i className="bi bi-arrow-left"></i> トップページへ戻る
       </Link>
@@ -96,7 +118,6 @@ export default function SignupPage() {
         
         <div className="flex flex-col items-center mb-8">
           <div className="relative w-[180px] h-[45px] mb-4">
-            {/* ★ 変更: 白背景用のロゴに変更 */}
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>
           <h1 className="text-xl font-bold text-slate-800">新規アカウント登録</h1>
@@ -173,9 +194,35 @@ export default function SignupPage() {
             </div>
           </div>
 
+          <div className="pt-4 space-y-3">
+            <label className="flex items-start gap-2.5 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                checked={agreeTerms}
+                onChange={e => setAgreeTerms(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed font-medium">
+                <button type="button" onClick={() => setShowTermsModal(true)} className="text-indigo-600 hover:underline font-bold">利用規約</button> および <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-indigo-600 hover:underline font-bold">個人情報の取り扱いについて</button> に同意します <span className="text-rose-500">*</span>
+              </span>
+            </label>
+            
+            <label className="flex items-start gap-2.5 cursor-pointer group">
+              <input 
+                type="checkbox" 
+                checked={wantsNewsletter}
+                onChange={e => setWantsNewsletter(e.target.checked)}
+                className="mt-0.5 w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
+              />
+              <span className="text-xs text-slate-600 leading-relaxed font-medium">
+                キャンペーンやお得な情報などのメールマガジンを受け取る
+              </span>
+            </label>
+          </div>
+
           <button 
             type="submit" 
-            disabled={loading || !isPasswordValid || !passwordsMatch} 
+            disabled={loading || !isPasswordValid || !passwordsMatch || !agreeTerms} 
             className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? '登録中...' : '無料で登録する'}
@@ -186,6 +233,51 @@ export default function SignupPage() {
           すでにアカウントをお持ちですか？ <Link href="/portal/login" className="text-indigo-600 hover:underline font-bold">ログインはこちら</Link>
         </div>
       </div>
+
+      {/* ========================================================= */}
+      {/* 利用規約モーダル */}
+      {/* ========================================================= */}
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowTermsModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-lg">利用規約</h3>
+              <button onClick={() => setShowTermsModal(false)} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors"><i className="bi bi-x-lg"></i></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 custom-scrollbar">
+              <TermsContent /> {/* ★ここで部品を呼び出す */}
+            </div>
+            
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-end shrink-0">
+              <button onClick={() => setShowTermsModal(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors">確認して閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* プライバシーポリシーモーダル */}
+      {/* ========================================================= */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowPrivacyModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-lg">個人情報の取り扱いについて</h3>
+              <button onClick={() => setShowPrivacyModal(false)} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors"><i className="bi bi-x-lg"></i></button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 bg-slate-50 custom-scrollbar">
+              <PrivacyContent /> {/* ★ここで部品を呼び出す */}
+            </div>
+            
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-end shrink-0">
+              <button onClick={() => setShowPrivacyModal(false)} className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors">確認して閉じる</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
