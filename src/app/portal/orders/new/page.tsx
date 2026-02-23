@@ -1,13 +1,12 @@
 'use client';
 
-// ★ 変更: useSearchParams と Suspense のインポート追加
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '@/components/portal/CartContext';
 import { GoogleMap, useJsApiLoader, Polygon, Circle, Marker } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
 
-const initialCenter = { lat: 35.6580, lng: 139.7016 }; 
+const initialCenter = { lat: 35.6580, lng: 139.7016 };
 const mapContainerStyle = { width: '100%', height: '100%' };
 const LIBRARIES: ("geometry")[] = ["geometry"];
 
@@ -20,11 +19,6 @@ const mapOptions = {
     { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
     { featureType: "transit", elementType: "labels", stylers: [{ visibility: "off" }] }
   ]
-};
-
-const PRICES = {
-  postingBase: 5.0,
-  printingBase: { 'A4': 3.0, 'B4': 4.5, 'A3': 6.0, 'ハガキ': 2.5 } as Record<string, number>
 };
 
 const extractPaths = (geojsonStr: string) => {
@@ -43,7 +37,7 @@ const extractPaths = (geojsonStr: string) => {
         return [];
       };
       const rawPolygons = getCoords(parsed);
-      const paths = rawPolygons.map(poly => 
+      const paths = rawPolygons.map(poly =>
         poly.map((c: any[]) => ({ lat: parseFloat(c[1]), lng: parseFloat(c[0]) })).filter((c: any) => !isNaN(c.lat) && !isNaN(c.lng))
       );
       return paths.length > 0 ? paths : [];
@@ -81,11 +75,11 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
   const t = town || '';
   const c = chome || '';
   if (!t && !c) return '-';
-  if (t === c) return c; 
-  if (c.includes(t)) return c; 
-  const baseTown = t.replace(/[一二三四五六七八九十]+丁目$/, ''); 
+  if (t === c) return c;
+  if (c.includes(t)) return c;
+  const baseTown = t.replace(/[一二三四五六七八九十]+丁目$/, '');
   if (baseTown && c.includes(baseTown)) return c;
-  return t && c ? `${t} ${c}` : (c || t); 
+  return t && c ? `${t} ${c}` : (c || t);
 };
 
 const MemoizedArea = React.memo(({ area, isSelected, currentZoom, onClick }: { area: any, isSelected: boolean, currentZoom: number, onClick: (id: number) => void }) => {
@@ -119,23 +113,43 @@ const MemoizedArea = React.memo(({ area, isSelected, currentZoom, onClick }: { a
   );
 }, (prev, next) => prev.isSelected === next.isSelected && (prev.currentZoom >= 14) === (next.currentZoom >= 14));
 
-
-// ★ 追加: Suspenseで囲むための中身コンポーネント
 function NewOrderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const editItemId = searchParams.get('editItemId'); // URLからの編集ID取得
+  const editItemId = searchParams.get('editItemId');
 
   const { items, addItem, updateItem } = useCart();
-  
+
   const [projectName, setProjectName] = useState('');
   const [orderType, setOrderType] = useState<'POSTING_ONLY' | 'PRINT_AND_POSTING'>('PRINT_AND_POSTING');
   const [size, setSize] = useState('A4');
   const [method, setMethod] = useState('軒並み配布');
-  const [plannedCount, setPlannedCount] = useState<number | ''>(''); 
+  const [plannedCount, setPlannedCount] = useState<number | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [spareDate, setSpareDate] = useState('');
+
+  // 印刷仕様
+  const [foldingTypeId, setFoldingTypeId] = useState<number | null>(null);
+  const [paperType, setPaperType] = useState('コート紙');
+  const [paperWeight, setPaperWeight] = useState('73kg (標準)');
+  const [colorType, setColorType] = useState('両面カラー');
+  const [printCount, setPrintCount] = useState<number | ''>('');
+
+  // 価格マスター
+  const [pricingData, setPricingData] = useState<{
+    flyerSizes: any[];
+    foldingTypes: any[];
+    areaRanks: any[];
+    periodPrices: any[];
+  }>({ flyerSizes: [], foldingTypes: [], areaRanks: [], periodPrices: [] });
+
+  useEffect(() => {
+    fetch('/api/portal/pricing')
+      .then(r => r.json())
+      .then(d => setPricingData(d))
+      .catch(e => console.error('Pricing fetch error:', e));
+  }, []);
 
   const minStartDate = useMemo(() => {
     const d = new Date();
@@ -163,13 +177,13 @@ function NewOrderContent() {
   };
 
   const [locations, setLocations] = useState<any[]>([]);
-  const [selectedPref, setSelectedPref] = useState<number | null>(13); 
+  const [selectedPref, setSelectedPref] = useState<number | null>(13);
   const [selectedPanelCities, setSelectedPanelCities] = useState<Set<string>>(new Set());
 
   const [mapAreas, setMapAreas] = useState<any[]>([]);
   const [loadedCities, setLoadedCities] = useState<Set<string>>(new Set());
   const [selectedAreaIds, setSelectedAreaIds] = useState<Set<number>>(new Set());
-  
+
   const [searchAddress, setSearchAddress] = useState('');
   const [radiusKm, setRadiusKm] = useState<number>(1);
   const [appliedRadiusKm, setAppliedRadiusKm] = useState<number>(1);
@@ -199,23 +213,23 @@ function NewOrderContent() {
     if (!cityName) return;
     const cacheKey = `${prefName}_${cityName}`;
     if (loadedCities.has(cacheKey)) return;
-    
+
     setLoadedCities(prev => new Set(prev).add(cacheKey));
     try {
       const query = new URLSearchParams();
       if (prefName) query.append('prefName', prefName);
       if (cityName) query.append('cityName', cityName);
-      
+
       const res = await fetch(`/api/areas/map?${query.toString()}`);
       const data = await res.json();
-      
+
       if (Array.isArray(data)) {
         const enrichedData = data.map(a => {
           const paths = extractPaths(a.boundary_geojson);
           const feature = createTurfFeature(paths);
           return { ...a, parsedPaths: paths, turfFeature: feature, centerLabel: calcCenterAndSize(feature) };
         }).filter(a => a.parsedPaths && a.parsedPaths.length > 0);
-        
+
         setMapAreas(prev => {
           const existingIds = new Set(prev.map(a => a.id));
           const newAreas = enrichedData.filter(a => !existingIds.has(a.id));
@@ -242,17 +256,16 @@ function NewOrderContent() {
     });
   }, [loadedCities]);
 
-  useEffect(() => { 
+  useEffect(() => {
     if (isLoaded && mapAreas.length === 0) {
       loadCityAreas('東京都', '渋谷区');
       loadCityAreas('東京都', '港区');
       loadCityAreas('東京都', '目黒区');
       loadCityAreas('東京都', '新宿区');
       loadCityAreas('東京都', '世田谷区');
-    } 
+    }
   }, [isLoaded, mapAreas.length]);
 
-  // ★ 追加: 編集モード時のデータ復元処理
   useEffect(() => {
     if (editItemId && items.length > 0 && !isEditLoaded) {
       const editTarget = items.find(i => i.id === editItemId);
@@ -265,18 +278,21 @@ function NewOrderContent() {
         setStartDate(editTarget.startDate || '');
         setEndDate(editTarget.endDate || '');
         setSpareDate(editTarget.spareDate || '');
-        
-        // エリアの選択状態を復元
+        if (editTarget.foldingTypeId) setFoldingTypeId(editTarget.foldingTypeId);
+        if (editTarget.paperType) setPaperType(editTarget.paperType);
+        if (editTarget.paperWeight) setPaperWeight(editTarget.paperWeight);
+        if (editTarget.colorType) setColorType(editTarget.colorType);
+        if (editTarget.printCount) setPrintCount(editTarget.printCount);
+
         setSelectedAreaIds(new Set(editTarget.selectedAreas.map(a => a.id)));
 
-        // 必要なポリゴンをロード（カートのアイテムはprefName, cityNameを持っている）
         const citySet = new Set<string>();
         editTarget.selectedAreas.forEach(a => {
-           if (a.prefName && a.cityName) citySet.add(`${a.prefName}_${a.cityName}`);
+          if (a.prefName && a.cityName) citySet.add(`${a.prefName}_${a.cityName}`);
         });
         citySet.forEach(key => {
-           const [p, c] = key.split('_');
-           if (p && c) loadCityAreas(p, c);
+          const [p, c] = key.split('_');
+          if (p && c) loadCityAreas(p, c);
         });
 
         setIsEditLoaded(true);
@@ -301,12 +317,12 @@ function NewOrderContent() {
         setMapCenter({ lat, lng });
         setSearchMarker({ lat, lng });
         setAppliedRadiusKm(radiusKm);
-        
+
         const r = Number(radiusKm);
         if (r === 1) setMapZoom(14); else if (r === 2) setMapZoom(13); else if (r === 3) setMapZoom(12); else setMapZoom(11);
 
         await fetchAreasForLocation(lat, lng);
-        
+
         setTimeout(() => {
           const newSelected = new Set<number>();
           const centerPoint = turf.point([lng, lat]);
@@ -319,7 +335,6 @@ function NewOrderContent() {
             return currentAreas;
           });
         }, 500);
-
       } else alert('住所が見つかりませんでした。');
     });
   };
@@ -328,7 +343,7 @@ function NewOrderContent() {
     const address = `${prefName}${cityName}`;
     const cacheKey = `${prefName}_${cityName}`;
     setSearchMarker(null); setSearchAddress(''); setMapZoom(13);
-    
+
     const isCurrentlySelected = selectedPanelCities.has(cacheKey);
     setSelectedPanelCities(prev => {
       const next = new Set(prev);
@@ -376,12 +391,42 @@ function NewOrderContent() {
 
   const selectedAreasList = useMemo(() => mapAreas.filter(a => selectedAreaIds.has(a.id)), [mapAreas, selectedAreaIds]);
   const totalAreaCapacity = useMemo(() => selectedAreasList.reduce((sum, a) => sum + getCapacity(a), 0), [selectedAreasList, method]);
-  
+
   const pCount = typeof plannedCount === 'number' ? plannedCount : 0;
   const isCapacityEnough = pCount > 0 && totalAreaCapacity >= pCount;
-  
-  const unitPrice = PRICES.postingBase + (orderType === 'PRINT_AND_POSTING' ? (PRICES.printingBase[size] || 3) : 0);
-  const totalPrice = pCount * unitPrice; 
+
+  // 動的価格計算
+  const selectedFolding = pricingData.foldingTypes.find(f => f.id === foldingTypeId);
+  const selectedSize = pricingData.flyerSizes.find(s => s.name === size);
+
+  // 配布単価（エリアランクは未設定のためデフォルト5.0）
+  const postingUnitPrice = 5.0;
+
+  // 配布期間乗数
+  const periodMultiplier = useMemo(() => {
+    if (!startDate || !endDate || pricingData.periodPrices.length === 0) return 1.0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const match = pricingData.periodPrices.find(p =>
+      days >= p.minDays && (p.maxDays === null || days <= p.maxDays)
+    );
+    return match ? match.multiplier : 1.0;
+  }, [startDate, endDate, pricingData.periodPrices]);
+
+  // 印刷単価
+  const printUnitPricePerSheet = selectedSize
+    ? (selectedSize.printUnitPrice + (selectedSize.basePriceAddon || 0) + (selectedFolding?.unitPrice || 0))
+    : (3.0 + (selectedFolding?.unitPrice || 0));
+
+  // 配布合計
+  const totalPosting = pCount * postingUnitPrice * periodMultiplier;
+  // 印刷合計
+  const pPrintCount = typeof printCount === 'number' ? printCount : pCount;
+  const totalPrint = orderType === 'PRINT_AND_POSTING' ? pPrintCount * printUnitPricePerSheet : 0;
+  const totalPrice = Math.floor(totalPosting + totalPrint);
+
+  const selectedFoldingUnitPrice = selectedFolding?.unitPrice || 0;
 
   const handleAddToCart = () => {
     if (pCount <= 0) {
@@ -400,27 +445,34 @@ function NewOrderContent() {
     const newTarget = {
       type: orderType,
       title: `${size}サイズ ${orderType === 'PRINT_AND_POSTING' ? '印刷＋ポスティング' : 'ポスティングのみ'} (${method})`,
-      selectedAreas: selectedAreasList.map(a => ({ 
-        id: a.id, 
-        name: `${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`, 
+      selectedAreas: selectedAreasList.map(a => ({
+        id: a.id,
+        name: `${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`,
         count: getCapacity(a),
         prefName: a.prefecture?.name,
         cityName: a.city?.name
       })),
-      totalCount: pCount, 
+      totalCount: pCount,
       method, size, price: totalPrice,
-      unitPrice, 
+      unitPrice: postingUnitPrice,
       startDate, endDate, spareDate,
-      projectName 
+      projectName,
+      // 印刷仕様
+      foldingTypeId: orderType === 'PRINT_AND_POSTING' ? (foldingTypeId ?? undefined) : undefined,
+      foldingTypeName: orderType === 'PRINT_AND_POSTING' ? (selectedFolding?.name ?? undefined) : undefined,
+      foldingUnitPrice: orderType === 'PRINT_AND_POSTING' ? selectedFoldingUnitPrice : undefined,
+      paperType: orderType === 'PRINT_AND_POSTING' ? paperType : undefined,
+      paperWeight: orderType === 'PRINT_AND_POSTING' ? paperWeight : undefined,
+      colorType: orderType === 'PRINT_AND_POSTING' ? colorType : undefined,
+      printCount: orderType === 'PRINT_AND_POSTING' ? pPrintCount : undefined,
     };
 
-    // ★ 変更: 編集時は既存のアイテムを更新、新規時は追加
     if (editItemId) {
       updateItem(editItemId, newTarget);
     } else {
       addItem(newTarget);
     }
-    
+
     router.push('/portal/cart');
   };
 
@@ -432,17 +484,17 @@ function NewOrderContent() {
 
   return (
     <div className="absolute inset-0 flex bg-slate-50 overflow-hidden font-sans">
-      
+
       {/* --- 左側: 固定幅サイドパネル --- */}
-      <div className="w-[360px] h-full bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.06)] z-20 border-r border-slate-200">
-        
+      <div className="w-[380px] h-full bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.06)] z-20 border-r border-slate-200">
+
         <div className="p-5 border-b border-slate-100 shrink-0 bg-white">
           <h1 className="text-xl font-black text-slate-800 tracking-tight">発注シミュレーション</h1>
           <p className="text-[11px] text-slate-500 font-medium mt-1 leading-relaxed">地図からエリアを選び、リアルタイムで見積もりを確認できます。</p>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto p-5 space-y-8 custom-scrollbar">
-          
+
           <section>
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black"><i className="bi bi-tag-fill"></i></div>
@@ -471,9 +523,9 @@ function NewOrderContent() {
                   </button>
                 </div>
               </div>
-              
+
               <div>
-                <label className="text-[10px] font-bold text-slate-500 block mb-1">希望配布枚数 (印刷枚数) <span className="text-rose-500">*</span></label>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">希望配布枚数 <span className="text-rose-500">*</span></label>
                 <div className="relative">
                   <input type="number" required value={plannedCount} onChange={e => setPlannedCount(e.target.value === '' ? '' : Number(e.target.value))} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700 text-right pr-8 transition-shadow" placeholder="例: 10000" />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">枚</span>
@@ -484,7 +536,10 @@ function NewOrderContent() {
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1">チラシサイズ</label>
                   <select value={size} onChange={e => setSize(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
-                    <option value="A4">A4</option><option value="B4">B4</option><option value="A3">A3</option><option value="ハガキ">ハガキ</option>
+                    {pricingData.flyerSizes.length > 0
+                      ? pricingData.flyerSizes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)
+                      : ['A4', 'B4', 'A3', 'ハガキ'].map(s => <option key={s} value={s}>{s}</option>)
+                    }
                   </select>
                 </div>
                 <div>
@@ -494,6 +549,73 @@ function NewOrderContent() {
                   </select>
                 </div>
               </div>
+
+              {/* 印刷仕様 (PRINT_AND_POSTING のみ) */}
+              {orderType === 'PRINT_AND_POSTING' && (
+                <div className="pt-3 border-t border-slate-200 space-y-3">
+                  <div className="text-[10px] font-bold text-indigo-600 flex items-center gap-1">
+                    <i className="bi bi-printer-fill"></i> 印刷仕様
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">折り加工</label>
+                    <select
+                      value={foldingTypeId ?? ''}
+                      onChange={e => setFoldingTypeId(e.target.value ? parseInt(e.target.value) : null)}
+                      className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer"
+                    >
+                      <option value="">折り加工なし (¥0)</option>
+                      {pricingData.foldingTypes.map(f => (
+                        <option key={f.id} value={f.id}>{f.name} (+¥{f.unitPrice.toFixed(1)}/枚)</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">用紙種類</label>
+                      <select value={paperType} onChange={e => setPaperType(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
+                        <option value="コート紙">コート紙</option>
+                        <option value="マット紙">マット紙</option>
+                        <option value="上質紙">上質紙</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 block mb-1">厚さ</label>
+                      <select value={paperWeight} onChange={e => setPaperWeight(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
+                        <option value="73kg (標準)">73kg (標準)</option>
+                        <option value="90kg (少し厚め)">90kg</option>
+                        <option value="110kg (厚手)">110kg</option>
+                        <option value="135kg (ハガキ厚)">135kg</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">カラー</label>
+                    <select value={colorType} onChange={e => setColorType(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
+                      <option value="両面カラー">両面カラー</option>
+                      <option value="片面カラー (裏面白紙)">片面カラー</option>
+                      <option value="両面モノクロ">両面モノクロ</option>
+                      <option value="片面モノクロ">片面モノクロ</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-500 block mb-1">印刷枚数 <span className="text-slate-400">(空欄 = 配布枚数と同じ)</span></label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={printCount}
+                        onChange={e => setPrintCount(e.target.value === '' ? '' : Number(e.target.value))}
+                        className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 text-right pr-8"
+                        placeholder={pCount ? String(pCount) : '配布枚数と同じ'}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">枚</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 
@@ -514,6 +636,12 @@ function NewOrderContent() {
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
                 <input type="date" required value={endDate} min={minEndDate} onChange={handleEndDateChange} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
               </div>
+              {periodMultiplier > 1.0 && (
+                <div className="text-[10px] text-amber-600 font-bold bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+                  <i className="bi bi-clock-fill mr-1"></i>
+                  期間乗数: ×{periodMultiplier.toFixed(2)} が適用されます
+                </div>
+              )}
               <div className="pt-3 border-t border-slate-200 border-dashed">
                 <label className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1.5">
                   予備期限
@@ -535,17 +663,17 @@ function NewOrderContent() {
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">3</div>
               <h3 className="font-bold text-slate-800">配布エリアを選択</h3>
             </div>
-            
+
             <div className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-slate-500 block">住所・半径検索</label>
                 <div className="relative">
                   <i className="bi bi-geo-alt absolute left-3 top-2.5 text-slate-400"></i>
-                  <input 
-                    type="text" 
-                    placeholder="例: 渋谷区道玄坂" 
-                    value={searchAddress} 
-                    onChange={e => setSearchAddress(e.target.value)} 
+                  <input
+                    type="text"
+                    placeholder="例: 渋谷区道玄坂"
+                    value={searchAddress}
+                    onChange={e => setSearchAddress(e.target.value)}
                     onKeyDown={e => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -553,8 +681,8 @@ function NewOrderContent() {
                           handleSearchAndSelect();
                         }
                       }
-                    }} 
-                    className="w-full border border-slate-300 pl-9 pr-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" 
+                    }}
+                    className="w-full border border-slate-300 pl-9 pr-3 py-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -573,7 +701,7 @@ function NewOrderContent() {
                   <option value="">都道府県を選択</option>
                   {locations.map(pref => <option key={pref.id} value={pref.id}>{pref.name}</option>)}
                 </select>
-                
+
                 <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto custom-scrollbar p-2 bg-slate-50 rounded-lg border border-slate-100">
                   {locations.find(p => p.id === selectedPref)?.cities.map((city: any) => {
                     const prefName = locations.find(p => p.id === selectedPref)?.name || '';
@@ -603,7 +731,7 @@ function NewOrderContent() {
         ) : (
           <GoogleMap mapContainerStyle={mapContainerStyle} center={mapCenter} zoom={mapZoom} options={mapOptions} onLoad={map => setMapRef(map)} onIdle={handleMapIdle} onZoomChanged={() => { if(mapRef) setCurrentZoom(mapRef.getZoom() || 15) }}>
             {searchMarker && <Marker position={searchMarker} />}
-            {searchMarker && <Circle center={searchMarker} radius={appliedRadiusKm * 1000} options={{ fillColor: '#4f46e5', fillOpacity: 0.1, strokeColor: '#4338ca', strokeWeight: 2, borderStyle: 'dashed', clickable: false }} />}
+            {searchMarker && <Circle center={searchMarker} radius={appliedRadiusKm * 1000} options={{ fillColor: '#4f46e5', fillOpacity: 0.1, strokeColor: '#4338ca', strokeWeight: 2, clickable: false }} />}
             {mapAreas.map(area => <MemoizedArea key={area.id} area={area} isSelected={selectedAreaIds.has(area.id)} currentZoom={currentZoom} onClick={toggleArea} />)}
           </GoogleMap>
         )}
@@ -612,12 +740,11 @@ function NewOrderContent() {
           <i className="bi bi-cursor-fill text-indigo-500 text-lg"></i>
           地図上のエリアをクリックして、配布エリアを選択出来ます
         </div>
-        
-        {/* --- 右端フローティング: 統合された見積もり＆リストパネル --- */}
+
+        {/* --- 右端フローティング: 見積もり＆リストパネル --- */}
         <div className="absolute top-4 right-4 bottom-4 w-[340px] flex flex-col pointer-events-none z-30">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 flex flex-col h-full pointer-events-auto overflow-hidden">
-            
-            {/* 上部: リストヘッダー */}
+
             <div className="p-3 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
               <div className="flex items-center gap-2">
                 <h4 className="font-bold text-slate-700 text-sm flex items-center gap-1.5"><i className="bi bi-list-check text-indigo-600"></i> 選択エリア</h4>
@@ -629,8 +756,7 @@ function NewOrderContent() {
                 </button>
               )}
             </div>
-            
-            {/* 中部: エリアリスト */}
+
             <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar bg-slate-50">
               {selectedAreasList.length === 0 ? (
                 <div className="text-center text-slate-400 text-xs py-10 flex flex-col items-center justify-center h-full">
@@ -640,21 +766,18 @@ function NewOrderContent() {
               ) : (
                 selectedAreasList.map(a => (
                   <div key={a.id} className="flex justify-between items-center bg-white p-2.5 hover:bg-indigo-50/80 rounded-lg shadow-sm border border-slate-100 transition-colors group relative">
-                    
                     <div className="overflow-hidden flex-1 mr-2">
                       <div className="text-[10px] text-slate-400 leading-tight mb-0.5">{a.prefecture?.name} {a.city?.name}</div>
                       <div className="text-xs font-bold text-slate-700 truncate" title={`${a.prefecture?.name} ${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`}>
                         {formatAreaName(a.town_name, a.chome_name)}
                       </div>
                     </div>
-                    
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="text-right">
                         <div className="text-sm font-black text-indigo-600">{getCapacity(a).toLocaleString()}</div>
                         <div className="text-[9px] text-slate-400 leading-none">枚</div>
                       </div>
-                      
-                      <button 
+                      <button
                         onClick={() => toggleArea(a.id)}
                         className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                         title="選択解除"
@@ -669,23 +792,30 @@ function NewOrderContent() {
 
             {/* 下部: 見積もり＆カートボタン */}
             <div className="bg-white border-t border-slate-200 p-5 shrink-0 relative shadow-[0_-4px_15px_rgba(0,0,0,0.03)]">
-              
+
               <div className="flex justify-between items-end mb-1">
                 <span className="text-xs font-bold text-slate-500">希望配布枚数</span>
                 <span className="font-bold text-lg tracking-tight text-slate-800">{pCount.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span></span>
               </div>
-              
+
               <div className="flex justify-between items-end mb-3 pb-3 border-b border-slate-100">
                 <span className="text-xs font-bold text-slate-500">エリアカバー数</span>
                 <span className={`font-bold text-sm tracking-tight ${isCapacityEnough ? 'text-emerald-600' : 'text-rose-500'}`}>
                   {totalAreaCapacity.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span>
                 </span>
               </div>
-              
+
               {pCount > 0 && !isCapacityEnough && (
                 <div className="text-[10px] text-rose-500 font-bold mb-3 flex items-start gap-1">
                   <i className="bi bi-exclamation-triangle-fill mt-0.5"></i>
                   選択エリアの世帯数が希望枚数に達していません。
+                </div>
+              )}
+
+              {orderType === 'PRINT_AND_POSTING' && pCount > 0 && (
+                <div className="text-[10px] text-slate-500 mb-2 space-y-0.5">
+                  <div className="flex justify-between"><span>配布費</span><span>¥{Math.floor(totalPosting).toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span>印刷費</span><span>¥{Math.floor(totalPrint).toLocaleString()}</span></div>
                 </div>
               )}
 
@@ -694,9 +824,8 @@ function NewOrderContent() {
                 <span className="text-3xl font-black text-indigo-600 tracking-tighter">¥{totalPrice.toLocaleString()}</span>
               </div>
 
-              {/* ★ 変更: 編集時は「更新」、新規時は「カートへ」のテキストに */}
-              <button 
-                onClick={handleAddToCart} 
+              <button
+                onClick={handleAddToCart}
                 disabled={pCount === 0 || !isCapacityEnough}
                 className="w-full py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
@@ -707,16 +836,13 @@ function NewOrderContent() {
                 )}
               </button>
             </div>
-            
           </div>
         </div>
-
       </div>
     </div>
   );
 }
 
-// ★ 追加: Next.js 15+ で useSearchParams を使うためのラップコンポーネント
 export default function NewOrderPageWrapper() {
   return (
     <Suspense fallback={

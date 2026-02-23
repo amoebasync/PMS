@@ -9,16 +9,23 @@ const prisma = new PrismaClient();
 async function verifyQrOwnership(qrId: number, contactId: number): Promise<boolean> {
   const contact = await prisma.customerContact.findUnique({ where: { id: contactId } });
   if (!contact) return false;
+  const customerId = contact.customerId;
+
   const qr = await prisma.qrCode.findFirst({
     where: {
       id: qrId,
-      flyer: { customerId: contact.customerId },
+      OR: [
+        // フライヤー紐付きQR: チラシの顧客IDで判定
+        { flyer: { customerId } },
+        // スタンドアロンQR: 直接の顧客IDで判定
+        { customerId, flyerId: null },
+      ],
     },
   });
   return !!qr;
 }
 
-// PUT: QRコードの更新（転送先URL・メモ・有効/無効の切り替え）
+// PUT: QRコードの更新（転送先URL・メモ・有効/無効・flyerId紐付け）
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getServerSession(authOptions);
@@ -40,6 +47,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (body.redirectUrl !== undefined) dataToUpdate.redirectUrl = body.redirectUrl;
     if (body.memo !== undefined) dataToUpdate.memo = body.memo || null;
     if (body.isActive !== undefined) dataToUpdate.isActive = body.isActive;
+    // flyerId の更新 (スタンドアロンQRをフライヤーに紐付け)
+    if (body.flyerId !== undefined) {
+      dataToUpdate.flyerId = body.flyerId ? parseInt(body.flyerId) : null;
+    }
 
     const updated = await prisma.qrCode.update({
       where: { id: qrId },

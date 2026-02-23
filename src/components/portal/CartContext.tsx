@@ -15,9 +15,17 @@ export type CartItem = {
   startDate: string;
   endDate: string;
   spareDate: string;
-  projectName?: string; 
+  projectName?: string;
   flyerId?: string;
-  savedOrderId?: number; // ★ 追加: 一時保存時のDBのIDを保持
+  savedOrderId?: number;
+  // 印刷仕様 (PRINT_AND_POSTING のみ)
+  foldingTypeId?: number;
+  foldingTypeName?: string;
+  foldingUnitPrice?: number;
+  paperType?: string;
+  paperWeight?: string;
+  colorType?: string;
+  printCount?: number;
 };
 
 type CartContextType = {

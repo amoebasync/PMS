@@ -15,7 +15,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const contactId = parseInt((session.user as any).id);
     const contact = await prisma.customerContact.findUnique({ where: { id: contactId } });
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    
+
     const customerId = contact.customerId;
 
     const { id } = await params;
@@ -28,21 +28,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         throw new Error('Unauthorized');
       }
 
+      // 入稿完了 → 入金待ちへ遷移
       await tx.order.update({
         where: { id: orderId },
-        data: { status: 'PENDING_REVIEW' }
+        data: { status: 'PENDING_PAYMENT' }
       });
 
+      // 入稿データのみ更新（印刷仕様はチェックアウト時に確定済み）
       const printData = {
-        frontDesignUrl: body.frontDesignUrl || null, // ★追加
-        backDesignUrl: body.backDesignUrl || null,   // ★追加
-        paperType: body.paperType,
-        paperWeight: body.paperWeight,
-        colorType: body.colorType,
-        printCount: parseInt(body.printCount),
-        foldingOption: body.foldingOption,
-        sampleRequired: body.sampleRequired,
-        sampleShippingAddress: body.sampleRequired ? body.sampleShippingAddress : null,
+        frontDesignUrl: body.frontDesignUrl || null,
+        backDesignUrl: body.backDesignUrl || null,
         remarks: body.remarks || null
       };
 
@@ -57,6 +52,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
           data: {
             orderId,
             ...printData,
+            printCount: 0,
             status: 'UNORDERED'
           }
         });

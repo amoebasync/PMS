@@ -13,7 +13,6 @@ export async function GET(request: Request) {
     };
 
     if (cityName) {
-      // "Minato City" や "新宿区" などの表記ゆれを吸収
       const cleanCityName = cityName.replace(/(区|市|City|Ku|Ward|Town|Village|\s)/gi, '');
       whereClause.city = {
         name: {
@@ -24,7 +23,7 @@ export async function GET(request: Request) {
 
     const areas = await prisma.area.findMany({
       where: whereClause,
-      take: cityName ? 5000 : 500, // 区単位なら全件取得できる余裕を持たせる
+      take: cityName ? 5000 : 500,
       select: {
         id: true,
         address_code: true,
@@ -32,14 +31,24 @@ export async function GET(request: Request) {
         chome_name: true,
         door_to_door_count: true,
         multi_family_count: true,
-        posting_cap_with_ng: true, 
-        boundary_geojson: true, 
-        prefecture: { select: { name: true } }, // ★ 追加: 都道府県名も取得
+        posting_cap_with_ng: true,
+        boundary_geojson: true,
+        area_rank_id: true,
+        prefecture: { select: { name: true } },
         city: { select: { name: true } }
       }
     });
 
-    return NextResponse.json(areas);
+    // エリアランク情報を別途取得してマージ
+    const areaRanks = await prisma.areaRank.findMany();
+    const rankMap = new Map(areaRanks.map(r => [r.id, r]));
+
+    const areasWithRank = areas.map(a => ({
+      ...a,
+      areaRank: a.area_rank_id ? rankMap.get(a.area_rank_id) || null : null
+    }));
+
+    return NextResponse.json(areasWithRank);
   } catch (error) {
     console.error('Fetch Areas Map Error:', error);
     return NextResponse.json({ error: 'Failed to fetch map areas' }, { status: 500 });

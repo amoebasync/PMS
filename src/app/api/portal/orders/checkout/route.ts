@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const contactId = parseInt((session.user as any).id);
     const contact = await prisma.customerContact.findUnique({ where: { id: contactId } });
     if (!contact) return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    
+
     const customerId = contact.customerId;
     const { items, paymentMethod, isDraft } = await request.json();
 
@@ -25,25 +25,16 @@ export async function POST(request: Request) {
     }
 
     // 2. ステータスの判定
-    // 印刷が必要なアイテムが含まれているかチェック
-    const requiresPrinting = items.some((item: any) => item.type === 'PRINT_AND_POSTING' || item.isPrintingRequested);
-    
-    let initialStatus = 'PENDING_PAYMENT'; // デフォルトは銀行振込(入金待ち)
-    
-    if (isDraft) {
-      initialStatus = 'DRAFT';
-    } else if (paymentMethod === 'CREDIT' || paymentMethod === 'CREDIT_CARD') {
-      // 決済がカードの場合、印刷ありなら「入稿待ち」、配布のみなら「審査待ち」
-      initialStatus = requiresPrinting ? 'PENDING_SUBMISSION' : 'PENDING_REVIEW';
-    }
-
+    // 新フロー:
+    //   PRINT_AND_POSTING → PENDING_SUBMISSION (支払い方法によらず入稿待ち)
+    //   POSTING_ONLY → PENDING_PAYMENT (入金待ち)
     const defaultIndustry = await prisma.industry.findFirst();
     const orderIds: { cartItemId: string, orderId: number }[] = [];
 
     // 3. トランザクションによる一括保存処理
     await prisma.$transaction(async (tx) => {
       for (const item of items) {
-        
+
         // すでに一時保存されていた場合は、古い関連データを安全に削除して上書きする
         if (item.savedOrderId) {
           await tx.payment.deleteMany({ where: { orderId: item.savedOrderId } });
@@ -54,9 +45,20 @@ export async function POST(request: Request) {
 
         const timestamp = new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
         const orderNo = `WEB-${timestamp}-${Math.floor(Math.random() * 1000)}`;
-        const orderTotalAmount = Math.floor(item.price * 1.1); 
-        
+        const orderTotalAmount = Math.floor(item.price * 1.1);
+
         const pName = item.projectName || '名称未設定';
+        const isPrintAndPosting = item.type === 'PRINT_AND_POSTING';
+
+        // ステータス決定
+        let initialStatus: string;
+        if (isDraft) {
+          initialStatus = 'DRAFT';
+        } else if (isPrintAndPosting) {
+          initialStatus = 'PENDING_SUBMISSION'; // 印刷あり → 入稿待ち
+        } else {
+          initialStatus = 'PENDING_PAYMENT'; // 配布のみ → 入金待ち
+        }
 
         // 3-A. 受注ヘッダの作成
         const order = await tx.order.create({
@@ -82,8 +84,8 @@ export async function POST(request: Request) {
             orderId: order.id,
             amount: orderTotalAmount,
             method: isCredit ? 'CREDIT_CARD' : 'BANK_TRANSFER',
-            status: isDraft ? 'PENDING' : (isCredit ? 'COMPLETED' : 'PENDING'),
-            paidAt: (!isDraft && isCredit) ? new Date() : null,
+            status: isDraft ? 'PENDING' : (isCredit && !isPrintAndPosting ? 'COMPLETED' : 'PENDING'),
+            paidAt: (!isDraft && isCredit && !isPrintAndPosting) ? new Date() : null,
           }
         });
 
@@ -130,16 +132,20 @@ export async function POST(request: Request) {
           await tx.orderDistributionArea.createMany({ data: areaData });
         }
 
-        // 3-F. 印刷ありプランの場合は印刷手配データも作成
-        if (item.type === 'PRINT_AND_POSTING' || item.isPrintingRequested) {
+        // 3-F. 印刷ありプランの場合は印刷手配データも作成（発注時に仕様確定）
+        if (isPrintAndPosting) {
           await tx.orderPrinting.create({
             data: {
               orderId: order.id,
               flyerId: targetFlyerId,
-              printCount: item.totalCount,
+              printCount: item.printCount || item.totalCount,
               status: 'UNORDERED',
-              paperType: 'コート紙(EC標準)',
-              colorType: '両面カラー',
+              paperType: item.paperType || 'コート紙',
+              paperWeight: item.paperWeight || '73kg (標準)',
+              colorType: item.colorType || '両面カラー',
+              foldingOption: item.foldingTypeName || 'なし',
+              foldingTypeId: item.foldingTypeId || null,
+              foldingUnitPrice: item.foldingUnitPrice || null,
             }
           });
         }
