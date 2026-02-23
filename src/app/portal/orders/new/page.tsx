@@ -137,6 +137,31 @@ function NewOrderContent() {
   const [endDate, setEndDate] = useState('');
   const [spareDate, setSpareDate] = useState('');
 
+  const minStartDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return d.toISOString().split('T')[0];
+  }, []);
+  const minEndDate = startDate || minStartDate;
+  const minSpareDate = endDate || minEndDate;
+
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setStartDate(newDate);
+    if (endDate && newDate && endDate < newDate) {
+      setEndDate('');
+      setSpareDate('');
+    }
+  };
+
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newDate = e.target.value;
+    setEndDate(newDate);
+    if (spareDate && newDate && spareDate < newDate) {
+      setSpareDate('');
+    }
+  };
+
   const [locations, setLocations] = useState<any[]>([]);
   const [selectedPref, setSelectedPref] = useState<number | null>(13); 
   const [selectedPanelCities, setSelectedPanelCities] = useState<Set<string>>(new Set());
@@ -477,17 +502,17 @@ function NewOrderContent() {
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">2</div>
               <h3 className="font-bold text-slate-800">配布期間を選択</h3>
             </div>
-            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">開始予定日 <span className="text-rose-500">*</span></label>
-                  <input type="date" required value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" />
-                </div>
-                <div className="text-slate-400 pt-4"><i className="bi bi-arrow-right"></i></div>
-                <div className="flex-1">
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
-                  <input type="date" required value={endDate} onChange={e => setEndDate(e.target.value)} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
-                </div>
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">開始予定日 <span className="text-rose-500">*</span></label>
+                <input type="date" required value={startDate} min={minStartDate} onChange={handleStartDateChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" />
+              </div>
+              <div className="flex justify-center text-slate-300">
+                <i className="bi bi-arrow-down"></i>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
+                <input type="date" required value={endDate} min={minEndDate} onChange={handleEndDateChange} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
               </div>
               <div className="pt-3 border-t border-slate-200 border-dashed">
                 <label className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1.5">
@@ -500,7 +525,7 @@ function NewOrderContent() {
                     </div>
                   </div>
                 </label>
-                <input type="date" value={spareDate} onChange={e => setSpareDate(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-600" />
+                <input type="date" value={spareDate} min={minSpareDate} onChange={e => setSpareDate(e.target.value)} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none text-slate-600" />
               </div>
             </div>
           </section>

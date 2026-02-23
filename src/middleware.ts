@@ -12,8 +12,10 @@ export function middleware(request: NextRequest) {
     path === '/portal/login' ||
     path === '/portal/signup' ||
     path === '/portal' ||
-    path === '/portal/orders/new' || 
+    path === '/portal/orders/new' ||
     path === '/portal/cart' ||
+    path === '/portal/terms' ||
+    path === '/portal/privacy' ||
     path.startsWith('/api/locations') || 
     path.startsWith('/api/areas') ||
     path.startsWith('/api/upload') ||
