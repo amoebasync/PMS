@@ -66,13 +66,25 @@ export default function PayrollPage() {
   const [editForm, setEditForm] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  // 今週の月曜日を初期値にセット
+  // システム設定の週開始曜日を取得して今週の開始日を初期値にセット
   useEffect(() => {
-    const d = new Date();
-    const day = d.getDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    d.setDate(d.getDate() + diff);
-    setWeekStart(d.toISOString().split('T')[0]);
+    fetch('/api/settings/system')
+      .then(r => r.ok ? r.json() : { weekStartDay: '1' })
+      .then((settings: Record<string, string>) => {
+        const startDay = parseInt(settings.weekStartDay ?? '1'); // 0=日, 1=月, ...6=土
+        const d = new Date();
+        const currentDay = d.getDay(); // 0=日, 1=月, ...6=土
+        const diff = (currentDay - startDay + 7) % 7;
+        d.setDate(d.getDate() - diff);
+        setWeekStart(d.toISOString().split('T')[0]);
+      })
+      .catch(() => {
+        // フォールバック: 月曜始まり
+        const d = new Date();
+        const day = d.getDay();
+        d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+        setWeekStart(d.toISOString().split('T')[0]);
+      });
   }, []);
 
   const fetchRecords = async () => {
@@ -246,7 +258,7 @@ export default function PayrollPage() {
           </>
         ) : (
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">週開始日（月曜日）</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">週開始日</label>
             <input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white" />
           </div>

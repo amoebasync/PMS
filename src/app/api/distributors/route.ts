@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -7,15 +8,25 @@ const parseDate = (d: any) => d ? new Date(d) : null;
 const parseFloatSafe = (n: any) => n ? parseFloat(n) : null;
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
+function buildInitialPassword(birthday: string | null | undefined): string | null {
+  if (!birthday) return null;
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
+}
+
 export async function GET() {
   try {
     const distributors = await prisma.flyerDistributor.findMany({
       orderBy: { id: 'desc' },
-      // ★ ここが超重要：紐づくテーブルのデータを一緒に取得する
       include: {
-        branch: true,   
-        country: true,  
-      }
+        branch: true,
+        country: true,
+        visaType: true,
+      },
     });
     return NextResponse.json(distributors);
   } catch (error) {
@@ -28,18 +39,24 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    const passwordHash = buildInitialPassword(body.birthday);
+
     const newDistributor = await prisma.flyerDistributor.create({
       data: {
         branchId: parseIntSafe(body.branchId),
         countryId: parseIntSafe(body.countryId),
+        visaTypeId: parseIntSafe(body.visaTypeId),
         staffId: body.staffId,
         name: body.name,
         phone: body.phone,
         email: body.email,
         birthday: parseDate(body.birthday),
         gender: body.gender,
+        postalCode: body.postalCode,
         address: body.address,
-        visaType: body.visaType,
+        buildingName: body.buildingName,
+        passwordHash,
+        isPasswordTemp: true,
         visaExpiryDate: parseDate(body.visaExpiryDate),
         hasAgreedPersonalInfo: Boolean(body.hasAgreedPersonalInfo),
         hasSignedContract: Boolean(body.hasSignedContract),

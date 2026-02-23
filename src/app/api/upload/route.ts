@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
+import Busboy from 'busboy';
+import { PDFParse } from 'pdf-parse';
 
 const prisma = new PrismaClient();
 
@@ -16,11 +18,11 @@ async function housekeepUploads(uploadDir: string) {
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
     const [employees, printings] = await Promise.all([
-      prisma.employee.findMany({ 
-        select: { avatarUrl: true }, 
-        where: { avatarUrl: { not: null } } 
+      prisma.employee.findMany({
+        select: { avatarUrl: true },
+        where: { avatarUrl: { not: null } }
       }),
-      prisma.orderPrinting.findMany({ 
+      prisma.orderPrinting.findMany({
         select: { frontDesignUrl: true, backDesignUrl: true },
         where: { OR: [{ frontDesignUrl: { not: null } }, { backDesignUrl: { not: null } }] }
       })
@@ -38,7 +40,7 @@ async function housekeepUploads(uploadDir: string) {
 
       const filePath = path.join(uploadDir, file);
       const fileStat = await stat(filePath);
-      
+
       if (now - fileStat.mtimeMs > ONE_DAY_MS) {
         const fileUrl = `/uploads/avatars/${file}`;
         if (!activeUrls.has(fileUrl)) {
@@ -53,59 +55,119 @@ async function housekeepUploads(uploadDir: string) {
 }
 
 // ========================================================
+// ★ multipart/form-data を busboy で直接パースするヘルパー
+// request.formData() は Next.js 内部の制限で大きなファイルが失敗するため
+// ========================================================
+type ParsedUpload = {
+  file: { buffer: Buffer; originalName: string } | null;
+  fields: Record<string, string>;
+};
+
+function parseMultipart(request: Request): Promise<ParsedUpload> {
+  return new Promise((resolve, reject) => {
+    const contentType = request.headers.get('content-type') ?? '';
+
+    const busboy = Busboy({
+      headers: { 'content-type': contentType },
+      limits: { fileSize: 55 * 1024 * 1024 }, // 55MB
+    });
+
+    const fields: Record<string, string> = {};
+    let fileBuffer: Buffer | null = null;
+    let originalName = '';
+
+    busboy.on('field', (name, value) => {
+      fields[name] = value;
+    });
+
+    busboy.on('file', (_name, stream, info) => {
+      originalName = info.filename;
+      const chunks: Buffer[] = [];
+      stream.on('data', (chunk: Buffer) => chunks.push(chunk));
+      stream.on('end', () => { fileBuffer = Buffer.concat(chunks); });
+      stream.on('error', reject);
+    });
+
+    busboy.on('finish', () => {
+      resolve({
+        file: fileBuffer ? { buffer: fileBuffer, originalName } : null,
+        fields,
+      });
+    });
+
+    busboy.on('error', reject);
+
+    // Web ReadableStream → busboy へ流し込む
+    const reader = request.body?.getReader();
+    if (!reader) { reject(new Error('No request body')); return; }
+
+    const pump = async () => {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) { busboy.end(); break; }
+          busboy.write(Buffer.from(value));
+        }
+      } catch (err) {
+        reject(err);
+      }
+    };
+    pump();
+  });
+}
+
+// ========================================================
 // ★ メインのアップロード処理
 // ========================================================
 export async function POST(request: Request) {
   try {
-    const data = await request.formData();
-    const file = data.get('file') as File;
-    
-    // ★ 追加: フロントエンドから送られてくる案件情報を受け取る
-    const orderNo = data.get('orderNo') as string | null;
-    const title = data.get('title') as string | null;
-    const sideName = data.get('sideName') as string | null;
+    const { file, fields } = await parseMultipart(request);
 
     if (!file) {
       return NextResponse.json({ error: 'ファイルがありません' }, { status: 400 });
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const orderNo  = fields.orderNo  || null;
+    const title    = fields.title    || null;
+    const sideName = fields.sideName || null;
 
-    const ext = file.name.split('.').pop() || 'png';
+    const ext = file.originalName.split('.').pop() || 'bin';
     let filename = '';
 
     // ★ 案件情報がある場合は、システム的に追跡しやすいファイル名に変更する
     if (orderNo && title) {
-      // OSのファイル名で使えない記号やスペースをアンダースコアに置換する安全処理
       const safeOrderNo = orderNo.replace(/[^a-zA-Z0-9_-]/g, '');
-      const safeTitle = title.replace(/[\/\\?%*:|"<> ]/g, '_');
-      const safeSide = sideName ? `_${sideName}` : '';
-      
+      const safeTitle   = title.replace(/[\/\\?%*:|"<> ]/g, '_');
+      const safeSide    = sideName ? `_${sideName}` : '';
       // 例: WEB-20260221-199_焼肉屋チラシ_表面_1708611234567.pdf
       filename = `${safeOrderNo}_${safeTitle}${safeSide}_${Date.now()}.${ext}`;
     } else {
-      // 指定がない場合（アバター画像など）は従来のランダム生成
       filename = `file-${Date.now()}-${Math.round(Math.random() * 1000)}.${ext}`;
     }
 
     const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
-
-    try {
-      await mkdir(uploadDir, { recursive: true });
-    } catch (e) {
-      // 既に存在する場合は無視
-    }
+    await mkdir(uploadDir, { recursive: true });
 
     const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, buffer);
+    await writeFile(filepath, file.buffer);
 
     const url = `/uploads/avatars/${filename}`;
+
+    // PDF/AI ファイルのライブテキスト検出（アウトライン化チェック）
+    let hasLiveText = false;
+    if (['pdf', 'ai'].includes(ext.toLowerCase())) {
+      try {
+        const parser = new PDFParse({ data: new Uint8Array(file.buffer) });
+        const result = await parser.getText();
+        hasLiveText = result.text.trim().length > 0;
+        await parser.destroy();
+      } catch { /* 解析失敗でもアップロードは成功扱い */ }
+    }
 
     // バックグラウンドでHousekeep処理を実行
     housekeepUploads(uploadDir).catch(e => console.error(e));
 
-    return NextResponse.json({ url });
+    return NextResponse.json({ url, hasLiveText });
   } catch (error) {
     console.error('Upload Error:', error);
     return NextResponse.json({ error: 'ファイルのアップロードに失敗しました' }, { status: 500 });

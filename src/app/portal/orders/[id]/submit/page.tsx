@@ -3,15 +3,50 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 
+type ModalVariant = 'error' | 'warning' | 'success' | 'confirm';
+
+type ModalConfig = {
+  variant: ModalVariant;
+  title: string;
+  message: string;
+  showPhone?: boolean;
+  onConfirm?: () => void;
+};
+
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 4.0;
+
 export default function SubmitDataPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = React.use(params);
   const orderId = parseInt(resolvedParams.id);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewContainerRef = useRef<HTMLDivElement>(null);
+  const zoomAreaRef = useRef<HTMLDivElement>(null);
+
+  // ---- zoom / pan ----
+  const [zoom, setZoom] = useState(1.0);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const zoomRef = useRef(1.0);
+  const panRef = useRef({ x: 0, y: 0 });
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  useEffect(() => { panRef.current = pan; }, [pan]);
+
+  // ---- preview errors / live text ----
+  const [previewErrors, setPreviewErrors] = useState({ front: false, back: false });
+  const [liveTextWarnings, setLiveTextWarnings] = useState({ front: false, back: false });
+
+  // ---- checklist ----
+  const [showChecklist, setShowChecklist] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
 
   const [order, setOrder] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [modal, setModal] = useState<ModalConfig | null>(null);
+  const [supportPhone, setSupportPhone] = useState('');
 
   const [activeSide, setActiveSide] = useState<'front' | 'back'>('front');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -29,11 +64,92 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     backDesignUrl: '',
     frontPageNum: 1,
     backPageNum: 2,
+    sampleRequired: false,
+    sampleShippingAddress: '',
     remarks: ''
   });
+  const [defaultDeliveryAddress, setDefaultDeliveryAddress] = useState('');
 
   // 発注時に確定済みの印刷仕様を表示するため取得
   const [printingSpec, setPrintingSpec] = useState<any>(null);
+
+  // カスタマーセンター電話番号を取得
+  useEffect(() => {
+    fetch('/api/portal/settings')
+      .then(r => r.json())
+      .then(d => { if (d.supportPhone) setSupportPhone(d.supportPhone); })
+      .catch(() => {});
+  }, []);
+
+  // デフォルト納品先住所を取得
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/portal/settings/delivery-addresses');
+        if (res.ok) {
+          const data = await res.json();
+          const defaultId = data.myDefaultDeliveryAddressId;
+          if (defaultId && data.addresses) {
+            const addr = data.addresses.find((a: any) => a.id === defaultId);
+            if (addr) {
+              const parts = [
+                addr.postalCode ? `〒${addr.postalCode}` : '',
+                addr.address || '',
+                addr.addressBuilding || '',
+                addr.phone ? `TEL: ${addr.phone}` : '',
+              ].filter(Boolean);
+              setDefaultDeliveryAddress(parts.join('\n'));
+            }
+          }
+        }
+      } catch (e) { console.error(e); }
+    })();
+  }, []);
+
+  // ---- ホイールズームイベント（non-passive）----
+  useEffect(() => {
+    const el = zoomAreaRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const cx = e.clientX - rect.left - rect.width / 2;
+      const cy = e.clientY - rect.top - rect.height / 2;
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      const currentZoom = zoomRef.current;
+      const currentPan = panRef.current;
+      const newZoom = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, currentZoom * factor));
+      const scale = newZoom / currentZoom;
+      const newPan = {
+        x: cx * (1 - scale) + currentPan.x * scale,
+        y: cy * (1 - scale) + currentPan.y * scale,
+      };
+      setZoom(newZoom);
+      setPan(newPan);
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- モーダルヘルパー ----
+  const closeModal = () => setModal(null);
+
+  const showError = (title: string, message: string, showPhone = true, onClose?: () => void) => {
+    setModal({ variant: 'error', title, message, showPhone, onConfirm: onClose });
+  };
+
+  const showWarning = (title: string, message: string, showPhone = false, onClose?: () => void) => {
+    setModal({ variant: 'warning', title, message, showPhone, onConfirm: onClose });
+  };
+
+  const showSuccess = (title: string, message: string, onClose?: () => void) => {
+    setModal({ variant: 'success', title, message, onConfirm: onClose });
+  };
+
+  const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+    setModal({ variant: 'confirm', title, message, onConfirm });
+  };
+  // -------------------------
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -45,8 +161,9 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           const data = await res.json();
           const targetOrder = data.orders?.find((o: any) => o.id === orderId);
           if (!targetOrder || targetOrder.status !== 'PENDING_SUBMISSION') {
-            alert('不正なアクセス、または既に入稿済みの案件です。');
-            router.push('/portal/orders'); return;
+            setIsLoading(false);
+            showError('アクセスエラー', '不正なアクセス、または既に入稿済みの案件です。', false, () => router.push('/portal/orders'));
+            return;
           }
           setOrder(targetOrder);
           // 印刷仕様を取得
@@ -64,7 +181,11 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
   const processFile = async (file: File, side: 'front' | 'back') => {
     if (file.size > 50 * 1024 * 1024) {
-      alert('50MB以上のファイルはアップロードできません。GigaFile便等のURLを備考欄へ貼り付けてください。');
+      showWarning(
+        'ファイルサイズ超過',
+        '50MB以上のファイルはアップロードできません。\nGigaFile便等のURLを備考欄へ貼り付けてください。',
+        true
+      );
       return;
     }
 
@@ -85,8 +206,25 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           setSubmitForm(prev => ({ ...prev, backDesignUrl: data.url }));
         }
         setPreviewSettings(prev => ({ ...prev, [side]: { rotate: 0 } }));
-      } else { alert('アップロードに失敗しました。'); }
-    } catch (err) { alert('通信エラーが発生しました。'); }
+        setPreviewErrors(prev => ({ ...prev, [side]: false }));
+        setLiveTextWarnings(prev => ({ ...prev, [side]: data.hasLiveText ?? false }));
+        // アップロード成功時にズームリセット
+        if (side === activeSide) {
+          setZoom(1.0);
+          setPan({ x: 0, y: 0 });
+        }
+      } else {
+        showError(
+          'アップロード失敗',
+          'ファイルのアップロードに失敗しました。\n時間をおいて再度お試しいただくか、カスタマーセンターまでご連絡ください。'
+        );
+      }
+    } catch (err) {
+      showError(
+        '通信エラー',
+        '通信エラーが発生しました。\nインターネット接続を確認してから再度お試しください。'
+      );
+    }
     setIsUploading(false);
   };
 
@@ -105,9 +243,15 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     if (file) processFile(file, activeSide);
   };
 
+  const switchSide = (side: 'front' | 'back') => {
+    setActiveSide(side);
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
   const applyFrontToBack = () => {
     setSubmitForm(prev => ({ ...prev, backDesignUrl: prev.frontDesignUrl, backPageNum: prev.frontPageNum + 1 }));
-    setActiveSide('back');
+    switchSide('back');
   };
 
   const handleSwapSides = () => {
@@ -116,6 +260,8 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
       frontPageNum: prev.backPageNum, backPageNum: prev.frontPageNum,
     }));
     setPreviewSettings(prev => ({ front: prev.back, back: prev.front }));
+    setLiveTextWarnings(prev => ({ front: prev.back, back: prev.front }));
+    setPreviewErrors(prev => ({ front: prev.back, back: prev.front }));
   };
 
   const rotatePreview = () => {
@@ -127,28 +273,71 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
   const clearSide = (side: 'front' | 'back') => {
     setSubmitForm(prev => ({ ...prev, [side === 'front' ? 'frontDesignUrl' : 'backDesignUrl']: '' }));
     setPreviewSettings(prev => ({ ...prev, [side]: { rotate: 0 } }));
+    setLiveTextWarnings(prev => ({ ...prev, [side]: false }));
+    setPreviewErrors(prev => ({ ...prev, [side]: false }));
+    if (activeSide === side) {
+      setZoom(1.0);
+      setPan({ x: 0, y: 0 });
+    }
   };
 
-  const handleSubmitData = async (e: React.FormEvent) => {
+  // ---- ズームコントロール ----
+  const adjustZoom = (factor: number) => {
+    setZoom(prev => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prev * factor)));
+  };
+
+  const resetZoom = () => {
+    setZoom(1.0);
+    setPan({ x: 0, y: 0 });
+  };
+
+  // ---- パン操作 ----
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (zoom <= 1) return;
     e.preventDefault();
-    const hasExternalUrl = submitForm.remarks.includes('http');
+    isPanningRef.current = true;
+    setIsPanning(true);
+    panStartRef.current = { x: e.clientX, y: e.clientY };
+  };
 
-    if (!submitForm.frontDesignUrl && !hasExternalUrl) {
-      alert('表面のデータが添付されていません。\nファイルをアップロードするか、大容量の場合は備考欄にGigaFile便などのURLを記載してください。');
-      setActiveSide('front');
-      return;
-    }
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isPanningRef.current) return;
+    const dx = e.clientX - panStartRef.current.x;
+    const dy = e.clientY - panStartRef.current.y;
+    setPan(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+    panStartRef.current = { x: e.clientX, y: e.clientY };
+  };
 
-    if (isDoubleSided && !submitForm.backDesignUrl && !hasExternalUrl) {
-      alert('「両面」印刷が指定されていますが、裏面のデータが未入稿です。\n裏面のデータをアップロードするか、備考欄にURLを記載してください。');
-      setActiveSide('back');
-      return;
-    }
+  const handleMouseUp = () => {
+    isPanningRef.current = false;
+    setIsPanning(false);
+  };
 
-    if (!submitForm.frontDesignUrl && hasExternalUrl) {
-      if (!confirm('表面のデータがシステムに添付されていません。\n備考欄のURLにて手配済みとして入稿を進めますか？')) return;
-    }
+  const handleDoubleClick = () => {
+    resetZoom();
+  };
 
+  // ---- チェックリスト ----
+  const checklistItems = [
+    { id: 'trim', text: '断裁線（赤枠）より内側に重要なテキスト・ロゴが収まっている' },
+    { id: 'bleed', text: '背景色・画像は断裁線の外（塗り足し領域）まで伸びている' },
+    { id: 'outline', text: 'テキストはすべてアウトライン化されている', warnIfLiveText: true },
+    { id: 'front-correct', text: '表面の内容・向きが正しい' },
+    ...(isDoubleSided ? [{ id: 'back-correct', text: '裏面の内容が正しく、表裏が逆になっていない' }] : []),
+    { id: 'font-size', text: '文字は十分な大きさで読める' },
+  ];
+
+  const toggleCheckItem = (id: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 実際の送信処理（confirmモーダルのコールバックからも呼ばれる）
+  const doSubmit = async () => {
     setIsSubmitting(true);
     try {
       const res = await fetch(`/api/portal/orders/${orderId}/submit-data`, {
@@ -157,14 +346,79 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
         body: JSON.stringify(submitForm)
       });
       if (res.ok) {
-        alert('データを入稿しました！入金手続きへ進んでください。');
-        router.push('/portal/orders');
-      } else { alert('エラーが発生しました'); }
-    } catch (err) { alert('通信エラーが発生しました'); }
+        showSuccess(
+          '入稿完了！',
+          'データを入稿しました。\n入金手続きへ進んでください。',
+          () => router.push('/portal/orders')
+        );
+      } else {
+        showError(
+          '送信エラー',
+          '送信に失敗しました。\n時間をおいて再度お試しいただくか、カスタマーセンターまでご連絡ください。'
+        );
+      }
+    } catch (err) {
+      showError(
+        '通信エラー',
+        '通信エラーが発生しました。\nインターネット接続を確認してから再度お試しください。'
+      );
+    }
     setIsSubmitting(false);
   };
 
-  const PreviewElement = ({ url, pageNum, orientation, rotate, containerRef }: { url: string, pageNum: number, orientation: string, rotate: number, containerRef: React.RefObject<HTMLDivElement> }) => {
+  // チェックリストから呼ばれる送信（GigaFile確認フローを含む）
+  const doSubmitFromChecklist = () => {
+    setShowChecklist(false);
+    const hasExternalUrl = submitForm.remarks.includes('http');
+    if (!submitForm.frontDesignUrl && hasExternalUrl) {
+      showConfirm(
+        '入稿確認',
+        '表面のデータがシステムに添付されていません。\n備考欄のURLにて手配済みとして入稿を進めますか？',
+        doSubmit
+      );
+      return;
+    }
+    doSubmit();
+  };
+
+  const handleSubmitData = async () => {
+    const hasExternalUrl = submitForm.remarks.includes('http');
+
+    if (!submitForm.frontDesignUrl && !hasExternalUrl) {
+      showWarning(
+        'データ未添付',
+        '表面のデータが添付されていません。\nファイルをアップロードするか、大容量の場合は備考欄にGigaFile便などのURLを記載してください。',
+        false,
+        () => switchSide('front')
+      );
+      return;
+    }
+
+    if (isDoubleSided && !submitForm.backDesignUrl && !hasExternalUrl) {
+      showWarning(
+        '裏面データ未添付',
+        '「両面」印刷が指定されていますが、裏面のデータが未入稿です。\n裏面のデータをアップロードするか、備考欄にURLを記載してください。',
+        false,
+        () => switchSide('back')
+      );
+      return;
+    }
+
+    // バリデーション通過 → チェックリストを表示
+    setShowChecklist(true);
+  };
+
+  const PreviewElement = ({
+    url, pageNum, orientation, rotate, containerRef, hasIframeError, onIframeError
+  }: {
+    url: string;
+    pageNum: number;
+    orientation: string;
+    rotate: number;
+    containerRef: React.RefObject<HTMLDivElement>;
+    hasIframeError: boolean;
+    onIframeError: () => void;
+  }) => {
     const [dim, setDim] = useState({ w: 0, h: 0 });
 
     useEffect(() => {
@@ -202,23 +456,26 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
         </div>
       );
     }
-    if (lower.endsWith('.pdf')) {
+    // PDF および AI ファイル（CS2以降はPDF互換）をiframeでプレビュー
+    if (lower.match(/\.(pdf|ai)$/) && !hasIframeError) {
       return (
         <div className="absolute inset-0 overflow-hidden pointer-events-none bg-white">
           <div style={innerStyle}>
             <iframe src={`${url}#page=${pageNum}&view=Fit&toolbar=0&navpanes=0&scrollbar=0`}
               className="absolute border-none pointer-events-none"
               style={{ width: '104%', height: '104%', top: '-2%', left: '-2%' }}
-              scrolling="no" tabIndex={-1} />
+              scrolling="no" tabIndex={-1}
+              onError={onIframeError} />
           </div>
         </div>
       );
     }
+    // フォールバック（PSD / ZIP / 旧形式AI 等）
     return (
-      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-fuchsia-600 z-10">
+      <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 text-fuchsia-600 z-10 p-6 text-center">
         <i className="bi bi-filetype-ai text-6xl mb-4"></i>
-        <span className="font-black text-lg">AI / ZIP データ</span>
-        <span className="text-xs opacity-70 mt-1">※プレビュー非対応形式です</span>
+        <span className="font-black text-lg">AI / PSD / ZIP データ</span>
+        <span className="text-xs text-slate-500 mt-2 leading-relaxed">データを受け付けました。<br/>入稿後にスタッフがファイルの内容を確認します。</span>
       </div>
     );
   };
@@ -227,6 +484,15 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
   const currentUrl = activeSide === 'front' ? submitForm.frontDesignUrl : submitForm.backDesignUrl;
   const currentSettings = previewSettings[activeSide];
+  const hasLiveTextOnCurrent = liveTextWarnings[activeSide];
+
+  // モーダルのアイコン・カラー設定
+  const modalVariantStyles = {
+    error:   { bar: 'bg-rose-500',    icon: 'bg-rose-100 text-rose-500',    btn: 'bg-rose-500 hover:bg-rose-600',    iconClass: 'bi-exclamation-circle-fill' },
+    warning: { bar: 'bg-amber-500',   icon: 'bg-amber-100 text-amber-600',  btn: 'bg-amber-500 hover:bg-amber-600',  iconClass: 'bi-exclamation-triangle-fill' },
+    success: { bar: 'bg-emerald-500', icon: 'bg-emerald-100 text-emerald-500', btn: 'bg-emerald-500 hover:bg-emerald-600', iconClass: 'bi-check-circle-fill' },
+    confirm: { bar: 'bg-fuchsia-600', icon: 'bg-fuchsia-100 text-fuchsia-600', btn: 'bg-fuchsia-600 hover:bg-fuchsia-700', iconClass: 'bi-question-circle-fill' },
+  };
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden text-slate-800 font-sans">
@@ -274,13 +540,13 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           <div className="h-16 px-6 flex justify-between items-center bg-white/50 backdrop-blur-md border-b border-slate-300 z-30 shrink-0">
             <div className="flex items-center gap-2">
               <div className="bg-slate-200 p-1 rounded-xl flex gap-1 shadow-inner">
-                <button type="button" onClick={() => setActiveSide('front')} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button type="button" onClick={() => switchSide('front')} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   表面
                   {!submitForm.frontDesignUrl && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm"></span>
                   )}
                 </button>
-                <button type="button" onClick={() => setActiveSide('back')} disabled={!isDoubleSided} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative disabled:opacity-30 ${activeSide === 'back' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button type="button" onClick={() => switchSide('back')} disabled={!isDoubleSided} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative disabled:opacity-30 ${activeSide === 'back' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   裏面
                   {isDoubleSided && !submitForm.backDesignUrl && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm"></span>
@@ -303,18 +569,30 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
             </div>
           </div>
 
-          {/* 中央：プレビューキャンバス */}
-          <div className="flex-1 min-h-0 p-8 flex items-center justify-center relative overflow-hidden">
+          {/* 中央：プレビューキャンバス（ズーム＆パン対応） */}
+          <div
+            ref={zoomAreaRef}
+            className="flex-1 min-h-0 p-8 flex items-center justify-center relative overflow-hidden"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+            style={{ cursor: zoom > 1 ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+          >
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(#94a3b8 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
             <div
               ref={previewContainerRef}
-              className={`relative bg-white shadow-2xl flex items-center justify-center z-10 transition-all duration-300 overflow-hidden ${!currentUrl && 'border-4 border-dashed border-slate-300 bg-slate-100/50'}`}
+              className={`relative bg-white shadow-2xl flex items-center justify-center z-10 overflow-hidden ${!currentUrl && 'border-4 border-dashed border-slate-300 bg-slate-100/50'}`}
               style={{
                 containerType: 'size',
                 aspectRatio: orientation === 'portrait' ? '1 / 1.4142' : '1.4142 / 1',
                 maxHeight: '100%', maxWidth: '100%',
                 height: orientation === 'portrait' ? '100%' : 'auto',
                 width: orientation === 'landscape' ? '100%' : 'auto',
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                transformOrigin: 'center center',
+                transition: zoom === 1 && pan.x === 0 && pan.y === 0 ? 'aspect-ratio 0.3s, height 0.3s, width 0.3s' : 'none',
               }}
             >
               {isUploading === activeSide ? (
@@ -324,13 +602,28 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
                 </div>
               ) : currentUrl ? (
                 <>
-                  <PreviewElement url={currentUrl} pageNum={activeSide === 'front' ? submitForm.frontPageNum : submitForm.backPageNum} orientation={orientation} rotate={currentSettings.rotate} containerRef={previewContainerRef} />
+                  <PreviewElement
+                    url={currentUrl}
+                    pageNum={activeSide === 'front' ? submitForm.frontPageNum : submitForm.backPageNum}
+                    orientation={orientation}
+                    rotate={currentSettings.rotate}
+                    containerRef={previewContainerRef}
+                    hasIframeError={previewErrors[activeSide]}
+                    onIframeError={() => setPreviewErrors(prev => ({ ...prev, [activeSide]: true }))}
+                  />
                   <div className="absolute top-[2%] bottom-[2%] left-[2%] right-[2%] border-[1.5px] border-rose-500/80 pointer-events-none z-20">
                     <span className="absolute -top-[18px] left-0 text-rose-500 text-[10px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">仕上がり位置 (断裁線)</span>
                   </div>
                   <div className="absolute top-[4%] bottom-[4%] left-[4%] right-[4%] border-[1px] border-blue-500/80 border-dashed pointer-events-none z-20">
                     <span className="absolute -top-[18px] left-28 text-blue-500 text-[10px] font-black bg-white/90 px-1.5 py-0.5 rounded-t-sm whitespace-nowrap">文字切れ安全圏</span>
                   </div>
+                  {/* ライブテキスト警告バッジ */}
+                  {hasLiveTextOnCurrent && (
+                    <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-30 bg-amber-500 text-white px-3 py-1.5 rounded-full shadow-lg flex items-center gap-2 text-[11px] font-black pointer-events-none whitespace-nowrap">
+                      <i className="bi bi-exclamation-triangle-fill"></i>
+                      テキストがアウトライン化されていない可能性があります
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center text-slate-400 p-6 text-center z-10 pointer-events-none">
@@ -360,11 +653,26 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
 
           {/* 下部：ツールバー */}
           <div className="bg-white p-4 border-t border-slate-200 shrink-0 z-20 flex items-center justify-between gap-4 shadow-[0_-10px_15px_-3px_rgba(0,0,0,0.05)]">
-            <div className="relative">
+            <div className="flex items-center gap-2">
               <input type="file" ref={fileInputRef} accept=".pdf,.ai,.psd,.jpg,.jpeg,.png,.zip" onChange={(e) => handleFileUpload(e, activeSide)} className="hidden" />
               <button type="button" onClick={() => fileInputRef.current?.click()} className="bg-fuchsia-50 hover:bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200 px-6 py-2.5 rounded-xl font-bold transition-colors flex items-center gap-2 text-sm shadow-sm">
                 <i className="bi bi-cloud-arrow-up"></i> ファイルを選択
               </button>
+              {/* ズームコントロール */}
+              {currentUrl && (
+                <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded-xl p-1 ml-1">
+                  <button type="button" onClick={() => adjustZoom(1 / 1.25)} className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-lg text-slate-600 font-bold text-base transition-colors" title="縮小">
+                    <i className="bi bi-dash"></i>
+                  </button>
+                  <span className="w-12 text-center text-xs font-mono font-bold text-slate-700 select-none">{Math.round(zoom * 100)}%</span>
+                  <button type="button" onClick={() => adjustZoom(1.25)} className="w-7 h-7 flex items-center justify-center hover:bg-white rounded-lg text-slate-600 font-bold text-base transition-colors" title="拡大">
+                    <i className="bi bi-plus"></i>
+                  </button>
+                  <button type="button" onClick={resetZoom} className={`w-7 h-7 flex items-center justify-center rounded-lg text-xs transition-colors ${zoom !== 1 || pan.x !== 0 || pan.y !== 0 ? 'hover:bg-fuchsia-100 text-fuchsia-600' : 'text-slate-300'}`} title="リセット (ダブルクリックでもリセット)">
+                    <i className="bi bi-arrows-angle-contract"></i>
+                  </button>
+                </div>
+              )}
             </div>
             {currentUrl && (
               <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
@@ -419,10 +727,62 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
               </div>
             )}
 
-            {/* 備考 */}
+            {/* サンプル送付 */}
             <div className="space-y-4">
               <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
                 <span className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center font-black text-xs">{printingSpec ? '2' : '1'}</span>
+                <h2 className="text-lg font-black text-slate-800">サンプル送付</h2>
+              </div>
+              <label className="flex items-start gap-3 cursor-pointer group p-3 bg-slate-50 rounded-xl border border-slate-100 hover:border-fuchsia-200 transition-colors">
+                <div className="relative flex items-center justify-center mt-0.5">
+                  <input
+                    type="checkbox"
+                    className="peer w-5 h-5 appearance-none border-2 border-slate-300 rounded focus:ring-2 focus:ring-fuchsia-500 checked:bg-fuchsia-600 checked:border-fuchsia-600 transition-colors"
+                    checked={submitForm.sampleRequired}
+                    onChange={e => {
+                      const checked = e.target.checked;
+                      setSubmitForm(prev => ({
+                        ...prev,
+                        sampleRequired: checked,
+                        sampleShippingAddress: checked && !prev.sampleShippingAddress && defaultDeliveryAddress ? defaultDeliveryAddress : prev.sampleShippingAddress,
+                      }));
+                    }}
+                  />
+                  <i className="bi bi-check text-white absolute pointer-events-none opacity-0 peer-checked:opacity-100 text-lg"></i>
+                </div>
+                <div>
+                  <div className="font-bold text-slate-800 text-sm group-hover:text-fuchsia-700 transition-colors">印刷見本（サンプル）の送付を希望する</div>
+                  <div className="text-xs text-slate-500 mt-0.5">印刷完了後、ご指定の住所へ約50枚を無料でお送りします。</div>
+                </div>
+              </label>
+              {submitForm.sampleRequired && (
+                <div className="animate-in slide-in-from-top-2">
+                  <label className="block text-xs font-bold text-slate-600 mb-2">サンプル送付先住所・宛名 <span className="text-rose-500">*</span></label>
+                  <textarea
+                    required
+                    value={submitForm.sampleShippingAddress}
+                    onChange={e => setSubmitForm({...submitForm, sampleShippingAddress: e.target.value})}
+                    className="w-full p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-fuchsia-500 outline-none text-sm bg-white shadow-sm"
+                    rows={3}
+                    placeholder="〒000-0000 東京都...&#10;株式会社〇〇 ご担当者様名"
+                  />
+                  {defaultDeliveryAddress && submitForm.sampleShippingAddress !== defaultDeliveryAddress && (
+                    <button
+                      type="button"
+                      onClick={() => setSubmitForm(prev => ({ ...prev, sampleShippingAddress: defaultDeliveryAddress }))}
+                      className="mt-1 text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1"
+                    >
+                      <i className="bi bi-arrow-repeat"></i> デフォルト住所を入力
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* 備考 */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 border-b border-slate-100 pb-2">
+                <span className="w-6 h-6 rounded-full bg-slate-800 text-white flex items-center justify-center font-black text-xs">{printingSpec ? '3' : '2'}</span>
                 <h2 className="text-lg font-black text-slate-800">備考・特記事項</h2>
               </div>
               <textarea
@@ -451,6 +811,130 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
       </div>
+
+      {/* ========== 通常モーダル ========== */}
+      {modal && (() => {
+        const s = modalVariantStyles[modal.variant];
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+            {/* バックドロップ */}
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={modal.variant !== 'confirm' ? () => { const cb = modal.onConfirm; closeModal(); cb?.(); } : closeModal}
+            />
+            {/* モーダルカード */}
+            <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+              {/* 上部カラーバー */}
+              <div className={`h-1.5 w-full ${s.bar}`} />
+
+              <div className="p-8">
+                {/* アイコン */}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-5 ${s.icon}`}>
+                  <i className={`bi ${s.iconClass}`} />
+                </div>
+
+                {/* タイトル */}
+                <h3 className="text-xl font-black text-slate-800 text-center mb-3">{modal.title}</h3>
+
+                {/* メッセージ */}
+                <p className="text-sm text-slate-600 text-center leading-relaxed whitespace-pre-line">{modal.message}</p>
+
+                {/* カスタマーセンター電話番号（エラー・警告で電話番号あり） */}
+                {modal.showPhone && supportPhone && (
+                  <div className="mt-5 bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center">
+                    <p className="text-xs text-slate-500 mb-2">解決しない場合はお気軽にご連絡ください</p>
+                    <a
+                      href={`tel:${supportPhone.replace(/[-() ]/g, '')}`}
+                      className="text-fuchsia-600 font-black text-2xl hover:text-fuchsia-700 flex items-center justify-center gap-2 transition-colors"
+                    >
+                      <i className="bi bi-telephone-fill text-xl" />
+                      {supportPhone}
+                    </a>
+                    <p className="text-[10px] text-slate-400 mt-1">カスタマーセンター（受付時間内）</p>
+                  </div>
+                )}
+
+                {/* ボタン */}
+                <div className="mt-6 flex gap-3">
+                  {modal.variant === 'confirm' && (
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors text-sm"
+                    >
+                      キャンセル
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { const cb = modal.onConfirm; closeModal(); cb?.(); }}
+                    className={`flex-1 py-3 font-black text-white rounded-xl transition-colors text-sm ${s.btn}`}
+                  >
+                    {modal.variant === 'confirm' ? '入稿する' : 'OK'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========== 入稿前チェックリストモーダル ========== */}
+      {showChecklist && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowChecklist(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="h-1.5 w-full bg-fuchsia-600" />
+            <div className="p-8">
+              <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-5 bg-fuchsia-100 text-fuchsia-600">
+                <i className="bi bi-clipboard2-check" />
+              </div>
+              <h3 className="text-xl font-black text-slate-800 text-center mb-1">入稿前チェックリスト</h3>
+              <p className="text-xs text-slate-500 text-center mb-6 leading-relaxed">
+                以下の項目を確認してから入稿してください。<br />チェックは任意です。確認なしでも入稿できます。
+              </p>
+
+              <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
+                {checklistItems.map((item) => {
+                  const checked = checkedItems.has(item.id);
+                  const showLiveTextBadge = 'warnIfLiveText' in item && item.warnIfLiveText && (liveTextWarnings.front || liveTextWarnings.back);
+                  return (
+                    <label
+                      key={item.id}
+                      className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all select-none ${checked ? 'bg-fuchsia-50 border-fuchsia-200' : 'bg-slate-50 border-slate-200 hover:border-slate-300'}`}
+                      onClick={() => toggleCheckItem(item.id)}
+                    >
+                      <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 mt-0.5 transition-all ${checked ? 'bg-fuchsia-600 border-fuchsia-600' : 'border-slate-300 bg-white'}`}>
+                        {checked && <i className="bi bi-check text-white text-sm" />}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-700 leading-relaxed">
+                        {showLiveTextBadge && (
+                          <span className="inline-block bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded mr-1.5 leading-tight">⚠ 要確認</span>
+                        )}
+                        {item.text}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+
+              <div className="mt-6 flex gap-3">
+                <button
+                  onClick={() => setShowChecklist(false)}
+                  className="flex-1 py-3 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors text-sm"
+                >
+                  戻る
+                </button>
+                <button
+                  onClick={doSubmitFromChecklist}
+                  className="flex-1 py-3 font-black text-white bg-fuchsia-600 hover:bg-fuchsia-700 rounded-xl transition-colors text-sm flex items-center justify-center gap-2"
+                >
+                  <i className="bi bi-send-fill" /> 確認して入稿する
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

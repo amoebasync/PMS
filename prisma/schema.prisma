@@ -204,7 +204,8 @@ model Bank {
   code      String   @unique @db.VarChar(20)    // 銀行コード (例: 0001)
   name      String   @db.VarChar(100)           // 銀行名 (例: みずほ銀行)
   nameKana  String?  @map("name_kana") @db.VarChar(100)
-  
+  sortOrder Int      @default(100) @map("sort_order")
+
   financials EmployeeFinancial[]
 
   createdAt DateTime @default(now()) @map("created_at")
@@ -280,6 +281,7 @@ model Country {
   code      String   @unique @db.Char(2) // 'JP', 'US' など
   name      String   @db.VarChar(50) // '日本'
   nameEn    String?  @map("name_en") @db.VarChar(50) // 'Japan'
+  sortOrder Int      @default(100) @map("sort_order") // 表示順（小さいほど上位）
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -301,6 +303,15 @@ model Department {
   employees Employee[]
 
   @@map("departments")
+}
+
+// --- システム設定（キー・バリュー形式） ---
+model SystemSetting {
+  key       String   @id @db.VarChar(50)
+  value     String   @db.VarChar(255)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("system_settings")
 }
 
 model Role {
@@ -352,6 +363,7 @@ model Customer {
   salesRepId        Int? @map("sales_rep_id")
   billingCustomerId Int? @map("billing_customer_id")
   parentCustomerId  Int? @map("parent_customer_id")
+  industryId        Int? @map("industry_id")
 
   // 基本情報
   name     String @db.VarChar(100)
@@ -377,6 +389,7 @@ model Customer {
   updatedAt DateTime       @updatedAt @map("updated_at")
   deletedAt DateTime?      @map("deleted_at")
   wantsNewsletter Boolean @default(true)
+  defaultPaymentMethod String? @map("default_payment_method") @db.VarChar(30)
 
   // --- リレーション定義 ---
 
@@ -393,7 +406,10 @@ model Customer {
   //    子顧客 (自己参照: 子)
   childCustomers Customer[] @relation("ParentRelation")
 
-  // 4. 担当者マスタ
+  // 4. 業種
+  industry Industry? @relation(fields: [industryId], references: [id])
+
+  // 5. 担当者マスタ
   contacts CustomerContact[]
 
   // リレーション（この顧客の配布アイテム明細）
@@ -403,6 +419,7 @@ model Customer {
   orders   Order[]
   notifications   Notification[] // ★これを追加
   qrCodes  QrCode[]
+  deliveryAddresses CustomerDeliveryAddress[]
 
   @@map("customers")
 }
@@ -426,9 +443,15 @@ model CustomerContact {
   // 役割フラグ
   isPrimary        Boolean @default(false) @map("is_primary")
   isBillingContact Boolean @default(false) @map("is_billing_contact")
+  notifyOrderStatus Boolean @default(true) @map("notify_order_status")
+  notifyQrScan      Boolean @default(true) @map("notify_qr_scan")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // デフォルト納品先住所
+  defaultDeliveryAddressId Int?                     @map("default_delivery_address_id")
+  defaultDeliveryAddress   CustomerDeliveryAddress?  @relation("ContactDefaultDeliveryAddress", fields: [defaultDeliveryAddressId], references: [id], onDelete: SetNull)
 
   // リレーション
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
@@ -439,6 +462,26 @@ model CustomerContact {
   @@map("customer_contacts")
 }
 
+// --- 顧客納品先住所マスタ (CustomerDeliveryAddresses) ---
+model CustomerDeliveryAddress {
+  id               Int      @id @default(autoincrement())
+  customerId       Int      @map("customer_id")
+  label            String   @db.VarChar(100)  // "本社", "支社A" 等
+  organizationName String?  @map("organization_name") @db.VarChar(100) // 組織名
+  recipientName    String?  @map("recipient_name") @db.VarChar(100)    // 宛先名
+  postalCode       String?  @map("postal_code") @db.VarChar(8)
+  address          String?  @db.VarChar(255)
+  addressBuilding  String?  @map("address_building") @db.VarChar(255)
+  phone            String?  @db.VarChar(20)
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  customer           Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  defaultForContacts CustomerContact[] @relation("ContactDefaultDeliveryAddress")
+
+  @@map("customer_delivery_addresses")
+}
+
 // --- チラシ配布員マスタ (Flyer Distributors) ---
 model FlyerDistributor {
   id       Int     @id @default(autoincrement())
@@ -446,22 +489,31 @@ model FlyerDistributor {
   branch   Branch? @relation(fields: [branchId], references: [id])
   // ▲ ここまで ▲
 
-  // ★ 追加：国籍のリレーション
+  // 国籍
   countryId Int?     @map("country_id")
   country   Country? @relation(fields: [countryId], references: [id])
 
+  // 在留資格
+  visaTypeId Int?      @map("visa_type_id")
+  visaType   VisaType? @relation(fields: [visaTypeId], references: [id])
+
   // 基本情報
-  staffId  String    @unique @map("staff_id") @db.VarChar(20) // スタッフID (MBF1001など)
-  name     String    @db.VarChar(100) // 名前
-  phone    String?   @db.VarChar(20) // 電話番号
-  email    String?   @db.VarChar(100) // メールアドレス
-  birthday DateTime? @db.Date // 誕生日
-  gender   String?   @db.VarChar(10) // 性別 (男性, 女性など)
-  address  String?   @db.Text // 住所
+  staffId      String    @unique @map("staff_id") @db.VarChar(20)
+  name         String    @db.VarChar(100)
+  phone        String?   @db.VarChar(20)
+  email        String?   @db.VarChar(100)
+  birthday     DateTime? @db.Date
+  gender       String?   @db.VarChar(10)
+  postalCode   String?   @map("postal_code") @db.VarChar(8)
+  address      String?   @db.Text
+  buildingName String?   @map("building_name") @db.VarChar(100)
+
+  // 認証
+  passwordHash   String?  @map("password_hash") @db.VarChar(100)
+  isPasswordTemp Boolean  @default(true) @map("is_password_temp") // 初回ログイン時に変更必須
 
   // 在留資格・契約情報
-  visaType              String?   @map("visa_type") @db.VarChar(50) // ビザ (ワーホリ, 特定活動など)
-  visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date // 有効期限
+  visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date
   hasAgreedPersonalInfo Boolean   @default(false) @map("has_agreed_personal_info") // 個人情報同意 (○)
   hasSignedContract     Boolean   @default(false) @map("has_signed_contract") // 業務委託締結 (○)
   hasResidenceCard      Boolean   @default(false) @map("has_residence_card") // 在留カード (○)
@@ -516,6 +568,19 @@ model FlyerDistributor {
   schedules DistributionSchedule[]
 
   @@map("flyer_distributors")
+}
+
+// --- 在留資格マスタ ---
+model VisaType {
+  id        Int                @id @default(autoincrement())
+  name      String             @unique @db.VarChar(100)
+  sortOrder Int                @default(100) @map("sort_order")
+  createdAt DateTime           @default(now()) @map("created_at")
+  updatedAt DateTime           @updatedAt @map("updated_at")
+
+  distributors FlyerDistributor[]
+
+  @@map("visa_types")
 }
 
 // --- 支店マスタ (Branches) ---
@@ -658,7 +723,25 @@ model Industry {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   flyers    Flyer[]
+  customers Customer[]
   @@map("industries")
+}
+
+// --- 配布方法マスター ---
+model DistributionMethod {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique @db.VarChar(100)
+  // 'all' = 軒並み (door_to_door_count)
+  // 'detached' = 戸建限定 (door_to_door_count - multi_family_count)
+  // 'apartment' = 集合住宅限定 (multi_family_count)
+  capacityType String   @default("all") @map("capacity_type") @db.VarChar(20)
+  priceAddon   Float    @default(0.0) @map("price_addon")
+  sortOrder    Int      @default(100) @map("sort_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("distribution_methods")
 }
 
 // --- 折り加工マスター ---
@@ -672,13 +755,13 @@ model FoldingType {
   @@map("folding_types")
 }
 
-// --- 配布期間別価格乗数マスター ---
+// --- 配布期間別単価加算マスター ---
 model DistributionPeriodPrice {
-  id         Int     @id @default(autoincrement())
-  minDays    Int     @map("min_days")
-  maxDays    Int?    @map("max_days")
-  multiplier Float   @default(1.0)
-  label      String? @db.VarChar(50)
+  id           Int     @id @default(autoincrement())
+  minDays      Int     @map("min_days")
+  maxDays      Int?    @map("max_days")
+  priceAddon   Float   @default(0.0) @map("price_addon") // 単価への加算額 (例: 0.5 → +0.5円)
+  label        String? @db.VarChar(50)
 
   @@map("distribution_period_prices")
 }
@@ -923,6 +1006,9 @@ model OrderDistribution {
   method       String    @db.VarChar(50) // 軒並み, 戸建限定 など
   plannedCount Int       @map("planned_count") // 配布予定枚数
 
+  // ★ 1枚あたりの配布単価 (管理者が手動設定)
+  distributionUnitPrice Float? @map("distribution_unit_price")
+
   startDate    DateTime? @map("start_date") @db.Date // 配布開始日
   endDate      DateTime? @map("end_date") @db.Date   // 配布完了期限
   spareDate    DateTime? @map("spare_date") @db.Date // ★ 予備期限 (悪天候時の許容日)
@@ -960,6 +1046,8 @@ model OrderPrinting {
   partner              Partner?  @relation(fields: [partnerId], references: [id]) // 印刷発注先
 
   printCount           Int       @map("print_count") // 印刷枚数
+  // ★ 1枚あたりの印刷単価 (管理者が手動設定)
+  printingUnitPrice    Float?    @map("printing_unit_price")
   paperSizeId          Int?      @map("paper_size_id")
   
   paperType            String?   @map("paper_type") @db.VarChar(50) // コート, マット等

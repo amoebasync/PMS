@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 export async function GET() {
   try {
     const countries = await prisma.country.findMany({
-      orderBy: { name: 'asc' }, // 日本語名で五十音順
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }], // 優先順 → 五十音順
     });
     return NextResponse.json(countries);
   } catch (error) {

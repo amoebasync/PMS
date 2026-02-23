@@ -62,6 +62,10 @@ function PortalOrdersContent() {
   const [editingQrId, setEditingQrId] = useState<number | null>(null);
   const [editQrForm, setEditQrForm] = useState({ redirectUrl: '', memo: '' });
   const [qrOptions, setQrOptions] = useState<Record<number, { transparent: boolean }>>({});
+  // スタンドアロンQR割り当て用 State
+  const [standaloneQrCodes, setStandaloneQrCodes] = useState<any[]>([]);
+  const [isStandaloneQrLoading, setIsStandaloneQrLoading] = useState(false);
+  const [isAssigning, setIsAssigning] = useState<number | null>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -232,6 +236,37 @@ function PortalOrdersContent() {
       setEditingQrId(null);
       fetchQrCodes(flyerId);
     }
+  };
+
+  const fetchStandaloneQrCodes = async () => {
+    setIsStandaloneQrLoading(true);
+    try {
+      const res = await fetch('/api/portal/qrcodes?unlinked=true');
+      if (res.ok) {
+        const data = await res.json();
+        setStandaloneQrCodes(data.qrCodes || []);
+      }
+    } catch (e) { console.error(e); }
+    setIsStandaloneQrLoading(false);
+  };
+
+  const assignQrToFlyer = async (qrId: number, flyerId: number) => {
+    setIsAssigning(qrId);
+    try {
+      const res = await fetch(`/api/portal/qrcodes/${qrId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flyerId }),
+      });
+      if (res.ok) {
+        // スタンドアロン一覧から除外し、チラシ紐付きQR一覧を再取得
+        setStandaloneQrCodes(prev => prev.filter(q => q.id !== qrId));
+        fetchQrCodes(flyerId);
+      } else {
+        alert('割り当てに失敗しました。');
+      }
+    } catch (e) { alert('通信エラーが発生しました。'); }
+    setIsAssigning(null);
   };
 
   if (isLoading) return <div className="p-20 text-center text-slate-500"><div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mx-auto mb-4"></div>データを読み込んでいます...</div>;
@@ -515,6 +550,7 @@ function PortalOrdersContent() {
                   onClick={() => {
                     setModalTab('qr');
                     if (flyerId && qrCodes.length === 0) fetchQrCodes(flyerId);
+                    if (standaloneQrCodes.length === 0) fetchStandaloneQrCodes();
                   }}
                   className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors flex items-center gap-1.5 ${modalTab === 'qr' ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'}`}
                 >
@@ -673,6 +709,52 @@ function PortalOrdersContent() {
 
                     {/* 右側: 発行済みQRコード一覧 */}
                     <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+
+                      {/* スタンドアロンQR割り当てセクション */}
+                      {flyerId && (
+                        <div className="mb-5 bg-fuchsia-50 border border-fuchsia-200 rounded-xl p-4">
+                          <h4 className="font-bold text-fuchsia-800 mb-3 flex items-center gap-2 text-sm">
+                            <i className="bi bi-link-45deg text-fuchsia-500"></i> 既存のスタンドアロンQRをこのチラシに割り当て
+                          </h4>
+                          {isStandaloneQrLoading ? (
+                            <div className="text-center py-3 text-slate-400 text-xs flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-slate-200 border-t-slate-400 rounded-full animate-spin"></div>
+                              読み込み中...
+                            </div>
+                          ) : standaloneQrCodes.length === 0 ? (
+                            <p className="text-[11px] text-fuchsia-600 text-center py-1">割り当て可能なスタンドアロンQRコードがありません</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {standaloneQrCodes.map(qr => (
+                                <div key={qr.id} className="flex items-center gap-3 bg-white border border-fuchsia-100 rounded-lg px-3 py-2.5 shadow-sm">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-bold text-slate-800 text-sm truncate">
+                                      {qr.memo || <span className="text-slate-400 font-normal">(メモなし)</span>}
+                                    </div>
+                                    <div className="font-mono text-[10px] text-slate-400 truncate mt-0.5">/q/{qr.alias}</div>
+                                    <div className="text-[11px] text-slate-500 mt-1">
+                                      <i className="bi bi-calendar3 mr-1"></i>
+                                      作成日：{new Date(qr.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => assignQrToFlyer(qr.id, flyerId)}
+                                    disabled={isAssigning === qr.id}
+                                    className="shrink-0 px-3 py-1.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white text-[11px] font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                                  >
+                                    {isAssigning === qr.id ? (
+                                      <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    ) : (
+                                      <><i className="bi bi-link-45deg"></i> 割り当て</>
+                                    )}
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {isQrLoading ? (
                         <div className="flex items-center justify-center h-40 text-slate-400">
                           <div className="w-6 h-6 border-2 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mr-2"></div>

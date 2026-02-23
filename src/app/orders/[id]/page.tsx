@@ -151,11 +151,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   });
 
   const [distForm, setDistForm] = useState({
-    id: '', flyerId: '', method: '軒並み配布', plannedCount: '', startDate: '', endDate: '', spareDate: '', status: 'UNSTARTED', remarks: ''
+    id: '', flyerId: '', method: '軒並み配布', plannedCount: '', distributionUnitPrice: '', startDate: '', endDate: '', spareDate: '', status: 'UNSTARTED', remarks: ''
   });
 
   const [printForm, setPrintForm] = useState({
-    id: '', flyerId: '', partnerId: '', printCount: '', paperType: 'コート紙', paperWeight: '90kg', colorType: '両面カラー', orderDate: '', expectedDeliveryDate: '', status: 'UNORDERED'
+    id: '', flyerId: '', partnerId: '', printCount: '', printingUnitPrice: '', paperType: 'コート紙', paperWeight: '90kg', colorType: '両面カラー', orderDate: '', expectedDeliveryDate: '', status: 'UNORDERED'
   });
 
   const [newsForm, setNewsForm] = useState({
@@ -259,6 +259,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               const dist = order.distributions[0];
               setDistForm({
                 id: dist.id?.toString() || '', flyerId: dist.flyerId?.toString() || '', method: dist.method, plannedCount: dist.plannedCount?.toString() || '',
+                distributionUnitPrice: dist.distributionUnitPrice != null ? dist.distributionUnitPrice.toString() : '',
                 startDate: dist.startDate ? dist.startDate.split('T')[0] : '', endDate: dist.endDate ? dist.endDate.split('T')[0] : '',
                 spareDate: dist.spareDate ? dist.spareDate.split('T')[0] : '', status: dist.status || 'UNSTARTED', remarks: dist.remarks || ''
               });
@@ -284,7 +285,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               const pr = order.printings[0];
               setPrintForm({
                 id: pr.id?.toString() || '', flyerId: pr.flyerId?.toString() || '', partnerId: pr.partnerId?.toString() || '',
-                printCount: pr.printCount?.toString() || '', paperType: pr.paperType || '', paperWeight: pr.paperWeight || '', colorType: pr.colorType || '',
+                printCount: pr.printCount?.toString() || '', printingUnitPrice: pr.printingUnitPrice != null ? pr.printingUnitPrice.toString() : '',
+                paperType: pr.paperType || '', paperWeight: pr.paperWeight || '', colorType: pr.colorType || '',
                 orderDate: pr.orderDate ? pr.orderDate.split('T')[0] : '', expectedDeliveryDate: pr.expectedDeliveryDate ? pr.expectedDeliveryDate.split('T')[0] : '', status: pr.status || 'UNORDERED'
               });
             }
@@ -744,6 +746,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </select>
                 </div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">配布予定枚数 *</label><input type="number" required value={distForm.plannedCount} onChange={e => setDistForm({...distForm, plannedCount: e.target.value})} className="w-full border p-2.5 rounded-lg text-lg font-bold text-indigo-600 text-right pr-4" placeholder="10000" /></div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">
+                    配布単価 (円/枚)
+                    <span className="ml-1 text-slate-400 font-normal">※空欄の場合はシステム自動計算</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={distForm.distributionUnitPrice}
+                      onChange={e => setDistForm({...distForm, distributionUnitPrice: e.target.value})}
+                      className="w-full border p-2.5 rounded-lg text-sm font-bold text-emerald-700 bg-emerald-50 focus:ring-2 focus:ring-emerald-500 outline-none text-right pr-10"
+                      placeholder="例: 5.50"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">円/枚</span>
+                  </div>
+                  {distForm.distributionUnitPrice && distForm.plannedCount && (
+                    <p className="text-[10px] text-emerald-600 font-bold mt-1 text-right">
+                      配布代計: ¥{(parseFloat(distForm.distributionUnitPrice) * parseInt(distForm.plannedCount)).toLocaleString()}
+                    </p>
+                  )}
+                </div>
                 <div><label className="text-xs font-bold text-slate-600 block mb-1">配布開始日</label><input type="date" value={distForm.startDate} onChange={e => setDistForm({...distForm, startDate: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" /></div>
                 <div className="flex gap-2">
                   <div className="flex-1"><label className="text-xs font-bold text-slate-600 block mb-1">完了期限日 *</label><input type="date" required value={distForm.endDate} onChange={e => setDistForm({...distForm, endDate: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" /></div>
@@ -784,7 +809,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 ) : (
                   <GoogleMap mapContainerStyle={mapContainerStyle} center={mapCenter} zoom={mapZoom} options={{ mapTypeControl: false, streetViewControl: false }} onLoad={map => setMapRef(map)} onIdle={handleMapIdle} onZoomChanged={() => { if(mapRef) setCurrentZoom(mapRef.getZoom() || 14) }}>
                     {searchMarker && <Marker position={searchMarker} />}
-                    {searchMarker && radiusKm !== 'ALL' && <Circle center={searchMarker} radius={Number(radiusKm) * 1000} options={{ fillColor: '#10b981', fillOpacity: 0.1, strokeColor: '#059669', strokeWeight: 2, borderStyle: 'dashed', clickable: false }} />}
+                    {searchMarker && radiusKm !== 'ALL' && <Circle center={searchMarker} radius={Number(radiusKm) * 1000} options={{ fillColor: '#10b981', fillOpacity: 0.1, strokeColor: '#059669', strokeWeight: 2, strokeOpacity: 0.6, clickable: false }} />}
                     {mapAreas.map(area => <MemoizedArea key={area.id} area={area} isSelected={selectedAreaIds.has(area.id)} currentZoom={currentZoom} onClick={toggleAreaSelection} />)}
                   </GoogleMap>
                 )}
@@ -873,6 +898,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
               
               <div><label className="text-xs font-bold text-slate-600 block mb-1">印刷枚数 *</label><input type="number" value={printForm.printCount} onChange={e => setPrintForm({...printForm, printCount: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm" placeholder="例: 20000" /></div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">
+                  印刷単価 (円/枚)
+                  <span className="ml-1 text-slate-400 font-normal">※空欄の場合はシステム自動計算</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={printForm.printingUnitPrice}
+                    onChange={e => setPrintForm({...printForm, printingUnitPrice: e.target.value})}
+                    className="w-full border p-2.5 rounded-lg text-sm font-bold text-blue-700 bg-blue-50 focus:ring-2 focus:ring-blue-500 outline-none text-right pr-10"
+                    placeholder="例: 3.50"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">円/枚</span>
+                </div>
+                {printForm.printingUnitPrice && printForm.printCount && (
+                  <p className="text-[10px] text-blue-600 font-bold mt-1 text-right">
+                    印刷代計: ¥{(parseFloat(printForm.printingUnitPrice) * parseInt(printForm.printCount)).toLocaleString()}
+                  </p>
+                )}
+              </div>
               <div>
                 <label className="text-xs font-bold text-slate-600 block mb-1">用紙種類</label>
                 <select value={printForm.paperType} onChange={e => setPrintForm({...printForm, paperType: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white">

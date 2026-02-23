@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -7,24 +8,42 @@ const parseDate = (d: any) => d ? new Date(d) : null;
 const parseFloatSafe = (n: any) => n ? parseFloat(n) : null;
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
+function buildInitialPassword(birthday: string | null | undefined): string | null {
+  if (!birthday) return null;
+  const d = new Date(birthday);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
+}
+
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await request.json();
+
+    // パスワードリセット（誕生日に戻す）が要求された場合
+    const passwordData = body.resetPassword
+      ? { passwordHash: buildInitialPassword(body.birthday), isPasswordTemp: true }
+      : {};
 
     const updated = await prisma.flyerDistributor.update({
       where: { id: parseInt(id) },
       data: {
         branchId: parseIntSafe(body.branchId),
         countryId: parseIntSafe(body.countryId),
+        visaTypeId: parseIntSafe(body.visaTypeId),
         staffId: body.staffId,
         name: body.name,
         phone: body.phone,
         email: body.email,
         birthday: parseDate(body.birthday),
         gender: body.gender,
+        postalCode: body.postalCode,
         address: body.address,
-        visaType: body.visaType,
+        buildingName: body.buildingName,
+        ...passwordData,
         visaExpiryDate: parseDate(body.visaExpiryDate),
         hasAgreedPersonalInfo: Boolean(body.hasAgreedPersonalInfo),
         hasSignedContract: Boolean(body.hasSignedContract),

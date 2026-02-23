@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       maxAge: 60 * 60 * 24 * 30 // 30日間有効
     });
 
-    return NextResponse.json({ success: true, user: { name: contact.name, company: contact.customer.name } });
+    return NextResponse.json({ success: true, user: { name: `${contact.lastName} ${contact.firstName}`, company: contact.customer.name } });
 
   } catch (error) {
     console.error('Portal Login API Error:', error);

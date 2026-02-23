@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { handlePhoneChange } from '@/lib/formatters';
 
 // --- 型定義 ---
 type Department = { id: number; code: string; name: string };
@@ -759,7 +760,7 @@ export default function EmployeePage() {
                     <label className={labelClass}>電話番号</label>
                     <div className="relative">
                       <i className="bi bi-telephone absolute left-3 top-3 text-slate-400"></i>
-                      <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className={`${inputClass} pl-9`} placeholder="090-1234-5678" />
+                      <input type="tel" name="phone" value={formData.phone} onChange={e => handlePhoneChange(e.target.value, v => setFormData(prev => ({ ...prev, phone: v })))} className={`${inputClass} pl-9`} placeholder="090-1234-5678" maxLength={13} />
                     </div>
                   </div>
                 </div>

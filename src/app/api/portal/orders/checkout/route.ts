@@ -71,7 +71,8 @@ export async function POST(request: Request) {
             orderDate: new Date(),
             totalAmount: orderTotalAmount,
             status: initialStatus as any,
-            remarks: isDraft ? 'カートからの下書き保存' : 'ECサイトからの発注',
+            remarks: isDraft ? 'カートからの下書き保存' :
+              (!isPrintAndPosting && item.foldingTypeName ? `ECサイトからの発注 (折り加工: ${item.foldingTypeName})` : 'ECサイトからの発注'),
           }
         });
 
@@ -95,13 +96,13 @@ export async function POST(request: Request) {
           const flyerSize = await tx.flyerSize.findUnique({ where: { name: item.size } });
           const newFlyer = await tx.flyer.create({
             data: {
-              name: `(未入稿) ${pName} 用`,
+              name: item.flyerName || `(未入稿) ${pName} 用`,
               customerId,
-              industryId: defaultIndustry?.id || 1,
+              industryId: item.industryId || defaultIndustry?.id || 1,
               sizeId: flyerSize?.id || 1,
               startDate: item.startDate ? new Date(item.startDate) : null,
               endDate: item.endDate ? new Date(item.endDate) : null,
-              foldStatus: 'NO_FOLDING_REQUIRED',
+              foldStatus: item.foldingTypeId ? 'NEEDS_FOLDING' : (item.foldStatus || 'NO_FOLDING_REQUIRED'),
             }
           });
           targetFlyerId = newFlyer.id;

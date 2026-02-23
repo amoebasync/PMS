@@ -35,11 +35,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       });
 
       // 入稿データのみ更新（印刷仕様はチェックアウト時に確定済み）
-      const printData = {
+      const printData: Record<string, unknown> = {
         frontDesignUrl: body.frontDesignUrl || null,
         backDesignUrl: body.backDesignUrl || null,
-        remarks: body.remarks || null
+        remarks: body.remarks || null,
       };
+      // サンプル送付情報
+      if (body.sampleRequired !== undefined) {
+        printData.sampleRequired = !!body.sampleRequired;
+      }
+      if (body.sampleShippingAddress !== undefined) {
+        printData.sampleShippingAddress = body.sampleShippingAddress || null;
+      }
 
       const existingPrinting = await tx.orderPrinting.findFirst({ where: { orderId } });
       if (existingPrinting) {

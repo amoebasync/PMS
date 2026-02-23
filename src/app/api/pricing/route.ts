@@ -15,14 +15,15 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [flyerSizes, areaRanks, foldingTypes, periodPrices] = await Promise.all([
+  const [flyerSizes, areaRanks, foldingTypes, periodPrices, distributionMethods] = await Promise.all([
     prisma.flyerSize.findMany({ orderBy: { id: 'asc' } }),
     prisma.areaRank.findMany({ orderBy: { name: 'asc' } }),
     prisma.foldingType.findMany({ orderBy: { sortOrder: 'asc' } }),
     prisma.distributionPeriodPrice.findMany({ orderBy: { minDays: 'asc' } }),
+    prisma.distributionMethod.findMany({ orderBy: { sortOrder: 'asc' } }),
   ]);
 
-  return NextResponse.json({ flyerSizes, areaRanks, foldingTypes, periodPrices });
+  return NextResponse.json({ flyerSizes, areaRanks, foldingTypes, periodPrices, distributionMethods });
 }
 
 export async function POST(request: Request) {
@@ -57,9 +58,19 @@ export async function POST(request: Request) {
         data: {
           minDays: parseInt(data.minDays),
           maxDays: data.maxDays ? parseInt(data.maxDays) : null,
-          multiplier: parseFloat(data.multiplier),
+          priceAddon: parseFloat(data.multiplier ?? data.priceAddon ?? 0),
           label: data.label || null,
         }
+      });
+    } else if (type === 'distributionMethod') {
+      result = await prisma.distributionMethod.create({
+        data: {
+          name: data.name,
+          capacityType: data.capacityType || 'all',
+          priceAddon: parseFloat(data.priceAddon ?? 0),
+          sortOrder: parseInt(data.sortOrder ?? 100),
+          isActive: data.isActive !== false,
+        },
       });
     } else {
       return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
@@ -106,7 +117,7 @@ export async function PUT(request: Request) {
         data: {
           minDays: parseInt(data.minDays),
           maxDays: data.maxDays ? parseInt(data.maxDays) : null,
-          multiplier: parseFloat(data.multiplier),
+          priceAddon: parseFloat(data.multiplier ?? data.priceAddon ?? 0),
           label: data.label || null,
         }
       });
@@ -117,6 +128,17 @@ export async function PUT(request: Request) {
           printUnitPrice: parseFloat(data.printUnitPrice),
           basePriceAddon: parseFloat(data.basePriceAddon ?? 0),
         }
+      });
+    } else if (type === 'distributionMethod') {
+      result = await prisma.distributionMethod.update({
+        where: { id: parseInt(id) },
+        data: {
+          name: data.name,
+          capacityType: data.capacityType || 'all',
+          priceAddon: parseFloat(data.priceAddon ?? 0),
+          sortOrder: parseInt(data.sortOrder ?? 100),
+          isActive: data.isActive !== false,
+        },
       });
     } else {
       return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
@@ -144,6 +166,8 @@ export async function DELETE(request: Request) {
       await prisma.areaRank.delete({ where: { id } });
     } else if (type === 'periodPrice') {
       await prisma.distributionPeriodPrice.delete({ where: { id } });
+    } else if (type === 'distributionMethod') {
+      await prisma.distributionMethod.delete({ where: { id } });
     } else {
       return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
     }

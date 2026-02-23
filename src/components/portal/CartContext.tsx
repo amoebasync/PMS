@@ -26,6 +26,9 @@ export type CartItem = {
   paperWeight?: string;
   colorType?: string;
   printCount?: number;
+  flyerName?: string;
+  industryId?: number;
+  foldStatus?: string;
 };
 
 type CartContextType = {

@@ -9,9 +9,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params;
     const flyerId = parseInt(id, 10);
 
-    const deliveries = await prisma.flyerDelivery.findMany({
-      where: { flyerId: flyerId },
-      orderBy: { expectedAt: 'desc' } // 新しい順に並べる
+    const deliveries = await prisma.flyerTransaction.findMany({
+      where: { flyerId: flyerId, transactionType: 'RECEIVE' },
+      orderBy: { expectedAt: 'desc' },
     });
 
     return NextResponse.json(deliveries);
@@ -36,11 +36,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // ★ トランザクション：履歴の作成と、親(Flyer)の在庫更新を同時に行う（途中でエラーが出たら両方キャンセルされる安全な仕組み）
     const result = await prisma.$transaction(async (tx) => {
       // 1. 納品履歴を作成
-      const delivery = await tx.flyerDelivery.create({
+      const delivery = await tx.flyerTransaction.create({
         data: {
           flyerId: flyerId,
+          transactionType: 'RECEIVE',
           expectedAt: new Date(body.expectedAt),
-          actualAt: body.status === 'COMPLETED' ? new Date() : null, // 完了なら実績日時に「今」を入れる
+          actualAt: body.status === 'COMPLETED' ? new Date() : null,
           count: count,
           status: body.status,
           note: body.note || null,

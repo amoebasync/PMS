@@ -34,6 +34,7 @@ export default function PortalMyPage() {
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [defaultDeliveryAddress, setDefaultDeliveryAddress] = useState('');
 
   const [submitForm, setSubmitForm] = useState({
     designFileUrl: '',
@@ -67,6 +68,31 @@ export default function PortalMyPage() {
   };
 
   useEffect(() => { fetchData(); }, [router]);
+
+  // デフォルト納品先住所を取得
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/portal/settings/delivery-addresses');
+        if (res.ok) {
+          const data = await res.json();
+          const defaultId = data.myDefaultDeliveryAddressId;
+          if (defaultId && data.addresses) {
+            const addr = data.addresses.find((a: any) => a.id === defaultId);
+            if (addr) {
+              const parts = [
+                addr.postalCode ? `〒${addr.postalCode}` : '',
+                addr.address || '',
+                addr.addressBuilding || '',
+                addr.phone ? `TEL: ${addr.phone}` : '',
+              ].filter(Boolean);
+              setDefaultDeliveryAddress(parts.join('\n'));
+            }
+          }
+        }
+      } catch (e) { console.error(e); }
+    })();
+  }, []);
 
   const openSubmitModal = (order: any) => {
     setActiveOrderId(order.id);
@@ -340,7 +366,14 @@ export default function PortalMyPage() {
                   <div>
                     <label className="flex items-start gap-3 cursor-pointer group">
                       <div className="relative flex items-center justify-center mt-0.5">
-                        <input type="checkbox" className="peer w-5 h-5 appearance-none border-2 border-slate-300 rounded focus:ring-2 focus:ring-fuchsia-500 checked:bg-fuchsia-600 checked:border-fuchsia-600 transition-colors" checked={submitForm.sampleRequired} onChange={e => setSubmitForm({...submitForm, sampleRequired: e.target.checked})} />
+                        <input type="checkbox" className="peer w-5 h-5 appearance-none border-2 border-slate-300 rounded focus:ring-2 focus:ring-fuchsia-500 checked:bg-fuchsia-600 checked:border-fuchsia-600 transition-colors" checked={submitForm.sampleRequired} onChange={e => {
+                          const checked = e.target.checked;
+                          setSubmitForm(prev => ({
+                            ...prev,
+                            sampleRequired: checked,
+                            sampleShippingAddress: checked && !prev.sampleShippingAddress && defaultDeliveryAddress ? defaultDeliveryAddress : prev.sampleShippingAddress,
+                          }));
+                        }} />
                         <i className="bi bi-check text-white absolute pointer-events-none opacity-0 peer-checked:opacity-100 text-lg"></i>
                       </div>
                       <div>

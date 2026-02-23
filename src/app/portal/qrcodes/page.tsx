@@ -18,6 +18,7 @@ export default function QrCodesPage() {
 
   const [createForm, setCreateForm] = useState({ redirectUrl: '', memo: '' });
   const [editForm, setEditForm] = useState({ redirectUrl: '', memo: '', isActive: true });
+  const [qrTransparent, setQrTransparent] = useState<Record<number, boolean>>({});
 
   useEffect(() => {
     if (status === 'unauthenticated') router.push('/portal/login');
@@ -87,15 +88,24 @@ export default function QrCodesPage() {
 
   const handleDownloadQr = async (qr: any, format: 'png' | 'svg') => {
     const qrUrl = `${window.location.origin}/q/${qr.alias}`;
+    const transparent = qrTransparent[qr.id] || false;
     try {
       if (format === 'png') {
-        const dataUrl = await QRCode.toDataURL(qrUrl, { width: 512, margin: 2 });
+        const dataUrl = await QRCode.toDataURL(qrUrl, {
+          width: 512,
+          margin: 2,
+          color: { light: transparent ? '#00000000' : '#ffffff' },
+        });
         const link = document.createElement('a');
         link.href = dataUrl;
         link.download = `qr-${qr.alias}.png`;
         link.click();
       } else {
-        const svgString = await QRCode.toString(qrUrl, { type: 'svg', margin: 2 });
+        const svgString = await QRCode.toString(qrUrl, {
+          type: 'svg',
+          margin: 2,
+          color: { light: transparent ? '#00000000' : '#ffffff' },
+        });
         const blob = new Blob([svgString], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -200,6 +210,15 @@ export default function QrCodesPage() {
 
                   {/* アクション */}
                   <div className="flex flex-col gap-2 shrink-0">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-xs text-slate-500 hover:text-indigo-600 transition-colors justify-end">
+                      <input
+                        type="checkbox"
+                        checked={qrTransparent[qr.id] || false}
+                        onChange={e => setQrTransparent(prev => ({ ...prev, [qr.id]: e.target.checked }))}
+                        className="accent-indigo-600 w-3.5 h-3.5"
+                      />
+                      背景透過
+                    </label>
                     <div className="flex gap-2">
                       <button onClick={() => handleDownloadQr(qr, 'png')} className="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors">
                         <i className="bi bi-download"></i> PNG

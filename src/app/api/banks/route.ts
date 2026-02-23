@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 export async function GET() {
   try {
     const banks = await prisma.bank.findMany({
-      orderBy: { code: 'asc' }
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return NextResponse.json(banks);
   } catch (error) {

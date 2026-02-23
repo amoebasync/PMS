@@ -123,10 +123,18 @@ function NewOrderContent() {
   const [projectName, setProjectName] = useState('');
   const [orderType, setOrderType] = useState<'POSTING_ONLY' | 'PRINT_AND_POSTING'>('PRINT_AND_POSTING');
   const [size, setSize] = useState('A4');
-  const [method, setMethod] = useState('軒並み配布');
+  const [method, setMethod] = useState(''); // DB取得後に初期値セット
   const [plannedCount, setPlannedCount] = useState<number | ''>('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 3);
+    return d.toISOString().split('T')[0];
+  });
+  const [endDate, setEndDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 10); // 3日後から7日間
+    return d.toISOString().split('T')[0];
+  });
   const [spareDate, setSpareDate] = useState('');
 
   // 印刷仕様
@@ -142,14 +150,21 @@ function NewOrderContent() {
     foldingTypes: any[];
     areaRanks: any[];
     periodPrices: any[];
-  }>({ flyerSizes: [], foldingTypes: [], areaRanks: [], periodPrices: [] });
+    distributionMethods: any[];
+  }>({ flyerSizes: [], foldingTypes: [], areaRanks: [], periodPrices: [], distributionMethods: [] });
 
   useEffect(() => {
     fetch('/api/portal/pricing')
       .then(r => r.json())
-      .then(d => setPricingData(d))
+      .then(d => {
+        setPricingData(d);
+        // 初回ロード時にデフォルト配布方法をセット
+        if (d.distributionMethods?.length > 0 && !method) {
+          setMethod(d.distributionMethods[0].name);
+        }
+      })
       .catch(e => console.error('Pricing fetch error:', e));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const minStartDate = useMemo(() => {
     const d = new Date();
@@ -381,48 +396,81 @@ function NewOrderContent() {
     });
   }, []);
 
+  const selectedMethodObj = pricingData.distributionMethods.find(m => m.name === method) ?? null;
+  const methodCapacityType = selectedMethodObj?.capacityType ?? 'all';
+  const methodPriceAddon = selectedMethodObj?.priceAddon ?? 0;
+
   const getCapacity = (a: any) => {
     const doorCount = a.door_to_door_count || 0;
     const multiCount = a.multi_family_count || 0;
-    if (method === '集合住宅限定') return multiCount;
-    if (method === '戸建限定') return Math.floor(Math.max(0, doorCount - multiCount) * 0.5);
+    if (methodCapacityType === 'apartment') return multiCount;
+    if (methodCapacityType === 'detached') return Math.floor(Math.max(0, doorCount - multiCount) * 0.5);
     return doorCount;
   };
 
   const selectedAreasList = useMemo(() => mapAreas.filter(a => selectedAreaIds.has(a.id)), [mapAreas, selectedAreaIds]);
-  const totalAreaCapacity = useMemo(() => selectedAreasList.reduce((sum, a) => sum + getCapacity(a), 0), [selectedAreasList, method]);
+  const totalAreaCapacity = useMemo(() => selectedAreasList.reduce((sum, a) => sum + getCapacity(a), 0), [selectedAreasList, methodCapacityType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pCount = typeof plannedCount === 'number' ? plannedCount : 0;
+  // 希望配布枚数未入力の場合はエリア合計世帯数を使って金額計算
+  const effectiveCount = pCount > 0 ? pCount : totalAreaCapacity;
   const isCapacityEnough = pCount > 0 && totalAreaCapacity >= pCount;
 
   // 動的価格計算
   const selectedFolding = pricingData.foldingTypes.find(f => f.id === foldingTypeId);
   const selectedSize = pricingData.flyerSizes.find(s => s.name === size);
 
-  // 配布単価（エリアランクは未設定のためデフォルト5.0）
-  const postingUnitPrice = 5.0;
+  // エリアランクの加重平均単価（選択エリアのキャパシティで按分）
+  const areaRankUnitPrice = useMemo(() => {
+    if (selectedAreasList.length === 0) return 5.0;
+    const totalCap = selectedAreasList.reduce((sum, a) => sum + getCapacity(a), 0);
+    if (totalCap === 0) return 5.0;
+    const weighted = selectedAreasList.reduce((sum, a) => {
+      const cap = getCapacity(a);
+      const rankPrice = a.areaRank?.postingUnitPrice ?? 5.0;
+      return sum + cap * rankPrice;
+    }, 0);
+    return weighted / totalCap;
+  }, [selectedAreasList, methodCapacityType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 配布期間乗数
-  const periodMultiplier = useMemo(() => {
-    if (!startDate || !endDate || pricingData.periodPrices.length === 0) return 1.0;
+  // チラシサイズによる単価加算
+  const sizeAddon = selectedSize?.basePriceAddon ?? 0;
+
+  // 配布期間による単価加算
+  const periodAddon = useMemo(() => {
+    if (!startDate || !endDate || pricingData.periodPrices.length === 0) return 0;
     const start = new Date(startDate);
     const end = new Date(endDate);
-    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const match = pricingData.periodPrices.find(p =>
+    // 開始日・終了日両方を含む日数 (例: 3/1〜3/7 = 7日間)
+    const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const match = pricingData.periodPrices.find((p: any) =>
       days >= p.minDays && (p.maxDays === null || days <= p.maxDays)
     );
-    return match ? match.multiplier : 1.0;
+    return match ? (match.priceAddon ?? 0) : 0;
   }, [startDate, endDate, pricingData.periodPrices]);
+
+  // 配布期間の日数（表示用）
+  const distributionDays = useMemo(() => {
+    if (!startDate || !endDate) return 0;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  }, [startDate, endDate]);
+
+  // 実際の配布単価 = エリアランク単価 + サイズ加算 + 期間加算 + 配布方法加算
+  const postingUnitPrice = areaRankUnitPrice + sizeAddon + periodAddon + methodPriceAddon;
 
   // 印刷単価
   const printUnitPricePerSheet = selectedSize
-    ? (selectedSize.printUnitPrice + (selectedSize.basePriceAddon || 0) + (selectedFolding?.unitPrice || 0))
+    ? (selectedSize.printUnitPrice + (selectedFolding?.unitPrice || 0))
     : (3.0 + (selectedFolding?.unitPrice || 0));
 
-  // 配布合計
-  const totalPosting = pCount * postingUnitPrice * periodMultiplier;
-  // 印刷合計
-  const pPrintCount = typeof printCount === 'number' ? printCount : pCount;
+  // 配布合計 = min(選択エリア合計世帯数, 希望配布枚数) × 配布単価
+  // エリア未選択または希望枚数未入力の場合は 0
+  const billingCount = totalAreaCapacity > 0 ? Math.min(totalAreaCapacity, effectiveCount) : 0;
+  const totalPosting = billingCount * postingUnitPrice;
+  // 印刷合計（希望配布枚数ベース）
+  const pPrintCount = typeof printCount === 'number' ? printCount : effectiveCount;
   const totalPrint = orderType === 'PRINT_AND_POSTING' ? pPrintCount * printUnitPricePerSheet : 0;
   const totalPrice = Math.floor(totalPosting + totalPrint);
 
@@ -453,8 +501,13 @@ function NewOrderContent() {
         cityName: a.city?.name
       })),
       totalCount: pCount,
+      billingCount,
       method, size, price: totalPrice,
       unitPrice: postingUnitPrice,
+      areaRankUnitPrice,
+      sizeAddon,
+      periodAddon,
+      methodPriceAddon,
       startDate, endDate, spareDate,
       projectName,
       // 印刷仕様
@@ -545,7 +598,11 @@ function NewOrderContent() {
                 <div>
                   <label className="text-[10px] font-bold text-slate-500 block mb-1">配布方法</label>
                   <select value={method} onChange={e => setMethod(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
-                    <option value="軒並み配布">軒並配布</option><option value="戸建限定">戸建限定</option><option value="集合住宅限定">集合限定</option>
+                    {pricingData.distributionMethods.map(m => (
+                      <option key={m.id} value={m.name}>
+                        {m.name}{m.priceAddon > 0 ? ` (+¥${m.priceAddon.toFixed(2)})` : ''}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -629,17 +686,18 @@ function NewOrderContent() {
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">開始予定日 <span className="text-rose-500">*</span></label>
                 <input type="date" required value={startDate} min={minStartDate} onChange={handleStartDateChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700" />
               </div>
-              <div className="flex justify-center text-slate-300">
-                <i className="bi bi-arrow-down"></i>
-              </div>
               <div>
                 <label className="text-[10px] font-bold text-slate-500 block mb-1">完了期限日 <span className="text-rose-500">*</span></label>
                 <input type="date" required value={endDate} min={minEndDate} onChange={handleEndDateChange} className="w-full border border-indigo-300 p-2.5 rounded-lg text-sm bg-indigo-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-indigo-700" />
               </div>
-              {periodMultiplier > 1.0 && (
-                <div className="text-[10px] text-amber-600 font-bold bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+              {startDate && endDate && (
+                <div className={`text-[10px] font-bold px-3 py-2 rounded-lg border ${periodAddon > 0 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-slate-500 bg-slate-50 border-slate-200'}`}>
                   <i className="bi bi-clock-fill mr-1"></i>
-                  期間乗数: ×{periodMultiplier.toFixed(2)} が適用されます
+                  配布期間: {distributionDays}日間
+                  {periodAddon > 0
+                    ? <span className="ml-2 text-amber-700">→ 単価に +¥{periodAddon.toFixed(2)}/枚 が加算されます</span>
+                    : <span className="ml-2 text-slate-400">→ 期間加算なし</span>
+                  }
                 </div>
               )}
               <div className="pt-3 border-t border-slate-200 border-dashed">
@@ -812,10 +870,27 @@ function NewOrderContent() {
                 </div>
               )}
 
-              {orderType === 'PRINT_AND_POSTING' && pCount > 0 && (
+              {billingCount > 0 && (
                 <div className="text-[10px] text-slate-500 mb-2 space-y-0.5">
-                  <div className="flex justify-between"><span>配布費</span><span>¥{Math.floor(totalPosting).toLocaleString()}</span></div>
-                  <div className="flex justify-between"><span>印刷費</span><span>¥{Math.floor(totalPrint).toLocaleString()}</span></div>
+                  <div className="flex justify-between">
+                    <span className="flex items-center gap-1 flex-wrap">
+                      配布費
+                      <span className="text-slate-400">
+                        ({billingCount.toLocaleString()}枚 × ¥{postingUnitPrice.toFixed(2)}
+                        {sizeAddon > 0 && <span> +サイズ:{sizeAddon.toFixed(2)}</span>}
+                        {periodAddon > 0 && <span className="text-amber-500"> +期間:{periodAddon.toFixed(2)}</span>}
+                        {methodPriceAddon > 0 && <span className="text-violet-500"> +方法:{methodPriceAddon.toFixed(2)}</span>}
+                        )
+                      </span>
+                    </span>
+                    <span>¥{Math.floor(totalPosting).toLocaleString()}</span>
+                  </div>
+                  {orderType === 'PRINT_AND_POSTING' && effectiveCount > 0 && (
+                    <div className="flex justify-between">
+                      <span>印刷費 <span className="text-slate-400">({pPrintCount.toLocaleString()}枚 × ¥{printUnitPricePerSheet.toFixed(2)})</span></span>
+                      <span>¥{Math.floor(totalPrint).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
               )}
 
