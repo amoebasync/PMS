@@ -7,13 +7,15 @@ import { useState } from 'react';
 export default function LayoutWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   
-  // ★ 変更: ログイン画面に加えて、ポータル画面の場合もサイドバーを隠す
+  // ログイン画面・ポータル画面・配布員ポータルはサイドバーを隠す
   const isAuthPage = pathname === '/login';
   const isPortalPage = pathname.startsWith('/portal');
-  
+  const isDistributorPage = pathname.startsWith('/staff');
+  const isAppPrivacyPage = pathname.startsWith('/app-privacy');
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
-  if (isAuthPage || isPortalPage) {
+  if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage) {
     return (
       <main className={`w-full min-h-screen m-0 p-0 ${isAuthPage ? 'bg-[#0f172a]' : ''}`}>
         {children}

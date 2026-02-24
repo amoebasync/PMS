@@ -36,6 +36,7 @@ export async function PUT(request: Request) {
     if (body.targetSlotIndex !== undefined) data.slotIndex = parseInt(body.targetSlotIndex);
     // ★ 追加: 手配枚数を変更できるようにする
     if (body.plannedCount !== undefined) data.plannedCount = parseInt(body.plannedCount);
+    if (body.actualCount !== undefined) data.actualCount = body.actualCount === null ? null : parseInt(body.actualCount);
 
     const updated = await prisma.distributionItem.update({
       where: { id: parseInt(body.itemId) },

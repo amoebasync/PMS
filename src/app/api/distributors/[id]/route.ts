@@ -18,6 +18,22 @@ function buildInitialPassword(birthday: string | null | undefined): string | nul
   return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
 }
 
+export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const distributor = await prisma.flyerDistributor.findUnique({
+      where: { id: parseInt(id) },
+      include: { branch: true, country: true, visaType: true },
+    });
+    if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const { passwordHash, ...safe } = distributor;
+    return NextResponse.json(safe);
+  } catch (error) {
+    console.error('Get Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
@@ -81,6 +97,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         maxSheets: parseIntSafe(body.maxSheets),
         targetAmount: body.targetAmount,
         note: body.note,
+        language: body.language || 'ja',
       },
     });
 

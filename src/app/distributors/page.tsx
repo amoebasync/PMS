@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { handlePhoneChange } from '@/lib/formatters';
 
 type Distributor = any;
@@ -51,6 +52,7 @@ const Label = ({ children, required }: { children: React.ReactNode; required?: b
 );
 
 export default function DistributorPage() {
+  const router = useRouter();
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [countries, setCountries] = useState<any[]>([]);
@@ -314,7 +316,11 @@ export default function DistributorPage() {
             ) : filteredDistributors.length === 0 ? (
               <tr><td colSpan={5} className="p-8 text-center text-slate-400">該当するスタッフがいません</td></tr>
             ) : filteredDistributors.map(d => (
-              <tr key={d.id} className="hover:bg-slate-50">
+              <tr
+                key={d.id}
+                onClick={() => router.push(`/distributors/${d.id}`)}
+                className="hover:bg-slate-50 cursor-pointer"
+              >
                 <td className="px-6 py-4">
                   <div className="font-mono text-xs text-slate-400">{d.staffId}</div>
                   <div className="font-bold text-slate-800">{d.name}</div>
@@ -333,7 +339,7 @@ export default function DistributorPage() {
                     ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">退社済</span>
                     : <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">在籍中</span>}
                 </td>
-                <td className="px-6 py-4 text-right">
+                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
                   <button onClick={() => openForm(d)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors">
                     <i className="bi bi-pencil-square"></i>
                   </button>

@@ -511,6 +511,7 @@ model FlyerDistributor {
   // 認証
   passwordHash   String?  @map("password_hash") @db.VarChar(100)
   isPasswordTemp Boolean  @default(true) @map("is_password_temp") // 初回ログイン時に変更必須
+  language       String   @default("ja") @db.VarChar(5) // ポータル言語: "ja" or "en"
 
   // 在留資格・契約情報
   visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date
@@ -560,14 +561,50 @@ model FlyerDistributor {
   maxSheets       Int?    @map("max_sheets") // 最高枚数1
   targetAmount    String? @map("target_amount") @db.VarChar(50) // 目標金額 (¥8,000–¥9,999など)
 
+  // プロフィール写真
+  avatarUrl String? @map("avatar_url") @db.Text
+
   // システム用
   note      String?  @db.Text // 備考
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  schedules DistributionSchedule[]
+  schedules      DistributionSchedule[]
+  shifts         DistributorShift[]
+  expenses       DistributorExpense[]
+  payrollRecords DistributorPayrollRecord[]
 
   @@map("flyer_distributors")
+}
+
+model DistributorShift {
+  id            Int              @id @default(autoincrement())
+  distributorId Int              @map("distributor_id")
+  distributor   FlyerDistributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  date          DateTime         @db.Date
+  status        String           @default("REQUESTED") @db.VarChar(20)
+  // REQUESTED / APPROVED / REJECTED / CANCELED
+  note          String?          @db.Text
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@unique([distributorId, date])
+  @@map("distributor_shifts")
+}
+
+model DistributorExpense {
+  id            Int              @id @default(autoincrement())
+  distributorId Int              @map("distributor_id")
+  distributor   FlyerDistributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  date          DateTime         @db.Date
+  amount        Int
+  description   String           @db.Text
+  status        String           @default("PENDING") @db.VarChar(20)
+  // PENDING / APPROVED / REJECTED
+  createdAt     DateTime         @default(now()) @map("created_at")
+  updatedAt     DateTime         @updatedAt @map("updated_at")
+
+  @@map("distributor_expenses")
 }
 
 // --- 在留資格マスタ ---
@@ -1391,6 +1428,65 @@ model PayrollRecord {
 
   @@unique([employeeId, periodStart, periodEnd])
   @@map("payroll_records")
+}
+
+// ==========================================
+// 配布員 給与計算モジュール
+// ==========================================
+
+// --- 給与明細ステータス ---
+enum DistributorPayrollStatus {
+  DRAFT      @map("下書き")
+  CONFIRMED  @map("確定済")
+  PAID       @map("支払済")
+}
+
+// --- 配布員週次給与レコード ---
+model DistributorPayrollRecord {
+  id            Int                       @id @default(autoincrement())
+  distributorId Int                       @map("distributor_id")
+  distributor   FlyerDistributor          @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  periodStart   DateTime                  @map("period_start") @db.Date  // 日曜日
+  periodEnd     DateTime                  @map("period_end") @db.Date    // 土曜日
+  paymentDate   DateTime                  @map("payment_date") @db.Date  // 翌週金曜日
+
+  schedulePay   Int                       @default(0) @map("schedule_pay")  // 配布報酬合計
+  expensePay    Int                       @default(0) @map("expense_pay")   // 交通費合計
+  grossPay      Int                       @default(0) @map("gross_pay")     // 支給合計
+
+  status        DistributorPayrollStatus  @default(DRAFT)
+  note          String?                   @db.Text
+
+  items         DistributorPayrollItem[]
+
+  createdAt     DateTime                  @default(now()) @map("created_at")
+  updatedAt     DateTime                  @updatedAt @map("updated_at")
+
+  @@unique([distributorId, periodStart])
+  @@map("distributor_payroll_records")
+}
+
+// --- 配布員給与明細行（スケジュール単位）---
+model DistributorPayrollItem {
+  id             Int                      @id @default(autoincrement())
+  payrollId      Int                      @map("payroll_id")
+  payroll        DistributorPayrollRecord @relation(fields: [payrollId], references: [id], onDelete: Cascade)
+
+  date           DateTime                 @db.Date
+  scheduleId     Int?                     @map("schedule_id")  // DistributionSchedule.id
+
+  flyerTypeCount Int                      @map("flyer_type_count")   // チラシ種類数 n (1〜6)
+  baseRate       Float                    @map("base_rate")          // rate_n_type の値
+  areaUnitPrice  Float                    @default(0) @map("area_unit_price")
+  sizeUnitPrice  Float                    @default(0) @map("size_unit_price")
+  unitPrice      Float                    @map("unit_price")         // baseRate + area + size
+  actualCount    Int                      @default(0) @map("actual_count")  // 投函ポスト数
+  earnedAmount   Int                      @default(0) @map("earned_amount") // unitPrice × actualCount (切り捨て)
+
+  createdAt      DateTime                 @default(now()) @map("created_at")
+
+  @@map("distributor_payroll_items")
 }
 
 model Notification {
