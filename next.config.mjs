@@ -5,6 +5,7 @@ const nextConfig = {
   assetPrefix: isProd ? 'https://d1mzs3dojvfqpz.cloudfront.net' : undefined,
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'canvas'],
   images: {
+    unoptimized: isProd ? true : false,
     remotePatterns: [
   {
     protocol: 'https',
