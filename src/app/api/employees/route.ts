@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
 
-const prisma = new PrismaClient();
 
 // 一覧取得
 export async function GET(request: Request) {

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 
 // 認証不要 — ポータル向けの公開設定のみ返す
 const PUBLIC_KEYS = ['supportPhone', 'supportEmail', 'companyName'];

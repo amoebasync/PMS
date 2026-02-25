@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { generateUniqueCustomerCode } from '@/lib/customerCode';
 import { sendWelcomeEmail } from '@/lib/mailer';
 
-const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {

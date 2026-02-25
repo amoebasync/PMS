@@ -1,11 +1,10 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
+import { prisma } from '@/lib/prisma';
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
-import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
 import { generateUniqueCustomerCode } from "@/lib/customerCode";
 
-const prisma = new PrismaClient();
 
 export const authOptions: NextAuthOptions = {
   providers: [

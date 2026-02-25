@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import crypto from 'crypto'; // ★ 追加: パスワードを暗号化(ハッシュ化)するためのライブラリ
 
-const prisma = new PrismaClient();
 
 export async function GET(request: Request) {
   try {

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 
-const prisma = new PrismaClient();
 
 // PUT /api/staff/schedules/report
 // 自分のスケジュールアイテムの actualCount を報告する

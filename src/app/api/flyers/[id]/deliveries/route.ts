@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 
 // --- 納品履歴の取得 ---
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {

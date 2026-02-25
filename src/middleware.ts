@@ -22,7 +22,8 @@ export function middleware(request: NextRequest) {
     path.startsWith('/api/locations') ||
     path.startsWith('/api/areas') ||
     path.startsWith('/api/upload') ||
-    path.startsWith('/uploads/') || // アップロードされたファイルの閲覧を許可
+    path.startsWith('/uploads/') || // アップロードされたファイルの閲覧を許可（旧パス互換）
+    path.startsWith('/api/s3-proxy') || // S3署名付きURLプロキシ
     path === '/staff/login' ||
     path === '/api/staff/auth/login';
 

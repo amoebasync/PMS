@@ -1,31 +1,30 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir, readdir, stat, unlink } from 'fs/promises';
-import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import Busboy from 'busboy';
 import { PDFParse } from 'pdf-parse';
+import { uploadToS3, deleteFromS3, listS3Objects, getS3Url, getMimeType } from '@/lib/s3';
 
-const prisma = new PrismaClient();
+
+const S3_PREFIX = 'uploads/avatars/';
 
 // ========================================================
 // ★ Housekeep (お掃除) 関数
-// フォルダ内の古いファイルのうち、DBで使われていないものを削除する
+// S3上の古いファイルのうち、DBで使われていないものを削除する
 // ========================================================
-async function housekeepUploads(uploadDir: string) {
+async function housekeepUploads() {
   try {
-    const files = await readdir(uploadDir);
     const now = Date.now();
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
     const [employees, printings] = await Promise.all([
       prisma.employee.findMany({
         select: { avatarUrl: true },
-        where: { avatarUrl: { not: null } }
+        where: { avatarUrl: { not: null } },
       }),
       prisma.orderPrinting.findMany({
         select: { frontDesignUrl: true, backDesignUrl: true },
-        where: { OR: [{ frontDesignUrl: { not: null } }, { backDesignUrl: { not: null } }] }
-      })
+        where: { OR: [{ frontDesignUrl: { not: null } }, { backDesignUrl: { not: null } }] },
+      }),
     ]);
 
     const activeUrls = new Set<string>();
@@ -35,17 +34,14 @@ async function housekeepUploads(uploadDir: string) {
       if (p.backDesignUrl) activeUrls.add(p.backDesignUrl);
     });
 
-    for (const file of files) {
-      if (file.startsWith('.')) continue;
+    const objects = await listS3Objects(S3_PREFIX);
 
-      const filePath = path.join(uploadDir, file);
-      const fileStat = await stat(filePath);
-
-      if (now - fileStat.mtimeMs > ONE_DAY_MS) {
-        const fileUrl = `/uploads/avatars/${file}`;
+    for (const obj of objects) {
+      if (now - obj.lastModified.getTime() > ONE_DAY_MS) {
+        const fileUrl = getS3Url(obj.key);
         if (!activeUrls.has(fileUrl)) {
-          await unlink(filePath);
-          console.log(`[Housekeep] Deleted unused file: ${file}`);
+          await deleteFromS3(obj.key);
+          console.log(`[Housekeep] Deleted unused S3 object: ${obj.key}`);
         }
       }
     }
@@ -145,13 +141,8 @@ export async function POST(request: Request) {
       filename = `file-${Date.now()}-${Math.round(Math.random() * 1000)}.${ext}`;
     }
 
-    const uploadDir = path.join(process.cwd(), 'public/uploads/avatars');
-    await mkdir(uploadDir, { recursive: true });
-
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, file.buffer);
-
-    const url = `/uploads/avatars/${filename}`;
+    const s3Key = `${S3_PREFIX}${filename}`;
+    const url = await uploadToS3(file.buffer, s3Key, getMimeType(ext));
 
     // PDF/AI ファイルのライブテキスト検出（アウトライン化チェック）
     let hasLiveText = false;
@@ -165,7 +156,7 @@ export async function POST(request: Request) {
     }
 
     // バックグラウンドでHousekeep処理を実行
-    housekeepUploads(uploadDir).catch(e => console.error(e));
+    housekeepUploads().catch(e => console.error(e));
 
     return NextResponse.json({ url, hasLiveText });
   } catch (error) {

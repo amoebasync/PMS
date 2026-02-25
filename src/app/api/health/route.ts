@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-// PrismaClientのインスタンス作成（シングルトン推奨だが簡易的に）
-const prisma = new PrismaClient();
 
 export async function GET() {
   const start = Date.now();

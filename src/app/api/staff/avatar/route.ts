@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import Busboy from 'busboy';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
+import { uploadToS3, getMimeType } from '@/lib/s3';
 
-const prisma = new PrismaClient();
 
 function parseMultipart(request: Request): Promise<{ buffer: Buffer; originalName: string } | null> {
   return new Promise((resolve, reject) => {
@@ -69,13 +67,8 @@ export async function POST(request: Request) {
     }
 
     const filename = `distributor-${distributor.id}-${Date.now()}.${ext}`;
-    const uploadDir = path.join(process.cwd(), 'public/uploads/distributor-avatars');
-    await mkdir(uploadDir, { recursive: true });
-
-    const filepath = path.join(uploadDir, filename);
-    await writeFile(filepath, file.buffer);
-
-    const url = `/uploads/distributor-avatars/${filename}`;
+    const s3Key = `uploads/distributor-avatars/${filename}`;
+    const url = await uploadToS3(file.buffer, s3Key, getMimeType(ext));
 
     await prisma.flyerDistributor.update({
       where: { id: distributor.id },

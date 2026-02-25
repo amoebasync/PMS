@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
-const prisma = new PrismaClient();
 
 async function getAuthorizedUser() {
   const cookieStore = await cookies();

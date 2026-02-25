@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
-const prisma = new PrismaClient();
 
 // GET: 全ログイン済み社員が閲覧可能
 export async function GET() {

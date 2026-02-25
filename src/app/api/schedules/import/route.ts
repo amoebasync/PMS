@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient();
 
 // "16日(月)" や "2026-02-18" などを適切に処理して Date型を作る
 function parseDayString(baseDateStr: string, dayStr: string) {

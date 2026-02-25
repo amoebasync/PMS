@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 
-const prisma = new PrismaClient();
 
 // GET /api/staff/schedules?year=YYYY&month=MM
 // スタッフ自身のスケジュール一覧を取得（配布アイテム含む）

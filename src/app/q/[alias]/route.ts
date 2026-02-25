@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { sendScanNotification } from '@/lib/mailer'; // ★追加
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const prisma = new PrismaClient();
 
 export async function GET(request: Request, { params }: { params: Promise<{ alias: string }> }) {
   try {

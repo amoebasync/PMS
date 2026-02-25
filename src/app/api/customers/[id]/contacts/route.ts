@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { sendContactCredentials } from '@/lib/mailer';
 
-const prisma = new PrismaClient();
 
 function generateInitialPassword(): string {
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';

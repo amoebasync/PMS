@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 
-const prisma = new PrismaClient();
 
 // GET /api/staff/payroll?year=YYYY&month=MM
 // ログイン中スタッフの給与レコード一覧

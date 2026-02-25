@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 
-const prisma = new PrismaClient();
 
 function buildPasswordFromBirthday(birthday: Date): string {
   const y = birthday.getFullYear();

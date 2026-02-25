@@ -13,6 +13,8 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.997.0",
+    "@aws-sdk/s3-request-presigner": "^3.997.0",
     "@react-google-maps/api": "^2.20.8",
     "@tailwindcss/postcss": "^4.1.18",
     "@turf/turf": "^7.3.4",
@@ -41,9 +43,11 @@
     "@types/papaparse": "^5.5.2",
     "@types/react": "19.2.14",
     "autoprefixer": "^10.4.24",
+    "dotenv": "^17.3.1",
     "postcss": "^8.5.6",
     "prisma": "^5.10.0",
     "tailwindcss": "^4.1.18",
+    "tsx": "^4.21.0",
     "typescript": "5.9.3"
   }
 }

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
 
 // デフォルト設定値
 const DEFAULTS: Record<string, string> = {
