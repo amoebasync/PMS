@@ -22,6 +22,11 @@ jobs:
             npm install --legacy-peer-deps
             npx prisma generate
             npm run build
+            aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
+              --cache-control "public,max-age=31536000,immutable"
+            aws cloudfront create-invalidation \
+              --distribution-id EOOGEE1IL7T06 \
+              --paths "/_next/static/*"
             pm2 restart pms
 
       - name: Deploy to EC2 #2
