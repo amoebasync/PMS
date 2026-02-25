@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Cropper from 'react-easy-crop';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 // --- 定数・ヘルパー関数 ---
 const RANK_MAP: Record<string, string> = {
@@ -71,7 +72,20 @@ export default function ProfilePage() {
   const [banks, setBanks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  
+
+  // --- 社員プロフィール閲覧モーダル用State ---
+  const [viewingEmployee, setViewingEmployee] = useState<any>(null);
+  const [isViewModalLoading, setIsViewModalLoading] = useState(false);
+
+  // --- 上司変更用State ---
+  const [isEditingManager, setIsEditingManager] = useState(false);
+  const [managerSearch, setManagerSearch] = useState('');
+  const [managerCandidates, setManagerCandidates] = useState<any[]>([]);
+  const [selectedNewManager, setSelectedNewManager] = useState<any>(null);
+  const [isSavingManager, setIsSavingManager] = useState(false);
+  const managerSearchRef = useRef<HTMLInputElement>(null);
+  const managerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // --- トリミング用State ---
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
@@ -87,8 +101,10 @@ export default function ProfilePage() {
     email: '', phone: '', avatarUrl: '',
     bankId: '', branchName: '', branchCode: '', accountType: 'ORDINARY',
     accountNumber: '', accountName: '', accountNameKana: '',
-    password: '', confirmPassword: '' 
+    password: '', confirmPassword: ''
   });
+
+  const { showToast, showConfirm } = useNotification();
 
   // ★ パスワードのバリデーションチェック
   const hasUpper = /[A-Z]/.test(formData.password);
@@ -138,6 +154,66 @@ export default function ProfilePage() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // 上司検索オートコンプリート
+  const handleManagerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setManagerSearch(val);
+    setSelectedNewManager(null);
+    if (managerTimerRef.current) clearTimeout(managerTimerRef.current);
+    if (!val.trim()) { setManagerCandidates([]); return; }
+    managerTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/employees?search=${encodeURIComponent(val)}`);
+        if (res.ok) setManagerCandidates(await res.json());
+      } catch { /* ignore */ }
+    }, 250);
+  };
+
+  const handleSelectManager = (emp: any) => {
+    setSelectedNewManager(emp);
+    setManagerSearch(`${emp.lastNameJa} ${emp.firstNameJa}`);
+    setManagerCandidates([]);
+  };
+
+  const handleSaveManager = async () => {
+    setIsSavingManager(true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ managerId: selectedNewManager ? selectedNewManager.id : null })
+      });
+      if (res.ok) {
+        setIsEditingManager(false);
+        setManagerSearch('');
+        setSelectedNewManager(null);
+        setManagerCandidates([]);
+        fetchData();
+      } else {
+        const data = await res.json();
+        showToast(data.error || '上司の変更に失敗しました', 'error');
+      }
+    } catch { showToast('通信エラーが発生しました', 'error'); }
+    setIsSavingManager(false);
+  };
+
+  const handleCancelManagerEdit = () => {
+    setIsEditingManager(false);
+    setManagerSearch('');
+    setSelectedNewManager(null);
+    setManagerCandidates([]);
+  };
+
+  const openEmployeeView = async (id: number) => {
+    setIsViewModalLoading(true);
+    setViewingEmployee({}); // モーダルを即座に開く（ローディング状態）
+    try {
+      const res = await fetch(`/api/employees/${id}`);
+      if (res.ok) setViewingEmployee(await res.json());
+    } catch { /* ignore */ }
+    setIsViewModalLoading(false);
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -193,10 +269,10 @@ export default function ProfilePage() {
         setIsUploadModalOpen(false);
         setTempImageSrc(null);
       } else {
-        alert(data.error || 'アップロードに失敗しました');
+        showToast(data.error || 'アップロードに失敗しました', 'error');
       }
     } catch (e) {
-      alert('画像の処理中にエラーが発生しました');
+      showToast('画像の処理中にエラーが発生しました', 'error');
     }
     setIsUploading(false);
   };
@@ -205,13 +281,11 @@ export default function ProfilePage() {
     e.preventDefault();
 
     if (formData.password && !isPasswordValid) {
-      alert('新しいパスワードが要件を満たしていません。');
-      return;
+      showToast('新しいパスワードが要件を満たしていません。', 'warning'); return;
     }
 
     if (formData.password && !passwordsMatch) {
-      alert('新しいパスワードと確認用パスワードが一致しません。');
-      return;
+      showToast('新しいパスワードと確認用パスワードが一致しません。', 'error'); return;
     }
 
     setIsSaving(true);
@@ -222,18 +296,20 @@ export default function ProfilePage() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
-        alert('プロフィール情報を保存しました！');
+        showToast('プロフィール情報を保存しました', 'success');
         setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         fetchData();
       } else {
-        alert('保存に失敗しました');
+        showToast('保存に失敗しました', 'error');
       }
-    } catch (err) { alert('通信エラーが発生しました'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
     setIsSaving(false);
   };
 
   if (isLoading) return <div className="p-10 text-center text-slate-500">読み込み中...</div>;
   if (!profile) return <div className="p-10 text-center text-rose-500">プロフィール情報が見つかりません。</div>;
+
+  const isAuthorized = profile.roles?.some((r: any) => r.role?.code === 'SUPER_ADMIN' || r.role?.code === 'HR_ADMIN');
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10 relative">
@@ -275,7 +351,7 @@ export default function ProfilePage() {
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属部署</div><div className="font-bold text-slate-800">{profile.department?.name || '未設定'}</div></div>
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属支店</div><div className="font-bold text-slate-800">{profile.branch?.nameJa || '未設定'}</div></div>
             <div><div className="text-[10px] font-bold text-slate-400 uppercase">階級 (等級)</div><div className="font-bold text-slate-800">{RANK_MAP[profile.rank] || profile.rank}</div></div>
-            
+
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase">システム権限</div>
               <div className="flex flex-wrap gap-1 mt-1">
@@ -291,6 +367,160 @@ export default function ProfilePage() {
                   </span>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* --- 上司・部下 カード --- */}
+          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 space-y-5">
+            <h3 className="text-sm font-bold text-slate-700 border-b border-slate-200 pb-2 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2"><i className="bi bi-diagram-3"></i> 上司・部下</span>
+              {isAuthorized && !isEditingManager && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingManager(true);
+                    setManagerSearch(profile.manager ? `${profile.manager.lastNameJa} ${profile.manager.firstNameJa}` : '');
+                    setTimeout(() => managerSearchRef.current?.focus(), 50);
+                  }}
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 transition-colors"
+                >
+                  <i className="bi bi-pencil text-[10px]"></i> 変更
+                </button>
+              )}
+            </h3>
+
+            {/* 上司セクション */}
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">上司</div>
+              {!isEditingManager ? (
+                profile.manager ? (
+                  <button
+                    type="button"
+                    onClick={() => openEmployeeView(profile.manager.id)}
+                    className="flex items-center gap-3 w-full text-left group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-300">
+                      {profile.manager.avatarUrl ? (
+                        <img src={profile.manager.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <i className="bi bi-person-fill text-slate-400 text-xl mt-1"></i>
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-bold text-sm text-indigo-600 group-hover:text-indigo-800 group-hover:underline transition-colors">
+                        {profile.manager.lastNameJa} {profile.manager.firstNameJa}
+                      </div>
+                      <div className="text-xs text-slate-500">{profile.manager.jobTitle || '役職未設定'}</div>
+                    </div>
+                  </button>
+                ) : (
+                  <p className="text-sm text-slate-400">未設定</p>
+                )
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                    <input
+                      ref={managerSearchRef}
+                      type="text"
+                      value={managerSearch}
+                      onChange={handleManagerSearchChange}
+                      placeholder="名前で検索..."
+                      className="w-full border border-slate-300 bg-white py-2 pl-8 pr-3 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    {managerCandidates.length > 0 && (
+                      <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {managerCandidates.map((emp: any) => (
+                          <button
+                            key={emp.id}
+                            type="button"
+                            onMouseDown={() => handleSelectManager(emp)}
+                            className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-sm border-b border-slate-100 last:border-0 transition-colors"
+                          >
+                            <span className="font-bold text-slate-800">{emp.lastNameJa} {emp.firstNameJa}</span>
+                            {emp.department && <span className="text-xs text-slate-400 ml-2">{emp.department.name}</span>}
+                            {emp.jobTitle && <span className="text-xs text-slate-500 ml-1">/ {emp.jobTitle}</span>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveManager}
+                      disabled={isSavingManager}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
+                    >
+                      {isSavingManager ? '保存中...' : <><i className="bi bi-check-lg"></i> 保存</>}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelManagerEdit}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg transition-colors"
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!await showConfirm('上司の設定を解除しますか？', { title: '上司の設定を解除', confirmLabel: '解除する', variant: 'danger' })) return;
+                        setIsSavingManager(true);
+                        try {
+                          const res = await fetch('/api/profile', {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ managerId: null })
+                          });
+                          if (res.ok) { setIsEditingManager(false); setManagerSearch(''); setSelectedNewManager(null); fetchData(); }
+                          else { const d = await res.json(); showToast(d.error || '解除に失敗しました', 'error'); }
+                        } catch { showToast('通信エラー', 'error'); }
+                        setIsSavingManager(false);
+                      }}
+                      disabled={isSavingManager}
+                      className="text-xs text-rose-400 hover:text-rose-600 font-bold px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
+                      title="上司の設定を解除"
+                    >
+                      <i className="bi bi-x-circle"></i>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 部下セクション */}
+            <div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">
+                部下 ({profile.subordinates?.length || 0}名)
+              </div>
+              {profile.subordinates && profile.subordinates.length > 0 ? (
+                <div className="space-y-2.5">
+                  {profile.subordinates.map((sub: any) => (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      onClick={() => openEmployeeView(sub.id)}
+                      className="flex items-center gap-3 w-full text-left group"
+                    >
+                      <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-300">
+                        {sub.avatarUrl ? (
+                          <img src={sub.avatarUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <i className="bi bi-person-fill text-slate-400 text-base mt-0.5"></i>
+                        )}
+                      </div>
+                      <div>
+                        <div className="font-bold text-sm text-indigo-600 group-hover:text-indigo-800 group-hover:underline transition-colors">
+                          {sub.lastNameJa} {sub.firstNameJa}
+                        </div>
+                        <div className="text-xs text-slate-500">{sub.jobTitle || RANK_MAP[sub.rank] || '役職未設定'}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">なし</p>
+              )}
             </div>
           </div>
         </div>
@@ -450,6 +680,144 @@ export default function ProfilePage() {
           </form>
         </div>
       </div>
+
+      {/* --- 社員プロフィール閲覧モーダル --- */}
+      {viewingEmployee && (
+        <div
+          className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => setViewingEmployee(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* ヘッダー */}
+            <div className="bg-slate-800 px-6 py-4 flex items-center justify-between">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <i className="bi bi-person-badge text-slate-300"></i> 社員プロフィール
+              </h3>
+              <button
+                onClick={() => setViewingEmployee(null)}
+                className="text-slate-400 hover:text-white transition-colors"
+              >
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            {isViewModalLoading || !viewingEmployee.id ? (
+              <div className="flex items-center justify-center py-16 text-slate-400">
+                <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mr-3"></div>
+                読み込み中...
+              </div>
+            ) : (
+              <div className="p-6">
+                {/* アバター・名前 */}
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 border-2 border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                    {viewingEmployee.avatarUrl ? (
+                      <img src={viewingEmployee.avatarUrl} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <i className="bi bi-person-fill text-3xl text-slate-300 mt-2"></i>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                      {viewingEmployee.employeeCode}
+                    </p>
+                    <h4 className="text-xl font-black text-slate-800">
+                      {viewingEmployee.lastNameJa} {viewingEmployee.firstNameJa}
+                    </h4>
+                    <p className="text-sm text-indigo-600 font-bold">{viewingEmployee.jobTitle || '役職未設定'}</p>
+                  </div>
+                </div>
+
+                {/* 組織情報 */}
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3 mb-4">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">所属部署</div>
+                      <div className="font-bold text-slate-700">{viewingEmployee.department?.name || '未設定'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">所属支店</div>
+                      <div className="font-bold text-slate-700">{viewingEmployee.branch?.nameJa || '未設定'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">階級</div>
+                      <div className="font-bold text-slate-700">{RANK_MAP[viewingEmployee.rank] || viewingEmployee.rank || '未設定'}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">システム権限</div>
+                      <div className="flex flex-wrap gap-1 mt-0.5">
+                        {viewingEmployee.roles && viewingEmployee.roles.length > 0 ? (
+                          viewingEmployee.roles.map((r: any) => (
+                            <span key={r.id} className="px-1.5 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold rounded">
+                              {r.role?.name}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-slate-400 text-xs">一般</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 上司・部下 */}
+                <div className="space-y-3 text-sm">
+                  {viewingEmployee.manager && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0">上司</span>
+                      <button
+                        type="button"
+                        onClick={() => openEmployeeView(viewingEmployee.manager.id)}
+                        className="flex items-center gap-2 group"
+                      >
+                        <div className="w-7 h-7 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                          {viewingEmployee.manager.avatarUrl ? (
+                            <img src={viewingEmployee.manager.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="bi bi-person-fill text-slate-400 text-sm mt-0.5"></i>
+                          )}
+                        </div>
+                        <span className="font-bold text-indigo-600 group-hover:text-indigo-800 group-hover:underline transition-colors">
+                          {viewingEmployee.manager.lastNameJa} {viewingEmployee.manager.firstNameJa}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+                  {viewingEmployee.subordinates && viewingEmployee.subordinates.length > 0 && (
+                    <div className="flex items-start gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0 mt-1">部下</span>
+                      <div className="flex flex-wrap gap-2">
+                        {viewingEmployee.subordinates.map((sub: any) => (
+                          <button
+                            key={sub.id}
+                            type="button"
+                            onClick={() => openEmployeeView(sub.id)}
+                            className="flex items-center gap-1.5 group"
+                          >
+                            <div className="w-6 h-6 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                              {sub.avatarUrl ? (
+                                <img src={sub.avatarUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <i className="bi bi-person-fill text-slate-400 text-xs mt-0.5"></i>
+                              )}
+                            </div>
+                            <span className="font-bold text-indigo-600 group-hover:text-indigo-800 group-hover:underline text-xs transition-colors">
+                              {sub.lastNameJa} {sub.firstNameJa}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* --- 画像トリミングモーダル --- */}
       {isUploadModalOpen && tempImageSrc && (

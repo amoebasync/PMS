@@ -1,22 +1,45 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
 
 const prisma = new PrismaClient();
 
 // 一覧取得
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+
+    // ?search= が指定された場合はオートコンプリート用に絞り込んで返す
+    if (search) {
+      const employees = await prisma.employee.findMany({
+        where: {
+          isActive: true,
+          OR: [
+            { lastNameJa: { contains: search } },
+            { firstNameJa: { contains: search } },
+            { lastNameKana: { contains: search } },
+            { firstNameKana: { contains: search } },
+            { employeeCode: { contains: search } },
+          ]
+        },
+        take: 10,
+        orderBy: { lastNameJa: 'asc' },
+        select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, department: { select: { name: true } } }
+      });
+      return NextResponse.json(employees);
+    }
+
     const employees = await prisma.employee.findMany({
       orderBy: { id: 'desc' },
       include: {
         department: true,
-        branch: true, 
+        branch: true,
         roles: { include: { role: true } },
         country: true,
-        financial: true, 
-        // ★ 追加: 上司の基本情報を取得
-        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } } 
+        financial: true,
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } }
       }
     });
     return NextResponse.json(employees);
@@ -30,7 +53,11 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const hash = crypto.createHash('sha256').update(body.password || 'password123').digest('hex');
+    // 初期パスワード = 生年月日 (YYYYMMDD)。未入力の場合は今日の日付をフォールバック
+    const birthdayStr = body.birthday
+      ? new Date(body.birthday).toISOString().slice(0, 10).replace(/-/g, '')
+      : new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const hash = crypto.createHash('sha256').update(birthdayStr).digest('hex');
 
     // ★ 社員コードが空欄の場合は自動採番する (EMP + 年月日 + 4桁のランダム数字)
     const generatedCode = `EMP${new Date().toISOString().slice(0,10).replace(/-/g, '')}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -53,6 +80,7 @@ export async function POST(request: Request) {
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender || 'unknown',
           isActive: true,
+          mustChangePassword: true,
           employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
           branchId: body.branchId ? parseInt(body.branchId) : null, 
@@ -91,6 +119,17 @@ export async function POST(request: Request) {
       }
       return emp;
     });
+
+    // ウェルカムメール送信（失敗しても登録自体は成功扱い）
+    const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
+    sendEmployeeWelcomeEmail(
+      body.email,
+      body.lastNameJa,
+      body.firstNameJa,
+      newEmployee.employeeCode,
+      birthdayStr,
+      `${siteUrl}/login`,
+    ).catch((err) => console.error('Welcome email failed:', err));
 
     return NextResponse.json(newEmployee);
   } catch (error) {

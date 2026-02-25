@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Expense = {
   id: number;
@@ -22,6 +23,7 @@ const statusLabel: Record<string, string> = {
 };
 
 export default function ExpensesPage() {
+  const { showConfirm } = useNotification();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -71,7 +73,7 @@ export default function ExpensesPage() {
   };
 
   const handleCancel = async (id: number) => {
-    if (!confirm('この申請を取消しますか？')) return;
+    if (!await showConfirm('この申請を取消しますか？', { variant: 'danger', confirmLabel: '取消する' })) return;
     setMessage(null);
     const res = await fetch(`/api/staff/expenses/${id}`, { method: 'DELETE' });
     const data = await res.json();

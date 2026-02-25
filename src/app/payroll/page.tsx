@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const EMP_TYPE_MAP: Record<string, string> = { FULL_TIME: '正社員', PART_TIME: 'アルバイト', OUTSOURCE: '業務委託' };
 const EMP_TYPE_COLOR: Record<string, string> = {
@@ -50,6 +51,7 @@ type PayrollRecord = {
 const fmt = (n: number) => `¥${n.toLocaleString()}`;
 
 export default function PayrollPage() {
+  const { showToast, showConfirm } = useNotification();
   const today = new Date();
   const [cycle, setCycle] = useState<'MONTHLY' | 'WEEKLY'>('MONTHLY');
   const [year, setYear] = useState(today.getFullYear());
@@ -108,7 +110,7 @@ export default function PayrollPage() {
   const handleCalculate = async () => {
     const label = cycle === 'MONTHLY' ? `${year}年${month}月` : `週：${weekStart}〜`;
     const target = cycle === 'MONTHLY' ? '正社員（月次）' : 'アルバイト・業務委託（週次）';
-    if (!confirm(`${label} の ${target} の給与を一括計算します。\n既存の下書きは上書きされます。続行しますか？`)) return;
+    if (!await showConfirm(`${label} の ${target} の給与を一括計算します。既存の下書きは上書きされます。続行しますか？`, { variant: 'warning', title: '給与計算の確認', confirmLabel: '計算する' })) return;
 
     setIsCalculating(true);
     try {
@@ -123,18 +125,18 @@ export default function PayrollPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        alert(`計算完了\n作成: ${data.created}件 / 更新: ${data.updated}件 / スキップ: ${data.skipped}件`);
+        showToast(`計算完了 / 作成:${data.created}件 / 更新:${data.updated}件 / スキップ:${data.skipped}件`, 'success');
         fetchRecords();
       } else {
-        alert(`エラー: ${data.error}`);
+        showToast(`エラー: ${data.error}`, 'error');
       }
-    } catch (e) { alert('通信エラーが発生しました'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
     setIsCalculating(false);
   };
 
   const handleBatchConfirm = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`選択した ${selectedIds.size} 件を確定します。よろしいですか？`)) return;
+    if (!await showConfirm(`選択した ${selectedIds.size} 件を確定します。よろしいですか？`, { variant: 'primary', confirmLabel: '確定する' })) return;
     try {
       await Promise.all(
         Array.from(selectedIds).map(id =>
@@ -147,14 +149,14 @@ export default function PayrollPage() {
       );
       setSelectedIds(new Set());
       fetchRecords();
-    } catch (e) { alert('確定処理に失敗しました'); }
+    } catch (e) { showToast('確定処理に失敗しました', 'error'); }
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('この下書きレコードを削除しますか？')) return;
+    if (!await showConfirm('この下書きレコードを削除しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
     const res = await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
     if (res.ok) fetchRecords();
-    else { const d = await res.json(); alert(d.error); }
+    else { const d = await res.json(); showToast(d.error, 'error'); }
   };
 
   const openEdit = (record: PayrollRecord) => {
@@ -191,7 +193,7 @@ export default function PayrollPage() {
     if (res.ok) {
       setEditRecord(null);
       fetchRecords();
-    } else { const d = await res.json(); alert(d.error); }
+    } else { const d = await res.json(); showToast(d.error, 'error'); }
     setIsSaving(false);
   };
 

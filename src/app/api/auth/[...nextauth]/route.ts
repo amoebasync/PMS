@@ -3,6 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import { PrismaClient } from "@prisma/client";
 import crypto from "crypto";
+import { generateUniqueCustomerCode } from "@/lib/customerCode";
 
 const prisma = new PrismaClient();
 
@@ -28,8 +29,19 @@ export const authOptions: NextAuthOptions = {
         });
         
         if (contact && contact.customer.status !== 'INVALID') {
-          // ★ 変更: lastName と firstName を結合して返す
-          return { id: contact.id.toString(), name: `${contact.lastName} ${contact.firstName}`, email: contact.email, company: contact.customer.name };
+          // lastLoginAt を非同期で更新
+          prisma.customerContact.update({
+            where: { id: contact.id },
+            data: { lastLoginAt: new Date() },
+          }).catch(console.error);
+
+          return {
+            id: contact.id.toString(),
+            name: `${contact.lastName} ${contact.firstName}`,
+            email: contact.email,
+            company: contact.customer.name,
+            mustChangePassword: contact.mustChangePassword,
+          };
         }
         return null;
       }
@@ -50,7 +62,7 @@ export const authOptions: NextAuthOptions = {
             });
             
             if (!contact) {
-              const customerCode = `EC${Date.now()}`;
+              const customerCode = await generateUniqueCustomerCode(prisma, 'EC');
               
               // ★ Googleのアカウント名 (例: "Taro Yamada") をスペースで「姓」と「名」に分割する
               const nameParts = (user.name || 'Google User').split(' ');
@@ -89,6 +101,7 @@ export const authOptions: NextAuthOptions = {
         } else if (account.provider === 'credentials') {
           token.id = user.id;
           token.company = (user as any).company;
+          token.mustChangePassword = (user as any).mustChangePassword ?? false;
         }
       }
       return token;
@@ -97,6 +110,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id;
         (session.user as any).company = token.company;
+        (session.user as any).mustChangePassword = token.mustChangePassword ?? false;
         if (token.name) {
           session.user.name = token.name;
         }

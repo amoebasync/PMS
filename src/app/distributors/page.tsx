@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { handlePhoneChange } from '@/lib/formatters';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Distributor = any;
 type FormTab = 'basic' | 'contract' | 'bank' | 'rate';
@@ -53,6 +54,7 @@ const Label = ({ children, required }: { children: React.ReactNode; required?: b
 
 export default function DistributorPage() {
   const router = useRouter();
+  const { showToast, showConfirm } = useNotification();
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [branches, setBranches] = useState<any[]>([]);
   const [countries, setCountries] = useState<any[]>([]);
@@ -203,8 +205,7 @@ export default function DistributorPage() {
     // 外国籍の場合は在留資格必須
     if (isNonJapanese && !formData.visaTypeId) {
       setFormTab('contract');
-      alert('日本国籍以外の場合、在留資格は必須です。');
-      return;
+      showToast('日本国籍以外の場合、在留資格は必須です', 'warning'); return;
     }
     try {
       const method = currentId ? 'PUT' : 'POST';
@@ -217,13 +218,13 @@ export default function DistributorPage() {
       if (!res.ok) throw new Error('Error');
       setIsFormModalOpen(false);
       loadData();
-    } catch { alert('保存に失敗しました'); }
+    } catch { showToast('保存に失敗しました', 'error'); }
   };
 
   const resetPassword = async () => {
     if (!currentId) return;
-    if (!formData.birthday) { alert('パスワードリセットには生年月日の入力が必要です。'); return; }
-    if (!confirm('パスワードを生年月日（YYYYMMDD）にリセットしますか？')) return;
+    if (!formData.birthday) { showToast('パスワードリセットには生年月日の入力が必要です', 'warning'); return; }
+    if (!await showConfirm('パスワードを生年月日（YYYYMMDD）にリセットしますか？', { variant: 'warning', title: 'パスワードリセット', confirmLabel: 'リセットする' })) return;
     try {
       const res = await fetch(`/api/distributors/${currentId}`, {
         method: 'PUT',
@@ -231,8 +232,8 @@ export default function DistributorPage() {
         body: JSON.stringify({ ...formData, resetPassword: true }),
       });
       if (!res.ok) throw new Error();
-      alert('パスワードをリセットしました。');
-    } catch { alert('リセットに失敗しました。'); }
+      showToast('パスワードをリセットしました', 'success');
+    } catch { showToast('リセットに失敗しました', 'error'); }
   };
 
   const del = async () => {
@@ -241,7 +242,7 @@ export default function DistributorPage() {
       await fetch(`/api/distributors/${currentId}`, { method: 'DELETE' });
       setIsDeleteModalOpen(false);
       loadData();
-    } catch { alert('削除に失敗しました'); }
+    } catch { showToast('削除に失敗しました', 'error'); }
   };
 
   const curTabIdx = FORM_TABS.findIndex(t => t.key === formTab);

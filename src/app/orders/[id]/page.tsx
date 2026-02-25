@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 import { GoogleMap, useJsApiLoader, Polygon, Circle, Marker } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
@@ -121,6 +122,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const id = resolvedParams.id;
   const isNew = id === 'new';
   const router = useRouter();
+  const { showToast, showConfirm } = useNotification();
 
   const [activeTab, setActiveTab] = useState('BASIC'); 
   const [isLoading, setIsLoading] = useState(true);
@@ -320,7 +322,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (!reason) return; 
       comment = reason;
     } else {
-      if (!confirm(`ステータスを「${STATUS_MAP[newStatus]?.label || newStatus}」に更新しますか？`)) return;
+      if (!await showConfirm(`ステータスを「${STATUS_MAP[newStatus]?.label || newStatus}」に更新しますか？`, { variant: 'primary', confirmLabel: '更新する' })) return;
     }
 
     try {
@@ -332,12 +334,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (res.ok) {
         setFormData(prev => ({ ...prev, status: newStatus }));
         setOrderFullData((prev: any) => ({ ...prev, status: newStatus }));
-        window.location.reload(); 
+        window.location.reload();
       } else {
-        alert('更新に失敗しました。');
+        showToast('更新に失敗しました', 'error');
       }
     } catch (e) {
-      alert('通信エラーが発生しました。');
+      showToast('通信エラーが発生しました', 'error');
     }
   };
 
@@ -364,7 +366,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       setIsFlyerModalOpen(false);
       setNewFlyerForm({ name: '', flyerCode: '', bundleCount: '', industryId: '', sizeId: '', foldStatus: 'NO_FOLDING_REQUIRED', remarks: '' });
       
-    } catch (err: any) { alert(err.message); } 
+    } catch (err: any) { showToast(err.message, 'error'); }
     finally { setIsSavingFlyer(false); }
   };
 
@@ -456,7 +458,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           }
           setSelectedAreaIds(newSelected);
         });
-      } else alert('入力された住所が見つかりませんでした。');
+      } else showToast('入力された住所が見つかりませんでした', 'warning');
     });
   };
 
@@ -523,8 +525,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       if (res.ok) {
         const savedData = await res.json();
-        alert(`${TABS.find(t => t.id === tabName)?.label} を保存しました！`);
-        
+        showToast(`${TABS.find(t => t.id === tabName)?.label} を保存しました！`, 'success');
+
         if (isNew && tabName === 'BASIC') {
           router.push(`/orders/${savedData.id}`);
         } else {
@@ -534,9 +536,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           if (tabName === 'DESIGN') setDesignForm(p => ({ ...p, id: savedData.id.toString() }));
         }
       } else {
-        alert('保存に失敗しました');
+        showToast('保存に失敗しました', 'error');
       }
-    } catch (err) { alert('通信エラーが発生しました'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
   };
 
   const getAreaCapacity = (a: any) => {

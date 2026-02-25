@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
   DRAFT: { label: '下書き', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200', icon: 'bi-pencil' },
@@ -16,6 +17,7 @@ const STATUS_MAP: Record<string, { label: string, color: string, icon: string }>
 };
 
 export default function OrdersListPage() {
+  const { showToast, showConfirm } = useNotification();
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -43,11 +45,11 @@ export default function OrdersListPage() {
 
   const del = async (e: React.MouseEvent, id: number) => {
     e.preventDefault();
-    if (!confirm('この受注データを削除しますか？')) return;
+    if (!await showConfirm('この受注データを削除しますか？', { variant: 'danger', confirmLabel: '削除する', title: '受注データの削除' })) return;
     try {
       const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
       if (res.ok) fetchOrders();
-    } catch (error) { alert('削除に失敗しました'); }
+    } catch (error) { showToast('削除に失敗しました', 'error'); }
   };
 
   // ★ ステータス更新APIを呼び出す共通関数
@@ -64,16 +66,17 @@ export default function OrdersListPage() {
         setShowRejectInput(false);
         fetchOrders(); // リストを再取得して画面を更新
       } else {
-        alert('ステータス更新に失敗しました。');
+        showToast('ステータス更新に失敗しました', 'error');
       }
     } catch (e) {
-      alert('通信エラーが発生しました。');
+      showToast('通信エラーが発生しました', 'error');
     }
   };
 
   // ★ 入金確認アクション
-  const handlePaymentConfirm = (order: any) => {
-    if (confirm(`受注番号 ${order.orderNo} (${order.customer?.name}) の入金を確認し、審査待ちへ進めますか？`)) {
+  const handlePaymentConfirm = async (order: any) => {
+    const ok = await showConfirm(`受注番号 ${order.orderNo} (${order.customer?.name}) の入金を確認し、審査待ちへ進めますか？`, { variant: 'primary', confirmLabel: '確認・進める' });
+    if (ok) {
       updateOrderStatus(order.id, 'PENDING_REVIEW', 'PAYMENT_CONFIRMED');
     }
   };
@@ -92,30 +95,32 @@ export default function OrdersListPage() {
         setReviewOrderData(await res.json());
       }
     } catch (e) {
-      alert('詳細データの取得に失敗しました');
+      showToast('詳細データの取得に失敗しました', 'error');
       setReviewModalOpen(false);
     }
     setIsReviewLoading(false);
   };
 
   // モーダル内の「承認」ボタン
-  const handleApprove = () => {
-    if (confirm('この発注を承認し、受注確定(手配中)としますか？')) {
+  const handleApprove = async () => {
+    const ok = await showConfirm('この発注を承認し、受注確定(手配中)としますか？', { variant: 'primary', confirmLabel: '承認する' });
+    if (ok) {
       updateOrderStatus(reviewOrderData.id, 'CONFIRMED', 'APPROVE');
     }
   };
 
   // モーダル内の「不承認」ボタン
-  const handleReject = () => {
+  const handleReject = async () => {
     if (!showRejectInput) {
       setShowRejectInput(true); // 理由入力欄を表示する
       return;
     }
     if (!rejectComment.trim()) {
-      alert('不承認の理由（クライアントへの伝達事項など）を入力してください。');
+      showToast('不承認の理由を入力してください', 'warning');
       return;
     }
-    if (confirm('この発注を不承認として差し戻しますか？')) {
+    const ok = await showConfirm('この発注を不承認として差し戻しますか？', { variant: 'danger', confirmLabel: '不承認にする' });
+    if (ok) {
       updateOrderStatus(reviewOrderData.id, 'ADJUSTING', 'REJECT', rejectComment);
     }
   };

@@ -27,9 +27,14 @@ export default function LoginPage() {
       });
 
       if (res.ok) {
-        // ログイン成功時
-        router.push('/');
-        router.refresh(); // 状態を最新にするためリフレッシュ
+        const data = await res.json();
+        // 初回ログイン / 仮パスワードの場合はパスワード変更ページへ
+        if (data.mustChangePassword) {
+          router.push('/change-password');
+        } else {
+          router.push('/');
+        }
+        router.refresh();
       } else {
         // ログイン失敗時 (401エラーなど)
         const data = await res.json();

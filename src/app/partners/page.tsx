@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 export default function PartnerPage() {
+  const { showToast, showConfirm } = useNotification();
   const [partners, setPartners] = useState<any[]>([]);
   const [partnerTypes, setPartnerTypes] = useState<any[]>([]); // ★ マスタデータ用State
   const [isLoading, setIsLoading] = useState(true);
@@ -65,16 +67,16 @@ export default function PartnerPage() {
       if (!res.ok) throw new Error();
       setIsFormOpen(false);
       fetchData();
-    } catch (e) { alert('保存に失敗しました'); }
+    } catch (e) { showToast('保存に失敗しました', 'error'); }
   };
 
   const del = async (id: number) => {
-    if (!confirm('この外注先を削除しますか？\n(※すでに受注データに紐づいている場合は削除できません)')) return;
+    if (!await showConfirm('この外注先を削除しますか？', { variant: 'danger', detail: 'すでに受注データに紐づいている場合は削除できません', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/partners/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       fetchData();
-    } catch (e) { alert('削除に失敗しました。関連する受注データが存在する可能性があります。'); }
+    } catch (e) { showToast('削除に失敗しました。関連する受注データが存在する可能性があります', 'error'); }
   };
 
   const filteredPartners = partners.filter(p => 

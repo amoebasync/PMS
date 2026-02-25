@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 // 本日の日付を YYYY-MM-DD 形式で取得する関数
 const getTodayStr = () => {
@@ -28,6 +29,7 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
 };
 
 export default function ScheduleListPage() {
+  const { showToast } = useNotification();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -72,10 +74,10 @@ export default function ScheduleListPage() {
         ));
         setEditingSchedule(null);
       } else {
-        alert('備考の保存に失敗しました');
+        showToast('備考の保存に失敗しました', 'error');
       }
     } catch (e) {
-      alert('通信エラーが発生しました');
+      showToast('通信エラーが発生しました', 'error');
     }
   };
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { sendOrderApprovalEmail } from '@/lib/mailer';
 
 const prisma = new PrismaClient();
 
@@ -84,6 +85,31 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           await tx.orderApproval.create({ data: { orderId, status: 'REJECTED', comment } });
         }
       });
+
+      // 承認時：顧客のプライマリコンタクトに審査完了メールを送信（fire-and-forget）
+      if (action === 'APPROVE') {
+        const orderForEmail = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: {
+            customer: {
+              include: { contacts: { where: { isPrimary: true }, take: 1 } },
+            },
+          },
+        });
+        const primaryContact = orderForEmail?.customer?.contacts?.[0];
+        if (primaryContact?.email) {
+          const myPageUrl = `${process.env.NEXTAUTH_URL}/portal/mypage`;
+          sendOrderApprovalEmail(
+            primaryContact.email,
+            primaryContact.lastName,
+            primaryContact.firstName,
+            orderForEmail!.orderNo,
+            orderForEmail!.title || orderForEmail!.orderNo,
+            myPageUrl,
+          ).catch(console.error);
+        }
+      }
+
       return NextResponse.json({ success: true });
     }
 

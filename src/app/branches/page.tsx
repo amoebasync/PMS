@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Employee = { id: number; lastNameJa: string; firstNameJa: string; isActive: boolean };
 type Branch = any; 
 
 export default function BranchPage() {
+  const { showToast } = useNotification();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -81,7 +83,7 @@ export default function BranchPage() {
       if (!res.ok) throw new Error('Error saving branch');
       setIsFormModalOpen(false);
       fetchData();
-    } catch (e) { alert('保存に失敗しました'); }
+    } catch (e) { showToast('保存に失敗しました', 'error'); }
   };
 
   const del = async () => {
@@ -91,7 +93,7 @@ export default function BranchPage() {
       if (!res.ok) throw new Error('Error deleting branch');
       setIsDeleteModalOpen(false);
       fetchData();
-    } catch (e) { alert('削除に失敗しました（※配布員が紐付いている場合は削除できません）'); }
+    } catch (e) { showToast('削除に失敗しました。配布員が紐付いている場合は削除できません', 'error'); }
   };
 
   // 店長名を表示するためのヘルパー関数

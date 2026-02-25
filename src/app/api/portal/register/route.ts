@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { generateUniqueCustomerCode } from '@/lib/customerCode';
+import { sendWelcomeEmail } from '@/lib/mailer';
 
 const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
     // ★ wantsNewsletter を受け取る
-    const { accountType, companyName, lastName, firstName, email, password, wantsNewsletter } = await request.json();
+    const { accountType, companyName, lastName, firstName, department, position, mobilePhone, email, password, wantsNewsletter } = await request.json();
 
     if (!lastName || !firstName || !email || !password) {
       return NextResponse.json({ error: '必須項目が入力されていません' }, { status: 400 });
@@ -23,7 +25,8 @@ export async function POST(request: Request) {
     }
 
     const hash = crypto.createHash('sha256').update(password).digest('hex');
-    const customerCode = `EC${Date.now()}`;
+
+    const customerCode = await generateUniqueCustomerCode(prisma, 'EC');
     
     // 法人なら入力された会社名、個人なら「姓 名」を顧客名とする
     const custName = accountType === 'company' ? companyName : `${lastName} ${firstName}`;
@@ -35,20 +38,31 @@ export async function POST(request: Request) {
         customerType: custType,
         name: custName,
         nameKana: null,
+        acquisitionChannel: 'EC',
         contacts: {
           create: {
             lastName: lastName,
             firstName: firstName,
+            department: department || null,
+            position: position || null,
+            mobilePhone: mobilePhone || null,
             email: email,
             passwordHash: hash,
             isPrimary: true,
-            // ★ もし schema.prisma の CustomerContact モデルに wantsNewsletter などの
-            // boolean型カラムを追加した場合は、以下のように保存できます。
-            // wantsNewsletter: wantsNewsletter,
           }
         }
       }
     });
+
+    // 登録完了メール送信（fire-and-forget）
+    const loginUrl = `${process.env.NEXTAUTH_URL}/portal/login`;
+    sendWelcomeEmail(
+      email,
+      lastName,
+      firstName,
+      loginUrl,
+      accountType === 'company' ? companyName : undefined,
+    ).catch(console.error);
 
     return NextResponse.json({ success: true });
   } catch (error) {

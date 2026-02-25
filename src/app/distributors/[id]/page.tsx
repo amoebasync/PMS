@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { handlePhoneChange } from '@/lib/formatters';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type FormTab = 'basic' | 'contract' | 'bank' | 'rate';
 const FORM_TABS: { key: FormTab; label: string; icon: string }[] = [
@@ -66,6 +67,7 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 export default function DistributorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const { showToast, showConfirm } = useNotification();
 
   const [distributor, setDistributor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -172,8 +174,37 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       rate1Type: distributor.rate1Type?.toString() || '',
       rate2Type: distributor.rate2Type?.toString() || '',
       rate3Type: distributor.rate3Type?.toString() || '',
+      rate4Type: distributor.rate4Type?.toString() || '',
+      rate5Type: distributor.rate5Type?.toString() || '',
+      rate6Type: distributor.rate6Type?.toString() || '',
       attendanceCount: distributor.attendanceCount?.toString() || '0',
+      minTypes: distributor.minTypes?.toString() || '',
+      maxTypes: distributor.maxTypes?.toString() || '',
+      minSheets: distributor.minSheets?.toString() || '',
+      maxSheets: distributor.maxSheets?.toString() || '',
       bankName: distributor.bankName || '',
+      phone: distributor.phone || '',
+      email: distributor.email || '',
+      gender: distributor.gender || '',
+      rank: distributor.rank || '',
+      ratePlan: distributor.ratePlan || '',
+      targetAmount: distributor.targetAmount || '',
+      note: distributor.note || '',
+      leaveReason: distributor.leaveReason || '',
+      transportationFee: distributor.transportationFee || '',
+      trainingAllowance: distributor.trainingAllowance || '',
+      paymentMethod: distributor.paymentMethod || '現金',
+      bankBranchCode: distributor.bankBranchCode || '',
+      bankAccountType: distributor.bankAccountType || '普通',
+      bankAccountNumber: distributor.bankAccountNumber || '',
+      bankAccountName: distributor.bankAccountName || '',
+      bankAccountNameKana: distributor.bankAccountNameKana || '',
+      transferNumber: distributor.transferNumber || '',
+      equipmentBattery: distributor.equipmentBattery || '',
+      equipmentBag: distributor.equipmentBag || '',
+      equipmentMobile: distributor.equipmentMobile || '',
+      flyerDeliveryMethod: distributor.flyerDeliveryMethod || '',
+      transportationMethod: distributor.transportationMethod || '',
     });
     setCountryInputText(distributor.country?.name || '');
     setBankInputText(distributor.bankName || '');
@@ -192,8 +223,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     e.preventDefault();
     if (isNonJapanese && !formData.visaTypeId) {
       setFormTab('contract');
-      alert('日本国籍以外の場合、在留資格は必須です。');
-      return;
+      showToast('日本国籍以外の場合、在留資格は必須です', 'warning'); return;
     }
     try {
       const res = await fetch(`/api/distributors/${id}`, {
@@ -204,12 +234,12 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       if (!res.ok) throw new Error();
       setIsEditOpen(false);
       loadDistributor();
-    } catch { alert('保存に失敗しました'); }
+    } catch { showToast('保存に失敗しました', 'error'); }
   };
 
   const resetPassword = async () => {
-    if (!formData.birthday) { alert('パスワードリセットには生年月日の入力が必要です。'); return; }
-    if (!confirm('パスワードを生年月日（YYYYMMDD）にリセットしますか？')) return;
+    if (!formData.birthday) { showToast('パスワードリセットには生年月日の入力が必要です', 'warning'); return; }
+    if (!await showConfirm('パスワードを生年月日（YYYYMMDD）にリセットしますか？', { variant: 'warning', title: 'パスワードリセット', confirmLabel: 'リセットする' })) return;
     try {
       const res = await fetch(`/api/distributors/${id}`, {
         method: 'PUT',
@@ -217,8 +247,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
         body: JSON.stringify({ ...formData, resetPassword: true }),
       });
       if (!res.ok) throw new Error();
-      alert('パスワードをリセットしました。');
-    } catch { alert('リセットに失敗しました。'); }
+      showToast('パスワードをリセットしました', 'success');
+    } catch { showToast('リセットに失敗しました', 'error'); }
   };
 
   const handleResetPassword = async () => {
@@ -244,7 +274,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     try {
       await fetch(`/api/distributors/${id}`, { method: 'DELETE' });
       router.push('/distributors');
-    } catch { alert('削除に失敗しました'); }
+    } catch { showToast('削除に失敗しました', 'error'); }
   };
 
   if (loading) {
@@ -700,7 +730,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                         ].map(f => (
                           <div key={f.name}>
                             <Label>{f.label}</Label>
-                            <input type="number" name={f.name} value={(formData as any)[f.name]} onChange={handleInputChange} className={inputCls} placeholder="0" />
+                            <input type="number" name={f.name} value={(formData as any)[f.name] ?? ''} onChange={handleInputChange} className={inputCls} placeholder="0" />
                           </div>
                         ))}
                       </div>

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { handlePhoneChange } from '@/lib/formatters';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 // ===========================
 // Types
@@ -413,6 +414,7 @@ function CompanySection({ customerType }: { customerType: CustomerType }) {
 // 2. Contacts Section
 // ===========================
 function ContactsSection({ customerType, isPrimary }: { customerType: CustomerType; isPrimary: boolean }) {
+  const { showConfirm } = useNotification();
   const [contacts, setContacts] = useState<ContactData[]>([]);
   const [currentContactId, setCurrentContactId] = useState<number | null>(null);
   const [deliveryAddresses, setDeliveryAddresses] = useState<DeliveryAddressData[]>([]);
@@ -443,7 +445,7 @@ function ContactsSection({ customerType, isPrimary }: { customerType: CustomerTy
   useEffect(() => { fetchContacts(); }, [fetchContacts]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('この担当者を削除してよろしいですか？')) return;
+    if (!await showConfirm('この担当者を削除してよろしいですか？', { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/portal/settings/contacts/${id}`, { method: 'DELETE' });
       const data = await res.json();
@@ -699,6 +701,7 @@ function FormFieldCompact({ label, required, children }: { label: string; requir
 // 2.5 Delivery Addresses Section
 // ===========================
 function DeliveryAddressesSection() {
+  const { showConfirm } = useNotification();
   const [addresses, setAddresses] = useState<DeliveryAddressData[]>([]);
   const [myDefaultId, setMyDefaultId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -747,7 +750,7 @@ function DeliveryAddressesSection() {
   useEffect(() => { fetchAddresses(); }, [fetchAddresses]);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('この納品先住所を削除してよろしいですか？')) return;
+    if (!await showConfirm('この納品先住所を削除してよろしいですか？', { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/portal/settings/delivery-addresses/${id}`, { method: 'DELETE' });
       const data = await res.json();

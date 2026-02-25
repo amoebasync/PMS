@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 export default function ApprovalsPage() {
+  const { showToast, showConfirm } = useNotification();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -72,21 +74,21 @@ export default function ApprovalsPage() {
 
   const handleApprove = async () => {
     if (selectedIds.size === 0) return;
-    if (!confirm(`${selectedIds.size} 件の申請を「承認」しますか？`)) return;
-    
+    if (!await showConfirm(`${selectedIds.size} 件の申請を「承認」しますか？`, { variant: 'primary', confirmLabel: '承認する' })) return;
+
     setIsSubmitting(true);
     const endpoint = activeTab === 'ATTENDANCE' ? '/api/approvals/attendance' : '/api/approvals/expense';
-    
+
     try {
       const res = await fetch(endpoint, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: Array.from(selectedIds), action: 'APPROVE' })
       });
       if (res.ok) {
-        alert('承認しました！');
+        showToast('承認しました', 'success');
         fetchData();
-      } else { alert('エラーが発生しました'); }
-    } catch (e) { alert('通信エラー'); }
+      } else { showToast('エラーが発生しました', 'error'); }
+    } catch (e) { showToast('通信エラー', 'error'); }
     setIsSubmitting(false);
   };
 
@@ -100,12 +102,12 @@ export default function ApprovalsPage() {
         body: JSON.stringify({ ids: Array.from(selectedIds), action: 'REJECT', reason: rejectReason })
       });
       if (res.ok) {
-        alert('申請を却下しました');
+        showToast('申請を却下しました', 'success');
         setIsRejectModalOpen(false);
         setRejectReason('');
         fetchData();
-      } else { alert('エラーが発生しました'); }
-    } catch (e) { alert('通信エラー'); }
+      } else { showToast('エラーが発生しました', 'error'); }
+    } catch (e) { showToast('通信エラー', 'error'); }
     setIsSubmitting(false);
   };
 

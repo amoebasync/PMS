@@ -18,8 +18,27 @@ function buildInitialPassword(birthday: string | null | undefined): string | nul
   return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+
+    // オートコンプリート用: search パラメータがある場合は絞り込みのみ返す
+    if (search) {
+      const distributors = await prisma.flyerDistributor.findMany({
+        where: {
+          OR: [
+            { name: { contains: search } },
+            { staffId: { contains: search } },
+          ],
+        },
+        orderBy: { name: 'asc' },
+        take: 10,
+        select: { id: true, name: true, staffId: true },
+      });
+      return NextResponse.json(distributors);
+    }
+
     const distributors = await prisma.flyerDistributor.findMany({
       orderBy: { id: 'desc' },
       include: {

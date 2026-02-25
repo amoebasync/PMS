@@ -140,7 +140,8 @@ model Employee {
 
   avatarUrl      String?       @map("avatar_url") @db.Text
 
-  isActive       Boolean   @default(true) @map("is_active")
+  isActive            Boolean   @default(true) @map("is_active")
+  mustChangePassword  Boolean   @default(false) @map("must_change_password")
   hireDate       DateTime? @map("hire_date") @db.Date
   resignationDate DateTime? @map("resignation_date") @db.Date
   
@@ -167,6 +168,14 @@ model Employee {
   managedBranches2   Branch[] @relation("BranchManager2")
   managedBranches3   Branch[] @relation("BranchManager3")
   managedBranches4   Branch[] @relation("BranchManager4")
+
+  // CRM
+  activities     CustomerActivity[] @relation("ActivityEmployee")
+  assignedTasks  Task[]             @relation("TaskAssignee")
+  createdTasks   Task[]             @relation("TaskCreator")
+  leads          Lead[]
+
+  announcements  Announcement[]
 
   @@map("employees")
 }
@@ -353,6 +362,24 @@ enum CustomerType {
   INDIVIDUAL  @map("個人")
 }
 
+// 流入経路
+enum AcquisitionChannel {
+  EC
+  SALES
+  REFERRAL
+  INQUIRY
+}
+
+// 見込み客ステージ
+enum LeadStage {
+  APPROACH     // アプローチ中
+  PROPOSAL     // 提案中
+  QUOTATION    // 見積中
+  NEGOTIATION  // 交渉中
+  LOST         // 失注
+  ON_HOLD      // 保留
+}
+
 // --- 顧客マスタ (Customers) ---
 model Customer {
   id           Int    @id @default(autoincrement())
@@ -381,6 +408,10 @@ model Customer {
   addressBuilding String? @map("address_building") @db.VarChar(255) // 建物名以降 (DDLの2つ目のaddress)
   phone           String? @db.VarChar(20)
   fax             String? @db.VarChar(20)
+
+  // マーケティング
+  acquisitionChannel AcquisitionChannel? @map("acquisition_channel")
+  campaignId         Int?                @map("campaign_id")
 
   // システム制御
   status    CustomerStatus @default(VALID)
@@ -420,6 +451,10 @@ model Customer {
   notifications   Notification[] // ★これを追加
   qrCodes  QrCode[]
   deliveryAddresses CustomerDeliveryAddress[]
+  activities CustomerActivity[]
+  tasks      Task[]
+  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  leads      Lead[]    @relation("LeadConversion")
 
   @@map("customers")
 }
@@ -456,8 +491,9 @@ model CustomerContact {
   // リレーション
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
   orderContacts OrderContact[]
-  passwordHash String?   @map("password_hash") @db.VarChar(255) // クライアントログイン用パスワード
-  lastLoginAt  DateTime? @map("last_login_at") @db.DateTime(0)
+  passwordHash      String?  @map("password_hash") @db.VarChar(255) // クライアントログイン用パスワード
+  lastLoginAt       DateTime? @map("last_login_at") @db.DateTime(0)
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
 
   @@map("customer_contacts")
 }
@@ -573,6 +609,7 @@ model FlyerDistributor {
   shifts         DistributorShift[]
   expenses       DistributorExpense[]
   payrollRecords DistributorPayrollRecord[]
+  tasks          Task[]
 
   @@map("flyer_distributors")
 }
@@ -1507,4 +1544,125 @@ model Notification {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("notifications")
+}
+
+// ==========================================
+// CRM モジュール
+// ==========================================
+
+model CustomerActivity {
+  id         Int       @id @default(autoincrement())
+  customerId Int       @map("customer_id")
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  employeeId Int?      @map("employee_id")
+  employee   Employee? @relation("ActivityEmployee", fields: [employeeId], references: [id])
+  type       String    @db.VarChar(20)    // CALL, VISIT, EMAIL, ONLINE, NOTE
+  subject    String    @db.VarChar(200)
+  body       String?   @db.Text
+  activityAt DateTime  @map("activity_at")
+  nextAction String?   @map("next_action") @db.VarChar(200)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@map("customer_activities")
+}
+
+model Task {
+  id             Int               @id @default(autoincrement())
+  customerId     Int?              @map("customer_id")
+  customer       Customer?         @relation(fields: [customerId], references: [id])
+  distributorId  Int?              @map("distributor_id")
+  distributor    FlyerDistributor? @relation(fields: [distributorId], references: [id])
+  assigneeId     Int?              @map("assignee_id")
+  assignee       Employee?         @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  createdById    Int?              @map("created_by_id")
+  createdBy      Employee?         @relation("TaskCreator", fields: [createdById], references: [id])
+  title          String            @db.VarChar(200)
+  description    String?           @db.Text
+  dueDate        DateTime          @map("due_date")
+  priority       String            @default("MEDIUM") @db.VarChar(10)  // LOW, MEDIUM, HIGH
+  status         String            @default("PENDING") @db.VarChar(20) // PENDING, IN_PROGRESS, DONE
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  @@map("tasks")
+}
+
+// ==========================================
+// キャンペーン管理
+// ==========================================
+
+model Campaign {
+  id          Int       @id @default(autoincrement())
+  name        String    @db.VarChar(100)
+  description String?   @db.Text
+  startDate   DateTime? @map("start_date")
+  endDate     DateTime? @map("end_date")
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  customers Customer[]
+  leads     Lead[]
+
+  @@map("campaigns")
+}
+
+// ==========================================
+// 見込み客（リード）管理
+// ==========================================
+
+model Lead {
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(100)
+  nameKana     String? @map("name_kana") @db.VarChar(100)
+  contactName  String? @map("contact_name") @db.VarChar(50)
+  contactEmail String? @map("contact_email") @db.VarChar(255)
+  phone        String? @db.VarChar(20)
+  postalCode   String? @map("postal_code") @db.VarChar(8)
+  address      String? @db.VarChar(255)
+
+  stage              LeadStage           @default(APPROACH)
+  acquisitionChannel AcquisitionChannel? @map("acquisition_channel")
+  salesRepId         Int?                @map("sales_rep_id")
+  campaignId         Int?                @map("campaign_id")
+
+  note              String?   @db.Text
+  nextAction        String?   @map("next_action") @db.VarChar(255)
+  expectedCloseDate DateTime? @map("expected_close_date")
+
+  convertedCustomerId Int?      @map("converted_customer_id")
+  convertedAt         DateTime? @map("converted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  salesRep          Employee? @relation(fields: [salesRepId], references: [id])
+  campaign          Campaign? @relation(fields: [campaignId], references: [id])
+  convertedCustomer Customer? @relation("LeadConversion", fields: [convertedCustomerId], references: [id])
+
+  @@map("leads")
+}
+
+// --- 全体お知らせカテゴリ (Enum) ---
+enum AnnouncementCategory {
+  UPDATE      // アップデート
+  MAINTENANCE // メンテナンス
+  IMPORTANT   // 重要
+  NOTICE      // お知らせ
+  OTHER       // その他
+}
+
+// --- 全体お知らせ ---
+model Announcement {
+  id          Int                  @id @default(autoincrement())
+  title       String               @db.VarChar(255)
+  content     String               @db.Text
+  category    AnnouncementCategory @default(OTHER)
+  createdById Int                  @map("created_by_id")
+  createdBy   Employee             @relation(fields: [createdById], references: [id])
+  createdAt   DateTime             @default(now()) @map("created_at")
+  updatedAt   DateTime             @updatedAt @map("updated_at")
+
+  @@map("announcements")
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type FoldingType = { id: number; name: string; unitPrice: number; sortOrder: number; isActive: boolean };
 type AreaRank = { id: number; name: string; postingUnitPrice: number; description: string | null };
@@ -8,6 +9,7 @@ type PeriodPrice = { id: number; minDays: number; maxDays: number | null; multip
 type FlyerSize = { id: number; name: string; printUnitPrice: number; basePriceAddon: number };
 
 export default function PricingPage() {
+  const { showToast, showConfirm } = useNotification();
   const [tab, setTab] = useState<'folding' | 'areaRank' | 'period' | 'size'>('folding');
   const [data, setData] = useState<{ foldingTypes: FoldingType[]; areaRanks: AreaRank[]; periodPrices: PeriodPrice[]; flyerSizes: FlyerSize[] }>({
     foldingTypes: [], areaRanks: [], periodPrices: [], flyerSizes: []
@@ -73,16 +75,16 @@ export default function PricingPage() {
       }
       setShowModal(null);
       await fetchData();
-    } catch (e) { alert('エラーが発生しました。'); }
+    } catch (e) { showToast('エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 
   const handleDelete = async (item: any) => {
-    if (!confirm(`「${item.name || item.label || item.id}」を削除しますか？`)) return;
+    if (!await showConfirm(`「${item.name || item.label || item.id}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       await fetch(`/api/pricing?type=${tab}&id=${item.id}`, { method: 'DELETE' });
       await fetchData();
-    } catch (e) { alert('削除に失敗しました。'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   };
 
   const tabs = [

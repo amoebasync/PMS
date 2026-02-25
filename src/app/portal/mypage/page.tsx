@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
   DRAFT: { label: '一時保存', color: 'bg-slate-100 text-slate-600', icon: 'bi-save' },
@@ -25,6 +26,7 @@ const FOLDING_OPTIONS = ['なし', '2つ折り', '3つ折り (巻き)', '3つ折
 
 export default function PortalMyPage() {
   const router = useRouter();
+  const { showToast, showConfirm } = useNotification();
   const [user, setUser] = useState<any>(null);
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -108,8 +110,7 @@ export default function PortalMyPage() {
     if (!file) return;
 
     if (file.size > 10 * 1024 * 1024) { // 10MB以上
-      alert('ファイルサイズが大きすぎます。10MB以上のデータは、GigaFile便などのURLを備考欄に貼り付けてください。');
-      return;
+      showToast('ファイルサイズが大きすぎます。10MB以上はGigaFile便などのURLを備考欄に貼り付けてください', 'warning'); return;
     }
 
     setIsUploading(true);
@@ -121,11 +122,11 @@ export default function PortalMyPage() {
       const data = await res.json();
       if (data.url) {
         setSubmitForm(prev => ({ ...prev, designFileUrl: data.url }));
-        alert('アップロードが完了しました。');
+        showToast('アップロードが完了しました', 'success');
       } else {
-        alert('アップロードに失敗しました。');
+        showToast('アップロードに失敗しました', 'error');
       }
-    } catch (err) { alert('通信エラーが発生しました。'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
     setIsUploading(false);
   };
 
@@ -135,7 +136,7 @@ export default function PortalMyPage() {
     
     // URLもファイルもない場合は警告
     if (!submitForm.designFileUrl && !submitForm.remarks.includes('http')) {
-      if (!confirm('入稿データが添付されていません。備考欄のURLから入稿しますか？\n(データがない場合は後からメール等で送付をお願いします)')) return;
+      if (!await showConfirm('入稿データが添付されていません。備考欄のURLから入稿しますか？', { variant: 'warning', detail: 'データがない場合は後からメール等で送付をお願いします', confirmLabel: '入稿する' })) return;
     }
 
     setIsSubmitting(true);
@@ -146,13 +147,13 @@ export default function PortalMyPage() {
         body: JSON.stringify(submitForm)
       });
       if (res.ok) {
-        alert('データを入稿しました！審査へ進みます。');
+        showToast('データを入稿しました。審査へ進みます', 'success');
         setIsSubmitModalOpen(false);
         fetchData();
       } else {
-        alert('エラーが発生しました');
+        showToast('エラーが発生しました', 'error');
       }
-    } catch (err) { alert('通信エラーが発生しました'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 

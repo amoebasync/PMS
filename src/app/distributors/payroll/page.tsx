@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Distributor = {
   id: number;
@@ -9,19 +10,11 @@ type Distributor = {
   name: string;
 };
 
-type PayrollRecord = {
-  id: number;
-  distributorId: number;
-  distributor: { id: number; staffId: string; name: string };
-  periodStart: string;
-  periodEnd: string;
-  paymentDate: string;
-  schedulePay: number;
-  expensePay: number;
-  grossPay: number;
-  status: 'DRAFT' | 'CONFIRMED' | 'PAID';
-  note: string | null;
-  items: PayrollItem[];
+type DailyExpense = {
+  date: string;
+  amount: number;
+  description: string;
+  status: string;
 };
 
 type PayrollItem = {
@@ -37,13 +30,32 @@ type PayrollItem = {
   earnedAmount: number;
 };
 
+type PayrollRecord = {
+  id: number;
+  distributorId: number;
+  distributor: { id: number; staffId: string; name: string };
+  periodStart: string;
+  periodEnd: string;
+  paymentDate: string;
+  schedulePay: number;
+  expensePay: number;
+  grossPay: number;
+  status: 'DRAFT' | 'CONFIRMED' | 'PAID';
+  note: string | null;
+  items: PayrollItem[];
+  expenses: DailyExpense[];
+};
+
 // 指定日の週の日曜日を返す
 function getSunday(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day);
+  d.setDate(d.getDate() - d.getDay());
   return d;
+}
+
+function isoDate(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatDateJa(dateStr: string): string {
@@ -56,9 +68,7 @@ function formatDateFull(dateStr: string): string {
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
 }
 
-function isoDate(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
 
 const statusConfig = {
   DRAFT:     { label: '下書き',  color: 'bg-slate-100 text-slate-600' },
@@ -67,25 +77,35 @@ const statusConfig = {
 };
 
 export default function DistributorPayrollPage() {
+  const { showConfirm } = useNotification();
   const today = new Date();
   const [weekStart, setWeekStart] = useState<Date>(() => getSunday(today));
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState<Record<number, boolean>>({});
+  const [generatingAll, setGeneratingAll] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<Record<number, boolean>>({});
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
 
-  const weekLabel = `${formatDateJa(isoDate(weekStart))}（日）〜 ${formatDateJa(isoDate(weekEnd))}（土）`;
+  // 週の各日付を生成 (日〜土)
+  const weekDays: Date[] = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
 
-  // 配布員一覧
+  const weekLabel = `${formatDateJa(isoDate(weekStart))}（日）〜 ${formatDateJa(isoDate(weekEnd))}（土）`;
+  const paymentDate = new Date(weekEnd);
+  paymentDate.setDate(paymentDate.getDate() + 6);
+
   useEffect(() => {
-    fetch('/api/distributors?limit=500')
+    fetch('/api/distributors')
       .then((r) => r.json())
-      .then((data) => setDistributors(data.distributors || []));
+      .then((data) => setDistributors(Array.isArray(data) ? data : (data.distributors || [])));
   }, []);
 
   const fetchRecords = useCallback(async () => {
@@ -111,6 +131,22 @@ export default function DistributorPayrollPage() {
     setGenerating((prev) => ({ ...prev, [distributorId]: false }));
   };
 
+  // 全員一斉計算
+  const handleGenerateAll = async () => {
+    setGeneratingAll(true);
+    for (const dist of distributors) {
+      setGenerating((prev) => ({ ...prev, [dist.id]: true }));
+      await fetch('/api/distributor-payroll/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ distributorId: dist.id, weekStart: isoDate(weekStart) }),
+      });
+      setGenerating((prev) => ({ ...prev, [dist.id]: false }));
+    }
+    await fetchRecords();
+    setGeneratingAll(false);
+  };
+
   const handleStatusChange = async (recordId: number, status: string) => {
     setStatusUpdating((prev) => ({ ...prev, [recordId]: true }));
     await fetch(`/api/distributor-payroll/${recordId}`, {
@@ -123,18 +159,32 @@ export default function DistributorPayrollPage() {
   };
 
   const handleDelete = async (recordId: number) => {
-    if (!confirm('この給与レコードを削除しますか？')) return;
+    if (!await showConfirm('この給与レコードを削除しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
     await fetch(`/api/distributor-payroll/${recordId}`, { method: 'DELETE' });
     await fetchRecords();
   };
 
-  // 配布員ごとにレコードをマップ
   const recordMap = new Map(records.map((r) => [r.distributorId, r]));
 
-  // 生成済み合計
   const totalSchedulePay = records.reduce((s, r) => s + r.schedulePay, 0);
-  const totalExpensePay = records.reduce((s, r) => s + r.expensePay, 0);
-  const totalGross = records.reduce((s, r) => s + r.grossPay, 0);
+  const totalExpensePay  = records.reduce((s, r) => s + r.expensePay, 0);
+  const totalGross       = records.reduce((s, r) => s + r.grossPay, 0);
+
+  // レコードの日別集計を生成
+  function buildDailyRows(record: PayrollRecord) {
+    return weekDays.map((day) => {
+      const dayStr = isoDate(day);
+      const scheduleEarned = record.items
+        .filter((item) => item.date.startsWith(dayStr))
+        .reduce((s, item) => s + item.earnedAmount, 0);
+      const scheduleItems = record.items.filter((item) => item.date.startsWith(dayStr));
+      const expenseAmount = record.expenses
+        .filter((e) => e.date.startsWith(dayStr))
+        .reduce((s, e) => s + e.amount, 0);
+      const total = scheduleEarned + expenseAmount;
+      return { day, dayStr, scheduleEarned, scheduleItems, expenseAmount, total };
+    });
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -148,6 +198,20 @@ export default function DistributorPayrollPage() {
           </div>
           <h1 className="text-2xl font-black text-slate-800">配布員 給与管理</h1>
         </div>
+        {/* 全員一斉計算ボタン */}
+        {distributors.length > 0 && (
+          <button
+            onClick={handleGenerateAll}
+            disabled={generatingAll || loading}
+            className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-60"
+          >
+            {generatingAll ? (
+              <><i className="bi bi-arrow-repeat animate-spin"></i>計算中...</>
+            ) : (
+              <><i className="bi bi-calculator-fill"></i>全員一斉計算</>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Week navigation */}
@@ -161,7 +225,7 @@ export default function DistributorPayrollPage() {
         <div className="text-center">
           <p className="font-bold text-slate-800">{weekLabel}</p>
           <p className="text-xs text-slate-400 mt-0.5">
-            支払日: {formatDateFull(isoDate((() => { const d = new Date(weekEnd); d.setDate(d.getDate() + 6); return d; })()))}（金）
+            支払日: {formatDateFull(isoDate(paymentDate))}（金）
           </p>
         </div>
         <button
@@ -176,9 +240,9 @@ export default function DistributorPayrollPage() {
       {records.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: '配布報酬', value: totalSchedulePay, color: 'text-indigo-600' },
-            { label: '交通費',   value: totalExpensePay,  color: 'text-emerald-600' },
-            { label: '合計支給', value: totalGross,       color: 'text-slate-800' },
+            { label: '配布報酬合計', value: totalSchedulePay, color: 'text-indigo-600' },
+            { label: '交通費合計',   value: totalExpensePay,  color: 'text-emerald-600' },
+            { label: '総支給合計',   value: totalGross,       color: 'text-slate-800' },
           ].map(({ label, value, color }) => (
             <div key={label} className="bg-white rounded-2xl border border-slate-200 p-4 text-center">
               <p className="text-xs text-slate-500 mb-1">{label}</p>
@@ -197,18 +261,24 @@ export default function DistributorPayrollPage() {
         <div className="space-y-3">
           {distributors.map((dist) => {
             const record = recordMap.get(dist.id);
-            const isExpanded = expandedId === (record?.id ?? null);
+            const isExpanded = expandedId === (record?.id ?? -1);
+            const dailyRows = record ? buildDailyRows(record) : [];
 
             return (
               <div key={dist.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                {/* Row header */}
                 <div className="flex items-center gap-4 px-5 py-4">
-                  {/* Name */}
                   <div className="flex-1 min-w-0">
                     <p className="text-xs text-slate-400">{dist.staffId}</p>
                     <p className="font-bold text-slate-800">{dist.name}</p>
                   </div>
 
-                  {/* Record info */}
+                  {generating[dist.id] && !record && (
+                    <span className="text-xs text-indigo-500 flex items-center gap-1">
+                      <i className="bi bi-arrow-repeat animate-spin"></i>計算中
+                    </span>
+                  )}
+
                   {record ? (
                     <>
                       <div className="text-right">
@@ -222,7 +292,7 @@ export default function DistributorPayrollPage() {
                       </span>
                       <button
                         onClick={() => setExpandedId(isExpanded ? null : record.id)}
-                        className="text-slate-400 hover:text-slate-700 transition-colors"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                       >
                         <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'}`}></i>
                       </button>
@@ -245,32 +315,66 @@ export default function DistributorPayrollPage() {
                 {/* Expanded detail */}
                 {record && isExpanded && (
                   <div className="border-t border-slate-100 px-5 py-4 space-y-4">
-                    {/* Line items */}
-                    {record.items.length > 0 ? (
-                      <div>
-                        <p className="text-xs font-bold text-slate-500 mb-2">配布明細</p>
-                        <div className="space-y-1.5">
-                          {record.items.map((item) => (
-                            <div key={item.id} className="flex items-center gap-3 text-xs">
-                              <span className="text-slate-500 w-12 shrink-0">{formatDateJa(item.date)}</span>
-                              <span className="text-slate-500">{item.flyerTypeCount}種 × ¥{item.unitPrice.toFixed(1)}/post</span>
-                              <span className="text-slate-600 font-medium">{item.actualCount.toLocaleString()}ポスト</span>
-                              <span className="ml-auto font-bold text-slate-800">¥{item.earnedAmount.toLocaleString()}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-slate-400">投函数が入力されているスケジュールがありません</p>
-                    )}
 
-                    {/* Expense pay */}
-                    {record.expensePay > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-500">交通費合計</span>
-                        <span className="font-bold text-emerald-600">¥{record.expensePay.toLocaleString()}</span>
+                    {/* 日別明細テーブル */}
+                    <div>
+                      <p className="text-xs font-bold text-slate-500 mb-2">日別明細</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-100">
+                              <th className="text-left py-2 pr-3 font-bold text-slate-500 w-16">日付</th>
+                              <th className="text-right py-2 px-3 font-bold text-slate-500">配布内容</th>
+                              <th className="text-right py-2 px-3 font-bold text-indigo-500">配布報酬</th>
+                              <th className="text-right py-2 px-3 font-bold text-emerald-600">交通費</th>
+                              <th className="text-right py-2 pl-3 font-bold text-slate-800">合計</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dailyRows.map(({ day, dayStr, scheduleEarned, scheduleItems, expenseAmount, total }) => {
+                              const dayLabel = DAY_LABELS[day.getDay()];
+                              const isWeekend = day.getDay() === 0 || day.getDay() === 6;
+                              const hasData = total > 0;
+                              return (
+                                <tr
+                                  key={dayStr}
+                                  className={`border-b border-slate-50 ${hasData ? '' : 'opacity-40'}`}
+                                >
+                                  <td className={`py-2 pr-3 font-bold ${day.getDay() === 0 ? 'text-rose-500' : day.getDay() === 6 ? 'text-blue-500' : 'text-slate-700'}`}>
+                                    {formatDateJa(dayStr)}（{dayLabel}）
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-slate-500">
+                                    {scheduleItems.length > 0
+                                      ? scheduleItems.map((item) =>
+                                          `${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount.toLocaleString()}投`
+                                        ).join(' / ')
+                                      : '—'}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-medium text-indigo-600">
+                                    {scheduleEarned > 0 ? `¥${scheduleEarned.toLocaleString()}` : '—'}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-medium text-emerald-600">
+                                    {expenseAmount > 0 ? `¥${expenseAmount.toLocaleString()}` : '—'}
+                                  </td>
+                                  <td className="py-2 pl-3 text-right font-bold text-slate-800">
+                                    {total > 0 ? `¥${total.toLocaleString()}` : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="border-t-2 border-slate-200">
+                              <td className="pt-2 pr-3 font-bold text-slate-600 text-xs">週計</td>
+                              <td></td>
+                              <td className="pt-2 px-3 text-right font-black text-indigo-600">¥{record.schedulePay.toLocaleString()}</td>
+                              <td className="pt-2 px-3 text-right font-black text-emerald-600">¥{record.expensePay.toLocaleString()}</td>
+                              <td className="pt-2 pl-3 text-right font-black text-slate-800">¥{record.grossPay.toLocaleString()}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
                       </div>
-                    )}
+                    </div>
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">

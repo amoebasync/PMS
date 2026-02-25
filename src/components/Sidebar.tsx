@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image'; 
+import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -21,6 +22,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   const [approvalPendingCount, setApprovalPendingCount] = useState(0);
 
   const [userProfile, setUserProfile] = useState<any>(null);
+  const { showToast } = useNotification();
 
   useEffect(() => {
     setMounted(true);
@@ -64,7 +66,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       router.push('/login');
       router.refresh();
     } catch (e) {
-      alert('ログアウトに失敗しました');
+      showToast('ログアウトに失敗しました', 'error');
     }
   };
 
@@ -72,17 +74,20 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
     {
       title: 'WORKFLOW',
       items: [
-        { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' }, 
+        { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' },
         { name: 'マイ勤怠・経費', href: '/attendance', icon: 'bi-clock-history' },
-        { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' }, 
+        { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' },
         { name: 'スケジュール照会', href: '/schedules', icon: 'bi-calendar-check' },
-        { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' }, 
+        { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' },
+        { name: 'CRM / タスク', href: '/crm/tasks', icon: 'bi-check2-all' },
+        { name: '見込み客管理', href: '/crm/leads', icon: 'bi-funnel-fill' },
       ]
     },
     {
       title: 'MASTERS',
       items: [
         { name: '顧客管理', href: '/customers', icon: 'bi-buildings-fill' },
+        { name: 'キャンペーン', href: '/campaigns', icon: 'bi-megaphone-fill' },
         { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
         { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
         { name: '入出庫・納品管理', href: '/transactions', icon: 'bi-box-seam' },
@@ -93,7 +98,8 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
       title: 'ORGANIZATION',
       items: [
         { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
-        { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' }, 
+        { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' },
+        { name: '配布員給与', href: '/distributors/payroll', icon: 'bi-cash-coin' },
         { name: '支店管理', href: '/branches', icon: 'bi-shop' },
         { name: '人事・経費承認', href: '/approvals', icon: 'bi-check2-square' },
         { name: '給与計算', href: '/payroll', icon: 'bi-cash-stack' },
@@ -135,7 +141,11 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
             )}
             <div className="space-y-1">
               {group.items.map((item) => {
-                const isActive = item.href === '/' ? pathname === '/' : pathname === item.href || pathname.startsWith(`${item.href}/`);
+                const isActive = item.href === '/'
+                  ? pathname === '/'
+                  : item.href === '/distributors'
+                  ? pathname === '/distributors' || (pathname.startsWith('/distributors/') && !pathname.startsWith('/distributors/payroll'))
+                  : pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link 
                     key={item.href} 

@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 // ステータス定義
 const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
@@ -37,6 +38,7 @@ function PortalOrdersContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetOrderId = searchParams.get('orderId');
+  const { showToast, showConfirm } = useNotification();
 
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,23 +90,23 @@ function PortalOrdersContent() {
     try {
       const res = await fetch(`/api/portal/orders/${selectedOrder.id}/cancel`, { method: 'PUT' });
       if (res.ok) {
-        alert('発注をキャンセルしました。');
+        showToast('発注をキャンセルしました', 'success');
         setIsCancelModalOpen(false);
         closeOrderModal();
         fetchData();
       } else {
         const err = await res.json();
-        alert(err.error || 'キャンセルの処理に失敗しました。');
+        showToast(err.error || 'キャンセルの処理に失敗しました', 'error');
       }
     } catch (e) {
-      alert('通信エラーが発生しました。');
+      showToast('通信エラーが発生しました', 'error');
     }
     setIsCanceling(false);
   };
 
   const handleSendInquiry = (e: React.FormEvent) => {
     e.preventDefault();
-    alert('お問い合わせを送信しました。\n担当者よりご登録のメールアドレスへご連絡いたします。');
+    showToast('お問い合わせを送信しました。担当者よりご登録のメールアドレスへご連絡いたします', 'success');
     setIsInquiryModalOpen(false);
     setInquiryText('');
   };
@@ -200,14 +202,14 @@ function PortalOrdersContent() {
         fetchQrCodes(flyerId);
       } else {
         const err = await res.json();
-        alert(err.error || 'エラーが発生しました');
+        showToast(err.error || 'エラーが発生しました', 'error');
       }
-    } catch (e) { alert('通信エラーが発生しました'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
     setIsQrSaving(false);
   };
 
   const deleteQrCode = async (qrId: number, flyerId: number) => {
-    if (!confirm('このQRコードを削除しますか？\nスキャン履歴も削除されます。この操作は元に戻せません。')) return;
+    if (!await showConfirm('このQRコードを削除しますか？', { variant: 'danger', detail: 'スキャン履歴も削除されます。この操作は元に戻せません。', confirmLabel: '削除する' })) return;
     const res = await fetch(`/api/portal/qrcodes/${qrId}`, { method: 'DELETE' });
     if (res.ok) fetchQrCodes(flyerId);
   };
@@ -263,9 +265,9 @@ function PortalOrdersContent() {
         setStandaloneQrCodes(prev => prev.filter(q => q.id !== qrId));
         fetchQrCodes(flyerId);
       } else {
-        alert('割り当てに失敗しました。');
+        showToast('割り当てに失敗しました', 'error');
       }
-    } catch (e) { alert('通信エラーが発生しました。'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
     setIsAssigning(null);
   };
 

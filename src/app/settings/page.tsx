@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
 type Industry = { id: number; name: string; _count: { flyers: number } };
@@ -22,6 +23,7 @@ const WEEK_DAY_OPTIONS = [
 const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500';
 
 export default function SettingsPage() {
+  const { showToast, showConfirm } = useNotification();
   const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod'>('general');
 
   // 全般設定
@@ -88,7 +90,7 @@ export default function SettingsPage() {
       setSystemSettings(prev => ({ ...prev, [key]: value }));
       setSystemSaved(true);
       setTimeout(() => setSystemSaved(false), 2000);
-    } catch (e) { alert('保存に失敗しました'); }
+    } catch (e) { showToast('保存に失敗しました', 'error'); }
     setIsSavingSystem(false);
   };
 
@@ -141,12 +143,12 @@ export default function SettingsPage() {
       }
       setShowModal(null);
       await fetchData();
-    } catch (e) { alert('エラーが発生しました。'); }
+    } catch (e) { showToast('エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 
   const handleDelete = async (item: any) => {
-    if (!confirm(`「${item.name}」を削除しますか？`)) return;
+    if (!await showConfirm(`「${item.name}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' })) return;
     const apiBase = isPricingTab ? '/api/pricing' : '/api/settings/masters';
     const res = await fetch(`${apiBase}?type=${tab}&id=${item.id}`, { method: 'DELETE' });
     if (res.status === 409) {

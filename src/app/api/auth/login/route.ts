@@ -33,14 +33,29 @@ export async function POST(request: Request) {
     // 3. 認証成功: Cookieにセッション情報を保存 (Next.js 15+ の書き方)
     const cookieStore = await cookies();
     cookieStore.set('pms_session', employee.id.toString(), {
-      httpOnly: true, // JavaScriptからのアクセスを禁止（セキュリティ対策）
+      httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 7 // 7日間有効
     });
 
-    return NextResponse.json({ success: true, user: { name: employee.lastNameJa } });
+    // 初回ログイン / 仮パスワードの場合: 強制変更フラグ Cookie をセット
+    if (employee.mustChangePassword) {
+      cookieStore.set('pms_force_pw_change', '1', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 // 24時間（変更完了で消去）
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      user: { name: employee.lastNameJa },
+      mustChangePassword: employee.mustChangePassword,
+    });
 
   } catch (error) {
     console.error('Login API Error:', error);

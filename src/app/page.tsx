@@ -3,6 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
+// カテゴリ設定マップ
+const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: string; bgColor: string; textColor: string; badgeBg: string; badgeText: string }> = {
+  UPDATE:      { label: 'アップデート', color: 'indigo',  icon: 'bi-stars',                      bgColor: 'bg-indigo-50',  textColor: 'text-indigo-600',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-600' },
+  MAINTENANCE: { label: 'メンテナンス', color: 'rose',    icon: 'bi-tools',                       bgColor: 'bg-rose-50',    textColor: 'text-rose-600',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-600' },
+  IMPORTANT:   { label: '重要',         color: 'amber',   icon: 'bi-exclamation-triangle-fill',   bgColor: 'bg-amber-50',   textColor: 'text-amber-600',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700' },
+  NOTICE:      { label: 'お知らせ',     color: 'emerald', icon: 'bi-bell-fill',                   bgColor: 'bg-emerald-50', textColor: 'text-emerald-600', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-600' },
+  OTHER:       { label: 'その他',       color: 'slate',   icon: 'bi-megaphone-fill',              bgColor: 'bg-slate-100',  textColor: 'text-slate-500',   badgeBg: 'bg-slate-100',  badgeText: 'text-slate-600' },
+};
+
 // スッキリさせたKPIカードコンポーネント
 const StatCard = ({ title, value, subValue, icon, color }: any) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors flex flex-col justify-between h-full">
@@ -29,12 +38,28 @@ export default function Dashboard() {
   const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [latency, setLatency] = useState<number | null>(null);
   const [data, setData] = useState<any>(null);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const res = await fetch('/api/dashboard');
-        if (res.ok) setData(await res.json());
+        const [dashRes, announcementsRes, profileRes] = await Promise.all([
+          fetch('/api/dashboard'),
+          fetch('/api/announcements'),
+          fetch('/api/profile'),
+        ]);
+        if (dashRes.ok) setData(await dashRes.json());
+        if (announcementsRes.ok) {
+          const ann = await announcementsRes.json();
+          setAnnouncements(Array.isArray(ann) ? ann : []);
+        }
+        if (profileRes.ok) {
+          const profile = await profileRes.json();
+          const roles: string[] = profile?.roles?.map((r: any) => r.role?.code) || [];
+          const primaryRoleCode: string = profile?.role?.code || '';
+          setIsSuperAdmin(roles.includes('SUPER_ADMIN') || primaryRoleCode === 'SUPER_ADMIN');
+        }
       } catch (e) { console.error(e); }
     };
     fetchDashboardData();
@@ -68,8 +93,8 @@ export default function Dashboard() {
       </div>
 
       {/* --- ★ アラートエリア (要対応タスク) --- */}
-      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0) && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.alerts.orders > 0 && (
             <Link href="/orders" className="bg-orange-50 border border-orange-200 p-4 rounded-xl shadow-sm flex items-center justify-between group hover:bg-orange-100 transition-colors">
               <div className="flex items-center gap-4">
@@ -96,6 +121,20 @@ export default function Dashboard() {
                 </div>
               </div>
               <i className="bi bi-chevron-right text-rose-400 group-hover:text-rose-600"></i>
+            </Link>
+          )}
+          {data.crm?.overdueTaskCount > 0 && (
+            <Link href="/crm/tasks?dueDate=overdue" className="bg-red-50 border border-red-200 p-4 rounded-xl shadow-sm flex items-center justify-between group hover:bg-red-100 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-lg shadow-inner shrink-0">
+                  <i className="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div>
+                  <h4 className="font-bold text-red-800 text-sm">期限超過タスク</h4>
+                  <p className="text-xs text-red-600 mt-0.5">期限を超えたタスクが <span className="font-black text-base">{data.crm.overdueTaskCount}</span> 件あります</p>
+                </div>
+              </div>
+              <i className="bi bi-chevron-right text-red-400 group-hover:text-red-600"></i>
             </Link>
           )}
         </div>
@@ -146,45 +185,119 @@ export default function Dashboard() {
             <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
               <i className="bi bi-megaphone-fill text-indigo-500"></i> 全体お知らせ
             </h3>
+            {isSuperAdmin && (
+              <Link
+                href="/announcements"
+                className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                <i className="bi bi-gear-fill text-[10px]"></i> 管理
+              </Link>
+            )}
           </div>
           <div className="p-6 space-y-6">
-            
-            <div className="flex gap-4 items-start">
-              <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center text-lg shrink-0 mt-1"><i className="bi bi-stars"></i></div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">アップデート</span>
-                  <span className="text-[10px] text-slate-400 font-mono">2026/02/22</span>
+            {announcements.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
+                  <i className="bi bi-megaphone text-xl"></i>
                 </div>
-                <h4 className="font-bold text-slate-800 text-sm mb-1.5">ダッシュボードのデザインを刷新しました</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  ダッシュボードのレイアウトを見直し、日々の業務に必要なKPI（アラートや本日の出勤人数・配布枚数）が一目でわかるように改善しました。
-                </p>
+                <p className="text-slate-500 text-sm font-medium">お知らせはまだありません</p>
+                {isSuperAdmin && (
+                  <Link href="/announcements" className="mt-2 text-xs text-indigo-500 hover:underline">
+                    お知らせを投稿する →
+                  </Link>
+                )}
               </div>
-            </div>
-
-            <div className="w-full h-px bg-slate-100"></div>
-
-            <div className="flex gap-4 items-start">
-              <div className="w-10 h-10 bg-rose-50 text-rose-600 rounded-lg flex items-center justify-center text-lg shrink-0 mt-1"><i className="bi bi-tools"></i></div>
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">メンテナンス</span>
-                  <span className="text-[10px] text-slate-400 font-mono">2026/02/15</span>
-                </div>
-                <h4 className="font-bold text-slate-800 text-sm mb-1.5">定期システムメンテナンスのお知らせ</h4>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  次回のシステムメンテナンスは 2月25日（水）の深夜 2:00〜4:00 を予定しています。この間は一時的にシステムにアクセスできなくなります。
-                </p>
-              </div>
-            </div>
-
+            ) : (
+              announcements.map((a, i) => {
+                const cfg = CATEGORY_CONFIG[a.category] || CATEGORY_CONFIG.OTHER;
+                const dateStr = new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
+                return (
+                  <React.Fragment key={a.id}>
+                    {i > 0 && <div className="w-full h-px bg-slate-100"></div>}
+                    <div className="flex gap-4 items-start">
+                      <div className={`w-10 h-10 ${cfg.bgColor} ${cfg.textColor} rounded-lg flex items-center justify-center text-lg shrink-0 mt-1`}>
+                        <i className={`bi ${cfg.icon}`}></i>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`text-[10px] font-bold ${cfg.badgeText} ${cfg.badgeBg} px-2 py-0.5 rounded`}>{cfg.label}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{dateStr}</span>
+                        </div>
+                        <h4 className="font-bold text-slate-800 text-sm mb-1.5">{a.title}</h4>
+                        <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">{a.content}</p>
+                      </div>
+                    </div>
+                  </React.Fragment>
+                );
+              })
+            )}
           </div>
         </div>
 
         {/* 右側: サブ情報 (ステータス・EC状況) */}
         <div className="space-y-6">
-          
+
+          {/* 本日のタスク */}
+          {data?.crm && (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                  <i className="bi bi-check2-all text-indigo-500"></i> 本日のタスク
+                </h3>
+                <Link href="/crm/tasks" className="text-xs text-blue-600 hover:underline">すべて見る</Link>
+              </div>
+              {data.crm.dueTodayTaskCount > 0 && (
+                <div className="mb-3 text-xs text-orange-600 bg-orange-50 px-2 py-1.5 rounded-lg font-medium">
+                  <i className="bi bi-clock-fill mr-1"></i> 本日期限: {data.crm.dueTodayTaskCount} 件
+                </div>
+              )}
+              {data.crm.myTasks.length === 0 ? (
+                <p className="text-xs text-slate-400 text-center py-3">担当タスクなし</p>
+              ) : (
+                <div className="space-y-2">
+                  {data.crm.myTasks.map((task: any) => {
+                    const dueDate = new Date(task.dueDate);
+                    const today = new Date();
+                    today.setHours(0,0,0,0);
+                    dueDate.setHours(0,0,0,0);
+                    const isOverdue = dueDate < today;
+                    return (
+                      <div key={task.id} className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-50 last:border-0">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{task.title}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[10px] font-medium ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                              {isOverdue && <i className="bi bi-exclamation-triangle-fill mr-0.5"></i>}
+                              {dueDate.toLocaleDateString('ja-JP')}
+                            </span>
+                            {task.customer && (
+                              <span className="text-[10px] text-slate-400">· {task.customer.name}</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={async () => {
+                            await fetch(`/api/tasks/${task.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ status: 'DONE' }),
+                            });
+                            const res = await fetch('/api/dashboard');
+                            if (res.ok) setData(await res.json());
+                          }}
+                          className="text-green-600 hover:bg-green-50 p-1 rounded transition-colors shrink-0"
+                          title="完了"
+                        >
+                          <i className="bi bi-check-lg text-base"></i>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ECポータル利用状況 (コンパクト化) */}
           {data && (
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">

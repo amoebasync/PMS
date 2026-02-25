@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { handlePhoneChange } from '@/lib/formatters';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 // --- 型定義 ---
 type Department = { id: number; code: string; name: string };
@@ -97,13 +98,18 @@ export default function EmployeePage() {
   const [leaveLedgers, setLeaveLedgers] = useState<any[]>([]);
   const [isLeaveFormOpen, setIsLeaveFormOpen] = useState(false);
   const [isLeaveSubmitting, setIsLeaveSubmitting] = useState(false);
+
+  const [sendingWelcomeId, setSendingWelcomeId] = useState<number | null>(null);
+  const [welcomeToast, setWelcomeToast] = useState<{ id: number; name: string } | null>(null);
+  const [isToastExiting, setIsToastExiting] = useState(false);
+  const [pendingWelcomeEmp, setPendingWelcomeEmp] = useState<Employee | null>(null);
   const [leaveForm, setLeaveForm] = useState({
     date: new Date().toISOString().split('T')[0], type: 'GRANTED', days: '', validUntil: '', note: ''
   });
 
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
-    lastNameEn: '', firstNameEn: '', email: '', phone: '', password: 'password123', 
+    lastNameEn: '', firstNameEn: '', email: '', phone: '',
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as 'male' | 'female' | 'other' | 'unknown',
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
     rank: 'ASSOCIATE', jobTitle: '', managerId: '',
@@ -115,6 +121,8 @@ export default function EmployeePage() {
   };
   
   const [formData, setFormData] = useState(initialForm);
+
+  const { showToast, showConfirm } = useNotification();
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -172,7 +180,7 @@ export default function EmployeePage() {
         lastNameJa: employee.lastNameJa, firstNameJa: employee.firstNameJa,
         lastNameKana: employee.lastNameKana || '', firstNameKana: employee.firstNameKana || '',
         lastNameEn: employee.lastNameEn || '', firstNameEn: employee.firstNameEn || '',
-        email: employee.email, phone: employee.phone || '', password: '', 
+        email: employee.email, phone: employee.phone || '',
         hireDate: employee.hireDate && !isNaN(new Date(employee.hireDate).getTime()) ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
         birthday: employee.birthday && !isNaN(new Date(employee.birthday).getTime()) ? new Date(employee.birthday).toISOString().split('T')[0] : '', 
         gender: employee.gender || 'unknown',
@@ -248,7 +256,7 @@ export default function EmployeePage() {
 
       setIsFormModalOpen(false);
       fetchData();
-    } catch (error) { alert('保存に失敗しました'); }
+    } catch (error) { showToast('保存に失敗しました', 'error'); }
   };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
@@ -261,31 +269,70 @@ export default function EmployeePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        alert('有給休暇を登録しました');
+        showToast('有給休暇を登録しました', 'success');
         setSelectedEmployee(prev => prev ? { ...prev, financial: { ...prev.financial, paidLeaveBalance: data.newBalance } } : prev);
         const ledgersRes = await fetch(`/api/employees/${selectedEmployee.id}/leave`);
         if (ledgersRes.ok) setLeaveLedgers(await ledgersRes.json());
         setIsLeaveFormOpen(false);
       } else {
         const data = await res.json();
-        alert(`登録エラー: ${data.error}`);
+        showToast(`登録エラー: ${data.error}`, 'error');
       }
-    } catch (error) { alert('通信エラーが発生しました'); }
+    } catch (error) { showToast('通信エラーが発生しました', 'error'); }
     setIsLeaveSubmitting(false);
   };
 
   const handlePasswordReset = async () => {
     if (!currentId) return;
-    if (!confirm('この社員のパスワードをリセットしますか？\n新しいパスワードが自動生成されます。')) return;
+    if (!await showConfirm('この社員のパスワードをリセットしますか？\n新しいパスワードが自動生成されます。', { variant: 'warning', confirmLabel: 'リセットする' })) return;
     try {
       const res = await fetch(`/api/employees/${currentId}/reset`, { method: 'POST' });
       if (!res.ok) throw new Error('Reset failed');
       const data = await res.json();
-      alert(`パスワードをリセットしました。\n\n新しいパスワード: ${data.newPassword}\n\nこのパスワードを社員に伝えてください。画面を閉じると二度と表示されません。`);
-    } catch (error) { alert('パスワードリセットに失敗しました'); }
+      await showConfirm(`新しいパスワード: ${data.newPassword}\n\nこのパスワードを社員に伝えてください。`, {
+        title: 'パスワードをリセットしました',
+        infoOnly: true,
+        confirmLabel: '閉じる',
+        variant: 'success',
+      });
+    } catch (error) { showToast('パスワードリセットに失敗しました', 'error'); }
   };
 
   const confirmDelete = (e: React.MouseEvent, id: number) => { e.stopPropagation(); setCurrentId(id); setIsDeleteModalOpen(true); };
+
+  const handleSendWelcome = (e: React.MouseEvent, emp: Employee) => {
+    e.stopPropagation();
+    setPendingWelcomeEmp(emp);
+  };
+
+  const dismissWelcomeToast = () => {
+    setIsToastExiting(true);
+    setTimeout(() => {
+      setWelcomeToast(null);
+      setIsToastExiting(false);
+    }, 350);
+  };
+
+  const executeSendWelcome = async () => {
+    if (!pendingWelcomeEmp) return;
+    const emp = pendingWelcomeEmp;
+    setPendingWelcomeEmp(null);
+    setSendingWelcomeId(emp.id);
+    try {
+      const res = await fetch(`/api/employees/${emp.id}/send-welcome`, { method: 'POST' });
+      if (res.ok) {
+        setIsToastExiting(false);
+        setWelcomeToast({ id: emp.id, name: `${emp.lastNameJa} ${emp.firstNameJa}` });
+        setTimeout(() => dismissWelcomeToast(), 4000);
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'メールの送信に失敗しました', 'error');
+      }
+    } catch {
+      showToast('通信エラーが発生しました', 'error');
+    }
+    setSendingWelcomeId(null);
+  };
   const executeDelete = async () => {
     if (!currentId) return;
     try {
@@ -293,7 +340,7 @@ export default function EmployeePage() {
       if (!res.ok) throw new Error('Failed to delete');
       setIsDeleteModalOpen(false);
       fetchData();
-    } catch (error) { alert('削除に失敗しました'); }
+    } catch (error) { showToast('削除に失敗しました', 'error'); }
   };
 
   const filteredEmployees = employees.filter(emp => {
@@ -459,6 +506,17 @@ export default function EmployeePage() {
                   <td className="px-6 py-4 text-right">
                     {canEdit ? (
                       <div className="space-x-2">
+                        <button
+                          onClick={(e) => handleSendWelcome(e, emp)}
+                          disabled={sendingWelcomeId === emp.id}
+                          className="p-2 text-slate-400 hover:text-indigo-600 transition-colors disabled:opacity-50"
+                          title="ログイン案内メールを送信"
+                        >
+                          {sendingWelcomeId === emp.id
+                            ? <span className="inline-block w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></span>
+                            : <i className="bi bi-envelope-arrow-up text-lg"></i>
+                          }
+                        </button>
                         <button onClick={(e) => { e.stopPropagation(); openFormModal(emp); }} className="p-2 text-slate-400 hover:text-blue-600 transition-colors">
                           <i className="bi bi-pencil-square text-lg"></i>
                         </button>
@@ -919,8 +977,8 @@ export default function EmployeePage() {
                 </div>
               ) : (
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-2 text-xs text-blue-800">
-                  <i className="bi bi-info-circle-fill mt-0.5"></i>
-                  <p>初期パスワードは自動的に <code>password123</code> に設定されます。ログイン後に変更するよう伝えてください。</p>
+                  <i className="bi bi-info-circle-fill mt-0.5 shrink-0"></i>
+                  <p>初期パスワードは <strong>生年月日（YYYYMMDD形式）</strong> に自動設定されます。例：1990年4月1日 → <code>19900401</code>。初回ログイン時にパスワード変更が強制されます。</p>
                 </div>
               )}
 
@@ -950,6 +1008,83 @@ export default function EmployeePage() {
               <button onClick={executeDelete} className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors">削除実行</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* --- ウェルカムメール送信確認モーダル --- */}
+      {pendingWelcomeEmp && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* アイコンヘッダー */}
+            <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 px-6 pt-8 pb-6 flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
+                <i className="bi bi-envelope-arrow-up-fill text-white text-3xl"></i>
+              </div>
+              <h3 className="text-white font-black text-lg">ログイン案内メールを送信</h3>
+              <p className="text-indigo-200 text-sm mt-1">
+                {pendingWelcomeEmp.lastNameJa} {pendingWelcomeEmp.firstNameJa} さん
+              </p>
+            </div>
+
+            <div className="p-6">
+              {/* 送信内容サマリー */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 space-y-2 text-sm">
+                <div className="flex items-center gap-2 text-slate-600">
+                  <i className="bi bi-person text-slate-400 w-4 text-center"></i>
+                  <span>社員コード：<span className="font-bold text-slate-800">{pendingWelcomeEmp.employeeCode}</span></span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600">
+                  <i className="bi bi-envelope text-slate-400 w-4 text-center"></i>
+                  <span className="font-bold text-slate-800 break-all">{pendingWelcomeEmp.email}</span>
+                </div>
+              </div>
+
+              {/* 注意書き */}
+              <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+                <i className="bi bi-exclamation-triangle-fill text-amber-500 text-sm mt-0.5 shrink-0"></i>
+                <p className="text-amber-700 text-xs leading-relaxed">
+                  パスワードが<strong>生年月日（YYYYMMDD）にリセット</strong>され、次回ログイン時にパスワード変更が求められます。
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPendingWelcomeEmp(null)}
+                  className="flex-1 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={executeSendWelcome}
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors flex items-center justify-center gap-2"
+                >
+                  <i className="bi bi-send-fill text-xs"></i> 送信する
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- ウェルカムメール送信完了トースト --- */}
+      {welcomeToast && (
+        <div
+          className={`fixed bottom-6 right-6 z-[3000] flex items-center gap-3 bg-indigo-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-350 ease-in-out ${
+            isToastExiting
+              ? 'opacity-0 translate-y-3 scale-95'
+              : 'opacity-100 translate-y-0 scale-100 animate-in slide-in-from-bottom-4 fade-in duration-300'
+          }`}
+        >
+          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+            <i className="bi bi-envelope-check-fill text-sm"></i>
+          </div>
+          <div>
+            <p className="font-bold text-sm">{welcomeToast.name} さんへ送信完了</p>
+            <p className="text-indigo-200 text-xs mt-0.5">ログイン案内メールを送信しました</p>
+          </div>
+          <button onClick={dismissWelcomeToast} className="ml-2 text-white/60 hover:text-white transition-colors">
+            <i className="bi bi-x-lg text-sm"></i>
+          </button>
         </div>
       )}
     </div>

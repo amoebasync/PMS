@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { sendOrderConfirmationEmail } from '@/lib/mailer';
 
 const prisma = new PrismaClient();
 
@@ -152,6 +153,27 @@ export async function POST(request: Request) {
         }
       }
     });
+
+    // 発注確定メール送信（下書き保存の場合は送らない、fire-and-forget）
+    if (!isDraft && contact.email) {
+      const createdOrders = await prisma.order.findMany({
+        where: { id: { in: orderIds.map((o) => o.orderId) } },
+        select: { orderNo: true, title: true, totalAmount: true, status: true },
+      });
+      const myPageUrl = `${process.env.NEXTAUTH_URL}/portal/mypage`;
+      sendOrderConfirmationEmail(
+        contact.email,
+        contact.lastName,
+        contact.firstName,
+        createdOrders.map((o) => ({
+          orderNo: o.orderNo,
+          title: o.title || '(件名未設定)',
+          totalAmount: o.totalAmount || 0,
+          status: o.status,
+        })),
+        myPageUrl,
+      ).catch(console.error);
+    }
 
     return NextResponse.json({ success: true, orderIds });
   } catch (error) {

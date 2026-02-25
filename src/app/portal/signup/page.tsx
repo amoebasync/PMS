@@ -12,13 +12,16 @@ export default function SignupPage() {
   const router = useRouter();
   
   const [accountType, setAccountType] = useState<'company' | 'individual'>('company');
-  const [form, setForm] = useState({ 
-    companyName: '', 
-    lastName: '', 
-    firstName: '', 
-    email: '', 
-    password: '', 
-    confirmPassword: '' 
+  const [form, setForm] = useState({
+    companyName: '',
+    lastName: '',
+    firstName: '',
+    department: '',
+    position: '',
+    mobilePhone: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
   });
   
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -150,22 +153,64 @@ export default function SignupPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           
           {accountType === 'company' && (
-            <div className="animate-in fade-in zoom-in-95 duration-200">
-              <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">会社名・組織名 <span className="text-rose-500">*</span></label>
-              <input type="text" required value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="株式会社〇〇" />
+            <div className="animate-in fade-in zoom-in-95 duration-200 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">会社名・組織名 <span className="text-rose-500">*</span></label>
+                <input type="text" required value={form.companyName} onChange={e => setForm({...form, companyName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="株式会社〇〇" />
+              </div>
+
+              {/* 担当者情報セクション */}
+              <div className="pt-2">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                  <span className="text-xs font-bold text-slate-500 px-1">担当者情報</span>
+                  <div className="flex-1 h-px bg-slate-200"></div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">担当者 姓 <span className="text-rose-500">*</span></label>
+                      <input type="text" required value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="山田" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">担当者 名 <span className="text-rose-500">*</span></label>
+                      <input type="text" required value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="太郎" />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">部署</label>
+                      <input type="text" value={form.department} onChange={e => setForm({...form, department: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="営業部" />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">役職</label>
+                      <input type="text" value={form.position} onChange={e => setForm({...form, position: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="部長" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">担当者 電話番号</label>
+                    <input type="tel" value={form.mobilePhone} onChange={e => setForm({...form, mobilePhone: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="090-1234-5678" maxLength={13} />
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">姓 <span className="text-rose-500">*</span></label>
-              <input type="text" required value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="山田" />
+          {accountType === 'individual' && (
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">姓 <span className="text-rose-500">*</span></label>
+                <input type="text" required value={form.lastName} onChange={e => setForm({...form, lastName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="山田" />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">名 <span className="text-rose-500">*</span></label>
+                <input type="text" required value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="太郎" />
+              </div>
             </div>
-            <div className="flex-1">
-              <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">名 <span className="text-rose-500">*</span></label>
-              <input type="text" required value={form.firstName} onChange={e => setForm({...form, firstName: e.target.value})} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm font-medium transition-all" placeholder="太郎" />
-            </div>
-          </div>
+          )}
 
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1 ml-1">メールアドレス <span className="text-rose-500">*</span></label>

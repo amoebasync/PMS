@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const TYPE_MAP: Record<string, { label: string, color: string, icon: string }> = {
   RECEIVE: { label: '納品(入庫)', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: 'bi-box-arrow-in-down' },
@@ -19,6 +20,7 @@ const getTodayStr = () => {
 };
 
 export default function TransactionsPage() {
+  const { showToast, showConfirm } = useNotification();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [flyers, setFlyers] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -104,21 +106,21 @@ export default function TransactionsPage() {
       if (!res.ok) throw new Error();
       setIsModalOpen(false);
       fetchData();
-    } catch (e) { alert('保存に失敗しました'); }
+    } catch (e) { showToast('保存に失敗しました', 'error'); }
     setIsSaving(false);
   };
 
   const del = async (id: number) => {
-    if (!confirm('この入出庫履歴を削除しますか？\n(※完了済みの場合は自動的に在庫が再計算されて元に戻ります)')) return;
+    if (!await showConfirm('この入出庫履歴を削除しますか？', { variant: 'danger', detail: '完了済みの場合は自動的に在庫が再計算されて元に戻ります', confirmLabel: '削除する' })) return;
     try {
       await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
       fetchData();
-    } catch (e) { alert('削除に失敗しました'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   };
 
   // ワンクリック完了処理
   const markAsCompleted = async (tx: any) => {
-    if (!confirm(`このトランザクションを「完了」に変更し、在庫に反映させますか？`)) return;
+    if (!await showConfirm('このトランザクションを「完了」に変更し、在庫に反映させますか？', { variant: 'primary', confirmLabel: '完了にする' })) return;
     try {
       const payload = {
         flyerId: tx.flyerId.toString(),
@@ -129,7 +131,7 @@ export default function TransactionsPage() {
         employeeId: tx.employeeId?.toString() || '',
         note: tx.note || ''
       };
-      
+
       const res = await fetch(`/api/transactions/${tx.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -137,7 +139,7 @@ export default function TransactionsPage() {
       });
       if (!res.ok) throw new Error();
       fetchData();
-    } catch (e) { alert('ステータスの更新に失敗しました'); }
+    } catch (e) { showToast('ステータスの更新に失敗しました', 'error'); }
   };
 
   // --- フィルタリング ---

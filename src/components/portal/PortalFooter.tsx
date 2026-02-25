@@ -37,6 +37,9 @@ export function PortalFooter() {
             <Link href="/portal/privacy" className="hover:text-white transition-colors">
               個人情報の取り扱いについて
             </Link>
+            <Link href="/app-privacy" className="hover:text-white transition-colors">
+              アプリプライバシーポリシー
+            </Link>
           </div>
 
         </div>

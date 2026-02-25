@@ -16,10 +16,14 @@ export async function GET(request: Request) {
       include: {
         branch: true,
         department: true,
-        roles: { include: { role: true } }, 
-        financial: true, 
-        manager: { select: { lastNameJa: true, firstNameJa: true, jobTitle: true } },
-        _count: { select: { subordinates: true } } // ★追加: 部下の人数を取得
+        roles: { include: { role: true } },
+        financial: true,
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true } },
+        subordinates: {
+          where: { isActive: true },
+          orderBy: { lastNameJa: 'asc' },
+          select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true, rank: true }
+        }
       }
     });
 
@@ -29,6 +33,41 @@ export async function GET(request: Request) {
     return NextResponse.json(safeData);
   } catch (error) {
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
+}
+
+// 上司変更 (PATCH) — HR_ADMIN / SUPER_ADMIN のみ
+export async function PATCH(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('pms_session')?.value;
+    if (!sessionId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const empId = parseInt(sessionId);
+
+    // 権限チェック: SUPER_ADMIN または HR_ADMIN のみ許可
+    const currentEmployee = await prisma.employee.findUnique({
+      where: { id: empId },
+      include: { roles: { include: { role: true } } }
+    });
+    const isAuthorized = currentEmployee?.roles.some(
+      (r) => r.role.code === 'SUPER_ADMIN' || r.role.code === 'HR_ADMIN'
+    );
+    if (!isAuthorized) {
+      return NextResponse.json({ error: '権限がありません。人事管理者またはスーパー管理者のみ変更できます。' }, { status: 403 });
+    }
+
+    const { managerId } = await request.json();
+
+    await prisma.employee.update({
+      where: { id: empId },
+      data: { managerId: managerId ? parseInt(managerId) : null }
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Update Manager Error:', error);
+    return NextResponse.json({ error: 'Failed to update manager' }, { status: 500 });
   }
 }
 

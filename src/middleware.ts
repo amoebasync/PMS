@@ -6,6 +6,8 @@ export function middleware(request: NextRequest) {
 
   const isPublicPath =
     path === '/login' ||
+    path === '/change-password' ||
+    path === '/api/auth/change-password' ||
     path.startsWith('/api/auth') ||
     path.startsWith('/api/portal/register') ||
     path.startsWith('/q/') ||
@@ -16,6 +18,7 @@ export function middleware(request: NextRequest) {
     path === '/portal/cart' ||
     path === '/portal/terms' ||
     path === '/portal/privacy' ||
+    path === '/app-privacy' ||
     path.startsWith('/api/locations') ||
     path.startsWith('/api/areas') ||
     path.startsWith('/api/upload') ||
@@ -26,6 +29,18 @@ export function middleware(request: NextRequest) {
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;
   const distributorSession = request.cookies.get('pms_distributor_session')?.value;
+  const forcePwChange = request.cookies.get('pms_force_pw_change')?.value;
+
+  // 社員ログイン後・初回パスワード強制変更
+  if (
+    adminSession &&
+    forcePwChange === '1' &&
+    !isPublicPath &&
+    !path.startsWith('/portal') &&
+    !path.startsWith('/staff')
+  ) {
+    return NextResponse.redirect(new URL('/change-password', request.url));
+  }
 
   // --- 0. 配布員ポータル画面 (/staff) へのアクセス制御 ---
   if (path.startsWith('/staff') && !isPublicPath) {

@@ -3,6 +3,39 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// 個別取得 (GET)
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const employeeId = parseInt(id);
+
+    const employee = await prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        department: true,
+        branch: true,
+        roles: { include: { role: true } },
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true } },
+        subordinates: {
+          where: { isActive: true },
+          orderBy: { lastNameJa: 'asc' },
+          select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true },
+        },
+      },
+    });
+
+    if (!employee) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+    const { passwordHash, ...safeData } = employee;
+    return NextResponse.json(safeData);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
+  }
+}
+
 // 更新 (PUT)
 export async function PUT(
   request: Request,

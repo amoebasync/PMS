@@ -5,12 +5,14 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { useCart, CartItem } from '@/components/portal/CartContext';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 export default function CartPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const { items, updateItem, removeItem, totalAmount, clearCart } = useCart();
-  
+  const { showToast } = useNotification();
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingItemId, setProcessingItemId] = useState<string | null>(null);
   const [myFlyers, setMyFlyers] = useState<any[]>([]);
@@ -147,8 +149,7 @@ export default function CartPage() {
 
     const isReady = items.every(item => item.projectName && item.flyerId);
     if (!isReady) {
-      alert('すべての発注アイテムに対して、「案件名」の入力と「チラシ」の選択を行ってください。');
-      return;
+      showToast('すべての発注アイテムに対して、案件名の入力とチラシの選択を行ってください', 'warning'); return;
     }
 
     setIsProcessing(true);
@@ -164,11 +165,11 @@ export default function CartPage() {
         router.push('/portal/orders');
       } else {
         const data = await res.json();
-        alert(`エラー: ${data.error || '決済処理に失敗しました。'}`);
+        showToast(data.error || '決済処理に失敗しました', 'error');
         setIsProcessing(false);
       }
     } catch (e) {
-      alert('通信エラーが発生しました。');
+      showToast('通信エラーが発生しました', 'error');
       setIsProcessing(false);
     }
   };
@@ -176,8 +177,7 @@ export default function CartPage() {
   // 各アイテム毎の一時保存（下書き）する
   const handleSaveDraftItem = async (item: CartItem) => {
     if (!item.projectName || !item.flyerId) {
-      alert('「案件名」を入力し、「使用するチラシ」を選択してから保存してください。');
-      return;
+      showToast('案件名を入力し、使用するチラシを選択してから保存してください', 'warning'); return;
     }
 
     setProcessingItemId(item.id);
@@ -196,13 +196,13 @@ export default function CartPage() {
         if (savedData) {
           updateItem(item.id, { savedOrderId: savedData.orderId });
         }
-        alert('一時保存しました。発注履歴画面からも確認できます。');
+        showToast('一時保存しました。発注履歴画面からも確認できます', 'success');
       } else {
         const data = await res.json();
-        alert(`エラー: ${data.error || '保存に失敗しました。'}`);
+        showToast(data.error || '保存に失敗しました', 'error');
       }
     } catch (e) {
-      alert('通信エラーが発生しました。');
+      showToast('通信エラーが発生しました', 'error');
     }
     setProcessingItemId(null);
   };

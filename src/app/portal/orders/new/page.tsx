@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCart } from '@/components/portal/CartContext';
+import { useNotification } from '@/components/ui/NotificationProvider';
 import { GoogleMap, useJsApiLoader, Polygon, Circle, Marker } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
 
@@ -113,16 +114,38 @@ const MemoizedArea = React.memo(({ area, isSelected, currentZoom, onClick }: { a
   );
 }, (prev, next) => prev.isSelected === next.isSelected && (prev.currentZoom >= 14) === (next.currentZoom >= 14));
 
+// チラシサイズの表示順（小→大）
+const FLYER_SIZE_ORDER = ['ハガキ', 'A5', 'B5', 'A4', 'B4', 'A3', 'B3', 'その他'];
+
+// 配布方法の説明・アイコン定義
+const METHOD_META: Record<string, { icon: string; description: string; recommended?: boolean }> = {
+  all: {
+    icon: 'bi-houses-fill',
+    description: '一軒家・マンション・アパートなど、すべての建物にポスティングします。最も広い範囲にリーチできるスタンダードな方法です。',
+    recommended: true,
+  },
+  detached: {
+    icon: 'bi-house-fill',
+    description: '一軒家（戸建住宅）のみに絞ってポスティングします。ファミリー層や持家世帯への訴求に効果的です。',
+  },
+  apartment: {
+    icon: 'bi-building-fill',
+    description: 'マンション・アパートなどの集合住宅のみにポスティングします。都市部の単身・若年世帯への訴求に適しています。',
+  },
+};
+
 function NewOrderContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const editItemId = searchParams.get('editItemId');
+  const { showToast } = useNotification();
 
   const { items, addItem, updateItem } = useCart();
 
   const [projectName, setProjectName] = useState('');
   const [orderType, setOrderType] = useState<'POSTING_ONLY' | 'PRINT_AND_POSTING'>('PRINT_AND_POSTING');
   const [size, setSize] = useState('A4');
+  const [customSize, setCustomSize] = useState(''); // 「その他」選択時のカスタムサイズ入力
   const [method, setMethod] = useState(''); // DB取得後に初期値セット
   const [plannedCount, setPlannedCount] = useState<number | ''>('');
   const [startDate, setStartDate] = useState(() => {
@@ -143,6 +166,7 @@ function NewOrderContent() {
   const [paperWeight, setPaperWeight] = useState('73kg (標準)');
   const [colorType, setColorType] = useState('両面カラー');
   const [printCount, setPrintCount] = useState<number | ''>('');
+  const [printCountSameAsDistribution, setPrintCountSameAsDistribution] = useState(true);
 
   // 価格マスター
   const [pricingData, setPricingData] = useState<{
@@ -287,7 +311,14 @@ function NewOrderContent() {
       if (editTarget) {
         setProjectName(editTarget.projectName || '');
         setOrderType(editTarget.type as any);
-        setSize(editTarget.size);
+        // 「その他（xxxx）」形式で保存されている場合はカスタム入力を復元
+        if (editTarget.size.startsWith('その他（') && editTarget.size.endsWith('）')) {
+          setSize('その他');
+          setCustomSize(editTarget.size.slice(4, -1));
+        } else {
+          setSize(editTarget.size);
+          setCustomSize('');
+        }
         setMethod(editTarget.method);
         setPlannedCount(editTarget.totalCount);
         setStartDate(editTarget.startDate || '');
@@ -297,7 +328,13 @@ function NewOrderContent() {
         if (editTarget.paperType) setPaperType(editTarget.paperType);
         if (editTarget.paperWeight) setPaperWeight(editTarget.paperWeight);
         if (editTarget.colorType) setColorType(editTarget.colorType);
-        if (editTarget.printCount) setPrintCount(editTarget.printCount);
+        if (editTarget.printCount && editTarget.printCount !== editTarget.totalCount) {
+          setPrintCount(editTarget.printCount);
+          setPrintCountSameAsDistribution(false);
+        } else {
+          setPrintCount('');
+          setPrintCountSameAsDistribution(true);
+        }
 
         setSelectedAreaIds(new Set(editTarget.selectedAreas.map(a => a.id)));
 
@@ -350,7 +387,7 @@ function NewOrderContent() {
             return currentAreas;
           });
         }, 500);
-      } else alert('住所が見つかりませんでした。');
+      } else showToast('住所が見つかりませんでした', 'warning');
     });
   };
 
@@ -469,30 +506,32 @@ function NewOrderContent() {
   // エリア未選択または希望枚数未入力の場合は 0
   const billingCount = totalAreaCapacity > 0 ? Math.min(totalAreaCapacity, effectiveCount) : 0;
   const totalPosting = billingCount * postingUnitPrice;
-  // 印刷合計（希望配布枚数ベース）
-  const pPrintCount = typeof printCount === 'number' ? printCount : effectiveCount;
+  // 印刷合計（チェック時は配布枚数と同じ、チェック解除時は入力値）
+  const pPrintCount = !printCountSameAsDistribution && typeof printCount === 'number' ? printCount : effectiveCount;
   const totalPrint = orderType === 'PRINT_AND_POSTING' ? pPrintCount * printUnitPricePerSheet : 0;
   const totalPrice = Math.floor(totalPosting + totalPrint);
 
   const selectedFoldingUnitPrice = selectedFolding?.unitPrice || 0;
 
+  // カートに渡す実際のサイズ名（「その他」の場合はカスタム入力を含む）
+  const effectiveSize = size === 'その他' && customSize.trim()
+    ? `その他（${customSize.trim()}）`
+    : size;
+
   const handleAddToCart = () => {
     if (pCount <= 0) {
-      alert('希望配布枚数を入力してください。');
-      return;
+      showToast('希望配布枚数を入力してください', 'warning'); return;
     }
     if (!isCapacityEnough) {
-      alert('選択されたエリアの世帯数が、希望配布枚数に達していません。\nマップまたは検索からエリアを追加してください。');
-      return;
+      showToast('選択されたエリアの世帯数が、希望配布枚数に達していません。マップまたは検索からエリアを追加してください', 'warning'); return;
     }
     if (!startDate || !endDate) {
-      alert('「開始予定日」と「完了期限日」を入力してください。');
-      return;
+      showToast('「開始予定日」と「完了期限日」を入力してください', 'warning'); return;
     }
 
     const newTarget = {
       type: orderType,
-      title: `${size}サイズ ${orderType === 'PRINT_AND_POSTING' ? '印刷＋ポスティング' : 'ポスティングのみ'} (${method})`,
+      title: `${effectiveSize}サイズ ${orderType === 'PRINT_AND_POSTING' ? '印刷＋ポスティング' : 'ポスティングのみ'} (${method})`,
       selectedAreas: selectedAreasList.map(a => ({
         id: a.id,
         name: `${a.city?.name} ${formatAreaName(a.town_name, a.chome_name)}`,
@@ -502,7 +541,7 @@ function NewOrderContent() {
       })),
       totalCount: pCount,
       billingCount,
-      method, size, price: totalPrice,
+      method, size: effectiveSize, price: totalPrice,
       unitPrice: postingUnitPrice,
       areaRankUnitPrice,
       sizeAddon,
@@ -585,25 +624,115 @@ function NewOrderContent() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">チラシサイズ</label>
-                  <select value={size} onChange={e => setSize(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
-                    {pricingData.flyerSizes.length > 0
-                      ? pricingData.flyerSizes.map(s => <option key={s.id} value={s.name}>{s.name}</option>)
-                      : ['A4', 'B4', 'A3', 'ハガキ'].map(s => <option key={s} value={s}>{s}</option>)
-                    }
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-500 block mb-1">配布方法</label>
-                  <select value={method} onChange={e => setMethod(e.target.value)} className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer">
-                    {pricingData.distributionMethods.map(m => (
-                      <option key={m.id} value={m.name}>
-                        {m.name}{m.priceAddon > 0 ? ` (+¥${m.priceAddon.toFixed(2)})` : ''}
-                      </option>
-                    ))}
-                  </select>
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-1">チラシサイズ</label>
+                <select
+                  value={size}
+                  onChange={e => { setSize(e.target.value); if (e.target.value !== 'その他') setCustomSize(''); }}
+                  className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 cursor-pointer"
+                >
+                  {(pricingData.flyerSizes.length > 0
+                    ? [...pricingData.flyerSizes].sort((a, b) => {
+                        const ai = FLYER_SIZE_ORDER.indexOf(a.name);
+                        const bi = FLYER_SIZE_ORDER.indexOf(b.name);
+                        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+                      })
+                    : [
+                        { id: 'ハガキ', name: 'ハガキ', basePriceAddon: -0.5 },
+                        { id: 'A5',   name: 'A5',   basePriceAddon: -0.25 },
+                        { id: 'B5',   name: 'B5',   basePriceAddon: -0.25 },
+                        { id: 'A4',   name: 'A4',   basePriceAddon: 0 },
+                        { id: 'B4',   name: 'B4',   basePriceAddon: 0 },
+                        { id: 'A3',   name: 'A3',   basePriceAddon: 0 },
+                        { id: 'B3',   name: 'B3',   basePriceAddon: 0 },
+                        { id: 'その他', name: 'その他', basePriceAddon: 0 },
+                      ]
+                  ).map(s => (
+                    <option key={s.id} value={s.name}>
+                      {s.name}
+                      {s.basePriceAddon < 0
+                        ? `  (-¥${Math.abs(s.basePriceAddon)}/枚)`
+                        : s.basePriceAddon > 0
+                          ? `  (+¥${s.basePriceAddon}/枚)`
+                          : ''
+                      }
+                    </option>
+                  ))}
+                </select>
+                {/* 「その他」選択時のカスタムサイズ入力 */}
+                {size === 'その他' && (
+                  <div className="mt-2 animate-in fade-in slide-in-from-top-1 duration-200">
+                    <input
+                      type="text"
+                      value={customSize}
+                      onChange={e => setCustomSize(e.target.value)}
+                      className="w-full border border-indigo-300 bg-indigo-50 p-2 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 transition-all"
+                      placeholder="サイズを入力（例: B2、正方形 など）"
+                      maxLength={30}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 block mb-2">配布方法</label>
+                <div className="flex flex-col gap-1.5">
+                  {pricingData.distributionMethods.map(m => {
+                    const meta = METHOD_META[m.capacityType] ?? { icon: 'bi-send-fill', description: '' };
+                    const isSelected = method === m.name;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMethod(m.name)}
+                        className={`flex items-center px-3 py-2.5 rounded-xl border-2 transition-all text-left w-full ${
+                          isSelected
+                            ? 'border-indigo-600 bg-indigo-50'
+                            : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        {/* ラジオインジケーター */}
+                        <div className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 transition-all mr-2 ${
+                          isSelected ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300'
+                        }`}>
+                          {isSelected && <div className="w-1.5 h-1.5 bg-white rounded-full m-auto mt-[1px]"></div>}
+                        </div>
+
+                        {/* アイコン */}
+                        <i className={`bi ${meta.icon} text-base mr-2 flex-shrink-0 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`}></i>
+
+                        {/* ラベル */}
+                        <span className={`font-bold text-xs flex-1 ${isSelected ? 'text-indigo-700' : 'text-slate-700'}`}>
+                          {m.name}
+                        </span>
+
+                        {/* おすすめバッジ */}
+                        {meta.recommended && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300 mr-1.5 flex-shrink-0">
+                            おすすめ
+                          </span>
+                        )}
+
+                        {/* 価格加算 */}
+                        {m.priceAddon > 0 && (
+                          <span className="text-[10px] text-slate-400 font-medium mr-1.5 flex-shrink-0">
+                            +¥{m.priceAddon.toFixed(2)}/枚
+                          </span>
+                        )}
+
+                        {/* ツールチップアイコン */}
+                        {meta.description && (
+                          <div className="group relative flex-shrink-0" onClick={e => e.stopPropagation()}>
+                            <i className="bi bi-info-circle text-slate-300 hover:text-indigo-400 transition-colors text-sm cursor-help"></i>
+                            <div className="absolute bottom-full right-0 mb-2 w-56 p-3 bg-slate-800 text-white text-[10px] leading-relaxed rounded-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-xl">
+                              {meta.description}
+                              <div className="absolute top-full right-3 border-4 border-transparent border-t-slate-800"></div>
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
@@ -659,17 +788,36 @@ function NewOrderContent() {
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold text-slate-500 block mb-1">印刷枚数 <span className="text-slate-400">(空欄 = 配布枚数と同じ)</span></label>
-                    <div className="relative">
+                    <label className="text-[10px] font-bold text-slate-500 block mb-2">印刷枚数</label>
+                    <label className="flex items-center gap-2 cursor-pointer mb-2 select-none">
                       <input
-                        type="number"
-                        value={printCount}
-                        onChange={e => setPrintCount(e.target.value === '' ? '' : Number(e.target.value))}
-                        className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 text-right pr-8"
-                        placeholder={pCount ? String(pCount) : '配布枚数と同じ'}
+                        type="checkbox"
+                        checked={printCountSameAsDistribution}
+                        onChange={e => {
+                          setPrintCountSameAsDistribution(e.target.checked);
+                          if (e.target.checked) setPrintCount('');
+                        }}
+                        className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 cursor-pointer"
                       />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">枚</span>
-                    </div>
+                      <span className="text-xs font-bold text-slate-600">
+                        配布枚数と同じ
+                        {pCount > 0 && (
+                          <span className="ml-1 text-indigo-600">({pCount.toLocaleString()}枚)</span>
+                        )}
+                      </span>
+                    </label>
+                    {!printCountSameAsDistribution && (
+                      <div className="relative animate-in fade-in slide-in-from-top-1 duration-200">
+                        <input
+                          type="number"
+                          value={printCount}
+                          onChange={e => setPrintCount(e.target.value === '' ? '' : Number(e.target.value))}
+                          className="w-full border border-slate-300 p-2 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-slate-700 text-right pr-8"
+                          placeholder="印刷枚数を入力"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-bold">枚</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -680,6 +828,46 @@ function NewOrderContent() {
             <div className="flex items-center gap-2 mb-3">
               <div className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-black">2</div>
               <h3 className="font-bold text-slate-800">配布期間を選択</h3>
+              {/* 期間別料金表ツールチップ */}
+              {pricingData.periodPrices.length > 0 && (
+                <div className="group relative ml-auto flex-shrink-0">
+                  <button type="button" className="flex items-center gap-1 text-[10px] font-bold text-slate-400 hover:text-indigo-500 transition-colors cursor-help">
+                    <i className="bi bi-clock-history text-sm"></i>
+                    期間料金
+                  </button>
+                  <div className="absolute bottom-full right-0 mb-2 w-64 bg-slate-800 text-white rounded-xl shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 overflow-hidden">
+                    <div className="px-3 py-2 bg-slate-700 text-[10px] font-black text-slate-200 flex items-center gap-1.5">
+                      <i className="bi bi-clock-history"></i> 配布期間による単価加算
+                    </div>
+                    <table className="w-full text-[10px]">
+                      <thead>
+                        <tr className="border-b border-slate-700">
+                          <th className="px-3 py-1.5 text-left text-slate-400 font-bold">期間</th>
+                          <th className="px-3 py-1.5 text-right text-slate-400 font-bold">単価加算</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pricingData.periodPrices.map((p: any, i: number) => (
+                          <tr key={i} className="border-b border-slate-700/50 last:border-0">
+                            <td className="px-3 py-1.5 text-slate-200">
+                              {p.label
+                                ? p.label
+                                : p.maxDays
+                                  ? `${p.minDays}〜${p.maxDays}日`
+                                  : `${p.minDays}日以上`
+                              }
+                            </td>
+                            <td className={`px-3 py-1.5 text-right font-bold ${p.priceAddon > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                              {p.priceAddon > 0 ? `+¥${p.priceAddon.toFixed(2)}/枚` : '加算なし'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="absolute top-full right-4 border-4 border-transparent border-t-slate-800"></div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3">
               <div>

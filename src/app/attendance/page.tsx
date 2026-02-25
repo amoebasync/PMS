@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 export default function AttendancePage() {
+  const { showToast, showConfirm } = useNotification();
   const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'EXPENSE'>('ATTENDANCE');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -111,36 +113,36 @@ export default function AttendancePage() {
       });
       if (res.ok) {
         const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '自分';
-        alert(`${selectedEmployeeId ? `${targetName}の` : ''}勤怠を記録しました！`);
+        showToast(`${selectedEmployeeId ? `${targetName}の` : ''}勤怠を記録しました`, 'success');
         const workType = attendanceTypes.find((t: any) => t.code === 'WORK');
         setAttendanceForm(prev => ({ ...prev, note: '', saveAsDefault: false, attendanceTypeId: workType?.id?.toString() || '' }));
         fetchData();
       } else {
         const data = await res.json();
-        alert(`打刻エラー: ${data.error || '失敗しました'}`);
+        showToast(`打刻エラー: ${data.error || '失敗しました'}`, 'error');
       }
-    } catch (err) { alert('通信エラーが発生しました'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 
   const handleDeleteAttendance = async (dateStr: string) => {
     const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '';
     const confirmMsg = selectedEmployeeId
-      ? `${targetName} の ${new Date(dateStr).toLocaleDateString()} の勤怠を削除しますか？\n（※有給休暇の場合は残日数が返還されます）`
-      : `${new Date(dateStr).toLocaleDateString()} の申請を取り下げますか？\n（※有給休暇の場合は残日数が返還されます）`;
-    if (!confirm(confirmMsg)) return;
+      ? `${targetName} の ${new Date(dateStr).toLocaleDateString()} の勤怠を削除しますか？（※有給休暇の場合は残日数が返還されます）`
+      : `${new Date(dateStr).toLocaleDateString()} の申請を取り下げますか？（※有給休暇の場合は残日数が返還されます）`;
+    if (!await showConfirm(confirmMsg, { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       const url = selectedEmployeeId
         ? `/api/attendance?date=${dateStr.split('T')[0]}&employeeId=${selectedEmployeeId}`
         : `/api/attendance?date=${dateStr.split('T')[0]}`;
       const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
-        alert(selectedEmployeeId ? '勤怠を削除しました。' : '申請を取り下げました。');
+        showToast(selectedEmployeeId ? '勤怠を削除しました' : '申請を取り下げました', 'success');
         fetchData();
       } else {
-        alert('削除に失敗しました。');
+        showToast('削除に失敗しました', 'error');
       }
-    } catch (e) { alert('エラーが発生しました。'); }
+    } catch (e) { showToast('エラーが発生しました', 'error'); }
   };
 
   const handleEditAttendance = (att: any) => {
@@ -164,11 +166,11 @@ export default function AttendancePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(expenseForm)
       });
       if (res.ok) {
-        alert('経費を申請しました！');
+        showToast('経費を申請しました', 'success');
         setExpenseForm(prev => ({ ...prev, amount: '', description: '' }));
         fetchData();
-      } else { alert('申請に失敗しました'); }
-    } catch (err) { alert('通信エラーが発生しました'); }
+      } else { showToast('申請に失敗しました', 'error'); }
+    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 

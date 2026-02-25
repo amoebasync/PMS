@@ -85,6 +85,31 @@ export async function GET() {
       where: { lastLoginAt: { gte: oneHourAgo } } // 直近1時間のログインをアクティブとみなす
     });
 
+    // 5. CRM タスク集計
+    const overdueTaskCount = await prisma.task.count({
+      where: {
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+        dueDate: { lt: today },
+      },
+    });
+
+    const dueTodayTaskCount = await prisma.task.count({
+      where: {
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+        dueDate: { gte: today, lt: tomorrow },
+      },
+    });
+
+    const myTasks = await prisma.task.findMany({
+      where: {
+        assigneeId: empId,
+        status: { in: ['PENDING', 'IN_PROGRESS'] },
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 5,
+      include: { customer: { select: { id: true, name: true } } },
+    });
+
     return NextResponse.json({
       alerts: {
         orders: pendingOrders,
@@ -101,7 +126,12 @@ export async function GET() {
         totalUsers,
         newUsersThisMonth,
         activeUsers
-      }
+      },
+      crm: {
+        overdueTaskCount,
+        dueTodayTaskCount,
+        myTasks,
+      },
     });
   } catch (error) {
     console.error('Dashboard API Error:', error);

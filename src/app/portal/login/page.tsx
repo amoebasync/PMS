@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { signIn } from 'next-auth/react';
+import { signIn, getSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
@@ -22,7 +22,12 @@ export default function LoginPage() {
     });
 
     if (res?.ok) {
-      router.push('/portal/mypage');
+      const session = await getSession();
+      if ((session?.user as any)?.mustChangePassword) {
+        router.push('/portal/change-password');
+      } else {
+        router.push('/portal/mypage');
+      }
       router.refresh();
     } else {
       setErrorMsg('メールアドレスまたはパスワードが間違っています。');

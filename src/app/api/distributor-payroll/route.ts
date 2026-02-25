@@ -39,7 +39,23 @@ export async function GET(request: Request) {
       orderBy: [{ periodStart: 'desc' }, { distributorId: 'asc' }],
     });
 
-    return NextResponse.json({ records });
+    // 各レコードの期間内の経費を日別に取得して付加
+    const recordsWithExpenses = await Promise.all(
+      records.map(async (record) => {
+        const expenses = await prisma.distributorExpense.findMany({
+          where: {
+            distributorId: record.distributorId,
+            date: { gte: record.periodStart, lte: record.periodEnd },
+            status: { in: ['APPROVED', 'PENDING'] },
+          },
+          select: { date: true, amount: true, description: true, status: true },
+          orderBy: { date: 'asc' },
+        });
+        return { ...record, expenses };
+      })
+    );
+
+    return NextResponse.json({ records: recordsWithExpenses });
   } catch (error) {
     console.error('Payroll GET Error:', error);
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });

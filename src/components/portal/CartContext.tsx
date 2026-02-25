@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 
 export type CartItem = {
   id: string;
@@ -43,18 +44,31 @@ type CartContextType = {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
+  const { data: session, status } = useSession();
+  const userId = (session?.user as any)?.id as string | undefined;
+  // ユーザーごとに独立したキーを使うことで、アカウント間のカート混在を防ぐ
+  const cartKey = `pms_cart_${userId ?? 'guest'}`;
+
   const [items, setItems] = useState<CartItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
+  // セッションが確定したら、そのユーザー専用のカートをロード
   useEffect(() => {
-    const saved = localStorage.getItem('pms_cart');
-    if (saved) { try { setItems(JSON.parse(saved)); } catch (e) {} }
+    if (status === 'loading') return;
+    setIsLoaded(false);
+    const saved = localStorage.getItem(cartKey);
+    const parsed: CartItem[] = (() => {
+      try { return saved ? JSON.parse(saved) : []; } catch { return []; }
+    })();
+    setItems(parsed);
     setIsLoaded(true);
-  }, []);
+  }, [cartKey, status]);
 
+  // カートの変更をlocalStorageに保存
   useEffect(() => {
-    if (isLoaded) localStorage.setItem('pms_cart', JSON.stringify(items));
-  }, [items, isLoaded]);
+    if (!isLoaded) return;
+    localStorage.setItem(cartKey, JSON.stringify(items));
+  }, [items, isLoaded, cartKey]);
 
   const addItem = (item: Omit<CartItem, 'id'>) => {
     const newItem = { ...item, id: crypto.randomUUID() };

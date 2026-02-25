@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -38,6 +39,7 @@ const getStickyStyle = (left: number, isHeader: boolean): React.CSSProperties =>
 });
 
 export default function DispatchPage() {
+  const { showToast, showConfirm } = useNotification();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [unassignedItems, setUnassignedItems] = useState<any[]>([]);
   const [distributors, setDistributors] = useState<any[]>([]);
@@ -106,13 +108,13 @@ export default function DispatchPage() {
     const data = JSON.parse(dataStr);
 
     if (data.areaId !== targetAreaId) {
-      alert('エラー: 配布先エリアが異なるため、このスケジュールには組み込めません。');
+      showToast('エラー: 配布先エリアが異なるため、このスケジュールには組み込めません。', 'error');
       return;
     }
 
     const targetSchedule = enrichedSchedules.find(s => s.id === targetScheduleId);
     if (targetSchedule && isFlyerDuplicate(targetSchedule, data)) {
-      alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
+      showToast('エラー: このスケジュールには、すでに同じチラシが組み込まれています。', 'error');
       return;
     }
 
@@ -130,7 +132,7 @@ export default function DispatchPage() {
         });
         if (res.ok) fetchData();
       }
-    } catch (err) { alert('処理に失敗しました'); }
+    } catch (err) { showToast('処理に失敗しました', 'error'); }
   };
 
   const handleCreateScheduleFromUnassigned = async (odaId: number, endDateStr: string | null) => {
@@ -142,13 +144,13 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         if (targetDate < dateFrom || targetDate > dateTo) {
-          alert(`チラシの完了期限日（${targetDate}）に合わせてスケジュールを作成しました。\n表示期間を自動調整します。`);
+          showToast(`チラシの完了期限日（${targetDate}）に合わせてスケジュールを作成しました。表示期間を自動調整します。`, 'success');
           setDateFrom(targetDate); setDateTo(targetDate);
         } else {
           fetchData();
         }
       }
-    } catch (e) { alert('スケジュールの作成に失敗しました'); }
+    } catch (e) { showToast('スケジュールの作成に失敗しました', 'error'); }
   };
 
   const updateScheduleProp = async (scheduleId: number, field: string, value: string) => {
@@ -160,7 +162,7 @@ export default function DispatchPage() {
       if (res.ok) {
         setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, [field]: value } : s));
       }
-    } catch (e) { alert('更新に失敗しました'); }
+    } catch (e) { showToast('更新に失敗しました', 'error'); }
   };
 
   const updateItemPlannedCount = async (itemId: number, newCount: string) => {
@@ -170,29 +172,29 @@ export default function DispatchPage() {
         body: JSON.stringify({ itemId, plannedCount: newCount })
       });
       if (res.ok) fetchData();
-    } catch (e) { alert('枚数の更新に失敗しました'); }
+    } catch (e) { showToast('枚数の更新に失敗しました', 'error'); }
   };
 
   const handleAdjustCount = async (itemId: number, currentCount: number, excess: number) => {
     const newCount = Math.max(0, currentCount - excess);
-    if (!confirm(`配布予定枚数を ${excess.toLocaleString()} 枚オーバーしています。\nこの枠の枚数を ${currentCount.toLocaleString()}枚 から 【${newCount.toLocaleString()}枚】 に自動調整しますか？`)) return;
+    if (!await showConfirm(`配布予定枚数を ${excess.toLocaleString()} 枚オーバーしています。この枠の枚数を ${currentCount.toLocaleString()}枚 から 【${newCount.toLocaleString()}枚】 に自動調整しますか？`, { variant: 'warning', confirmLabel: '調整する' })) return;
     await updateItemPlannedCount(itemId, newCount.toString());
   };
 
   const removeFlyerFromSchedule = async (itemId: number) => {
-    if (!confirm('このチラシをスケジュールから外して、未手配に戻しますか？')) return;
+    if (!await showConfirm('このチラシをスケジュールから外して、未手配に戻しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/schedules/items?id=${itemId}`, { method: 'DELETE' });
       if (res.ok) fetchData();
-    } catch (e) { alert('削除に失敗しました'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   };
 
   const deleteSchedule = async (scheduleId: number) => {
-    if (!confirm('このスケジュール枠自体を削除しますか？\n(※組み込まれているチラシはすべて未手配に戻ります)')) return;
+    if (!await showConfirm('このスケジュール枠自体を削除しますか？(※組み込まれているチラシはすべて未手配に戻ります)', { variant: 'danger', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' });
       if (res.ok) fetchData();
-    } catch (e) { alert('削除に失敗しました'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   };
 
   const executeMoveFromModal = async () => {
@@ -200,7 +202,7 @@ export default function DispatchPage() {
 
     const targetSchedule = enrichedSchedules.find(s => s.id === parseInt(targetMoveScheduleId));
     if (targetSchedule && isFlyerDuplicate(targetSchedule, { type: 'SCHEDULED', itemId: movingItem.id, flyerId: movingItem.flyerId, flyerCode: movingItem.flyerCode, flyerName: movingItem.flyerName })) {
-      alert('エラー: このスケジュールには、すでに同じチラシが組み込まれています。');
+      showToast('エラー: このスケジュールには、すでに同じチラシが組み込まれています。', 'error');
       return;
     }
 
@@ -212,7 +214,7 @@ export default function DispatchPage() {
       if (res.ok) {
         setMovingItem(null); setTargetMoveScheduleId(''); fetchData();
       }
-    } catch (e) { alert('移動に失敗しました'); }
+    } catch (e) { showToast('移動に失敗しました', 'error'); }
   };
 
   const handleMoveToNewSchedule = async () => {
@@ -234,7 +236,7 @@ export default function DispatchPage() {
       setMovingItem(null);
       fetchData();
     } catch (e) {
-      alert('新規スケジュールの作成＆移動に失敗しました。');
+      showToast('新規スケジュールの作成＆移動に失敗しました', 'error');
     }
   };
 

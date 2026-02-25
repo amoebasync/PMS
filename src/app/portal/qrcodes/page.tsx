@@ -4,10 +4,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import QRCode from 'qrcode';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 export default function QrCodesPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { showToast, showConfirm } = useNotification();
 
   const [qrCodes, setQrCodes] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -53,8 +55,8 @@ export default function QrCodesPage() {
         setShowCreateModal(false);
         setCreateForm({ redirectUrl: '', memo: '' });
         await fetchQrCodes();
-      } else { alert('作成に失敗しました。'); }
-    } catch (e) { alert('通信エラーが発生しました。'); }
+      } else { showToast('作成に失敗しました', 'error'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 
@@ -72,18 +74,18 @@ export default function QrCodesPage() {
         setShowEditModal(false);
         setEditTarget(null);
         await fetchQrCodes();
-      } else { alert('更新に失敗しました。'); }
-    } catch (e) { alert('通信エラーが発生しました。'); }
+      } else { showToast('更新に失敗しました', 'error'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
     setIsSubmitting(false);
   };
 
   const handleDelete = async (qr: any) => {
-    if (!confirm(`「${qr.memo || qr.alias}」を削除しますか？\nスキャンログも削除されます。`)) return;
+    if (!await showConfirm(`「${qr.memo || qr.alias}」を削除しますか？`, { variant: 'danger', detail: 'スキャンログも削除されます。', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/portal/qrcodes/${qr.id}`, { method: 'DELETE' });
       if (res.ok) { await fetchQrCodes(); }
-      else { alert('削除に失敗しました。'); }
-    } catch (e) { alert('通信エラーが発生しました。'); }
+      else { showToast('削除に失敗しました', 'error'); }
+    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
   };
 
   const handleDownloadQr = async (qr: any, format: 'png' | 'svg') => {
@@ -114,7 +116,7 @@ export default function QrCodesPage() {
         link.click();
         URL.revokeObjectURL(url);
       }
-    } catch (e) { alert('ダウンロードに失敗しました。'); }
+    } catch (e) { showToast('ダウンロードに失敗しました', 'error'); }
   };
 
   const openEditModal = (qr: any) => {

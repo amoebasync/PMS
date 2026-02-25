@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link'; // ★ 追加: これがないとエラーになります
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 const FOLD_STATUS_MAP: Record<string, { label: string, color: string }> = {
   NEEDS_FOLDING: { label: '要折', color: 'bg-rose-100 text-rose-700 border-rose-200' },
@@ -10,6 +11,7 @@ const FOLD_STATUS_MAP: Record<string, { label: string, color: string }> = {
 };
 
 export default function FlyerPage() {
+  const { showToast, showConfirm } = useNotification();
   const [flyers, setFlyers] = useState<any[]>([]);
   const [masters, setMasters] = useState({ industries: [], sizes: [], customers: [] });
   const [isLoading, setIsLoading] = useState(true);
@@ -97,16 +99,16 @@ export default function FlyerPage() {
       }
       setIsFormOpen(false);
       fetchData();
-    } catch (e: any) { alert(e.message); }
+    } catch (e: any) { showToast(e.message, 'error'); }
   };
 
   const del = async (id: number) => {
-    if (!confirm('このチラシを削除しますか？\n(※すでにスケジュールに登録されている場合は削除できません)')) return;
+    if (!await showConfirm('このチラシを削除しますか？', { variant: 'danger', title: 'チラシの削除', detail: 'すでにスケジュールに登録されている場合は削除できません', confirmLabel: '削除する' })) return;
     try {
       const res = await fetch(`/api/flyers/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       fetchData();
-    } catch (e) { alert('削除に失敗しました。関連データが存在する可能性があります。'); }
+    } catch (e) { showToast('削除に失敗しました。関連データが存在する可能性があります', 'error'); }
   };
 
   const openQrModal = async (flyer: any) => {
@@ -142,7 +144,7 @@ export default function FlyerPage() {
       
       setQrForm({ alias: '', redirectUrl: '', memo: '', notifyOnScan: false, notificationEmails: '' });
     } catch (e: any) {
-      alert(e.message);
+      showToast(e.message, 'error');
     }
     setIsQrSaving(false);
   };
@@ -162,16 +164,16 @@ export default function FlyerPage() {
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.map(q => q.id === qrId ? { ...q, ...editQrForm } : q));
       setEditingQrId(null);
-    } catch (e) { alert('更新に失敗しました。'); }
+    } catch (e) { showToast('更新に失敗しました', 'error'); }
   };
 
   const toggleQrActive = async (qr: any) => {
     const newStatus = !qr.isActive;
-    const confirmMsg = newStatus 
-      ? 'このQRコードを「有効」にしますか？' 
+    const confirmMsg = newStatus
+      ? 'このQRコードを「有効」にしますか？'
       : 'このQRコードを「無効（アーカイブ）」にしますか？\n無効にすると、スキャンしたユーザーはデフォルトページへ転送されます。';
-    
-    if (!confirm(confirmMsg)) return;
+
+    if (!await showConfirm(confirmMsg, { variant: 'warning', confirmLabel: '変更する' })) return;
 
     try {
       const res = await fetch(`/api/qrcodes/${qr.id}`, {
@@ -181,16 +183,16 @@ export default function FlyerPage() {
       });
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.map(q => q.id === qr.id ? { ...q, isActive: newStatus } : q));
-    } catch (e) { alert('ステータスの更新に失敗しました。'); }
+    } catch (e) { showToast('ステータスの更新に失敗しました', 'error'); }
   };
 
   const deleteQrCode = async (qrId: number) => {
-    if (!confirm('【警告】このQRコードを物理削除しますか？\nすでに印刷・配布されている場合、スキャンしても404エラーになってしまいます。\n\n※通常は「無効化」ボタンを使用してアーカイブすることを推奨します。')) return;
+    if (!await showConfirm('このQRコードを物理削除しますか？', { variant: 'danger', title: '【警告】QRコードの物理削除', detail: 'すでに印刷・配布されている場合、スキャンしても404エラーになります。通常は「無効化」を使用してください。', confirmLabel: '物理削除する' })) return;
     try {
       const res = await fetch(`/api/qrcodes/${qrId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.filter(q => q.id !== qrId));
-    } catch (e) { alert('削除に失敗しました。'); }
+    } catch (e) { showToast('削除に失敗しました', 'error'); }
   };
 
   const filteredFlyers = flyers.filter(f => 
