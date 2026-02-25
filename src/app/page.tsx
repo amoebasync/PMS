@@ -4,20 +4,20 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 // カテゴリ設定マップ
-const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: string; bgColor: string; textColor: string; badgeBg: string; badgeText: string }> = {
-  UPDATE:      { label: 'アップデート', color: 'indigo',  icon: 'bi-stars',                      bgColor: 'bg-indigo-50',  textColor: 'text-indigo-600',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-600' },
-  MAINTENANCE: { label: 'メンテナンス', color: 'rose',    icon: 'bi-tools',                       bgColor: 'bg-rose-50',    textColor: 'text-rose-600',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-600' },
-  IMPORTANT:   { label: '重要',         color: 'amber',   icon: 'bi-exclamation-triangle-fill',   bgColor: 'bg-amber-50',   textColor: 'text-amber-600',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700' },
-  NOTICE:      { label: 'お知らせ',     color: 'emerald', icon: 'bi-bell-fill',                   bgColor: 'bg-emerald-50', textColor: 'text-emerald-600', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-600' },
-  OTHER:       { label: 'その他',       color: 'slate',   icon: 'bi-megaphone-fill',              bgColor: 'bg-slate-100',  textColor: 'text-slate-500',   badgeBg: 'bg-slate-100',  badgeText: 'text-slate-600' },
+const CATEGORY_CONFIG: Record<string, { label: string; icon: string; bgColor: string; textColor: string; badgeBg: string; badgeText: string; iconBg: string; iconText: string }> = {
+  UPDATE:      { label: 'アップデート', icon: 'bi-stars',                      bgColor: 'bg-indigo-50',  textColor: 'text-indigo-600',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-600', iconBg: 'bg-indigo-50',  iconText: 'text-indigo-600' },
+  MAINTENANCE: { label: 'メンテナンス', icon: 'bi-tools',                       bgColor: 'bg-rose-50',    textColor: 'text-rose-600',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-600',   iconBg: 'bg-rose-50',    iconText: 'text-rose-600' },
+  IMPORTANT:   { label: '重要',         icon: 'bi-exclamation-triangle-fill',   bgColor: 'bg-amber-50',   textColor: 'text-amber-600',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700',  iconBg: 'bg-amber-50',   iconText: 'text-amber-600' },
+  NOTICE:      { label: 'お知らせ',     icon: 'bi-bell-fill',                   bgColor: 'bg-emerald-50', textColor: 'text-emerald-600', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-600',iconBg: 'bg-emerald-50', iconText: 'text-emerald-600' },
+  OTHER:       { label: 'その他',       icon: 'bi-megaphone-fill',              bgColor: 'bg-slate-100',  textColor: 'text-slate-500',   badgeBg: 'bg-slate-100',  badgeText: 'text-slate-600',  iconBg: 'bg-slate-100',  iconText: 'text-slate-500' },
 };
 
 // スッキリさせたKPIカードコンポーネント
-const StatCard = ({ title, value, subValue, icon, color }: any) => (
+const StatCard = ({ title, value, subValue, icon, iconBg, iconText }: { title: string; value: string | number; subValue?: React.ReactNode; icon: string; iconBg: string; iconText: string }) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 relative overflow-hidden group hover:border-indigo-300 transition-colors flex flex-col justify-between h-full">
     <div className="flex justify-between items-start mb-2 relative z-10">
       <div className="text-slate-500 text-xs font-bold uppercase tracking-wider">{title}</div>
-      <div className={`w-8 h-8 rounded-lg bg-${color}-50 text-${color}-600 flex items-center justify-center text-lg shrink-0`}>
+      <div className={`w-8 h-8 rounded-lg ${iconBg} ${iconText} flex items-center justify-center text-lg shrink-0`}>
         <i className={`bi ${icon}`}></i>
       </div>
     </div>
@@ -142,36 +142,36 @@ export default function Dashboard() {
 
       {/* --- ★ メインKPI カードエリア --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard 
-          title="今月の売上合計" 
-          value={`¥${(data?.kpi?.monthlySales || 0).toLocaleString()}`} 
-          icon="bi-currency-yen" color="blue" 
+        <StatCard
+          title="今月の売上合計"
+          value={`¥${(data?.kpi?.monthlySales || 0).toLocaleString()}`}
+          icon="bi-currency-yen" iconBg="bg-blue-50" iconText="text-blue-600"
           subValue={<><i className="bi bi-info-circle"></i> 受注確定済みの累計</>}
         />
-        <StatCard 
-          title="本日の稼働スタッフ" 
-          value={`${data?.kpi?.distributorsTotal || 0} 名`} 
-          icon="bi-bicycle" color="emerald" 
+        <StatCard
+          title="本日の稼働スタッフ"
+          value={`${data?.kpi?.distributorsTotal || 0} 名`}
+          icon="bi-bicycle" iconBg="bg-emerald-50" iconText="text-emerald-600"
           subValue={
             <span className={data?.kpi?.distributorsCompleted > 0 ? "text-emerald-500" : ""}>
               <i className="bi bi-check-circle-fill mr-1"></i> うち {data?.kpi?.distributorsCompleted || 0}名 が業務完了
             </span>
           }
         />
-        <StatCard 
-          title="本日の配布タスク" 
-          value={`${(data?.kpi?.flyersPlanned || 0).toLocaleString()} 枚`} 
-          icon="bi-send-fill" color="indigo" 
+        <StatCard
+          title="本日の配布タスク"
+          value={`${(data?.kpi?.flyersPlanned || 0).toLocaleString()} 枚`}
+          icon="bi-send-fill" iconBg="bg-indigo-50" iconText="text-indigo-600"
           subValue={
             <span className={data?.kpi?.flyersActual > 0 ? "text-indigo-500" : ""}>
               <i className="bi bi-check-circle-fill mr-1"></i> {data?.kpi?.flyersActual ? Math.floor((data.kpi.flyersActual / data.kpi.flyersPlanned) * 100) : 0}% ({data?.kpi?.flyersActual?.toLocaleString() || 0}枚) 完了
             </span>
           }
         />
-        <StatCard 
-          title="管理エリア総数" 
-          value="1,240 ヶ所" 
-          icon="bi-geo-alt-fill" color="slate" 
+        <StatCard
+          title="管理エリア総数"
+          value="1,240 ヶ所"
+          icon="bi-geo-alt-fill" iconBg="bg-slate-100" iconText="text-slate-500"
           subValue={<><i className="bi bi-house-heart"></i> 配布可能 385,200世帯</>}
         />
       </div>

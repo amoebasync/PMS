@@ -168,6 +168,7 @@ export default function ApprovalsPage() {
           </div>
         )}
 
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm whitespace-nowrap">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
             <tr>
@@ -286,6 +287,7 @@ export default function ApprovalsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* フローティング アクション バー (承認待ちモード かつ 選択時のみ表示) */}

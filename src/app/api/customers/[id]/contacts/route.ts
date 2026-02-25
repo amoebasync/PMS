@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { sendContactCredentials } from '@/lib/mailer';
+import { hashPassword } from '@/lib/password';
 
 
 function generateInitialPassword(): string {
@@ -98,7 +99,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!customer) return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
 
   const plainPassword = generateInitialPassword();
-  const passwordHash = crypto.createHash('sha256').update(plainPassword).digest('hex');
+  const passwordHash = await hashPassword(plainPassword);
 
   let contact;
   if (isPrimary) {

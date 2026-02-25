@@ -1,104 +1,507 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import EmptyState from '@/components/ui/EmptyState';
+import Pagination from '@/components/ui/Pagination';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
-// エリアデータの型定義
 type Area = {
   id: number;
   address_code: string;
   town_name: string;
   chome_name: string;
-  postal_code: string;
   door_to_door_count: number;
+  posting_cap_raw: number;
   posting_cap_with_ng: number;
-  city?: { name: string };
+  multi_family_count: number;
+  is_client_visible: number;
+  area_rank_id: number | null;
+  prefecture?: { id: number; name: string };
+  city?: { id: number; name: string };
+  areaRank?: { id: number; name: string; postingUnitPrice: number } | null;
 };
 
+type Prefecture = { id: number; name: string };
+type City = { id: number; name: string; prefecture_id: number };
+type AreaRank = { id: number; name: string; postingUnitPrice: number };
+
+const LIMIT = 50;
+
+// --- 編集モーダル ---
+function EditModal({
+  area,
+  areaRanks,
+  onClose,
+  onSaved,
+}: {
+  area: Area;
+  areaRanks: AreaRank[];
+  onClose: () => void;
+  onSaved: (updated: Area) => void;
+}) {
+  const { showToast } = useNotification();
+  const [form, setForm] = useState({
+    town_name: area.town_name,
+    chome_name: area.chome_name,
+    door_to_door_count: String(area.door_to_door_count),
+    posting_cap_raw: String(area.posting_cap_raw),
+    posting_cap_with_ng: String(area.posting_cap_with_ng),
+    multi_family_count: String(area.multi_family_count),
+    is_client_visible: String(area.is_client_visible),
+    area_rank_id: area.area_rank_id ? String(area.area_rank_id) : '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/areas/${area.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...form,
+          area_rank_id: form.area_rank_id || null,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      showToast('エリア情報を更新しました', 'success');
+      onSaved(updated);
+    } catch {
+      showToast('更新に失敗しました', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+        {/* ヘッダー */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+          <div>
+            <p className="text-xs text-slate-500 font-mono">{area.address_code}</p>
+            <h2 className="text-base font-bold text-slate-800">
+              {area.prefecture?.name}{area.city?.name}　{area.town_name}{area.chome_name ? ` ${area.chome_name}` : ''}
+            </h2>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-xl leading-none">
+            <i className="bi bi-x-lg" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          {/* 町名 / 丁目 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">町名</label>
+              <input
+                name="town_name"
+                value={form.town_name}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">丁目名</label>
+              <input
+                name="chome_name"
+                value={form.chome_name}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* 世帯数 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">総世帯数</label>
+              <input
+                name="door_to_door_count"
+                type="number"
+                min="0"
+                value={form.door_to_door_count}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">集合住宅数</label>
+              <input
+                name="multi_family_count"
+                type="number"
+                min="0"
+                value={form.multi_family_count}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* 配布可能数 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">配布可能数（生）</label>
+              <input
+                name="posting_cap_raw"
+                type="number"
+                min="0"
+                value={form.posting_cap_raw}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">配布可能数（NG除外後）</label>
+              <input
+                name="posting_cap_with_ng"
+                type="number"
+                min="0"
+                value={form.posting_cap_with_ng}
+                onChange={handleChange}
+                required
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              />
+            </div>
+          </div>
+
+          {/* エリアランク / 有効/無効 */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">エリアランク</label>
+              <select
+                name="area_rank_id"
+                value={form.area_rank_id}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+              >
+                <option value="">未設定</option>
+                {areaRanks.map(r => (
+                  <option key={r.id} value={String(r.id)}>{r.name}（¥{r.postingUnitPrice}/部）</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+              <select
+                name="is_client_visible"
+                value={form.is_client_visible}
+                onChange={handleChange}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+              >
+                <option value="1">有効（ECポータルに表示）</option>
+                <option value="0">無効（非表示）</option>
+              </select>
+            </div>
+          </div>
+
+          {/* ボタン */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+              キャンセル
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow transition-colors disabled:opacity-50"
+            >
+              {saving ? '保存中...' : '保存する'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// --- メインページ ---
 export default function AreasPage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
+  const [cities, setCities] = useState<City[]>([]);
+  const [areaRanks, setAreaRanks] = useState<AreaRank[]>([]);
 
-  // データをAPIから取得
+  const [searchQuery, setSearchQuery] = useState('');
+  const [prefectureId, setPrefectureId] = useState('');
+  const [cityId, setCityId] = useState('');
+  const [isVisible, setIsVisible] = useState('');
+
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+
+  const [editTarget, setEditTarget] = useState<Area | null>(null);
+
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 初期マスタデータ取得
   useEffect(() => {
-    async function loadAreas() {
-      try {
-        const res = await fetch('/api/areas');
-        const json = await res.json();
-        setAreas(json.data || []);
-      } catch (err) {
-        console.error('データ取得失敗:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadAreas();
+    Promise.all([
+      fetch('/api/prefectures').then(r => r.json()),
+      fetch('/api/area-ranks').then(r => r.json()),
+    ]).then(([prefs, ranks]) => {
+      setPrefectures(Array.isArray(prefs) ? prefs : []);
+      setAreaRanks(Array.isArray(ranks) ? ranks : []);
+    }).catch(() => {});
   }, []);
 
-  // 検索フィルタリング
-  const filteredAreas = areas.filter(area => 
-    area.town_name.includes(searchTerm) || 
-    area.address_code.includes(searchTerm)
-  );
+  // 都道府県変更 → 市区町村を再取得
+  useEffect(() => {
+    setCityId('');
+    if (!prefectureId) { setCities([]); return; }
+    fetch(`/api/cities?prefectureId=${prefectureId}`)
+      .then(r => r.json())
+      .then(data => setCities(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, [prefectureId]);
+
+  const buildQuery = useCallback((overrides: Record<string, unknown> = {}) => {
+    const params = new URLSearchParams();
+    const q = (overrides.searchQuery ?? searchQuery) as string;
+    const pref = (overrides.prefectureId ?? prefectureId) as string;
+    const city = (overrides.cityId ?? cityId) as string;
+    const vis = (overrides.isVisible ?? isVisible) as string;
+    const p = (overrides.page ?? page) as number;
+    if (q) params.set('search', q);
+    if (pref) params.set('prefectureId', pref);
+    if (city) params.set('cityId', city);
+    if (vis !== '') params.set('isVisible', vis);
+    params.set('page', String(p));
+    params.set('limit', String(LIMIT));
+    return params.toString();
+  }, [searchQuery, prefectureId, cityId, isVisible, page]);
+
+  const fetchAreas = useCallback(async (query: string) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/areas?${query}`);
+      const json = await res.json();
+      setAreas(json.data || []);
+      setTotal(json.total ?? 0);
+      setTotalPages(json.totalPages ?? 1);
+    } catch (err) {
+      console.error('データ取得失敗:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAreas(buildQuery({ page: 1 }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      fetchAreas(buildQuery({ searchQuery: value, page: 1 }));
+    }, 400);
+  };
+
+  const handleFilterChange = (overrides: Record<string, unknown>) => {
+    const merged = { page: 1, ...overrides };
+    setPage(1);
+    if ('prefectureId' in overrides) setPrefectureId(overrides.prefectureId as string);
+    if ('cityId' in overrides) setCityId(overrides.cityId as string);
+    if ('isVisible' in overrides) setIsVisible(overrides.isVisible as string);
+    fetchAreas(buildQuery(merged));
+  };
+
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchAreas(buildQuery({ page: newPage }));
+  };
+
+  // 編集保存後にリスト上のデータを即時更新
+  const handleSaved = (updated: Area) => {
+    setAreas(prev => prev.map(a => a.id === updated.id ? updated : a));
+    setEditTarget(null);
+  };
 
   return (
     <div className="space-y-6">
       {/* ページヘッダー */}
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">エリア管理</h1>
-          <p className="text-slate-500 text-sm">配布エリアのマスタ情報と世帯数統計を管理します。</p>
+          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+            <i className="bi bi-map-fill text-indigo-600"></i> エリア管理
+          </h1>
+          <p className="text-slate-500 text-sm mt-1">配布エリアのマスタ情報と世帯数統計を管理します。</p>
         </div>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold text-sm transition-all shadow-sm">
-          + 新規登録
+        <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
+          <i className="bi bi-plus-lg"></i> 新規登録
         </button>
       </div>
 
-      {/* 検索バー */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-        <div className="relative">
-          <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input 
-            type="text" 
-            placeholder="町名やエリアコードで検索..." 
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      {/* フィルターバー */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
+        {/* キーワード（複合住所検索対応） */}
+        <div className="flex-1 min-w-[220px]">
+          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <div className="relative">
+            <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
+            <input
+              type="text"
+              placeholder="例: 東京都新宿区高田馬場１丁目"
+              value={searchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* 都道府県 */}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">都道府県</label>
+          <select
+            value={prefectureId}
+            onChange={(e) => {
+              setPrefectureId(e.target.value);
+              handleFilterChange({ prefectureId: e.target.value, cityId: '' });
+            }}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[130px] bg-white cursor-pointer"
+          >
+            <option value="">すべて</option>
+            {prefectures.map(p => (
+              <option key={p.id} value={String(p.id)}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 市区町村（都道府県選択後に有効化） */}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">市区町村</label>
+          <select
+            value={cityId}
+            onChange={(e) => handleFilterChange({ cityId: e.target.value })}
+            disabled={!prefectureId}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[150px] bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <option value="">すべて</option>
+            {cities.map(c => (
+              <option key={c.id} value={String(c.id)}>{c.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* 有効/無効 */}
+        <div>
+          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <select
+            value={isVisible}
+            onChange={(e) => handleFilterChange({ isVisible: e.target.value })}
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
+          >
+            <option value="">すべて</option>
+            <option value="1">有効のみ</option>
+            <option value="0">無効のみ</option>
+          </select>
         </div>
       </div>
 
       {/* テーブル */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
             <tr>
-              <th className="px-6 py-4 font-semibold">コード</th>
-              <th className="px-6 py-4 font-semibold">市区町村 / 町名</th>
-              <th className="px-6 py-4 font-semibold text-right">総世帯数</th>
-              <th className="px-6 py-4 font-semibold text-right text-blue-600">配布可能数</th>
-              <th className="px-6 py-4 font-semibold text-center">操作</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">コード</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">都道府県</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">市区町村</th>
+              <th className="px-4 py-3 font-semibold">町名 / 丁目</th>
+              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">総世帯数</th>
+              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap text-indigo-600">配布可能数</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">ランク</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap text-center">状態</th>
+              <th className="px-4 py-3 font-semibold text-center">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan={5} className="px-6 py-10 text-center text-slate-400">読み込み中...</td></tr>
-            ) : filteredAreas.map((area) => (
-              <tr key={area.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 text-sm font-mono text-slate-500">{area.address_code}</td>
-                <td className="px-6 py-4 font-medium text-slate-800">
-                  {area.city?.name} {area.town_name} {area.chome_name}
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={i} className="animate-pulse">
+                  {Array.from({ length: 9 }).map((_, j) => (
+                    <td key={j} className="px-4 py-3">
+                      <div className="h-4 bg-slate-100 rounded" />
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : areas.length === 0 ? (
+              <EmptyState
+                icon="bi-map"
+                title="該当するエリアが見つかりません"
+                description="検索条件やフィルターを変更してお試しください。"
+              />
+            ) : areas.map((area) => (
+              <tr key={area.id} className={`hover:bg-slate-50 transition-colors ${area.is_client_visible === 0 ? 'opacity-50' : ''}`}>
+                <td className="px-4 py-3 font-mono text-slate-500 text-xs">{area.address_code}</td>
+                <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{area.prefecture?.name ?? '—'}</td>
+                <td className="px-4 py-3 text-slate-600 whitespace-nowrap">{area.city?.name ?? '—'}</td>
+                <td className="px-4 py-3 font-medium text-slate-800">
+                  {area.town_name}{area.chome_name ? `　${area.chome_name}` : ''}
                 </td>
-                <td className="px-6 py-4 text-sm text-right text-slate-600">{area.door_to_door_count.toLocaleString()}</td>
-                <td className="px-6 py-4 text-sm text-right font-bold text-blue-600">{area.posting_cap_with_ng.toLocaleString()}</td>
-                <td className="px-6 py-4 text-center">
-                  <button className="text-slate-400 hover:text-blue-600"><i className="bi bi-pencil-square"></i></button>
+                <td className="px-4 py-3 text-right text-slate-600">{area.door_to_door_count.toLocaleString()}</td>
+                <td className="px-4 py-3 text-right font-bold text-indigo-600">{area.posting_cap_with_ng.toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  {area.areaRank ? (
+                    <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-medium">
+                      {area.areaRank.name}
+                    </span>
+                  ) : <span className="text-slate-300 text-xs">—</span>}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  {area.is_client_visible === 1 ? (
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">有効</span>
+                  ) : (
+                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">無効</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={() => setEditTarget(area)}
+                    className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-indigo-50"
+                    title="編集"
+                  >
+                    <i className="bi bi-pencil-square"></i>
+                  </button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
+        <Pagination
+          page={page}
+          totalPages={totalPages}
+          total={total}
+          limit={LIMIT}
+          onPageChange={handlePageChange}
+        />
       </div>
+
+      {/* 編集モーダル */}
+      {editTarget && (
+        <EditModal
+          area={editTarget}
+          areaRanks={areaRanks}
+          onClose={() => setEditTarget(null)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   );
 }

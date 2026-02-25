@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { cookies } from 'next/headers';
 import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
+import { hashPassword } from '@/lib/password';
 
 
 // 一覧取得
 export async function GET(request: Request) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
@@ -100,13 +106,18 @@ export async function GET(request: Request) {
 
 // 新規登録 (POST)
 export async function POST(request: Request) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     // 初期パスワード = 生年月日 (YYYYMMDD)。未入力の場合は今日の日付をフォールバック
     const birthdayStr = body.birthday
       ? new Date(body.birthday).toISOString().slice(0, 10).replace(/-/g, '')
       : new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const hash = crypto.createHash('sha256').update(birthdayStr).digest('hex');
+    const hash = await hashPassword(birthdayStr);
 
     // ★ 社員コードが空欄の場合は自動採番する (EMP + 年月日 + 4桁のランダム数字)
     const generatedCode = `EMP${new Date().toISOString().slice(0,10).replace(/-/g, '')}${Math.floor(1000 + Math.random() * 9000)}`;

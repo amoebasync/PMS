@@ -120,13 +120,16 @@ export function PortalHeader() {
           {/* --- 通知アイコン --- */}
           {session && (
             <div className="relative mr-2" ref={notifRef}>
-              <button 
+              <button
                 onClick={handleOpenNotifications}
+                aria-label={unreadCount > 0 ? `お知らせ（未読${unreadCount}件）` : 'お知らせ'}
+                aria-expanded={isNotifOpen}
+                aria-haspopup="true"
                 className="w-10 h-10 rounded-full flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors relative"
               >
-                <i className="bi bi-bell text-2xl"></i>
+                <i className="bi bi-bell text-2xl" aria-hidden="true"></i>
                 {unreadCount > 0 && (
-                  <span className="absolute top-0 right-0 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm transform translate-x-1 -translate-y-1">
+                  <span className="absolute top-0 right-0 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm transform translate-x-1 -translate-y-1" aria-hidden="true">
                     {unreadCount}
                   </span>
                 )}
@@ -172,10 +175,14 @@ export function PortalHeader() {
           )}
 
           {/* カートアイコン */}
-          <Link href="/portal/cart" className="relative p-2 text-slate-600 hover:text-indigo-600 transition-colors mr-2">
-            <i className="bi bi-cart3 text-2xl"></i>
+          <Link
+            href="/portal/cart"
+            aria-label={cartItems && cartItems.length > 0 ? `カート（${cartItems.length}件）` : 'カート'}
+            className="relative p-2 text-slate-600 hover:text-indigo-600 transition-colors mr-2"
+          >
+            <i className="bi bi-cart3 text-2xl" aria-hidden="true"></i>
             {cartItems && cartItems.length > 0 && (
-              <span className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm transform translate-x-1">
+              <span className="absolute top-0 right-0 bg-rose-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm transform translate-x-1" aria-hidden="true">
                 {cartItems.length}
               </span>
             )}

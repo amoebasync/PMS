@@ -450,6 +450,7 @@ export default function CustomerPage() {
 
       {/* 顧客一覧テーブル */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
@@ -536,6 +537,7 @@ export default function CustomerPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* ===== 登録・編集モーダル ===== */}

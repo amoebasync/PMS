@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { verifyPassword, hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -12,27 +12,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'メールアドレスとパスワードを入力してください' }, { status: 400 });
     }
 
-    const hash = crypto.createHash('sha256').update(password).digest('hex');
-
     const contact = await prisma.customerContact.findFirst({
-      where: {
-        email: email,
-        passwordHash: hash,
-      },
-      include: {
-        customer: true // 紐づく企業情報も取得
-      }
+      where: { email },
+      include: { customer: true },
     });
 
     if (!contact || contact.customer.status === 'INVALID') {
       return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
     }
 
-    // 最終ログイン日時を更新 (awaitせずに裏で実行)
-    prisma.customerContact.update({
-      where: { id: contact.id },
-      data: { lastLoginAt: new Date() }
-    }).catch(console.error);
+    const { verified, needsUpgrade } = await verifyPassword(password, contact.passwordHash ?? '');
+    if (!verified) {
+      return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
+    }
+
+    // SHA-256ハッシュの場合はbcryptに自動アップグレード + 最終ログイン日時更新
+    const updateData: Record<string, unknown> = { lastLoginAt: new Date() };
+    if (needsUpgrade) {
+      updateData.passwordHash = await hashPassword(password);
+    }
+    prisma.customerContact.update({ where: { id: contact.id }, data: updateData }).catch(console.error);
 
     // クライアント専用のCookieを発行
     const cookieStore = await cookies();

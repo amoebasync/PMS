@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { generateUniqueCustomerCode } from '@/lib/customerCode';
 import { sendWelcomeEmail } from '@/lib/mailer';
+import { hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'このメールアドレスは既に登録されています' }, { status: 400 });
     }
 
-    const hash = crypto.createHash('sha256').update(password).digest('hex');
+    const hash = await hashPassword(password);
 
     const customerCode = await generateUniqueCustomerCode(prisma, 'EC');
     

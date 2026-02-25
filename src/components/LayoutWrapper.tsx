@@ -60,7 +60,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           onMobileClose={() => setIsMobileOpen(false)}
         />
 
-        <main className={`flex-1 transition-all duration-300 pt-14 md:pt-0 p-4 md:p-8 min-h-screen ${
+        <main className={`flex-1 transition-all duration-300 pt-14 p-4 md:px-12 md:py-10 min-h-screen ${
           isSidebarCollapsed ? 'md:ml-[80px]' : 'md:ml-[260px]'
         }`}>
           {children}

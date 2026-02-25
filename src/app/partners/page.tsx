@@ -105,6 +105,7 @@ export default function PartnerPage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
@@ -134,6 +135,7 @@ export default function PartnerPage() {
              ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {isFormOpen && (

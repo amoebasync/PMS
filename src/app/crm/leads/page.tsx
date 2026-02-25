@@ -278,6 +278,7 @@ export default function LeadsPage() {
 
       {/* 一覧テーブル */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
@@ -365,6 +366,7 @@ export default function LeadsPage() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 登録・編集モーダル */}

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
+import { hashPassword } from '@/lib/password';
 
 
 export async function POST(
@@ -26,7 +26,7 @@ export async function POST(
     const birthdayStr = employee.birthday
       ? new Date(employee.birthday).toISOString().slice(0, 10).replace(/-/g, '')
       : new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const hash = crypto.createHash('sha256').update(birthdayStr).digest('hex');
+    const hash = await hashPassword(birthdayStr);
 
     // パスワードをリセットし、初回変更フラグを立てる
     await prisma.employee.update({

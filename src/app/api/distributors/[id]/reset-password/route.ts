@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { hashPassword } from '@/lib/password';
 
 
-function buildPasswordFromBirthday(birthday: Date): string {
+async function buildPasswordFromBirthday(birthday: Date): Promise<string> {
   const y = birthday.getFullYear();
   const m = String(birthday.getMonth() + 1).padStart(2, '0');
   const d = String(birthday.getDate()).padStart(2, '0');
-  return crypto.createHash('sha256').update(`${y}${m}${d}`).digest('hex');
+  return hashPassword(`${y}${m}${d}`);
 }
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -29,7 +29,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       );
     }
 
-    const passwordHash = buildPasswordFromBirthday(distributor.birthday);
+    const passwordHash = await buildPasswordFromBirthday(distributor.birthday);
 
     await prisma.flyerDistributor.update({
       where: { id: parseInt(id) },
