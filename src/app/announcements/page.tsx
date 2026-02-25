@@ -204,6 +204,7 @@ export default function AnnouncementsPage() {
             <p className="text-slate-400 text-sm mt-1">「新規投稿」からお知らせを作成してください</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
@@ -252,6 +253,7 @@ export default function AnnouncementsPage() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

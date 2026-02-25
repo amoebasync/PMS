@@ -460,6 +460,7 @@ export default function CrmTasksPage() {
             <p className="text-sm">タスクがありません</p>
           </div>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50">
@@ -586,6 +587,7 @@ export default function CrmTasksPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

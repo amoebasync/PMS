@@ -127,9 +127,11 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
       
       <button
         onClick={toggleCollapse}
+        aria-label={isCollapsed ? 'サイドバーを展開する' : 'サイドバーを折りたたむ'}
+        aria-expanded={!isCollapsed}
         className="absolute -right-3 top-6 w-6 h-6 bg-blue-600 rounded-full items-center justify-center text-white shadow-md hover:bg-blue-500 transition-colors z-[1010] hidden md:flex"
       >
-        <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`}></i>
+        <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`} aria-hidden="true"></i>
       </button>
 
       <div className="h-[80px] flex items-center justify-center border-b border-white/10 bg-[#0f172a] shrink-0">

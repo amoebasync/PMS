@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { sendContactCredentials } from '@/lib/mailer';
+import { hashPassword } from '@/lib/password';
 
 
 function generateInitialPassword(): string {
@@ -26,6 +28,11 @@ function generateInitialPassword(): string {
 
 // 一覧取得 (GET)
 export async function GET(request: Request) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
@@ -59,6 +66,11 @@ export async function GET(request: Request) {
 
 // 新規登録 (POST)
 export async function POST(request: Request) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
 
@@ -112,7 +124,7 @@ export async function POST(request: Request) {
 
     if (contact?.lastName && contact?.firstName) {
       plainPassword = generateInitialPassword();
-      const passwordHash = crypto.createHash('sha256').update(plainPassword).digest('hex');
+      const passwordHash = await hashPassword(plainPassword);
 
       newCustomer = await prisma.$transaction(async (tx) => {
         const cust = await tx.customer.create({ data: customerData });

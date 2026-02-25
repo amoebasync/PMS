@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { verifyPassword, hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -13,26 +13,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'IDとパスワードを入力してください' }, { status: 400 });
     }
 
-    // 1. 入力されたパスワードを同じ方式(SHA-256)でハッシュ化
-    const hash = crypto.createHash('sha256').update(password).digest('hex');
-
-    // 2. データベースから社員を検索 (社員コード or メールアドレス どちらでもログイン可)
+    // 1. メールアドレスまたは社員コードでアカウントを検索
     const employee = await prisma.employee.findFirst({
       where: {
         OR: [
           { email: accountId },
           { employeeCode: accountId },
         ],
-        passwordHash: hash, // ハッシュ化したパスワードが一致するか
-        isActive: true      // 退職済(false)のアカウントは弾く
-      }
+        isActive: true,
+      },
     });
 
     if (!employee) {
       return NextResponse.json({ error: 'IDまたはパスワードが間違っています。' }, { status: 401 });
     }
 
-    // 3. 認証成功: Cookieにセッション情報を保存 (Next.js 15+ の書き方)
+    // 2. パスワードを検証（bcrypt / SHA-256 両対応）
+    const { verified, needsUpgrade } = await verifyPassword(password, employee.passwordHash);
+    if (!verified) {
+      return NextResponse.json({ error: 'IDまたはパスワードが間違っています。' }, { status: 401 });
+    }
+
+    // 3. SHA-256ハッシュの場合はbcryptに自動アップグレード
+    if (needsUpgrade) {
+      const newHash = await hashPassword(password);
+      await prisma.employee.update({ where: { id: employee.id }, data: { passwordHash: newHash } });
+    }
+
+    // 4. 認証成功: Cookieにセッション情報を保存 (Next.js 15+ の書き方)
     const cookieStore = await cookies();
     cookieStore.set('pms_session', employee.id.toString(), {
       httpOnly: true,

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
-import crypto from 'crypto';
+import { verifyPassword, hashPassword } from '@/lib/password';
 
 export async function POST(request: Request) {
   try {
@@ -44,12 +44,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'パスワードに数字または記号を含めてください' }, { status: 400 });
     }
 
-    const currentHash = crypto.createHash('sha256').update(currentPassword).digest('hex');
-    if (contact.passwordHash !== currentHash) {
+    const { verified } = await verifyPassword(currentPassword, contact.passwordHash ?? '');
+    if (!verified) {
       return NextResponse.json({ error: '現在のパスワードが正しくありません' }, { status: 400 });
     }
 
-    const newHash = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const newHash = await hashPassword(newPassword);
     await prisma.customerContact.update({
       where: { id: contactId },
       data: { passwordHash: newHash, mustChangePassword: false },

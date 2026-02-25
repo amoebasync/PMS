@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'パスワードは8文字以上で設定してください' }, { status: 400 });
     }
 
-    const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const hash = await hashPassword(newPassword);
 
     await prisma.employee.update({
       where: { id: employeeId },

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
+import { hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'パスワードは8文字以上で入力してください' }, { status: 400 });
     }
 
-    const hash = crypto.createHash('sha256').update(password).digest('hex');
+    const hash = await hashPassword(password);
 
     await prisma.flyerDistributor.update({
       where: { id: distributor.id },

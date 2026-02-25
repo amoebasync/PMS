@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
+import { hashPassword } from '@/lib/password';
 
 
 export async function POST(
@@ -15,7 +15,7 @@ export async function POST(
     const newPassword = Math.random().toString(36).slice(-8) + Math.random().toString(36).slice(-2);
 
     // 2. ハッシュ化
-    const hash = crypto.createHash('sha256').update(newPassword).digest('hex');
+    const hash = await hashPassword(newPassword);
 
     // 3. DB更新
     await prisma.employee.update({

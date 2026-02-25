@@ -506,6 +506,7 @@ export default function EmployeePage() {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
@@ -610,6 +611,7 @@ export default function EmployeePage() {
             )}
           </tbody>
         </table>
+        </div>
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} onPageChange={handleEmpPageChange} />
       </div>
 
@@ -764,6 +766,7 @@ export default function EmployeePage() {
                       ) : null}
 
                       <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
                         <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                             <tr>
@@ -804,6 +807,7 @@ export default function EmployeePage() {
                             )}
                           </tbody>
                         </table>
+                        </div>
                       </div>
                     </div>
                   )}

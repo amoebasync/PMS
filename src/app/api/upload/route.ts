@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
 import Busboy from 'busboy';
 import { PDFParse } from 'pdf-parse';
 import { uploadToS3, deleteFromS3, listS3Objects, getS3Url, getMimeType } from '@/lib/s3';
@@ -117,6 +118,12 @@ function parseMultipart(request: Request): Promise<ParsedUpload> {
 // ========================================================
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const session = cookieStore.get('pms_session')?.value;
+    if (!session) {
+      return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+    }
+
     const { file, fields } = await parseMultipart(request);
 
     if (!file) {

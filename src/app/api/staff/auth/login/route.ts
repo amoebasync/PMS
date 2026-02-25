@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { cookies } from 'next/headers';
+import { verifyPassword, hashPassword } from '@/lib/password';
 
 
 export async function POST(request: Request) {
@@ -12,17 +12,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'メールアドレスとパスワードを入力してください' }, { status: 400 });
     }
 
-    const hash = crypto.createHash('sha256').update(password).digest('hex');
-
     const distributor = await prisma.flyerDistributor.findFirst({
-      where: {
-        email: email,
-        passwordHash: hash,
-      },
+      where: { email },
     });
 
     if (!distributor) {
       return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
+    }
+
+    const { verified, needsUpgrade } = await verifyPassword(password, distributor.passwordHash ?? '');
+    if (!verified) {
+      return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
+    }
+
+    if (needsUpgrade) {
+      const newHash = await hashPassword(password);
+      await prisma.flyerDistributor.update({ where: { id: distributor.id }, data: { passwordHash: newHash } });
     }
 
     const cookieStore = await cookies();

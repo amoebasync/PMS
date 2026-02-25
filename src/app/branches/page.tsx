@@ -117,6 +117,7 @@ export default function BranchPage() {
 
       {/* テーブル */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
@@ -170,6 +171,7 @@ export default function BranchPage() {
              })}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* 登録・編集モーダル */}
