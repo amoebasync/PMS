@@ -68,7 +68,7 @@ export default function LoginPage() {
               priority
             />
           </div>
-          <p className="text-slate-400 text-sm tracking-widest uppercase">Property Management System</p>
+          <p className="text-slate-400 text-sm tracking-widest uppercase">Posting Management System</p>
         </div>
 
         {/* エラーメッセージの表示エリア */}
@@ -132,11 +132,20 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 text-center">
+        <div className="mt-6 text-center">
+          <a
+            href="/forgot-password"
+            className="text-sm text-slate-400 hover:text-blue-400 transition-colors"
+          >
+            パスワードをお忘れですか？
+          </a>
+        </div>
+
+        <div className="mt-4 text-center">
           <p className="text-xs text-slate-500">
             &copy; 2026 Tiramis Co., Ltd. All rights reserved.
           </p>
-        </div> 
+        </div>
       </div>
     </div>
   );

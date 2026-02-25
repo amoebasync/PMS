@@ -434,3 +434,45 @@ export const sendOrderApprovalEmail = async (
     text: `${lastName} ${firstName} 様\n\nご発注の審査が完了しました。\n\n注文番号: ${orderNo}\n件名: ${orderTitle}\nステータス: 受注確定\n\nマイページ: ${myPageUrl}\n\nご不明な点はinfo@tiramis.co.jpまでお問い合わせください。`,
   });
 };
+
+// ─────────────────────────────────────────────────────────
+// 6. 社員パスワードリセット（ワンタイムリンク）
+// ─────────────────────────────────────────────────────────
+export const sendPasswordResetEmail = async (
+  toEmail: string,
+  lastName: string,
+  firstName: string,
+  resetUrl: string,
+) => {
+  const contentHtml = `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${lastName} ${firstName} さん</p>
+    <p style="margin:0 0 16px;">
+      パスワードリセットのリクエストを受け付けました。<br>
+      下のボタンをクリックして、新しいパスワードを設定してください。
+    </p>
+
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${resetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">パスワードをリセットする</a>
+    </div>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>⚠ このリンクは1時間のみ有効で、1回しか使用できません。</strong><br>
+        心当たりがない場合は、このメールを無視してください。パスワードは変更されません。
+      </p>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      リンクが機能しない場合は、以下のURLをブラウザにコピー＆ペーストしてください。<br>
+      <span style="color:#6366f1;word-break:break-all;">${resetUrl}</span>
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis PMS Pro" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject: '【Tiramis PMS Pro】パスワードリセットのご案内',
+    html: htmlWrapper(contentHtml),
+    text: `${lastName} ${firstName} さん\n\nパスワードリセットのリクエストを受け付けました。\n\n以下のURLをクリックして新しいパスワードを設定してください（1時間以内・1回限り有効）。\n\n${resetUrl}\n\n心当たりがない場合はこのメールを無視してください。`,
+  });
+};

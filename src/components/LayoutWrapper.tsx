@@ -9,7 +9,11 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const pathname = usePathname();
 
   // ログイン画面・ポータル画面・配布員ポータルはサイドバーを隠す
-  const isAuthPage = pathname === '/login';
+  const isAuthPage =
+    pathname === '/login' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/change-password';
   const isPortalPage = pathname.startsWith('/portal');
   const isDistributorPage = pathname.startsWith('/staff');
   const isAppPrivacyPage = pathname.startsWith('/app-privacy');

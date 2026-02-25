@@ -6,6 +6,8 @@ export function middleware(request: NextRequest) {
 
   const isPublicPath =
     path === '/login' ||
+    path === '/forgot-password' ||
+    path === '/reset-password' ||
     path === '/change-password' ||
     path === '/api/auth/change-password' ||
     path.startsWith('/api/auth') ||

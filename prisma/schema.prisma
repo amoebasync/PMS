@@ -177,7 +177,22 @@ model Employee {
 
   announcements  Announcement[]
 
+  passwordResetTokens PasswordResetToken[]
+
   @@map("employees")
+}
+
+// --- パスワードリセットトークン (ワンタイム) ---
+model PasswordResetToken {
+  id         Int       @id @default(autoincrement())
+  token      String    @unique @db.VarChar(64)
+  employeeId Int       @map("employee_id")
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime  @map("expires_at")
+  usedAt     DateTime? @map("used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@map("password_reset_tokens")
 }
 
 // --- 雇用形態 ---
