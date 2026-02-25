@@ -42,4 +42,6 @@ jobs:
             npm install --legacy-peer-deps
             npx prisma generate
             npm run build
+            aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
+              --cache-control "public,max-age=31536000,immutable" --delete
             pm2 restart pms
