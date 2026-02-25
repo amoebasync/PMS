@@ -1,8 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import SkeletonRow from '@/components/ui/SkeletonRow';
+import EmptyState from '@/components/ui/EmptyState';
+import Pagination from '@/components/ui/Pagination';
 
 // --- 型定義 ---
 type Department = { id: number; code: string; name: string };
@@ -88,6 +91,15 @@ export default function EmployeePage() {
   const [filterBranchId, setFilterBranchId] = useState('');
   const [filterDepartmentId, setFilterDepartmentId] = useState('');
 
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const LIMIT = 20;
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const [sortKey, setSortKey] = useState<'name' | 'hireDate' | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -124,32 +136,104 @@ export default function EmployeePage() {
 
   const { showToast, showConfirm } = useNotification();
 
-  const fetchData = async () => {
+  const buildEmpQuery = (overrides: Record<string, unknown> = {}) => {
+    const params = new URLSearchParams();
+    const st = (overrides.filterStatus ?? filterStatus) as string;
+    const bid = (overrides.filterBranchId ?? filterBranchId) as string;
+    const did = (overrides.filterDepartmentId ?? filterDepartmentId) as string;
+    const q = (overrides.searchTerm ?? searchTerm) as string;
+    const p = (overrides.page ?? page) as number;
+    params.set('page', String(p));
+    params.set('limit', String(LIMIT));
+    params.set('status', st);
+    if (bid) params.set('branchId', bid);
+    if (did) params.set('departmentId', did);
+    if (q) params.set('search', q);
+    return params.toString();
+  };
+
+  const fetchEmployees = async (query: string) => {
     setIsLoading(true);
     try {
-      const [empRes, masterRes, branchRes, profileRes] = await Promise.all([ 
-        fetch('/api/employees'), 
+      const res = await fetch(`/api/employees?${query}`);
+      const data = await res.json();
+      if (data.data) {
+        setEmployees(data.data);
+        setTotal(data.total ?? 0);
+        setTotalPages(data.totalPages ?? 1);
+      }
+    } catch (error) { console.error(error); }
+    finally { setIsLoading(false); }
+  };
+
+  const fetchData = async () => {
+    try {
+      const [masterRes, branchRes, profileRes] = await Promise.all([
         fetch('/api/masters'),
         fetch('/api/branches'),
-        fetch('/api/profile') 
+        fetch('/api/profile')
       ]);
-      const empData = await empRes.json();
       const masterData = await masterRes.json();
       const branchData = await branchRes.json();
       const profileData = await profileRes.json();
 
-      if (Array.isArray(empData)) setEmployees(empData);
       setDepartments(masterData.departments || []);
       setRoles(masterData.roles || []);
       setCountries(masterData.countries || []);
       if (Array.isArray(branchData)) setBranches(branchData);
       if (profileData && profileData.id) setCurrentUser(profileData);
-
-    } catch (error) { console.error(error); } 
-    finally { setIsLoading(false); }
+    } catch (error) { console.error(error); }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData();
+    fetchEmployees(buildEmpQuery({ page: 1 }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleEmpFilterChange = (overrides: Record<string, unknown>) => {
+    const newPage = 1;
+    const merged = { page: newPage, ...overrides };
+    setPage(newPage);
+    if ('filterStatus' in overrides) setFilterStatus(overrides.filterStatus as 'ACTIVE' | 'INACTIVE' | 'ALL');
+    if ('filterBranchId' in overrides) setFilterBranchId(overrides.filterBranchId as string);
+    if ('filterDepartmentId' in overrides) setFilterDepartmentId(overrides.filterDepartmentId as string);
+    fetchEmployees(buildEmpQuery(merged));
+  };
+
+  const handleEmpSearchChange = (value: string) => {
+    setSearchTerm(value);
+    setPage(1);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      fetchEmployees(buildEmpQuery({ searchTerm: value, page: 1 }));
+    }, 400);
+  };
+
+  const handleEmpPageChange = (newPage: number) => {
+    setPage(newPage);
+    fetchEmployees(buildEmpQuery({ page: newPage }));
+  };
+
+  const handleEmpSort = (key: 'name' | 'hireDate') => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  };
+
+  const sortedEmployees = sortKey ? [...employees].sort((a, b) => {
+    if (sortKey === 'name') {
+      const aName = `${a.lastNameJa}${a.firstNameJa}`;
+      const bName = `${b.lastNameJa}${b.firstNameJa}`;
+      return sortDir === 'asc' ? aName.localeCompare(bName, 'ja') : bName.localeCompare(aName, 'ja');
+    }
+    const aDate = a.hireDate ? new Date(a.hireDate).getTime() : 0;
+    const bDate = b.hireDate ? new Date(b.hireDate).getTime() : 0;
+    return sortDir === 'asc' ? aDate - bDate : bDate - aDate;
+  }) : employees;
+
+  const EmpSortIcon = ({ col }: { col: 'name' | 'hireDate' }) => (
+    <i className={`bi ml-1 ${sortKey === col ? (sortDir === 'asc' ? 'bi-arrow-up text-blue-500' : 'bi-arrow-down text-blue-500') : 'bi-arrow-down-up text-slate-300'}`} />
+  );
 
   const currentUserRoles = currentUser?.roles?.map((r: any) => r.role?.code) || [];
   const isSuperAdmin = currentUserRoles.includes('SUPER_ADMIN');
@@ -255,7 +339,7 @@ export default function EmployeePage() {
       if (!res.ok) throw new Error('Failed to save');
 
       setIsFormModalOpen(false);
-      fetchData();
+      fetchEmployees(buildEmpQuery());
     } catch (error) { showToast('保存に失敗しました', 'error'); }
   };
 
@@ -339,22 +423,10 @@ export default function EmployeePage() {
       const res = await fetch(`/api/employees/${currentId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete');
       setIsDeleteModalOpen(false);
-      fetchData();
+      fetchEmployees(buildEmpQuery());
     } catch (error) { showToast('削除に失敗しました', 'error'); }
   };
 
-  const filteredEmployees = employees.filter(emp => {
-    if (filterStatus === 'ACTIVE' && !emp.isActive) return false;
-    if (filterStatus === 'INACTIVE' && emp.isActive) return false;
-    if (filterBranchId && emp.branchId?.toString() !== filterBranchId) return false;
-    if (filterDepartmentId && emp.department?.id.toString() !== filterDepartmentId) return false;
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      const target = `${emp.employeeCode || ''} ${emp.lastNameJa}${emp.firstNameJa} ${emp.lastNameKana || ''}${emp.firstNameKana || ''} ${emp.email} ${emp.phone || ''}`.toLowerCase();
-      if (!target.includes(q)) return false;
-    }
-    return true;
-  });
 
   const sectionClass = "bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4";
   const sectionHeaderClass = "text-sm font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2";
@@ -388,7 +460,7 @@ export default function EmployeePage() {
               type="text"
               placeholder="氏名、社員コード、メールアドレス等で検索..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => handleEmpSearchChange(e.target.value)}
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
@@ -397,7 +469,7 @@ export default function EmployeePage() {
           <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value as 'ACTIVE' | 'INACTIVE' | 'ALL')}
+            onChange={(e) => handleEmpFilterChange({ filterStatus: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
             <option value="ACTIVE">在職中</option>
@@ -409,7 +481,7 @@ export default function EmployeePage() {
           <label className="block text-xs font-bold text-slate-500 mb-1">支店</label>
           <select
             value={filterBranchId}
-            onChange={(e) => setFilterBranchId(e.target.value)}
+            onChange={(e) => handleEmpFilterChange({ filterBranchId: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
             <option value="">すべて</option>
@@ -422,7 +494,7 @@ export default function EmployeePage() {
           <label className="block text-xs font-bold text-slate-500 mb-1">部署</label>
           <select
             value={filterDepartmentId}
-            onChange={(e) => setFilterDepartmentId(e.target.value)}
+            onChange={(e) => handleEmpFilterChange({ filterDepartmentId: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
             <option value="">すべて</option>
@@ -437,7 +509,9 @@ export default function EmployeePage() {
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
-              <th className="px-6 py-4 font-semibold">社員番号 / 氏名</th>
+              <th className="px-6 py-4 font-semibold cursor-pointer select-none hover:bg-slate-100" onClick={() => handleEmpSort('name')}>
+                社員番号 / 氏名 <EmpSortIcon col="name" />
+              </th>
               <th className="px-6 py-4 font-semibold">雇用形態 / 役職・権限</th>
               <th className="px-6 py-4 font-semibold">所属 / 国籍</th>
               <th className="px-6 py-4 font-semibold">ステータス</th>
@@ -445,9 +519,12 @@ export default function EmployeePage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? (<tr><td colSpan={5} className="p-8 text-center text-slate-400">読み込み中...</td></tr>) : 
-             filteredEmployees.length === 0 ? (<tr><td colSpan={5} className="p-8 text-center text-slate-400">該当するデータが見つかりません</td></tr>) : (
-              filteredEmployees.map((emp) => (
+            {isLoading ? (
+              <SkeletonRow rows={8} cols={5} />
+            ) : employees.length === 0 ? (
+              <EmptyState icon="bi-person-x" title="該当するデータが見つかりません" description="検索条件を変更するか、新規社員を登録してください" />
+            ) : (
+              sortedEmployees.map((emp) => (
                 <tr key={emp.id} onClick={() => openDetailModal(emp)} className="hover:bg-blue-50/50 transition-colors cursor-pointer">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
@@ -533,6 +610,7 @@ export default function EmployeePage() {
             )}
           </tbody>
         </table>
+        <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} onPageChange={handleEmpPageChange} />
       </div>
 
       {/* --- ★ 詳細表示モーダル --- */}

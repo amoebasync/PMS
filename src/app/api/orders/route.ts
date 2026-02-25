@@ -2,21 +2,59 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const orders = await prisma.order.findMany({
-      orderBy: { id: 'desc' },
-      include: {
-        customer: true,
-        salesRep: true,
-        // ★ 追加: 各依頼が紐付いているか判別するためにIDだけ取得しておく
-        distributions: { select: { id: true } },
-        printings: { select: { id: true } },
-        newspaperInserts: { select: { id: true } },
-        designs: { select: { id: true } },
-      }
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search') || '';
+    const status = searchParams.get('status') || '';
+    const source = searchParams.get('source') || '';
+    const salesRepId = searchParams.get('salesRepId') || '';
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
+
+    const where: Record<string, unknown> = {};
+    if (status) where.status = status;
+    if (source) where.orderSource = source;
+    if (salesRepId) where.salesRepId = parseInt(salesRepId);
+    if (search) {
+      where.OR = [
+        { orderNo: { contains: search } },
+        { title: { contains: search } },
+        { customer: { name: { contains: search } } },
+        { customer: { nameKana: { contains: search } } },
+      ];
+    }
+
+    const include = {
+      customer: true,
+      salesRep: true,
+      distributions: { select: { id: true } },
+      printings: { select: { id: true } },
+      newspaperInserts: { select: { id: true } },
+      designs: { select: { id: true } },
+    };
+
+    const [total, orders, pendingPaymentCount, pendingReviewCount] = await Promise.all([
+      prisma.order.count({ where }),
+      prisma.order.findMany({
+        where,
+        orderBy: { id: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+        include,
+      }),
+      prisma.order.count({ where: { status: 'PENDING_PAYMENT' } }),
+      prisma.order.count({ where: { status: 'PENDING_REVIEW' } }),
+    ]);
+
+    return NextResponse.json({
+      data: orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      pendingPaymentCount,
+      pendingReviewCount,
     });
-    return NextResponse.json(orders);
   } catch (error) {
     console.error('Fetch Orders Error:', error);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });

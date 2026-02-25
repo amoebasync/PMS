@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [accountId, setAccountId] = useState('');
   const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const accountIdRef = useRef<HTMLInputElement>(null);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +41,7 @@ export default function LoginPage() {
         const data = await res.json();
         setErrorMsg(data.error || 'ログインに失敗しました');
         setLoading(false);
+        accountIdRef.current?.focus();
       }
     } catch (error) {
       setErrorMsg('通信エラーが発生しました');
@@ -82,11 +84,13 @@ export default function LoginPage() {
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">Account ID</label>
             <div className="relative">
               <i className="bi bi-person absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-              <input 
-                type="text" 
+              <input
+                ref={accountIdRef}
+                type="text"
                 value={accountId}
                 onChange={(e) => setAccountId(e.target.value)}
-                placeholder="社員コード または メールアドレス" 
+                placeholder="社員コード または メールアドレス"
+                autoComplete="username"
                 className="w-full bg-slate-900/50 border border-slate-700 text-white pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
                 required
               />
@@ -97,11 +101,12 @@ export default function LoginPage() {
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">Password</label>
             <div className="relative">
               <i className="bi bi-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
-              <input 
-                type="password" 
+              <input
+                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="パスワードを入力" 
+                placeholder="パスワードを入力"
+                autoComplete="current-password"
                 className="w-full bg-slate-900/50 border border-slate-700 text-white pl-12 pr-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all placeholder:text-slate-600"
                 required
               />

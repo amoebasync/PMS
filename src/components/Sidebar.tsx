@@ -9,9 +9,11 @@ import { useNotification } from '@/components/ui/NotificationProvider';
 interface SidebarProps {
   isCollapsed: boolean;
   toggleCollapse: () => void;
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
+export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
@@ -109,11 +111,23 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
   ];
 
   return (
-    <nav className={`h-screen bg-[#0f172a] text-slate-200 fixed left-0 top-0 z-[1000] flex flex-col shadow-2xl border-r border-white/5 font-sans transition-all duration-300 ${isCollapsed ? 'w-[80px]' : 'w-[260px]'}`}>
+    <>
+    {/* モバイル用オーバーレイ背景 */}
+    {isMobileOpen && (
+      <div
+        className="fixed inset-0 bg-black/50 z-[999] md:hidden"
+        onClick={onMobileClose}
+      />
+    )}
+    <nav className={`h-screen bg-[#0f172a] text-slate-200 fixed left-0 top-0 z-[1000] flex flex-col shadow-2xl border-r border-white/5 font-sans transition-all duration-300
+      ${isCollapsed ? 'md:w-[80px]' : 'md:w-[260px]'}
+      w-[260px]
+      ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+    `}>
       
-      <button 
-        onClick={toggleCollapse} 
-        className="absolute -right-3 top-6 w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-white shadow-md hover:bg-blue-500 transition-colors z-[1010]"
+      <button
+        onClick={toggleCollapse}
+        className="absolute -right-3 top-6 w-6 h-6 bg-blue-600 rounded-full items-center justify-center text-white shadow-md hover:bg-blue-500 transition-colors z-[1010] hidden md:flex"
       >
         <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`}></i>
       </button>
@@ -248,5 +262,6 @@ export default function Sidebar({ isCollapsed, toggleCollapse }: SidebarProps) {
         )}
       </div>
     </nav>
+    </>
   );
 }

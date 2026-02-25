@@ -9,9 +9,10 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
+    const pageParam = searchParams.get('page');
 
-    // ?search= が指定された場合はオートコンプリート用に絞り込んで返す
-    if (search) {
+    // ?search= のみ (pageなし): オートコンプリート用に絞り込んで返す
+    if (search && !pageParam) {
       const employees = await prisma.employee.findMany({
         where: {
           isActive: true,
@@ -30,6 +31,55 @@ export async function GET(request: Request) {
       return NextResponse.json(employees);
     }
 
+    // ?page= が指定された場合: サーバーサイドフィルタリング + ページネーション
+    if (pageParam) {
+      const status = searchParams.get('status') || 'ACTIVE';
+      const branchId = searchParams.get('branchId') || '';
+      const departmentId = searchParams.get('departmentId') || '';
+      const page = Math.max(1, parseInt(pageParam));
+      const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '20')));
+
+      const where: Record<string, unknown> = {};
+      if (status === 'ACTIVE') where.isActive = true;
+      else if (status === 'INACTIVE') where.isActive = false;
+      if (branchId) where.branchId = parseInt(branchId);
+      if (departmentId) where.departmentId = parseInt(departmentId);
+      if (search) {
+        where.OR = [
+          { lastNameJa: { contains: search } },
+          { firstNameJa: { contains: search } },
+          { lastNameKana: { contains: search } },
+          { firstNameKana: { contains: search } },
+          { employeeCode: { contains: search } },
+          { email: { contains: search } },
+          { phone: { contains: search } },
+        ];
+      }
+
+      const include = {
+        department: true,
+        branch: true,
+        roles: { include: { role: true } },
+        country: true,
+        financial: true,
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+      };
+
+      const [total, employees] = await Promise.all([
+        prisma.employee.count({ where }),
+        prisma.employee.findMany({
+          where,
+          orderBy: { id: 'desc' },
+          skip: (page - 1) * limit,
+          take: limit,
+          include,
+        }),
+      ]);
+
+      return NextResponse.json({ data: employees, total, page, totalPages: Math.ceil(total / limit) });
+    }
+
+    // パラメーターなし: 全件返す (後方互換・ドロップダウン用)
     const employees = await prisma.employee.findMany({
       orderBy: { id: 'desc' },
       include: {
