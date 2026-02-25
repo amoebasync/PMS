@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const area = await prisma.area.findUnique({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
       include: { prefecture: true, city: true, areaRank: true },
     });
     if (!area) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -15,11 +16,12 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   }
 }
 
-export async function PUT(request: Request, { params }: { params: { id: string } }) {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const updated = await prisma.area.update({
-      where: { id: parseInt(params.id) },
+      where: { id: parseInt(id) },
       data: {
         town_name: body.town_name,
         chome_name: body.chome_name,
