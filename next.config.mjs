@@ -6,11 +6,23 @@ const nextConfig = {
   serverExternalPackages: ['pdf-parse', 'pdfjs-dist', 'canvas'],
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'images.unsplash.com',
-      },
-    ],
+  {
+    protocol: 'https',
+    hostname: 'images.unsplash.com',
+  },
+  {
+    protocol: 'https',
+    hostname: 'pms.tiramis.co.jp',
+  },
+  {
+    protocol: 'https',
+    hostname: 'd1mzs3dojvfqpz.cloudfront.net',
+  },
+  {
+    protocol: 'https',
+    hostname: 'pms-uploads-tiramis.s3.ap-northeast-1.amazonaws.com',
+  },
+  ],
   },
   experimental: {
     serverActions: {
