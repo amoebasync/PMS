@@ -77,11 +77,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         orderId,
         documentType,
         documentNo,
-        issuedAt:    new Date(),
+        issuedAt:       new Date(),
         subtotal,
         taxAmount,
         totalAmount,
-        note: body.note ?? null,
+        note:           body.note ?? null,
+        paymentDueDate: body.paymentDueDate ? new Date(body.paymentDueDate) : null,
       },
     });
     return NextResponse.json(doc, { status: 201 });

@@ -71,16 +71,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     // 品目・金額計算
     const { lineItems, subtotal, taxAmount, totalAmount } = calcLineItems(order);
 
-    // 支払期限計算（締め日・支払いサイトから算出）
-    let paymentDueDate: Date | null = null;
-    if (doc.documentType === 'INVOICE' && cust.billingCutoffDay && cust.paymentMonthDelay != null && cust.paymentDay) {
+    // 支払期限：帳票レコードに保存された値を優先、なければ締め日・支払いサイトから算出
+    let paymentDueDate: Date | null = doc.paymentDueDate ?? null;
+    if (!paymentDueDate && doc.documentType === 'INVOICE' && cust.billingCutoffDay && cust.paymentMonthDelay != null && cust.paymentDay) {
       const now    = new Date(doc.issuedAt);
       const cutoff = cust.billingCutoffDay;
-      // 締め日を超えているか
       const baseMonth = now.getDate() > cutoff
         ? new Date(now.getFullYear(), now.getMonth() + 1, cutoff)
         : new Date(now.getFullYear(), now.getMonth(), cutoff);
-      // 支払いサイト後の月の支払い日
       paymentDueDate = new Date(
         baseMonth.getFullYear(),
         baseMonth.getMonth() + (cust.paymentMonthDelay ?? 1),
