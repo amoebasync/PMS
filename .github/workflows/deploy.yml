@@ -1,94 +1,85 @@
-name: Deploy
+name: Deploy to EC2
 
 on:
   push:
-    branches: [main]
-
-env:
-  EC2_USER: ec2-user
-  APP_DIR: ~/pms_java
-  S3_BUCKET: pms-uploads-tiramis
+    branches:
+      - main
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      # ── 1. チェックアウト（修正ポイント） ──
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0          # shallow clone を避ける
-          persist-credentials: true
-          # サブモジュールがあるなら:
-          # submodules: recursive
-          # プライベートリポジトリなら token は自動で使われるが、
-          # 別リポジトリのサブモジュールがあるなら:
-          # token: ${{ secrets.GH_PAT }}
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-      # ── 2. git が成功したか確認 ──
-      - name: Verify checkout
-        run: |
-          echo "Current directory: $(pwd)"
-          echo "Files:"
-          ls -la
-          echo "Git status:"
-          git log --oneline -3
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
         with:
           node-version: '20'
 
-      # ── 3. ビルド ──
-      - run: npm install --legacy-peer-deps
-      - run: npx prisma generate
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
 
-      # ── 4. ビルド確認 ──
-      - name: Verify build output
+      - name: Sync to S3
         run: |
-          ls -la .next/
-          cat .next/BUILD_ID
-
-      # ── 5. S3同期 ──
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-northeast-1
-
-      - run: |
-          aws s3 sync .next/static s3://$S3_BUCKET/_next/static \
+          aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
             --cache-control "public,max-age=31536000,immutable" --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
 
-      # ── 6. tar でまとめて EC2 にデプロイ ──
-      - run: tar czf next-build.tar.gz .next
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id EOOGEE1IL7T06 \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to EC2 #1
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.EC2_HOST_1 }}
-          username: ${{ env.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "next-build.tar.gz"
-          target: ${{ env.APP_DIR }}
-
-      - name: Restart EC2 #1
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.EC2_HOST_1 }}
-          username: ${{ env.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
           script: |
-            cd ${{ env.APP_DIR }}
+            cd ~/pms_java
             git pull origin main
-            rm -rf .next
-            tar xzf next-build.tar.gz
-            rm next-build.tar.gz
-            npm install --legacy-peer-deps --production
+            npm install --legacy-peer-deps
             npx prisma generate
             npx prisma migrate deploy
+            npm run build
+            rm -rf .next/static
+            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
             pm2 restart pms
 
-      # EC2 #2 も同様（省略）
+      - name: Deploy to EC2 #2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.EC2_HOST_2 }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_KEY }}
+          script: |
+            cd ~/pms_java
+            git pull origin main
+            npm install --legacy-peer-deps
+            npx prisma generate
+            npm run build
+            rm -rf .next/static
+            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
+            pm2 restart pms
