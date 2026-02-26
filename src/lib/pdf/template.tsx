@@ -36,32 +36,32 @@ const S = StyleSheet.create({
   issuerBlock: { flex: 1 },
   logo: { width: 90, height: 26, marginBottom: 8 },
   issuerName: { fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 },
-  issuerSub: { fontSize: 8, color: '#334155', lineHeight: 1.6 },
+  issuerSub: { fontSize: 9, color: '#1e293b', lineHeight: 1.6 },
   docTitleBlock: { alignItems: 'flex-end', minWidth: 200 },
   docTitle: { fontSize: 20, fontWeight: 700, color: '#4f46e5', marginBottom: 4 },
-  docNo: { fontSize: 8, color: '#334155' },
-  docDate: { fontSize: 8, color: '#334155' },
+  docNo: { fontSize: 9, fontWeight: 700, color: '#1e293b' },
+  docDate: { fontSize: 9, fontWeight: 700, color: '#1e293b' },
   /* 宛先・発行日セクション */
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   toBlock: { flex: 1 },
-  toLabel: { fontSize: 8, color: '#475569', marginBottom: 2 },
+  toLabel: { fontSize: 9, fontWeight: 700, color: '#334155', marginBottom: 2 },
   toName: { fontSize: 13, fontWeight: 700, color: '#0f172a', borderBottom: '1 solid #0f172a', paddingBottom: 2, marginBottom: 4 },
-  toAddress: { fontSize: 8, color: '#334155', lineHeight: 1.5 },
-  toContact: { fontSize: 8, color: '#334155', marginTop: 1 },
+  toAddress: { fontSize: 9, color: '#1e293b', lineHeight: 1.5 },
+  toContact: { fontSize: 9, color: '#1e293b', marginTop: 1 },
   metaBlock: { minWidth: 180, alignItems: 'flex-end' },
   metaRow2: { flexDirection: 'row', justifyContent: 'space-between', width: 180, marginBottom: 2 },
-  metaLabel: { fontSize: 8, color: '#475569' },
-  metaValue: { fontSize: 8, color: '#0f172a' },
+  metaLabel: { fontSize: 9, color: '#334155' },
+  metaValue: { fontSize: 9, fontWeight: 700, color: '#0f172a' },
   /* 挨拶文 */
-  greeting: { fontSize: 8, color: '#334155', marginBottom: 12 },
+  greeting: { fontSize: 9, color: '#1e293b', marginBottom: 12 },
   /* 合計金額ハイライト */
   totalHighlight: { backgroundColor: '#eef2ff', borderRadius: 4, padding: '8 12', marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalHighlightLabel: { fontSize: 10, fontWeight: 700, color: '#4338ca' },
   totalHighlightAmount: { fontSize: 16, fontWeight: 700, color: '#4338ca' },
   /* テーブル */
   table: { marginBottom: 12 },
-  tableHeader: { flexDirection: 'row', backgroundColor: '#e2e8f0', borderTop: '1 solid #94a3b8', borderBottom: '1 solid #94a3b8', paddingVertical: 5, paddingHorizontal: 4 },
-  tableHeaderText: { fontSize: 8, fontWeight: 700, color: '#0f172a' },
+  tableHeader: { flexDirection: 'row', backgroundColor: '#cbd5e1', borderTop: '1 solid #94a3b8', borderBottom: '1 solid #94a3b8', paddingVertical: 5, paddingHorizontal: 4 },
+  tableHeaderText: { fontSize: 9, fontWeight: 700, color: '#0f172a' },
   tableRow: { flexDirection: 'row', borderBottom: '0.5 solid #cbd5e1', paddingVertical: 5, paddingHorizontal: 4 },
   tableRowAlt: { backgroundColor: '#f8fafc' },
   // カラム幅
@@ -72,22 +72,22 @@ const S = StyleSheet.create({
   colAmount: { width: 75, textAlign: 'right' },
   /* 小計エリア */
   subtotalArea: { alignItems: 'flex-end', marginBottom: 12 },
-  subtotalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, marginBottom: 2 },
-  subtotalLabel: { fontSize: 8, color: '#475569', width: 110 },
-  subtotalValue: { fontSize: 8, color: '#0f172a', width: 110, textAlign: 'right' },
-  totalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, paddingTop: 4, borderTop: '1 solid #0f172a' },
+  subtotalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, marginBottom: 3 },
+  subtotalLabel: { fontSize: 9, color: '#334155', width: 110 },
+  subtotalValue: { fontSize: 9, color: '#0f172a', width: 110, textAlign: 'right' },
+  totalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, paddingTop: 4, borderTop: '1.5 solid #0f172a' },
   totalLabel: { fontSize: 10, fontWeight: 700, width: 110 },
   totalValue: { fontSize: 10, fontWeight: 700, width: 110, textAlign: 'right', color: '#4338ca' },
   /* 備考・振込先 */
   sectionTitle: { fontSize: 9, fontWeight: 700, color: '#0f172a', borderBottom: '0.5 solid #94a3b8', paddingBottom: 3, marginBottom: 6, marginTop: 12 },
-  sectionText: { fontSize: 8, color: '#1e293b', lineHeight: 1.6 },
+  sectionText: { fontSize: 9, color: '#1e293b', lineHeight: 1.6 },
   /* 領収書専用 */
   receiptAmount: { fontSize: 28, fontWeight: 700, color: '#0f172a', textAlign: 'center', marginVertical: 16 },
   receiptCenter: { alignItems: 'center' },
   stamp: { width: 60, height: 60, borderRadius: 30, border: '2 solid #dc2626', alignItems: 'center', justifyContent: 'center', marginTop: 8, marginBottom: 8 },
   stampText: { color: '#dc2626', fontWeight: 700, fontSize: 10 },
   /* 登録番号 */
-  invoiceRegNo: { fontSize: 7, color: '#334155', marginTop: 2 },
+  invoiceRegNo: { fontSize: 9, fontWeight: 700, color: '#1e293b', marginTop: 2 },
 });
 
 // ─── 共通ヘルパー ──────────────────────────────────────────
