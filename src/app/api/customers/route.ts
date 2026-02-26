@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import crypto from 'crypto';
 import { sendContactCredentials } from '@/lib/mailer';
 import { hashPassword } from '@/lib/password';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 function generateInitialPassword(): string {
@@ -70,6 +71,9 @@ export async function POST(request: Request) {
   if (!cookieStore.get('pms_session')?.value) {
     return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
   }
+
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
 
   try {
     const body = await request.json();
@@ -145,6 +149,20 @@ export async function POST(request: Request) {
             mustChangePassword: true,
           },
         });
+
+        await writeAuditLog({
+          actorType: 'EMPLOYEE',
+          actorId,
+          actorName,
+          action: 'CREATE',
+          targetModel: 'Customer',
+          targetId: cust.id,
+          afterData: { ...cust },
+          ipAddress: ip,
+          description: `顧客「${cust.name}」(${cust.customerCode})を作成（担当者情報含む）`,
+          tx,
+        });
+
         return cust;
       });
 
@@ -162,6 +180,17 @@ export async function POST(request: Request) {
       }
     } else {
       newCustomer = await prisma.customer.create({ data: customerData });
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'CREATE',
+        targetModel: 'Customer',
+        targetId: newCustomer.id,
+        afterData: { ...newCustomer },
+        ipAddress: ip,
+        description: `顧客「${newCustomer.name}」(${newCustomer.customerCode})を作成`,
+      });
     }
 
     return NextResponse.json(newCustomer, { status: 201 });

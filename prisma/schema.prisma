@@ -312,6 +312,7 @@ model Country {
   // リレーション
   employees    Employee[]
   distributors FlyerDistributor[]
+  applicants   Applicant[]
 
   @@map("countries")
 }
@@ -669,6 +670,7 @@ model VisaType {
   updatedAt DateTime           @updatedAt @map("updated_at")
 
   distributors FlyerDistributor[]
+  applicants   Applicant[]
 
   @@map("visa_types")
 }
@@ -1785,4 +1787,150 @@ model BillingStatementItem {
   amount             Int              @default(0)
 
   @@map("billing_statement_items")
+}
+
+// ==========================================
+// 監査ログ
+// ==========================================
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  STATUS_CHANGE
+}
+
+enum AuditActorType {
+  EMPLOYEE
+  PORTAL_USER
+  STAFF
+  SYSTEM
+}
+
+model AuditLog {
+  id          Int            @id @default(autoincrement())
+  actorType   AuditActorType @map("actor_type")
+  actorId     Int?           @map("actor_id")
+  actorName   String?        @map("actor_name") @db.VarChar(100)
+  action      AuditAction
+  targetModel String?        @map("target_model") @db.VarChar(50)
+  targetId    Int?           @map("target_id")
+  beforeData  Json?          @map("before_data")
+  afterData   Json?          @map("after_data")
+  ipAddress   String?        @map("ip_address") @db.VarChar(45)
+  userAgent   String?        @map("user_agent") @db.VarChar(500)
+  description String?        @db.VarChar(500)
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  @@index([actorId, actorType])
+  @@index([targetModel, targetId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ==========================================
+// 応募者管理・面接日程調整
+// ==========================================
+
+enum ApplicantFlowStatus {
+  INTERVIEW_WAITING  @map("面接待ち")
+  TRAINING_WAITING   @map("研修待ち")
+  TRAINING_COMPLETED @map("研修完了")
+}
+
+enum ApplicantHiringStatus {
+  IN_PROGRESS @map("選考中")
+  HIRED       @map("採用")
+  REJECTED    @map("不採用")
+}
+
+// --- 応募職種マスタ ---
+model JobCategory {
+  id        Int      @id @default(autoincrement())
+  nameJa    String   @map("name_ja") @db.VarChar(100)
+  nameEn    String?  @map("name_en") @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(100) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  applicants Applicant[]
+
+  @@map("job_categories")
+}
+
+// --- 面接スロット ---
+model InterviewSlot {
+  id        Int      @id @default(autoincrement())
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+  isBooked  Boolean  @default(false) @map("is_booked")
+  meetUrl   String?  @map("meet_url") @db.VarChar(500)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 1:1 with Applicant (optional)
+  applicantId Int?       @unique @map("applicant_id")
+  applicant   Applicant? @relation(fields: [applicantId], references: [id])
+
+  @@index([startTime])
+  @@index([isBooked])
+  @@map("interview_slots")
+}
+
+// --- 応募者 ---
+model Applicant {
+  id       Int     @id @default(autoincrement())
+  name     String  @db.VarChar(100)
+  email    String  @unique @db.VarChar(255)
+  phone    String? @db.VarChar(20)
+  language String  @default("ja") @db.VarChar(5)
+
+  // 職種
+  jobCategoryId Int         @map("job_category_id")
+  jobCategory   JobCategory @relation(fields: [jobCategoryId], references: [id])
+
+  // 国籍
+  countryId Int?     @map("country_id")
+  country   Country? @relation(fields: [countryId], references: [id])
+
+  // 在留資格
+  visaTypeId Int?      @map("visa_type_id")
+  visaType   VisaType? @relation(fields: [visaTypeId], references: [id])
+
+  // 住所
+  postalCode String? @map("postal_code") @db.VarChar(8)
+  address    String? @db.Text
+  building   String? @db.VarChar(200)
+
+  // 面接スロット (1:1 逆参照)
+  interviewSlot InterviewSlot?
+
+  // ステータス
+  flowStatus   ApplicantFlowStatus   @default(INTERVIEW_WAITING) @map("flow_status")
+  hiringStatus ApplicantHiringStatus @default(IN_PROGRESS) @map("hiring_status")
+
+  // 面接評価項目
+  hasOtherJob        Boolean? @map("has_other_job")
+  otherJobDetails    String?  @map("other_job_details") @db.Text
+  hasBankInJapan     Boolean? @map("has_bank_in_japan")
+  japaneseLevel      Int?     @map("japanese_level")
+  englishLevel       Int?     @map("english_level")
+  communicationScore Int?     @map("communication_score")
+  impressionScore    Int?     @map("impression_score")
+  interviewNotes     String?  @map("interview_notes") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([flowStatus])
+  @@index([hiringStatus])
+  @@index([createdAt])
+  @@map("applicants")
 }

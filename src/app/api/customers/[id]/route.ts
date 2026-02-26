@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 // 詳細取得 (GET)
@@ -43,10 +44,15 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
+
   try {
     const { id } = await params;
     const customerId = parseInt(id);
     const body = await request.json();
+
+    const beforeCustomer = await prisma.customer.findUnique({ where: { id: customerId } });
 
     // 数値変換
     const salesRepId = body.salesRepId ? parseInt(body.salesRepId) : null;
@@ -81,6 +87,19 @@ export async function PUT(
         campaignId,
       },
     });
+    await writeAuditLog({
+      actorType: 'EMPLOYEE',
+      actorId,
+      actorName,
+      action: 'UPDATE',
+      targetModel: 'Customer',
+      targetId: customerId,
+      beforeData: beforeCustomer as unknown as Record<string, unknown>,
+      afterData: updatedCustomer as unknown as Record<string, unknown>,
+      ipAddress: ip,
+      description: `顧客ID:${customerId}「${updatedCustomer.name}」の情報を更新`,
+    });
+
     return NextResponse.json(updatedCustomer);
   } catch (error) {
     console.error('Customer Update Error:', error);

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 export async function GET(request: Request) {
@@ -62,6 +63,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
+
   try {
     const body = await request.json();
 
@@ -79,6 +83,18 @@ export async function POST(request: Request) {
         status: body.status || 'PLANNING',
         remarks: body.remarks || null,
       },
+    });
+
+    await writeAuditLog({
+      actorType: 'EMPLOYEE',
+      actorId,
+      actorName,
+      action: 'CREATE',
+      targetModel: 'Order',
+      targetId: newOrder.id,
+      afterData: newOrder as unknown as Record<string, unknown>,
+      ipAddress: ip,
+      description: `受注「${newOrder.orderNo}」を作成`,
     });
 
     return NextResponse.json(newOrder);

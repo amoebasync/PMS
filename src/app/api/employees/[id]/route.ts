@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 // 個別取得 (GET)
@@ -40,10 +41,15 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
+
   try {
     const { id } = await params;
     const employeeId = parseInt(id);
     const body = await request.json();
+
+    const beforeEmployee = await prisma.employee.findUnique({ where: { id: employeeId } });
 
     const updated = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.update({
@@ -103,6 +109,20 @@ export async function PUT(
         }
       });
 
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'UPDATE',
+        targetModel: 'Employee',
+        targetId: employeeId,
+        beforeData: beforeEmployee as unknown as Record<string, unknown>,
+        afterData: emp as unknown as Record<string, unknown>,
+        ipAddress: ip,
+        description: `社員ID:${employeeId}「${emp.lastNameJa} ${emp.firstNameJa}」の情報を更新`,
+        tx,
+      });
+
       return emp;
     });
 
@@ -117,13 +137,30 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
+
   try {
     const { id } = await params;
     const employeeId = parseInt(id);
 
+    const beforeEmployee = await prisma.employee.findUnique({ where: { id: employeeId } });
+
     await prisma.employee.update({
       where: { id: employeeId },
       data: { isActive: false, resignationDate: new Date() },
+    });
+
+    await writeAuditLog({
+      actorType: 'EMPLOYEE',
+      actorId,
+      actorName,
+      action: 'DELETE',
+      targetModel: 'Employee',
+      targetId: employeeId,
+      beforeData: beforeEmployee as unknown as Record<string, unknown>,
+      ipAddress: ip,
+      description: `社員ID:${employeeId}「${beforeEmployee?.lastNameJa} ${beforeEmployee?.firstNameJa}」を退職処理（論理削除）`,
     });
 
     return NextResponse.json({ message: 'Deleted successfully (Logical)' });

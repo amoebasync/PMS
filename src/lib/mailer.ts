@@ -438,6 +438,215 @@ export const sendOrderApprovalEmail = async (
 // ─────────────────────────────────────────────────────────
 // 6. 社員パスワードリセット（ワンタイムリンク）
 // ─────────────────────────────────────────────────────────
+export const sendApplicantConfirmationEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  interviewDate: string,
+  interviewTime: string,
+  meetUrl: string | null,
+  jobCategoryName: string,
+) => {
+  const isEn = language === 'en';
+
+  const meetSection = meetUrl
+    ? `<tr>
+        <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
+        <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+       </tr>`
+    : '';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Thank you for your application. Your interview has been scheduled as follows.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">Interview Details</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Date</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Time</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Join Google Meet</a>
+    </div>` : ''}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      Please be on time for your interview. If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      この度はご応募いただき、誠にありがとうございます。<br>
+      以下の内容で面接のご予約を承りました。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">面接情報</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接日</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接時間</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Meetに参加する</a>
+    </div>` : ''}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      面接当日はお時間に余裕を持ってご参加ください。<br>
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Interview Appointment Confirmed'
+    : '【Tiramis】面接のご予約を承りました';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\n面接当日はお時間に余裕を持ってご参加ください。`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
+// 8. 採用通知メール（応募者向け ja/en）
+// ─────────────────────────────────────────────────────────
+export const sendHiringNotificationEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  jobCategoryName: string,
+) => {
+  const isEn = language === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Congratulations! We are pleased to inform you that you have been selected for the position below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#166534;">Hiring Decision</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Result</td>
+            <td style="padding:6px 0;">
+              <span style="background:#dcfce7;color:#166534;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Hired</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      We will contact you shortly with further details about your onboarding and next steps.<br>
+      Welcome to the team!
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      この度は弊社の選考にご参加いただき、誠にありがとうございました。<br>
+      選考の結果、下記の通り採用とさせていただくことになりました。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#166534;">採用結果</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">選考結果</td>
+            <td style="padding:6px 0;">
+              <span style="background:#dcfce7;color:#166534;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">採用</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      今後の入社手続きにつきましては、追ってご連絡いたします。<br>
+      一緒に働けることを楽しみにしております。
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? "[Tiramis] Congratulations! You're Hired!"
+    : '【Tiramis】採用のお知らせ';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nCongratulations! You have been selected for the position of ${jobCategoryName}.\n\nWe will contact you shortly with further details.\nWelcome to the team!\n\nContact: info@tiramis.co.jp`
+    : `${applicantName} 様\n\nこの度は弊社の選考にご参加いただき、ありがとうございました。\n選考の結果、採用とさせていただくことになりました。\n\n応募職種: ${jobCategoryName}\n\n今後の入社手続きにつきましては、追ってご連絡いたします。\nお問い合わせ: info@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
+// 6. 社員パスワードリセット（ワンタイムリンク）
+// ─────────────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (
   toEmail: string,
   lastName: string,

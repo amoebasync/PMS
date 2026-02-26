@@ -26,7 +26,13 @@ export function middleware(request: NextRequest) {
     path.startsWith('/uploads/') || // アップロードされたファイルの閲覧を許可（旧パス互換）
     path.startsWith('/api/s3-proxy') || // S3署名付きURLプロキシ
     path === '/staff/login' ||
-    path === '/api/staff/auth/login';
+    path === '/api/staff/auth/login' ||
+    path === '/apply' ||
+    path.startsWith('/api/apply') ||
+    path === '/api/interview-slots/available' ||
+    path === '/api/job-categories/public' ||
+    path === '/api/countries/public' ||
+    path === '/api/visa-types/public';
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;

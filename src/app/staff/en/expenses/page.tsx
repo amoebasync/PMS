@@ -50,12 +50,19 @@ export default function ExpensesPageEn() {
     setSubmitting(true);
     setMessage(null);
 
+    const amt = parseInt(form.amount);
+    if (isNaN(amt) || amt <= 0) {
+      setMessage({ type: 'error', text: 'Amount must be at least ¥1.' });
+      setSubmitting(false);
+      return;
+    }
+
     const res = await fetch('/api/staff/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: form.date,
-        amount: parseInt(form.amount),
+        amount: amt,
         description: form.description,
       }),
     });
@@ -122,7 +129,16 @@ export default function ExpensesPageEn() {
           <h2 className="font-bold text-slate-800">New Expense Request</h2>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5 ml-1">Date</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-600 ml-1">Date</label>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, date: today }))}
+                className="text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                Today
+              </button>
+            </div>
             <input
               type="date"
               required

@@ -36,12 +36,12 @@ export function StaffHeader({ name }: { name?: string }) {
           <Link href="/staff" className="relative w-[120px] h-[26px]">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </Link>
-          <div className="flex items-center gap-3">
-            {name && <span className="text-sm font-bold text-slate-700">{name}</span>}
+          <div className="flex items-center gap-2 min-w-0">
+            {name && <span className="text-sm font-bold text-slate-700 truncate max-w-[120px]">{name}</span>}
             <button
               onClick={handleLogout}
               disabled={loggingOut}
-              className="text-[11px] font-bold text-slate-500 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 disabled:opacity-60"
+              className="shrink-0 text-[11px] font-bold text-slate-500 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 disabled:opacity-60"
             >
               <i className="bi bi-box-arrow-right"></i> ログアウト
             </button>

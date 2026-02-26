@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
 import { hashPassword } from '@/lib/password';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 // 一覧取得
@@ -111,6 +112,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
   }
 
+  const { actorId, actorName } = await getAdminActorInfo();
+  const ip = getIpAddress(request);
+
   try {
     const body = await request.json();
     // 初期パスワード = 生年月日 (YYYYMMDD)。未入力の場合は今日の日付をフォールバック
@@ -177,6 +181,20 @@ export async function POST(request: Request) {
           }
         });
       }
+
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'CREATE',
+        targetModel: 'Employee',
+        targetId: emp.id,
+        afterData: emp as unknown as Record<string, unknown>,
+        ipAddress: ip,
+        description: `社員「${emp.lastNameJa} ${emp.firstNameJa}」(${emp.employeeCode})を作成`,
+        tx,
+      });
+
       return emp;
     });
 

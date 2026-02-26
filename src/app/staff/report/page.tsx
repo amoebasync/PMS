@@ -174,26 +174,22 @@ export default function StaffReportPage() {
                       <div className="divide-y divide-slate-50">
                         {schedule.items.map((item) => (
                           <div key={item.id} className="px-4 py-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-700 truncate">
-                                  {item.slotIndex}. {item.flyerName || '（チラシ名未設定）'}
-                                </p>
-                                <p className="text-[11px] text-slate-400 mt-0.5">
-                                  予定: {item.plannedCount?.toLocaleString() ?? '—'} ポスト
-                                </p>
-                              </div>
+                            <p className="text-xs font-bold text-slate-700 mb-1.5 leading-snug line-clamp-2">
+                              {item.slotIndex}. {item.flyerName || '（チラシ名未設定）'}
+                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] text-slate-400">
+                                予定: {item.plannedCount?.toLocaleString() ?? '—'} ポスト
+                              </p>
                               <div className="flex items-center gap-2 shrink-0">
-                                <div className="relative">
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={inputs[item.id] ?? ''}
-                                    onChange={(e) => setInputs((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                    placeholder="投函数"
-                                    className="w-24 text-right border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                                  />
-                                </div>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={inputs[item.id] ?? ''}
+                                  onChange={(e) => setInputs((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                                  placeholder="投函数"
+                                  className="w-24 text-right border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                                />
                                 <button
                                   onClick={() => handleSave(item.id)}
                                   disabled={saving[item.id] || inputs[item.id] === ''}
