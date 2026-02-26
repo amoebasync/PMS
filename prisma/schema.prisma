@@ -1056,14 +1056,15 @@ model Order {
   status       OrderStatus @default(DRAFT)
   remarks      String?     @db.Text
 
-  contacts           OrderContact[] 
+  contacts           OrderContact[]
   distributions      OrderDistribution[]
   printings          OrderPrinting[]
   newspaperInserts   OrderNewspaperInsert[]
   designs            OrderDesign[]
-  payments           Payment[] 
+  payments           Payment[]
   approvals          OrderApproval[] // ★ 追加: 審査履歴
-  notifications   Notification[]
+  notifications      Notification[]
+  documents          Document[]
 
   @@map("orders")
 }
@@ -1680,4 +1681,56 @@ model Announcement {
   updatedAt   DateTime             @updatedAt @map("updated_at")
 
   @@map("announcements")
+}
+
+// ─────────────────────────────────────────────
+// 帳票管理
+// ─────────────────────────────────────────────
+
+enum DocumentType {
+  ESTIMATE  // 見積書
+  INVOICE   // 請求書
+  DELIVERY  // 納品書
+  RECEIPT   // 領収書
+}
+
+// 自社情報（発行元設定）: 常に1レコードのみ
+model CompanySetting {
+  id                        Int      @id @default(autoincrement())
+  companyName               String   @db.VarChar(100) @map("company_name")
+  companyNameKana           String?  @db.VarChar(100) @map("company_name_kana")
+  postalCode                String?  @db.VarChar(10)  @map("postal_code")
+  address                   String?  @db.Text
+  phone                     String?  @db.VarChar(20)
+  fax                       String?  @db.VarChar(20)
+  email                     String?  @db.VarChar(100)
+  website                   String?  @db.VarChar(200)
+  invoiceRegistrationNumber String?  @db.VarChar(14)  @map("invoice_registration_number")
+  bankName                  String?  @db.VarChar(50)  @map("bank_name")
+  bankBranch                String?  @db.VarChar(50)  @map("bank_branch")
+  bankAccountType           String?  @db.VarChar(10)  @map("bank_account_type")
+  bankAccountNumber         String?  @db.VarChar(20)  @map("bank_account_number")
+  bankAccountHolder         String?  @db.VarChar(100) @map("bank_account_holder")
+  logoUrl                   String?  @db.Text         @map("logo_url")
+  updatedAt                 DateTime @updatedAt       @map("updated_at")
+
+  @@map("company_settings")
+}
+
+// 帳票発行履歴
+model Document {
+  id           Int          @id @default(autoincrement())
+  orderId      Int          @map("order_id")
+  order        Order        @relation(fields: [orderId], references: [id])
+  documentType DocumentType @map("document_type")
+  documentNo   String       @unique @map("document_no") @db.VarChar(30)
+  issuedAt     DateTime     @default(now())            @map("issued_at")
+  subtotal     Int          @default(0)
+  taxAmount    Int          @default(0)                @map("tax_amount")
+  totalAmount  Int          @default(0)                @map("total_amount")
+  note         String?      @db.Text
+  createdAt    DateTime     @default(now())            @map("created_at")
+  updatedAt    DateTime     @updatedAt                 @map("updated_at")
+
+  @@map("documents")
 }

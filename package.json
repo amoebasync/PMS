@@ -16,6 +16,7 @@
     "@aws-sdk/client-s3": "^3.997.0",
     "@aws-sdk/s3-request-presigner": "^3.997.0",
     "@react-google-maps/api": "^2.20.8",
+    "@react-pdf/renderer": "^4.3.2",
     "@tailwindcss/postcss": "^4.1.18",
     "@turf/turf": "^7.3.4",
     "@types/busboy": "^1.5.4",
