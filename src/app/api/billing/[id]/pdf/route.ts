@@ -58,15 +58,38 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const cust = stmt.customer;
     const billingContact = cust.contacts[0] ?? null;
 
-    // 各受注の金額を計算（DBの値が正確でない場合の保険）
+    // 各受注の金額・明細を計算
+    const TAX_RATE = 0.10;
     const orders = stmt.items.map(item => {
       const calc = calcLineItems(item.order);
+      const subtotal   = calc.subtotal   || item.subtotal;
+      const taxAmount  = calc.taxAmount  || item.taxAmount;
+      const totalAmount = calc.totalAmount || item.amount;
+
+      // 明細行（0円除外）
+      const lineItems = calc.lineItems
+        .filter(li => li.amount > 0)
+        .map(li => {
+          const liTax   = Math.round(li.amount * TAX_RATE);
+          const liTotal = li.amount + liTax;
+          return {
+            description: li.description,
+            quantity:    li.quantity,
+            unitPrice:   li.unitPrice,
+            amount:      li.amount,
+            taxAmount:   liTax,
+            totalAmount: liTotal,
+            unit:        li.unit,
+          };
+        });
+
       return {
-        orderNo:  item.order.orderNo,
-        title:    item.order.title,
-        subtotal: calc.subtotal  || item.subtotal,
-        taxAmount: calc.taxAmount || item.taxAmount,
-        amount:   calc.totalAmount || item.amount,
+        orderNo:   item.order.orderNo,
+        title:     item.order.title,
+        subtotal,
+        taxAmount,
+        amount:    totalAmount,
+        lineItems,
       };
     });
 

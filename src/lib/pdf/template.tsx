@@ -36,7 +36,7 @@ const S = StyleSheet.create({
   issuerBlock: { flex: 1 },
   logo: { width: 90, height: 26, marginBottom: 8 },
   issuerName: { fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 2 },
-  issuerSub: { fontSize: 9, color: '#1e293b', lineHeight: 1.6 },
+  issuerSub: { fontSize: 9, fontWeight: 700, color: '#1e293b', lineHeight: 1.6 },
   docTitleBlock: { alignItems: 'flex-end', minWidth: 200 },
   docTitle: { fontSize: 20, fontWeight: 700, color: '#4f46e5', marginBottom: 4 },
   docNo: { fontSize: 9, fontWeight: 700, color: '#1e293b' },
@@ -46,14 +46,14 @@ const S = StyleSheet.create({
   toBlock: { flex: 1 },
   toLabel: { fontSize: 9, fontWeight: 700, color: '#334155', marginBottom: 2 },
   toName: { fontSize: 13, fontWeight: 700, color: '#0f172a', borderBottom: '1 solid #0f172a', paddingBottom: 2, marginBottom: 4 },
-  toAddress: { fontSize: 9, color: '#1e293b', lineHeight: 1.5 },
-  toContact: { fontSize: 9, color: '#1e293b', marginTop: 1 },
+  toAddress: { fontSize: 9, fontWeight: 700, color: '#1e293b', lineHeight: 1.5 },
+  toContact: { fontSize: 9, fontWeight: 700, color: '#1e293b', marginTop: 1 },
   metaBlock: { minWidth: 180, alignItems: 'flex-end' },
   metaRow2: { flexDirection: 'row', justifyContent: 'space-between', width: 180, marginBottom: 2 },
-  metaLabel: { fontSize: 9, color: '#334155' },
+  metaLabel: { fontSize: 9, fontWeight: 700, color: '#334155' },
   metaValue: { fontSize: 9, fontWeight: 700, color: '#0f172a' },
   /* 挨拶文 */
-  greeting: { fontSize: 9, color: '#1e293b', marginBottom: 12 },
+  greeting: { fontSize: 9, fontWeight: 700, color: '#1e293b', marginBottom: 12 },
   /* 合計金額ハイライト */
   totalHighlight: { backgroundColor: '#eef2ff', borderRadius: 4, padding: '8 12', marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   totalHighlightLabel: { fontSize: 10, fontWeight: 700, color: '#4338ca' },
@@ -73,14 +73,14 @@ const S = StyleSheet.create({
   /* 小計エリア */
   subtotalArea: { alignItems: 'flex-end', marginBottom: 12 },
   subtotalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, marginBottom: 3 },
-  subtotalLabel: { fontSize: 9, color: '#334155', width: 110 },
-  subtotalValue: { fontSize: 9, color: '#0f172a', width: 110, textAlign: 'right' },
+  subtotalLabel: { fontSize: 9, fontWeight: 700, color: '#334155', width: 110 },
+  subtotalValue: { fontSize: 9, fontWeight: 700, color: '#0f172a', width: 110, textAlign: 'right' },
   totalRow: { flexDirection: 'row', justifyContent: 'flex-end', width: 220, paddingTop: 4, borderTop: '1.5 solid #0f172a' },
   totalLabel: { fontSize: 10, fontWeight: 700, width: 110 },
   totalValue: { fontSize: 10, fontWeight: 700, width: 110, textAlign: 'right', color: '#4338ca' },
   /* 備考・振込先 */
   sectionTitle: { fontSize: 9, fontWeight: 700, color: '#0f172a', borderBottom: '0.5 solid #94a3b8', paddingBottom: 3, marginBottom: 6, marginTop: 12 },
-  sectionText: { fontSize: 9, color: '#1e293b', lineHeight: 1.6 },
+  sectionText: { fontSize: 9, fontWeight: 700, color: '#1e293b', lineHeight: 1.6 },
   /* 領収書専用 */
   receiptAmount: { fontSize: 28, fontWeight: 700, color: '#0f172a', textAlign: 'center', marginVertical: 16 },
   receiptCenter: { alignItems: 'center' },
@@ -169,13 +169,13 @@ function LineItemsTable({ items }: { items: DocumentData['lineItems'] }) {
       </View>
       {items.map((item, i) => (
         <View key={i} style={[S.tableRow, i % 2 === 1 ? S.tableRowAlt : {}]}>
-          <Text style={[{ fontSize: 9, color: '#0f172a' }, S.colDesc]}>{item.description}</Text>
-          <Text style={[{ fontSize: 9, color: '#0f172a' }, S.colQty]}>{item.quantity.toLocaleString('ja-JP')}</Text>
-          <Text style={[{ fontSize: 8, color: '#475569' }, S.colUnit]}>{item.unit ?? '式'}</Text>
-          <Text style={[{ fontSize: 9, color: '#0f172a' }, S.colUnitPrice]}>
+          <Text style={[{ fontSize: 9, fontWeight: 700, color: '#0f172a' }, S.colDesc]}>{item.description}</Text>
+          <Text style={[{ fontSize: 9, fontWeight: 700, color: '#0f172a' }, S.colQty]}>{item.quantity.toLocaleString('ja-JP')}</Text>
+          <Text style={[{ fontSize: 9, fontWeight: 700, color: '#334155' }, S.colUnit]}>{item.unit ?? '式'}</Text>
+          <Text style={[{ fontSize: 9, fontWeight: 700, color: '#0f172a' }, S.colUnitPrice]}>
             {item.unitPrice > 0 ? `¥${item.unitPrice.toLocaleString('ja-JP')}` : '—'}
           </Text>
-          <Text style={[{ fontSize: 9, color: '#0f172a' }, S.colAmount]}>
+          <Text style={[{ fontSize: 9, fontWeight: 700, color: '#0f172a' }, S.colAmount]}>
             {item.amount > 0 ? yen(item.amount) : '—'}
           </Text>
         </View>
