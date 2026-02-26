@@ -146,6 +146,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [isSavingFlyer, setIsSavingFlyer] = useState(false);
   const [activeFlyerSelectTab, setActiveFlyerSelectTab] = useState<'DIST' | 'PRINT'>('DIST');
 
+  // --- 帳票発行 ---
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+  const [isIssuingDoc, setIsIssuingDoc] = useState(false);
+  const [docType, setDocType] = useState('ESTIMATE');
+  const [docNote, setDocNote] = useState('');
+  const [downloadingDocId, setDownloadingDocId] = useState<number | null>(null);
+
   // --- 各タブのフォームState ---
   const [formData, setFormData] = useState({
     orderNo: '', title: '', customerId: '', salesRepId: '', orderDate: new Date().toISOString().split('T')[0],
@@ -555,12 +563,81 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const isCapacityEnough = plannedCount > 0 && totalCapacity >= plannedCount;
 
   const TABS = [
-    { id: 'BASIC', label: '基本情報', icon: 'bi-info-circle' },
-    { id: 'DIST', label: 'ポスティング', icon: 'bi-send' },
-    { id: 'PRINT', label: '印刷手配', icon: 'bi-printer' },
-    { id: 'NEWS', label: '新聞折込', icon: 'bi-newspaper' },
-    { id: 'DESIGN', label: 'デザイン', icon: 'bi-palette' },
+    { id: 'BASIC',   label: '基本情報',     icon: 'bi-info-circle' },
+    { id: 'DIST',    label: 'ポスティング', icon: 'bi-send' },
+    { id: 'PRINT',   label: '印刷手配',     icon: 'bi-printer' },
+    { id: 'NEWS',    label: '新聞折込',     icon: 'bi-newspaper' },
+    { id: 'DESIGN',  label: 'デザイン',     icon: 'bi-palette' },
+    { id: 'DOC',     label: '帳票発行',     icon: 'bi-file-earmark-pdf' },
   ];
+
+  // 帳票一覧を取得
+  const fetchDocuments = async () => {
+    if (isNew || !id) return;
+    setIsLoadingDocs(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/documents`);
+      const data = await res.json();
+      setDocuments(Array.isArray(data) ? data : []);
+    } catch { /* noop */ }
+    setIsLoadingDocs(false);
+  };
+
+  // 帳票を発行
+  const issueDocument = async () => {
+    if (!id) return;
+    setIsIssuingDoc(true);
+    try {
+      const res = await fetch(`/api/orders/${id}/documents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentType: docType, note: docNote }),
+      });
+      if (!res.ok) throw new Error();
+      const created = await res.json();
+      showToast(`${DOC_TYPE_LABEL[docType]}（${created.documentNo}）を発行しました`, 'success');
+      setDocNote('');
+      await fetchDocuments();
+    } catch {
+      showToast('帳票の発行に失敗しました', 'error');
+    }
+    setIsIssuingDoc(false);
+  };
+
+  // PDFダウンロード
+  const downloadPdf = async (docId: number, documentNo: string) => {
+    setDownloadingDocId(docId);
+    try {
+      const res = await fetch(`/api/documents/${docId}/pdf`);
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${documentNo}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      showToast('PDFの生成に失敗しました', 'error');
+    }
+    setDownloadingDocId(null);
+  };
+
+  const DOC_TYPE_LABEL: Record<string, string> = {
+    ESTIMATE: '見積書', INVOICE: '請求書', DELIVERY: '納品書', RECEIPT: '領収書',
+  };
+  const DOC_TYPE_ICON: Record<string, string> = {
+    ESTIMATE: 'bi-file-earmark-text',
+    INVOICE:  'bi-file-earmark-check',
+    DELIVERY: 'bi-truck',
+    RECEIPT:  'bi-receipt',
+  };
+  const DOC_TYPE_COLOR: Record<string, string> = {
+    ESTIMATE: 'bg-blue-100 text-blue-700',
+    INVOICE:  'bg-indigo-100 text-indigo-700',
+    DELIVERY: 'bg-emerald-100 text-emerald-700',
+    RECEIPT:  'bg-amber-100 text-amber-700',
+  };
 
   if (isLoading) return <div className="p-10 text-center">読み込み中...</div>;
 
@@ -654,7 +731,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         {TABS.map(tab => {
           const isActive = activeTab === tab.id;
           return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} disabled={isNew && tab.id !== 'BASIC'} 
+            <button key={tab.id} onClick={() => { setActiveTab(tab.id); if (tab.id === 'DOC') fetchDocuments(); }} disabled={isNew && tab.id !== 'BASIC'}
               className={`flex items-center gap-2 px-6 py-3 font-bold text-sm border-b-2 transition-all whitespace-nowrap ${
                 isActive ? 'border-indigo-600 text-indigo-600' : 
                 isNew && tab.id !== 'BASIC' ? 'border-transparent text-slate-300 cursor-not-allowed' :
@@ -1025,6 +1102,138 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="pt-4 border-t flex justify-end">
                <button type="button" onClick={() => saveTabInfo('DESIGN', designForm)} className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg">デザイン依頼を保存する</button>
+            </div>
+          </div>
+        )}
+
+        {/* ─── 帳票発行タブ ─── */}
+        {activeTab === 'DOC' && (
+          <div className="space-y-6 max-w-3xl">
+            {/* 発行フォーム */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <i className="bi bi-plus-circle text-indigo-500"></i> 新規帳票を発行する
+                </h3>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-2">帳票の種類</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(DOC_TYPE_LABEL).map(([type, label]) => (
+                      <button
+                        key={type}
+                        type="button"
+                        onClick={() => setDocType(type)}
+                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-sm font-bold transition-all ${
+                          docType === type
+                            ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                            : 'border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <i className={`bi ${DOC_TYPE_ICON[type]} text-xl`}></i>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">備考（帳票に印刷されます）</label>
+                  <textarea
+                    rows={2}
+                    value={docNote}
+                    onChange={e => setDocNote(e.target.value)}
+                    placeholder="お支払い期限、ご連絡事項など..."
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400 flex items-center gap-1">
+                    <i className="bi bi-info-circle"></i>
+                    発行元の自社情報は
+                    <a href="/settings/company" target="_blank" className="text-indigo-500 underline hover:text-indigo-700">
+                      自社情報設定
+                    </a>
+                    で管理できます
+                  </p>
+                  <button
+                    type="button"
+                    onClick={issueDocument}
+                    disabled={isIssuingDoc}
+                    className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50"
+                  >
+                    {isIssuingDoc
+                      ? <><i className="bi bi-hourglass-split animate-spin"></i> 発行中...</>
+                      : <><i className="bi bi-file-earmark-plus"></i> {DOC_TYPE_LABEL[docType]}を発行する</>
+                    }
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 発行済み帳票一覧 */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="bg-slate-50 border-b border-slate-200 px-5 py-3 flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                  <i className="bi bi-archive text-indigo-500"></i> 発行済み帳票
+                </h3>
+                <button onClick={fetchDocuments} className="text-slate-400 hover:text-indigo-500 text-xs flex items-center gap-1">
+                  <i className="bi bi-arrow-clockwise"></i> 更新
+                </button>
+              </div>
+              {isLoadingDocs ? (
+                <div className="px-5 py-10 text-center text-slate-400 text-sm">
+                  <i className="bi bi-hourglass-split animate-spin mr-2"></i>読み込み中...
+                </div>
+              ) : documents.length === 0 ? (
+                <div className="px-5 py-10 text-center text-slate-400 text-sm">
+                  <i className="bi bi-file-earmark-x text-3xl block mb-2"></i>
+                  まだ帳票が発行されていません
+                </div>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 text-xs text-slate-500 uppercase border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold text-left">帳票番号</th>
+                      <th className="px-4 py-3 font-semibold text-left">種類</th>
+                      <th className="px-4 py-3 font-semibold text-left">発行日</th>
+                      <th className="px-4 py-3 font-semibold text-right">合計金額</th>
+                      <th className="px-4 py-3 font-semibold text-center">ダウンロード</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {documents.map((doc: any) => (
+                      <tr key={doc.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{doc.documentNo}</td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 w-fit ${DOC_TYPE_COLOR[doc.documentType]}`}>
+                            <i className={`bi ${DOC_TYPE_ICON[doc.documentType]}`}></i>
+                            {DOC_TYPE_LABEL[doc.documentType]}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-slate-600 text-xs">
+                          {new Date(doc.issuedAt).toLocaleDateString('ja-JP')}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-indigo-600">
+                          ¥{doc.totalAmount.toLocaleString('ja-JP')}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            onClick={() => downloadPdf(doc.id, doc.documentNo)}
+                            disabled={downloadingDocId === doc.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition-colors disabled:opacity-50"
+                          >
+                            {downloadingDocId === doc.id
+                              ? <><i className="bi bi-hourglass-split animate-spin"></i> 生成中</>
+                              : <><i className="bi bi-file-pdf"></i> PDF</>
+                            }
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
           </div>
         )}

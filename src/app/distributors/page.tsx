@@ -44,6 +44,16 @@ function handlePostalInput(
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+// ゆうちょ銀行：記号番号 → 支店番号・口座番号 変換
+function convertYuchoNumber(kigo: string, bango: string): { branchCode: string; accountNumber: string } | null {
+  if (!kigo || kigo.length < 3) return null;
+  const mid = parseInt(kigo.substring(1, 3), 10);
+  if (isNaN(mid)) return null;
+  const branchCode = String(mid * 10 + 8).padStart(3, '0');
+  const accountNumber = kigo.startsWith('1') ? bango.slice(0, -1) : bango;
+  return { branchCode, accountNumber };
+}
+
 const inputCls = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white';
 const selectCls = inputCls + ' cursor-pointer';
 const Label = ({ children, required }: { children: React.ReactNode; required?: boolean }) => (
@@ -76,6 +86,11 @@ export default function DistributorPage() {
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
   const [bankInputText, setBankInputText] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
+
+  // ゆうちょ変換モーダル
+  const [showYuchoModal, setShowYuchoModal] = useState(false);
+  const [yuchoKigo, setYuchoKigo] = useState('');
+  const [yuchoBango, setYuchoBango] = useState('');
 
   const initialForm = {
     staffId: '', name: '', branchId: '', phone: '', email: '',
@@ -144,6 +159,12 @@ export default function DistributorPage() {
       b.name.toLowerCase().includes(q) || (b.nameKana && b.nameKana.toLowerCase().includes(q))
     ).slice(0, 15);
   }, [banks, bankInputText]);
+
+  const isYuchoSelected = formData.bankName.includes('ゆうちょ');
+  const yuchoPreview = useMemo(
+    () => yuchoKigo.length >= 3 && yuchoBango ? convertYuchoNumber(yuchoKigo, yuchoBango) : null,
+    [yuchoKigo, yuchoBango],
+  );
 
   const filteredDistributors = useMemo(() => {
     return distributors.filter(d => {
@@ -664,6 +685,17 @@ export default function DistributorPage() {
                             </div>
                           )}
                         </div>
+                        {/* ゆうちょ変換ボタン */}
+                        {isYuchoSelected && (
+                          <button
+                            type="button"
+                            onClick={() => { setYuchoKigo(''); setYuchoBango(''); setShowYuchoModal(true); }}
+                            className="mt-2 flex items-center gap-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition-colors w-full justify-center"
+                          >
+                            <i className="bi bi-calculator-fill"></i>
+                            記号・番号から支店番号・口座番号を自動変換
+                          </button>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -824,6 +856,123 @@ export default function DistributorPage() {
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ゆうちょ記号番号変換モーダル */}
+      {showYuchoModal && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+            {/* ヘッダー */}
+            <div className="bg-amber-50 border-b border-amber-200 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-black text-amber-800 flex items-center gap-2 text-base">
+                <i className="bi bi-calculator-fill text-amber-600"></i>
+                ゆうちょ銀行 記号番号変換
+              </h2>
+              <button
+                type="button"
+                onClick={() => setShowYuchoModal(false)}
+                className="w-7 h-7 bg-amber-100 hover:bg-amber-200 rounded-full flex items-center justify-center transition-colors"
+              >
+                <i className="bi bi-x text-amber-700 text-lg"></i>
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-slate-500 leading-relaxed">
+                通帳に記載の<strong className="text-slate-700">記号</strong>（5桁）と<strong className="text-slate-700">番号</strong>（8桁）を入力すると、
+                振込に必要な<strong className="text-slate-700">支店番号</strong>と<strong className="text-slate-700">口座番号</strong>を自動算出します。
+              </p>
+
+              {/* 入力欄 */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    記号 <span className="text-rose-500">*</span>
+                    <span className="font-normal text-slate-400 ml-1">（5桁）</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={yuchoKigo}
+                    onChange={e => setYuchoKigo(e.target.value.replace(/[^\d]/g, '').slice(0, 5))}
+                    className={inputCls + ' font-mono tracking-widest text-center'}
+                    placeholder="10120"
+                    maxLength={5}
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    番号 <span className="text-rose-500">*</span>
+                    <span className="font-normal text-slate-400 ml-1">（8桁）</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={yuchoBango}
+                    onChange={e => setYuchoBango(e.target.value.replace(/[^\d]/g, '').slice(0, 8))}
+                    className={inputCls + ' font-mono tracking-widest text-center'}
+                    placeholder="12345678"
+                    maxLength={8}
+                  />
+                </div>
+              </div>
+
+              {/* 変換結果プレビュー */}
+              {yuchoPreview ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+                  <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                    <i className="bi bi-check-circle-fill"></i>変換結果
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-white rounded-lg p-3 border border-emerald-100 text-center">
+                      <p className="text-[10px] text-slate-400 mb-1">支店番号</p>
+                      <p className="text-2xl font-black text-slate-800 font-mono tracking-wider">{yuchoPreview.branchCode}</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3 border border-emerald-100 text-center">
+                      <p className="text-[10px] text-slate-400 mb-1">口座番号</p>
+                      <p className="text-2xl font-black text-slate-800 font-mono tracking-wider">{yuchoPreview.accountNumber}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center text-xs text-slate-400">
+                  <i className="bi bi-arrow-up text-slate-300 block text-lg mb-1"></i>
+                  記号と番号を入力すると変換結果が表示されます
+                </div>
+              )}
+
+              {/* ボタン */}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowYuchoModal(false)}
+                  className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm transition-colors"
+                >
+                  キャンセル
+                </button>
+                <button
+                  type="button"
+                  disabled={!yuchoPreview}
+                  onClick={() => {
+                    if (!yuchoPreview) return;
+                    setFormData(p => ({
+                      ...p,
+                      bankBranchCode: yuchoPreview.branchCode,
+                      bankAccountNumber: yuchoPreview.accountNumber,
+                    }));
+                    setShowYuchoModal(false);
+                    setYuchoKigo('');
+                    setYuchoBango('');
+                  }}
+                  className="flex-1 py-2.5 font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                >
+                  <i className="bi bi-check2"></i>フォームに適用
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

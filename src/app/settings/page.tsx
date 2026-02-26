@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
 
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
 type Industry = { id: number; name: string; _count: { flyers: number } };
@@ -9,6 +10,18 @@ type Country = { id: number; code: string; name: string; nameEn: string | null; 
 type VisaType = { id: number; name: string; sortOrder: number; _count: { distributors: number } };
 type Bank = { id: number; code: string; name: string; nameKana: string | null; sortOrder: number };
 type DistributionMethod = { id: number; name: string; capacityType: string; priceAddon: number; sortOrder: number; isActive: boolean };
+type CompanySetting = {
+  companyName: string; companyNameKana: string; postalCode: string; address: string;
+  phone: string; fax: string; email: string; website: string;
+  invoiceRegistrationNumber: string; bankName: string; bankBranch: string;
+  bankAccountType: string; bankAccountNumber: string; bankAccountHolder: string; logoUrl: string;
+};
+const COMPANY_DEFAULTS: CompanySetting = {
+  companyName: '', companyNameKana: '', postalCode: '', address: '',
+  phone: '', fax: '', email: '', website: '',
+  invoiceRegistrationNumber: '', bankName: '', bankBranch: '',
+  bankAccountType: '普通', bankAccountNumber: '', bankAccountHolder: '', logoUrl: '',
+};
 
 const WEEK_DAY_OPTIONS = [
   { value: '0', label: '日曜日' },
@@ -24,7 +37,44 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company'>('general');
+
+  // 自社情報
+  const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
+  const [isLoadingCompany, setIsLoadingCompany] = useState(false);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+
+  const fetchCompanySettings = async () => {
+    setIsLoadingCompany(true);
+    try {
+      const res = await fetch('/api/settings/company');
+      if (res.ok) {
+        const data = await res.json();
+        if (data?.companyName !== undefined) {
+          setCompanyForm({ ...COMPANY_DEFAULTS, ...Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v ?? ''])) });
+        }
+      }
+    } catch (e) { console.error(e); }
+    setIsLoadingCompany(false);
+  };
+
+  const handleSaveCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingCompany(true);
+    try {
+      const res = await fetch('/api/settings/company', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(companyForm),
+      });
+      if (!res.ok) throw new Error();
+      showToast('自社情報を保存しました', 'success');
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
 
   // 全般設定
   const [systemSettings, setSystemSettings] = useState<Record<string, string>>({ weekStartDay: '1' });
@@ -169,9 +219,10 @@ export default function SettingsPage() {
     { key: 'visaType',           label: '在留資格',    icon: 'bi-card-checklist' },
     { key: 'bank',               label: '銀行',        icon: 'bi-bank2' },
     { key: 'distributionMethod', label: '配布方法',    icon: 'bi-signpost-2' },
+    { key: 'company',            label: '自社情報',    icon: 'bi-building' },
   ] as const;
 
-  const isMasterTab = tab !== 'general';
+  const isMasterTab = tab !== 'general' && tab !== 'company';
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -196,7 +247,7 @@ export default function SettingsPage() {
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setErrorMsg(''); }}
+              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); }}
               className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === t.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${t.icon}`}></i> {t.label}
@@ -262,6 +313,212 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 自社情報タブ */}
+        {tab === 'company' && (
+          isLoadingCompany ? (
+            <div className="flex items-center justify-center h-40 text-slate-400">
+              <i className="bi bi-hourglass-split text-2xl animate-spin mr-3" />読み込み中...
+            </div>
+          ) : (
+            <form onSubmit={handleSaveCompany} className="space-y-6">
+              {/* 基本情報 */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i className="bi bi-info-circle text-indigo-500"></i> 基本情報
+                  </h2>
+                </div>
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* 会社名 */}
+                  {[
+                    { label: '会社名', name: 'companyName', placeholder: '株式会社ティラミス', required: true },
+                    { label: '会社名（カナ）', name: 'companyNameKana', placeholder: 'カブシキガイシャティラミス' },
+                  ].map(f => (
+                    <div key={f.name}>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">
+                        {f.label}{f.required && <span className="text-red-500 ml-1">*</span>}
+                      </label>
+                      <input
+                        name={f.name}
+                        value={(companyForm as any)[f.name]}
+                        onChange={e => setCompanyForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        required={f.required}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  ))}
+
+                  {/* 郵便番号（自動ハイフン＋住所補完） */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">郵便番号</label>
+                    <input
+                      name="postalCode"
+                      value={companyForm.postalCode}
+                      onChange={e => handlePostalInput(
+                        e.target.value,
+                        v => setCompanyForm(prev => ({ ...prev, postalCode: v })),
+                        v => setCompanyForm(prev => ({ ...prev, address: v })),
+                      )}
+                      placeholder="100-0001"
+                      maxLength={8}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* 電話番号（自動ハイフン） */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">電話番号</label>
+                    <input
+                      name="phone"
+                      value={companyForm.phone}
+                      onChange={e => handlePhoneChange(
+                        e.target.value,
+                        v => setCompanyForm(prev => ({ ...prev, phone: v })),
+                      )}
+                      placeholder="03-0000-0000"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* 住所（郵便番号入力で自動補完） */}
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-500 mb-1">住所</label>
+                    <input
+                      name="address"
+                      value={companyForm.address}
+                      onChange={e => setCompanyForm(prev => ({ ...prev, address: e.target.value }))}
+                      placeholder="東京都千代田区〇〇 1-2-3"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* FAX番号（自動ハイフン） */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">FAX番号</label>
+                    <input
+                      name="fax"
+                      value={companyForm.fax}
+                      onChange={e => handlePhoneChange(
+                        e.target.value,
+                        v => setCompanyForm(prev => ({ ...prev, fax: v })),
+                      )}
+                      placeholder="03-0000-0001"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* メール・ウェブサイト */}
+                  {[
+                    { label: 'メールアドレス', name: 'email', placeholder: 'info@example.co.jp' },
+                    { label: 'ウェブサイト', name: 'website', placeholder: 'https://example.co.jp' },
+                  ].map(f => (
+                    <div key={f.name}>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">{f.label}</label>
+                      <input
+                        name={f.name}
+                        value={(companyForm as any)[f.name]}
+                        onChange={e => setCompanyForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* インボイス情報 */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i className="bi bi-receipt text-indigo-500"></i> インボイス・税務情報
+                  </h2>
+                </div>
+                <div className="p-5">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">適格請求書発行事業者登録番号</label>
+                  <input
+                    name="invoiceRegistrationNumber"
+                    value={companyForm.invoiceRegistrationNumber}
+                    onChange={e => setCompanyForm(prev => ({ ...prev, invoiceRegistrationNumber: e.target.value }))}
+                    placeholder="T1234567890123"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none max-w-xs"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Tから始まる13桁の番号を入力してください</p>
+                </div>
+              </div>
+
+              {/* 振込先口座 */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i className="bi bi-bank text-indigo-500"></i> 振込先口座
+                  </h2>
+                </div>
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { label: '銀行名', name: 'bankName', placeholder: '〇〇銀行' },
+                    { label: '支店名', name: 'bankBranch', placeholder: '〇〇支店' },
+                  ].map(f => (
+                    <div key={f.name}>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">{f.label}</label>
+                      <input
+                        name={f.name}
+                        value={(companyForm as any)[f.name]}
+                        onChange={e => setCompanyForm(prev => ({ ...prev, [e.target.name]: e.target.value }))}
+                        placeholder={f.placeholder}
+                        className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">口座種別</label>
+                    <select
+                      name="bankAccountType"
+                      value={companyForm.bankAccountType}
+                      onChange={e => setCompanyForm(prev => ({ ...prev, bankAccountType: e.target.value }))}
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                    >
+                      <option value="普通">普通</option>
+                      <option value="当座">当座</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">口座番号</label>
+                    <input
+                      name="bankAccountNumber"
+                      value={companyForm.bankAccountNumber}
+                      onChange={e => setCompanyForm(prev => ({ ...prev, bankAccountNumber: e.target.value }))}
+                      placeholder="1234567"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold text-slate-500 mb-1">口座名義（カナ）</label>
+                    <input
+                      name="bankAccountHolder"
+                      value={companyForm.bankAccountHolder}
+                      onChange={e => setCompanyForm(prev => ({ ...prev, bankAccountHolder: e.target.value }))}
+                      placeholder="カブシキガイシャティラミス"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 保存ボタン */}
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isSavingCompany}
+                  className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSavingCompany ? <><i className="bi bi-hourglass-split animate-spin"></i> 保存中...</> : <><i className="bi bi-check2-circle"></i> 設定を保存</>}
+                </button>
+              </div>
+            </form>
+          )
         )}
 
         {/* マスタタブ共通 */}
