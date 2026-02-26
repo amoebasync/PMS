@@ -84,7 +84,7 @@ async function main() {
     genderLabel[e.gender] ?? e.gender,
     escape(e.email),
     escape(e.phone),
-    escape(e.branch?.name),
+    escape(e.branch?.nameJa),
     escape(e.department?.name),
     rankLabel[e.rank] ?? e.rank,
     escape(e.jobTitle),
