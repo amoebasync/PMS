@@ -470,6 +470,7 @@ model Customer {
   tasks      Task[]
   campaign   Campaign? @relation(fields: [campaignId], references: [id])
   leads      Lead[]    @relation("LeadConversion")
+  billingStatements BillingStatement[]
 
   @@map("customers")
 }
@@ -1062,9 +1063,10 @@ model Order {
   newspaperInserts   OrderNewspaperInsert[]
   designs            OrderDesign[]
   payments           Payment[]
-  approvals          OrderApproval[] // ★ 追加: 審査履歴
+  approvals          OrderApproval[]
   notifications      Notification[]
   documents          Document[]
+  billingItem        BillingStatementItem?
 
   @@map("orders")
 }
@@ -1728,9 +1730,59 @@ model Document {
   subtotal     Int          @default(0)
   taxAmount    Int          @default(0)                @map("tax_amount")
   totalAmount  Int          @default(0)                @map("total_amount")
-  note         String?      @db.Text
-  createdAt    DateTime     @default(now())            @map("created_at")
+  note            String?      @db.Text
+  paymentDueDate  DateTime?                            @map("payment_due_date")
+  createdAt       DateTime     @default(now())         @map("created_at")
   updatedAt    DateTime     @updatedAt                 @map("updated_at")
 
   @@map("documents")
+}
+
+// ==========================================
+// 月次まとめ請求（BillingStatement）
+// ==========================================
+
+enum BillingStatus {
+  DRAFT      // 下書き（作成後、確定前）
+  CONFIRMED  // 確定済み（営業マンが確認・ロック）
+  SENT       // 請求書を顧客に送付済み
+  PAID       // 入金済み
+}
+
+// 月次まとめ請求ヘッダー（1顧客×1請求月に対して1レコード）
+model BillingStatement {
+  id            Int                    @id @default(autoincrement())
+  statementNo   String                 @unique @map("statement_no") @db.VarChar(30)
+  customerId    Int                    @map("customer_id")
+  customer      Customer               @relation(fields: [customerId], references: [id])
+  billingMonth  String                 @map("billing_month") @db.VarChar(7) // "2026-02"
+  status        BillingStatus          @default(DRAFT)
+  subtotal      Int                    @default(0)
+  taxAmount     Int                    @default(0)  @map("tax_amount")
+  totalAmount   Int                    @default(0)  @map("total_amount")
+  note          String?                @db.Text
+  paymentDueDate DateTime?             @map("payment_due_date")
+  confirmedAt   DateTime?              @map("confirmed_at")
+  sentAt        DateTime?              @map("sent_at")
+  paidAt        DateTime?              @map("paid_at")
+  paymentMethod String?                @map("payment_method") @db.VarChar(50)
+  items         BillingStatementItem[]
+  createdAt     DateTime               @default(now()) @map("created_at")
+  updatedAt     DateTime               @updatedAt     @map("updated_at")
+
+  @@map("billing_statements")
+}
+
+// まとめ請求の明細行（受注と1:1）
+model BillingStatementItem {
+  id                 Int              @id @default(autoincrement())
+  billingStatementId Int              @map("billing_statement_id")
+  billingStatement   BillingStatement @relation(fields: [billingStatementId], references: [id], onDelete: Cascade)
+  orderId            Int              @unique @map("order_id")
+  order              Order            @relation(fields: [orderId], references: [id])
+  subtotal           Int              @default(0)
+  taxAmount          Int              @default(0)  @map("tax_amount")
+  amount             Int              @default(0)
+
+  @@map("billing_statement_items")
 }

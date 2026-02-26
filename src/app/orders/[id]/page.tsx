@@ -153,6 +153,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [docType, setDocType] = useState('ESTIMATE');
   const [docNote, setDocNote] = useState('');
   const [downloadingDocId, setDownloadingDocId] = useState<number | null>(null);
+  // 支払期限（請求書用）— デフォルト: 翌月末
+  const [paymentDueDate, setPaymentDueDate] = useState<string>(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth() + 2, 0).toISOString().split('T')[0];
+  });
 
   // --- 各タブのフォームState ---
   const [formData, setFormData] = useState({
@@ -591,7 +596,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const res = await fetch(`/api/orders/${id}/documents`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentType: docType, note: docNote }),
+        body: JSON.stringify({
+          documentType: docType,
+          note: docNote,
+          paymentDueDate: docType === 'INVOICE' ? paymentDueDate : null,
+        }),
       });
       if (!res.ok) throw new Error();
       const created = await res.json();
@@ -1137,6 +1146,46 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     ))}
                   </div>
                 </div>
+                {/* 支払期限（請求書のみ） */}
+                {docType === 'INVOICE' && (
+                  <div className="rounded-lg border border-indigo-100 bg-indigo-50 p-3">
+                    <label className="block text-xs font-bold text-indigo-700 mb-2">
+                      <i className="bi bi-calendar-check mr-1"></i>支払期限
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          setPaymentDueDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                          (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0]; })() === paymentDueDate
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'
+                        }`}
+                      >当月末</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          setPaymentDueDate(new Date(d.getFullYear(), d.getMonth() + 2, 0).toISOString().split('T')[0]);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                          (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 2, 0).toISOString().split('T')[0]; })() === paymentDueDate
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'
+                        }`}
+                      >翌月末</button>
+                      <input
+                        type="date"
+                        value={paymentDueDate}
+                        onChange={e => setPaymentDueDate(e.target.value)}
+                        className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">備考（帳票に印刷されます）</label>
                   <textarea

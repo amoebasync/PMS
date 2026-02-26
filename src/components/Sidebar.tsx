@@ -81,6 +81,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
         { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' },
         { name: 'スケジュール照会', href: '/schedules', icon: 'bi-calendar-check' },
         { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill' },
+        { name: '請求管理', href: '/billing', icon: 'bi-receipt-cutoff' },
         { name: 'CRM / タスク', href: '/crm/tasks', icon: 'bi-check2-all' },
         { name: '見込み客管理', href: '/crm/leads', icon: 'bi-funnel-fill' },
       ]

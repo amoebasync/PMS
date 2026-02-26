@@ -28,7 +28,7 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Sync to S3
+      - name: Sync static to S3
         run: |
           aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
             --cache-control "public,max-age=31536000,immutable" --delete
@@ -47,39 +47,29 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ap-northeast-1
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to EC2 #1
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ~/pms_java
-            git pull origin main
-            npm install --legacy-peer-deps
-            npx prisma generate
-            npx prisma migrate deploy
-            npm run build
-            rm -rf .next/static
-            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
-            pm2 restart pms
+      - name: Zip build for CodeDeploy
+        run: |
+          zip -r deploy.zip . \
+            --exclude "*.git*" \
+            --exclude "node_modules/*"
 
-      - name: Deploy to EC2 #2
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.EC2_HOST_2 }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_KEY }}
-          script: |
-            cd ~/pms_java
-            git pull origin main
-            npm install --legacy-peer-deps
-            npx prisma generate
-            npm run build
-            rm -rf .next/static
-            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
-            pm2 restart pms
+      - name: Upload to S3 for CodeDeploy
+        run: |
+          aws s3 cp deploy.zip s3://pms-uploads-tiramis/codedeploy/deploy.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+
+      - name: Deploy via CodeDeploy
+        run: |
+          aws deploy create-deployment \
+            --application-name pms-deploy-group \
+            --deployment-group-name pms-group \
+            --s3-location bucket=pms-uploads-tiramis,key=codedeploy/deploy.zip,bundleType=zip \
+            --deployment-config-name CodeDeployDefault.AllAtOnce \
+            --description "Deploy from GitHub Actions"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
