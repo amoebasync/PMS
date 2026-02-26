@@ -30,7 +30,7 @@ const statusConfig = {
 };
 
 function formatDateJa(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(dateStr.slice(0, 10) + 'T00:00:00');
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
 

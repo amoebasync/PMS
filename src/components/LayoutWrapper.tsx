@@ -17,6 +17,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isPortalPage = pathname.startsWith('/portal');
   const isDistributorPage = pathname.startsWith('/staff');
   const isAppPrivacyPage = pathname.startsWith('/app-privacy');
+  const isApplyPage = pathname === '/apply';
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -24,7 +25,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   // ページ遷移でモバイルメニューを閉じる
   useEffect(() => { setIsMobileOpen(false); }, [pathname]);
 
-  if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage) {
+  if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage || isApplyPage) {
     return (
       <NotificationProvider>
         <main className={`w-full min-h-screen m-0 p-0 ${isAuthPage ? 'bg-[#0f172a]' : ''}`}>

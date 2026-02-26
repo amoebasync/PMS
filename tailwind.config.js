@@ -11,6 +11,9 @@ module.exports = {
         sans: ['var(--font-inter)', 'var(--font-notojp)', 'sans-serif'],
         mono: ['var(--font-jetbrains)', 'monospace'],
       },
+      boxShadow: {
+        'up': '0 -2px 8px -2px rgba(0, 0, 0, 0.08)',
+      },
     },
   },
   plugins: [],

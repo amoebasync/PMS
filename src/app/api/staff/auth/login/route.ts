@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyPassword, hashPassword } from '@/lib/password';
+import { writeAuditLog, getIpAddress } from '@/lib/audit';
 
 
 export async function POST(request: Request) {
+  const ip = getIpAddress(request);
+  const ua = request.headers.get('user-agent');
+
   try {
     const { email, password } = await request.json();
 
@@ -17,11 +21,30 @@ export async function POST(request: Request) {
     });
 
     if (!distributor) {
+      await writeAuditLog({
+        actorType: 'STAFF',
+        action: 'LOGIN_FAILURE',
+        targetModel: 'FlyerDistributor',
+        description: `スタッフログイン失敗: email="${email}"（ユーザー不存在）`,
+        ipAddress: ip,
+        userAgent: ua,
+      });
       return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
     }
 
     const { verified, needsUpgrade } = await verifyPassword(password, distributor.passwordHash ?? '');
     if (!verified) {
+      await writeAuditLog({
+        actorType: 'STAFF',
+        actorId: distributor.id,
+        actorName: distributor.name,
+        action: 'LOGIN_FAILURE',
+        targetModel: 'FlyerDistributor',
+        targetId: distributor.id,
+        description: `スタッフログイン失敗: パスワード不一致 (${distributor.name})`,
+        ipAddress: ip,
+        userAgent: ua,
+      });
       return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
     }
 
@@ -37,6 +60,18 @@ export async function POST(request: Request) {
       sameSite: 'lax',
       path: '/',
       maxAge: 60 * 60 * 24 * 30, // 30日間有効
+    });
+
+    await writeAuditLog({
+      actorType: 'STAFF',
+      actorId: distributor.id,
+      actorName: distributor.name,
+      action: 'LOGIN_SUCCESS',
+      targetModel: 'FlyerDistributor',
+      targetId: distributor.id,
+      description: `スタッフログイン成功: ${distributor.name}`,
+      ipAddress: ip,
+      userAgent: ua,
     });
 
     return NextResponse.json({

@@ -15,6 +15,11 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.997.0",
     "@aws-sdk/s3-request-presigner": "^3.997.0",
+    "@fullcalendar/core": "^6.1.20",
+    "@fullcalendar/daygrid": "^6.1.20",
+    "@fullcalendar/interaction": "^6.1.20",
+    "@fullcalendar/react": "^6.1.20",
+    "@fullcalendar/timegrid": "^6.1.20",
     "@react-google-maps/api": "^2.20.8",
     "@react-pdf/renderer": "^4.3.2",
     "@tailwindcss/postcss": "^4.1.18",

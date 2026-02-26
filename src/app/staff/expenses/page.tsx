@@ -50,12 +50,19 @@ export default function ExpensesPage() {
     setSubmitting(true);
     setMessage(null);
 
+    const amt = parseInt(form.amount);
+    if (isNaN(amt) || amt <= 0) {
+      setMessage({ type: 'error', text: '金額は1円以上の整数を入力してください' });
+      setSubmitting(false);
+      return;
+    }
+
     const res = await fetch('/api/staff/expenses', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         date: form.date,
-        amount: parseInt(form.amount),
+        amount: amt,
         description: form.description,
       }),
     });
@@ -129,7 +136,16 @@ export default function ExpensesPage() {
           <h2 className="font-bold text-slate-800">新規交通費申請</h2>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1.5 ml-1">日付</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-bold text-slate-600 ml-1">日付</label>
+              <button
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, date: today }))}
+                className="text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
+              >
+                今日
+              </button>
+            </div>
             <input
               type="date"
               required

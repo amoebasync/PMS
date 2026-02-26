@@ -1,0 +1,155 @@
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { sendHiringNotificationEmail } from '@/lib/mailer';
+
+// GET /api/applicants/[id]
+// 管理者: 応募者詳細取得
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const applicantId = parseInt(id);
+
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
+      include: {
+        jobCategory: true,
+        country: true,
+        visaType: true,
+        interviewSlot: true,
+      },
+    });
+
+    if (!applicant) {
+      return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
+    }
+
+    return NextResponse.json(applicant);
+  } catch (error) {
+    console.error('Applicant Detail Error:', error);
+    return NextResponse.json({ error: '応募者の取得に失敗しました' }, { status: 500 });
+  }
+}
+
+// PUT /api/applicants/[id]
+// 管理者: 応募者情報・評価・ステータスの更新
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const applicantId = parseInt(id);
+    const body = await request.json();
+    const { actorId, actorName } = await getAdminActorInfo();
+    const ip = getIpAddress(request);
+
+    // 更新前データ取得
+    const beforeData = await prisma.applicant.findUnique({
+      where: { id: applicantId },
+      include: { jobCategory: true },
+    });
+
+    if (!beforeData) {
+      return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
+    }
+
+    const previousHiringStatus = beforeData.hiringStatus;
+
+    // 更新可能フィールド
+    const updateData: any = {};
+
+    // 基本情報の修正（面接時に修正可能）
+    if (body.countryId !== undefined) updateData.countryId = body.countryId ? Number(body.countryId) : null;
+    if (body.visaTypeId !== undefined) updateData.visaTypeId = body.visaTypeId ? Number(body.visaTypeId) : null;
+    if (body.postalCode !== undefined) updateData.postalCode = body.postalCode || null;
+    if (body.address !== undefined) updateData.address = body.address || null;
+    if (body.building !== undefined) updateData.building = body.building || null;
+
+    // ステータス
+    if (body.flowStatus !== undefined) updateData.flowStatus = body.flowStatus;
+    if (body.hiringStatus !== undefined) updateData.hiringStatus = body.hiringStatus;
+
+    // 評価項目
+    if (body.hasOtherJob !== undefined) updateData.hasOtherJob = body.hasOtherJob;
+    if (body.otherJobDetails !== undefined) updateData.otherJobDetails = body.otherJobDetails || null;
+    if (body.hasBankInJapan !== undefined) updateData.hasBankInJapan = body.hasBankInJapan;
+    if (body.japaneseLevel !== undefined) updateData.japaneseLevel = body.japaneseLevel != null ? Number(body.japaneseLevel) : null;
+    if (body.englishLevel !== undefined) updateData.englishLevel = body.englishLevel != null ? Number(body.englishLevel) : null;
+    if (body.communicationScore !== undefined) updateData.communicationScore = body.communicationScore != null ? Number(body.communicationScore) : null;
+    if (body.impressionScore !== undefined) updateData.impressionScore = body.impressionScore != null ? Number(body.impressionScore) : null;
+    if (body.interviewNotes !== undefined) updateData.interviewNotes = body.interviewNotes || null;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.applicant.update({
+        where: { id: applicantId },
+        data: updateData,
+        include: {
+          jobCategory: true,
+          country: true,
+          visaType: true,
+          interviewSlot: true,
+        },
+      });
+
+      const action = body.hiringStatus && body.hiringStatus !== previousHiringStatus
+        ? 'STATUS_CHANGE' as const
+        : 'UPDATE' as const;
+
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action,
+        targetModel: 'Applicant',
+        targetId: applicantId,
+        beforeData: beforeData as unknown as Record<string, unknown>,
+        afterData: result as unknown as Record<string, unknown>,
+        ipAddress: ip,
+        description: action === 'STATUS_CHANGE'
+          ? `応募者「${result.name}」のステータスを変更（${previousHiringStatus} → ${result.hiringStatus}）`
+          : `応募者「${result.name}」の情報を更新`,
+        tx,
+      });
+
+      return result;
+    });
+
+    // 採用に変更された場合、採用通知メールを送信
+    if (
+      body.hiringStatus === 'HIRED' &&
+      previousHiringStatus !== 'HIRED'
+    ) {
+      const lang = updated.language || 'ja';
+      const jobName = lang === 'en'
+        ? (updated.jobCategory?.nameEn || updated.jobCategory?.nameJa || '')
+        : (updated.jobCategory?.nameJa || '');
+
+      sendHiringNotificationEmail(
+        updated.email,
+        updated.name,
+        lang,
+        jobName,
+      ).catch((err) => console.error('Hiring notification email failed:', err));
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Applicant Update Error:', error);
+    return NextResponse.json({ error: '応募者の更新に失敗しました' }, { status: 500 });
+  }
+}

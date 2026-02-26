@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendOrderApprovalEmail } from '@/lib/mailer';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -68,6 +69,14 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (tab === 'STATUS') {
       const { status: newStatus, action, comment } = body;
 
+      const { actorId, actorName } = await getAdminActorInfo();
+      const ip = getIpAddress(request);
+
+      const beforeOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, orderNo: true, status: true },
+      });
+
       await prisma.$transaction(async (tx) => {
         await tx.order.update({ where: { id: orderId }, data: { status: newStatus } });
 
@@ -83,6 +92,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         else if (action === 'REJECT') {
           await tx.orderApproval.create({ data: { orderId, status: 'REJECTED', comment } });
         }
+
+        const auditAction = action === 'APPROVE' ? 'APPROVE' as const
+          : action === 'REJECT' ? 'REJECT' as const
+          : 'STATUS_CHANGE' as const;
+
+        await writeAuditLog({
+          actorType: 'EMPLOYEE',
+          actorId,
+          actorName,
+          action: auditAction,
+          targetModel: 'Order',
+          targetId: orderId,
+          beforeData: { status: beforeOrder?.status },
+          afterData: { status: newStatus, action, comment },
+          ipAddress: ip,
+          description: `受注「${beforeOrder?.orderNo}」ステータスを「${beforeOrder?.status}」→「${newStatus}」に変更`,
+          tx,
+        });
       });
 
       // 承認時：顧客のプライマリコンタクトに審査完了メールを送信（fire-and-forget）

@@ -116,7 +116,7 @@ export default function StaffReportPageEn() {
         <button onClick={prevMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors">
           <i className="bi bi-chevron-left text-lg"></i>
         </button>
-        <span className="font-bold text-slate-700 text-sm">{today.toLocaleString('en-US', { month: 'long' })} {year}</span>
+        <span className="font-bold text-slate-700 text-sm">{new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long' })} {year}</span>
         <button onClick={nextMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors">
           <i className="bi bi-chevron-right text-lg"></i>
         </button>
@@ -174,15 +174,13 @@ export default function StaffReportPageEn() {
                       <div className="divide-y divide-slate-50">
                         {schedule.items.map((item) => (
                           <div key={item.id} className="px-4 py-3">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-bold text-slate-700 truncate">
-                                  {item.slotIndex}. {item.flyerName || '(Unnamed flyer)'}
-                                </p>
-                                <p className="text-[11px] text-slate-400 mt-0.5">
-                                  Planned: {item.plannedCount?.toLocaleString() ?? '—'} posts
-                                </p>
-                              </div>
+                            <p className="text-xs font-bold text-slate-700 mb-1.5 leading-snug line-clamp-2">
+                              {item.slotIndex}. {item.flyerName || '(Unnamed flyer)'}
+                            </p>
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="text-[11px] text-slate-400">
+                                Planned: {item.plannedCount?.toLocaleString() ?? '—'} posts
+                              </p>
                               <div className="flex items-center gap-2 shrink-0">
                                 <input
                                   type="number"

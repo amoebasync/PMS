@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { verifyPassword, hashPassword } from '@/lib/password';
+import { writeAuditLog, getIpAddress } from '@/lib/audit';
 
 
 export async function POST(request: Request) {
+  const ip = getIpAddress(request);
+  const ua = request.headers.get('user-agent');
+
   try {
     const body = await request.json();
     const { accountId, password } = body;
@@ -25,12 +29,31 @@ export async function POST(request: Request) {
     });
 
     if (!employee) {
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        action: 'LOGIN_FAILURE',
+        targetModel: 'Employee',
+        description: `ログイン失敗: アカウントID="${accountId}"（ユーザー不存在）`,
+        ipAddress: ip,
+        userAgent: ua,
+      });
       return NextResponse.json({ error: 'IDまたはパスワードが間違っています。' }, { status: 401 });
     }
 
     // 2. パスワードを検証（bcrypt / SHA-256 両対応）
     const { verified, needsUpgrade } = await verifyPassword(password, employee.passwordHash);
     if (!verified) {
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId: employee.id,
+        actorName: `${employee.lastNameJa} ${employee.firstNameJa}`,
+        action: 'LOGIN_FAILURE',
+        targetModel: 'Employee',
+        targetId: employee.id,
+        description: 'ログイン失敗: パスワード不一致',
+        ipAddress: ip,
+        userAgent: ua,
+      });
       return NextResponse.json({ error: 'IDまたはパスワードが間違っています。' }, { status: 401 });
     }
 
@@ -60,6 +83,18 @@ export async function POST(request: Request) {
         maxAge: 60 * 60 * 24 // 24時間（変更完了で消去）
       });
     }
+
+    await writeAuditLog({
+      actorType: 'EMPLOYEE',
+      actorId: employee.id,
+      actorName: `${employee.lastNameJa} ${employee.firstNameJa}`,
+      action: 'LOGIN_SUCCESS',
+      targetModel: 'Employee',
+      targetId: employee.id,
+      description: '管理者ログイン成功',
+      ipAddress: ip,
+      userAgent: ua,
+    });
 
     return NextResponse.json({
       success: true,
