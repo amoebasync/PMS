@@ -6,7 +6,49 @@ on:
       - main
 
 jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Sync to S3
+        run: |
+          aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
+            --cache-control "public,max-age=31536000,immutable" --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+
+      - name: Invalidate CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id EOOGEE1IL7T06 \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ap-northeast-1
+
   deploy:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to EC2 #1
@@ -22,11 +64,8 @@ jobs:
             npm install --legacy-peer-deps
             npx prisma generate
             npm run build
-            aws s3 sync .next/static s3://pms-uploads-tiramis/_next/static \
-              --cache-control "public,max-age=31536000,immutable" --delete
-            aws cloudfront create-invalidation \
-              --distribution-id EOOGEE1IL7T06 \
-              --paths "/*"
+            rm -rf .next/static
+            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
             pm2 restart pms
 
       - name: Deploy to EC2 #2
@@ -42,6 +81,6 @@ jobs:
             npm install --legacy-peer-deps
             npx prisma generate
             npm run build
-            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static \
-              --delete
+            rm -rf .next/static
+            aws s3 sync s3://pms-uploads-tiramis/_next/static .next/static
             pm2 restart pms
