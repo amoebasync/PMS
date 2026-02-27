@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 import { sendApplicantConfirmationEmail } from '@/lib/mailer';
+import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
 
 // POST /api/apply
 // 公開API: 応募者情報を送信し、面接スロットを予約する
@@ -40,6 +41,11 @@ export async function POST(request: Request) {
       );
     }
 
+    // 職種名を事前に取得（Google Meet の予定タイトルに使用）
+    const jobCategory = await prisma.jobCategory.findUnique({
+      where: { id: Number(jobCategoryId) },
+    });
+
     // トランザクション: 応募者作成 + スロット予約
     const result = await prisma.$transaction(async (tx) => {
       // スロットの空き状況を確認
@@ -53,6 +59,23 @@ export async function POST(request: Request) {
 
       if (new Date(slot.startTime) <= new Date()) {
         throw new Error('SLOT_EXPIRED');
+      }
+
+      // Google Meet イベントを作成（設定されている場合のみ）
+      let meetUrl = slot.meetUrl; // 既存のURLがあればそれを使用
+      
+      if (!meetUrl && isGoogleMeetConfigured()) {
+        const jobName = jobCategory?.nameJa || '面接';
+        const meetTitle = `【ティラミス】${name}様 ${jobName} 面接`;
+        const meetDescription = `応募者: ${name}\nメール: ${email}\n職種: ${jobName}`;
+        
+        meetUrl = await createGoogleMeetEvent(
+          meetTitle,
+          meetDescription,
+          slot.startTime,
+          slot.endTime,
+          email // 応募者をゲストとして招待
+        );
       }
 
       // 応募者レコード作成
@@ -71,12 +94,13 @@ export async function POST(request: Request) {
         },
       });
 
-      // スロットに応募者を紐付け
+      // スロットに応募者を紐付け（Meet URLも更新）
       const updatedSlot = await tx.interviewSlot.update({
         where: { id: Number(interviewSlotId) },
         data: {
           isBooked: true,
           applicantId: applicant.id,
+          meetUrl: meetUrl || slot.meetUrl, // 新しいURLがあれば更新
         },
       });
 
@@ -88,16 +112,11 @@ export async function POST(request: Request) {
         targetId: applicant.id,
         afterData: applicant as unknown as Record<string, unknown>,
         ipAddress: getIpAddress(request),
-        description: `応募者「${name}」が応募を完了（面接枠ID: ${interviewSlotId}）`,
+        description: `応募者「${name}」が応募を完了（面接枠ID: ${interviewSlotId}）${meetUrl ? '、Meet URL自動生成' : ''}`,
         tx,
       });
 
       return { applicant, slot: updatedSlot };
-    });
-
-    // 職種名を取得してメール送信
-    const jobCategory = await prisma.jobCategory.findUnique({
-      where: { id: Number(jobCategoryId) },
     });
 
     const lang = language || 'ja';

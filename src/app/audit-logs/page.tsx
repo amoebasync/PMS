@@ -233,11 +233,7 @@ export default function AuditLogsPage() {
                 ? Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
                 : logs.length === 0
                 ? (
-                  <tr>
-                    <td colSpan={7}>
-                      <EmptyState title="条件に一致するログが見つかりません" />
-                    </td>
-                  </tr>
+                  <EmptyState title="条件に一致するログが見つかりません" />
                 )
                 : logs.map(log => (
                   <tr

@@ -113,3 +113,264 @@ npm start
 - docxファイルの読み書きには `python-docx`（`import docx`）を使用する
 - 設計書生成スクリプト例: `scripts/generate_applicant_docs.py`
 - 機能一覧: `~/Downloads/PMS_設計書/PMS_機能一覧.docx` — 新機能追加時はセクション追加すること
+
+## タスク管理（ATF Kanban）
+
+このプロジェクトのタスクは **ATF Kanban**（`http://localhost:3002`）で管理する。
+MCPサーバー `atf-kanban` が利用可能。プロジェクト名: **PMS開発**
+
+### 開発ワークフロー
+
+```
+① ユーザーがかんばんUIでチケットをバックログに登録
+        ↓
+② PM エージェントがバックログを分析
+        ↓
+③ 【Q&Aループ】PM が不明点をユーザーに質問
+        ↓
+   ユーザーが回答
+        ↓
+   PMがまだ疑問点があれば → ③に戻って再質問
+   全ての疑問点が解消されたら → ④へ
+        ↓
+④ PM がスプリント計画を提示
+        ↓
+   ユーザーが承認 → ⑤へ
+   ユーザーが却下（修正依頼） → ④に戻って計画を修正して再提示
+        ↓
+⑤ 開発エージェントが並列実装（backend / frontend）
+        ↓
+⑥ レビューエージェントがバグチェック・修正
+        ↓
+⑦ ドキュメントエージェントが CLAUDE.md・設計書を更新
+        ↓
+⑧ 全チケット done/blocked → complete_pm_session を呼び出して終了
+```
+
+### PM エージェントの詳細フロー（MCP ツール使用手順）
+
+PM として動作する場合、**必ず以下の手順に従うこと**：
+
+**Phase 0: コードベース・実装済み内容の把握（必須・最初に必ず実行）**
+
+バックログを分析する前に、必ず現在のプロジェクト状態を把握すること。
+
+1. **直近の実装内容を確認する**
+   - `git log --oneline -20` でここ最近のコミット履歴を確認
+   - `git diff HEAD~5 --stat` で変更されたファイルを把握
+
+2. **既存チケットの状態を確認する**
+   - `mcp__atf-kanban__list_tickets` で **status=done** のチケットを確認し、何が実装済みかを把握
+   - `mcp__atf-kanban__list_tickets` で **status=in_progress** のチケットも確認（進行中の作業と重複しないか）
+
+3. **コードベースの現状を把握する**
+   - `cat prisma/schema.prisma` で現在のDBスキーマ・モデル定義を確認
+   - `ls src/app/api/` でどのAPIエンドポイントが既に存在するかを確認
+   - `ls src/app/` でページ構成を確認
+   - バックログのチケット内容に関連する既存ファイルがあれば内容も確認する
+
+4. **CLAUDE.md の「実装済み」セクションを再確認する**
+   - 本ファイルに記載の実装済み機能（監査ログ、応募者管理、Google Meet等）を念頭に置く
+
+⚠️ **この Phase 0 を省略して Phase 1 に進んではいけない。** 既存コードを理解せずに計画を立てると、重複実装・既存機能との矛盾・アーキテクチャの不統一が生じる。
+
+**Phase 1: バックログ確認**
+- `mcp__atf-kanban__list_tickets` で status=backlog のチケットを確認する
+- Phase 0 で把握した実装済み内容と照らし合わせ、本当に新規実装が必要なものだけを対象にする
+- バックログが空の場合は `mcp__atf-kanban__complete_pm_session` を呼び出して即終了する
+
+**Phase 2: Q&A フェーズ（複数ラウンド必須）**
+- `mcp__atf-kanban__post_pm_questions` で疑問点を質問する
+- `mcp__atf-kanban__wait_for_questions_answer` でユーザーの回答を待機する
+- 回答を受け取ったら内容を分析し、**まだ不明点・疑問点が残っている場合は必ず再度 `post_pm_questions` を呼んで追加質問する**
+- ⚠️ **回答を受け取ってもまだ理解が不十分な場合は、絶対に次のフェーズ（計画作成）に進んではいけない**
+- 全ての疑問点が完全に解消されてから Phase 3 に進む
+
+**Phase 3: スプリント計画フェーズ**
+- `mcp__atf-kanban__post_sprint_plan` でスプリント計画を投稿する
+- `mcp__atf-kanban__wait_for_sprint_approval` でユーザーの承認を待機する
+- 却下された場合はフィードバックを元に計画を修正して再投稿する（Phase 3 を繰り返す）
+
+**Phase 4: 実装フェーズ**
+- 承認後、サブエージェントを起動して並列実装させる
+- 各サブエージェントに `add_activity_log` で節目ごとの進捗を記録させる
+
+**Phase 5: 完了フェーズ（必ずここで終了すること）**
+- 全チケットが done/blocked になったら `mcp__atf-kanban__complete_pm_session` を呼び出す
+- ⚠️ **`complete_pm_session` を呼んだら、そこで処理を完全に終了する**
+- ⚠️ **完了後に再度バックログを確認したり、Q&A フェーズを再開してはいけない**
+- ⚠️ **1回の PM 起動 = 1スプリント分の作業。完了したら次の起動を待つ**
+
+### PM エージェントの起動方法
+
+```bash
+cd ~/PMS && claude
+# 起動後に入力：
+> バックログのチケットをPMとして処理して
+```
+
+または subagent として呼び出し：
+```
+Use the pm-agent subagent to process the backlog
+```
+
+**PM エージェントは必ずユーザーの承認を得てから実装を開始する。**
+
+### エージェントの作業フロー（各エージェント共通）
+1. `mcp__atf-kanban__register_agent` で自分を登録
+2. `mcp__atf-kanban__claim_ticket` でチケットを担当宣言（status: in_progress）
+3. 実装・作業を進める
+4. `mcp__atf-kanban__add_activity_log` で節目ごとに進捗をログ（**必須・省略禁止**）
+   - 作業開始時: `log_type: "progress"`, message: "作業開始: [何をするか]"
+   - 中間報告 (30分毎 or 主要ステップ完了時): `log_type: "progress"`, message: "[完了したこと]"
+   - エラー発生時: `log_type: "error"`, message: "[エラー内容と対処]"
+   - 完了直前: `log_type: "completion"`, message: "[実装した内容のサマリー]"
+   - ⚠️ `complete_ticket` を呼ぶ前に必ず少なくとも1回は `add_activity_log` を呼ぶこと
+5. **実装中に仕様や要件が不明な場合は `mcp__atf-kanban__wait_for_pm_response` でユーザーに質問する（下記参照）**
+6. `mcp__atf-kanban__complete_ticket` で完了報告
+7. ブロック時は `mcp__atf-kanban__block_ticket` で理由を記録
+
+### エージェントの質問フロー（実装中に不明点がある場合）
+
+実装を進める中で仕様が不明な場合は、`block_ticket` で止まらずに **`wait_for_pm_response` で質問する**こと。
+
+```
+mcp__atf-kanban__wait_for_pm_response({
+  ticket_id:  "チケットのUUID",
+  question:   "ログイン後のリダイレクト先はダッシュボード（/dashboard）でよいですか？それとも前のページに戻りますか？",
+  agent_name: "backend-agent-1"
+})
+```
+
+**動作の流れ：**
+1. 質問がかんばんUIのアクティビティログに紫色 `?` で表示される
+2. チケットに `awaiting_pm` タグが付き、UIに返答フォームが現れる
+3. ユーザーが返答フォームに入力して送信
+4. `wait_for_pm_response` が回答テキストを返す → 実装を再開
+
+**注意事項：**
+- 質問後は回答が来るまでそのままポーリング待機する（プロセスを終了しないこと）
+- 同じチケットに対して複数回質問することも可能（都度 `wait_for_pm_response` を呼ぶ）
+- タイムアウト（デフォルト 600 秒）した場合は `timed_out: true` が返るので、その場合は `block_ticket` でブロック状態にして理由を記録すること
+
+### かんばんUI
+`http://localhost:3002` でリアルタイムに進捗を視覚確認できる（要起動: `cd ~/AI_TaskForce/kanban-ui && pnpm dev`）
+
+## ロゴ画像使用ガイドライン
+
+`/public/logo/` に複数種類のロゴファイルがある。背景色に応じて使い分けること。
+
+| ファイル名 | 用途 |
+|---|---|
+| `logo_light.png` | 明るい背景（白・グレー系）のページ |
+| `logo_light_transparent.png` | 明るい背景（背景透過） — `/apply` などの白系ページはこれを使用 |
+| `logo_dark.png` | 暗い背景のページ |
+| `logo_dark_transparent.png` | 暗い背景（背景透過） |
+| `logo_Icon_transparent.png` | アイコンのみ（ファビコン等） |
+| `logo_SNS.png` | SNS共有用 |
+
+### 注意事項
+- 白・グレー背景のページ（例: `/apply`）では `logo_light_transparent.png` を使用する
+- 暗い背景のページでは `logo_dark_transparent.png` を使用する
+- 2026-02-27 に `/apply` ページのロゴを `logo_dark_transparent.png` から `logo_light_transparent.png` に修正済み
+
+## Google Meet 自動作成機能
+
+2026-02-27 実装済み。
+
+### 概要
+応募者が `/apply` から応募した際に、Google Calendar API を使用して Google Meet リンク付きの予定を自動作成する。
+
+### 必要な環境変数
+```
+GOOGLE_CLIENT_ID=xxx
+GOOGLE_CLIENT_SECRET=xxx
+GOOGLE_REFRESH_TOKEN=xxx
+```
+
+### セットアップ手順
+1. Google Cloud Console でプロジェクトを作成
+2. Google Calendar API を有効化
+3. OAuth 2.0 認証情報を作成（Webアプリケーション）
+4. OAuth同意画面で必要なスコープを追加:
+   - `https://www.googleapis.com/auth/calendar.events`
+5. [OAuth Playground](https://developers.google.com/oauthplayground) でリフレッシュトークンを取得
+6. `.env` に上記の環境変数を追加
+
+### 処理フロー
+1. 応募者が `/apply` フォームを送信
+2. `POST /api/apply` が呼ばれる
+3. 環境変数が設定されていれば `createGoogleMeetEvent()` を呼び出し
+4. Google Calendar にイベント + Meet リンクを作成
+5. `interview_slots.meet_url` に Meet URL を保存
+6. 確認メールに Meet URL を含めて送信
+
+### ユーティリティ
+- `src/lib/google-meet.ts` - Google Meet 作成関数
+- `isGoogleMeetConfigured()` - 環境変数が設定されているかチェック
+- `createGoogleMeetEvent()` - Meet リンク付きイベントを作成
+
+### 注意事項
+- 環境変数が設定されていない場合、Meet 作成はスキップされる（エラーにはならない）
+- スロットに既に `meetUrl` が設定されている場合は上書きしない
+- リフレッシュトークンは長期間有効だが、Google アカウントのパスワード変更などで無効になる場合がある
+
+## 面接スロットの職種対応（2026-02-27 追加）
+
+### 概要
+面接スロットに職種ID（`jobCategoryId`）を追加し、職種別または全職種対応のスロットを作成可能にした。
+
+### データモデル変更
+- `InterviewSlot.jobCategoryId` (nullable): 特定職種用のスロット（nullの場合は全職種対応）
+- `JobCategory.interviewSlots`: 逆参照リレーション
+
+### UI変更
+- `/settings` 面接スロットタブ: 「面接スロットマスタ」セクションで個別スロットを追加可能
+  - 日付、開始時刻、終了時刻、対象職種（または全職種）を指定
+  - コンポーネント: `src/components/settings/InterviewSlotManager.tsx`
+- `/apply` 応募フォーム: 職種選択後、その職種用 + 全職種対応のスロットのみを表示
+
+### API変更
+- `GET /api/interview-slots`: `jobCategoryId` パラメータでフィルタ可能
+- `POST /api/interview-slots`: `jobCategoryId` パラメータで職種指定可能
+- `GET /api/interview-slots/available`: `jobCategoryId` パラメータで職種フィルタ（その職種 OR 全職種対応を返す）
+
+## CRM タスク機能改修（定期タスク自動生成 & 柔軟な担当者アサイン）
+
+2026-02-27 実装済み。設計書: ~/Downloads/PMS_設計書/PMS_CRMタスク機能改修_設計書.docx
+
+### 概要
+- 定期タスクテンプレートから自動タスク生成（CRON: 毎日00:00）
+- 担当者を社員個人・部署・支店単位で柔軟にアサイン可能
+- タスクカテゴリ（営業/現場/アドミン）による分類と関連先UIの出し分け
+- Enum: `TaskCategory`（SALES/FIELD/ADMIN）、`RecurrenceType`（ONCE/DAILY/WEEKLY/MONTHLY/YEARLY）、`TaskCompletionRule`（SHARED/INDIVIDUAL）
+- DB: `task_assignees`（中間テーブル）、`task_templates`（定期タスクマスタ）、`tasks` に category/branch_id/schedule_id/template_id 追加
+
+### API（管理者 pms_session 必須）
+- `GET /api/search-assignees?q=keyword` — 社員・部署・支店を横断検索
+- `GET/POST /api/task-templates` — テンプレート一覧・作成
+- `GET/PUT/DELETE /api/task-templates/[id]` — テンプレート詳細・更新・削除
+- `GET /api/tasks` — category, myTasks フィルタ追加、assignees include 追加
+- `POST /api/tasks`, `PUT /api/tasks/[id]` — category, assignees 対応追加
+
+### CRON API（Bearer CRON_SECRET 認証）
+- `GET /api/cron/generate-tasks` — テンプレートに基づきタスクを自動生成
+  - SHARED: 1タスク + 複数 TaskAssignee
+  - INDIVIDUAL: 部署/支店→社員展開 → 人数分の個別タスク生成
+  - 重複防止: 同日・同テンプレートからの二重生成チェック
+
+### フロントエンド
+- `/crm/tasks` にタブ追加（タスク一覧 / 定期タスク設定）
+- 担当者マルチセレクト UI（AssigneeMultiSelect コンポーネント）
+- カテゴリバッジ表示、マイタスクフィルタ
+- テンプレート CRUD モーダル（サイクル設定UI: 曜日ボタン/日付/月日セレクト）
+
+### CRON 登録（CodeDeploy）
+- `scripts/after_install.sh` に登録（重複チェック付き）
+- 面接スロット生成: 毎日01:00 → `/api/cron/generate-slots`
+- 定期タスク生成: 毎日00:00 → `/api/cron/generate-tasks`
+
+### 注意事項
+- `src/middleware.ts` に `/api/cron/generate-tasks` を公開パスとして追加済み
+- テンプレートの targetEmployeeIds/targetDepartmentIds/targetBranchIds は JSON 配列として保存
+- CRON_SECRET 環境変数が必要（`.env` に設定済み）
