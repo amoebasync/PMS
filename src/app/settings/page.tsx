@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
+import DefaultSlotSettings from '@/components/settings/DefaultSlotSettings';
 
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
 type Industry = { id: number; name: string; _count: { flyers: number } };
@@ -37,7 +38,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -220,9 +221,10 @@ export default function SettingsPage() {
     { key: 'bank',               label: '銀行',        icon: 'bi-bank2' },
     { key: 'distributionMethod', label: '配布方法',    icon: 'bi-signpost-2' },
     { key: 'company',            label: '自社情報',    icon: 'bi-building' },
+    { key: 'interviewSlot',      label: '面接スロット', icon: 'bi-calendar-check' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot';
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -627,6 +629,9 @@ export default function SettingsPage() {
           </div>
         )}
       </div>
+
+        {/* 面接スロット設定タブ */}
+        {tab === 'interviewSlot' && (<DefaultSlotSettings />)}
 
       {/* モーダル */}
       {showModal && (

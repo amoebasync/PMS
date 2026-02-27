@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 
 // ─── i18n ────────────────────────────────────────────────
@@ -23,9 +24,9 @@ const translations = {
     phonePlaceholder: '090-1234-5678',
     nationalityVisa: '国籍・ビザ',
     country: '国籍',
-    countryPlaceholder: '国を選択してください',
+    countryPlaceholder: '国を選択 / 検索...',
     visaType: '在留資格',
-    visaTypePlaceholder: '在留資格を選択してください',
+    visaTypePlaceholder: '在留資格を選択 / 検索...',
     addressSection: '住所',
     postalCode: '郵便番号',
     postalCodePlaceholder: '123-4567',
@@ -53,6 +54,8 @@ const translations = {
     loadingSlots: '面接枠を読み込み中...',
     loadingCategories: '読み込み中...',
     errorGeneral: '送信に失敗しました。もう一度お試しください。',
+    searchPlaceholder: '検索...',
+    noResults: '該当なし',
   },
   en: {
     title: 'Job Application',
@@ -72,9 +75,9 @@ const translations = {
     phonePlaceholder: '090-1234-5678',
     nationalityVisa: 'Nationality & Visa',
     country: 'Nationality',
-    countryPlaceholder: 'Select a country',
+    countryPlaceholder: 'Select / Search...',
     visaType: 'Visa Type',
-    visaTypePlaceholder: 'Select a visa type',
+    visaTypePlaceholder: 'Select / Search...',
     addressSection: 'Address',
     postalCode: 'Postal Code',
     postalCodePlaceholder: '123-4567',
@@ -102,6 +105,8 @@ const translations = {
     loadingSlots: 'Loading interview slots...',
     loadingCategories: 'Loading...',
     errorGeneral: 'Submission failed. Please try again.',
+    searchPlaceholder: 'Search...',
+    noResults: 'No results',
   },
 };
 
@@ -150,8 +155,165 @@ const formatPostalCode = (val: string) => {
   return `${digits.slice(0, 3)}-${digits.slice(3)}`;
 };
 
-// ─── Component ───────────────────────────────────────────
-export default function ApplyPage() {
+/**
+ * 面接スロットが選択可能かどうかを判定する
+ * - 7:00以前（0:00〜6:59）: 当日のスロットも選択可能
+ * - 7:00以降: 翌日以降のスロットのみ選択可能
+ */
+const isSlotSelectable = (slotStartTime: string): boolean => {
+  const now = new Date();
+  const slotDate = new Date(slotStartTime);
+  
+  // 現在時刻の時間を取得
+  const currentHour = now.getHours();
+  
+  // 今日の日付（時刻を0:00:00に設定）
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  // スロットの日付（時刻を0:00:00に設定）
+  const slotDay = new Date(slotDate.getFullYear(), slotDate.getMonth(), slotDate.getDate());
+  
+  // 7時より前（0:00〜6:59）の場合
+  if (currentHour < 7) {
+    // 当日以降のスロットは選択可能（かつ、スロット開始時刻が現在より後）
+    return slotDate > now;
+  }
+  
+  // 7時以降の場合
+  // 翌日以降のスロットのみ選択可能
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  return slotDay >= tomorrow;
+};
+
+// ─── SearchableSelect Component ──────────────────────────
+interface SearchableSelectProps<T> {
+  options: T[];
+  value: string;
+  onChange: (value: string) => void;
+  getOptionValue: (option: T) => string;
+  getOptionLabel: (option: T) => string;
+  placeholder: string;
+  searchPlaceholder: string;
+  noResultsText: string;
+  disabled?: boolean;
+  className?: string;
+}
+
+function SearchableSelect<T>({
+  options,
+  value,
+  onChange,
+  getOptionValue,
+  getOptionLabel,
+  placeholder,
+  searchPlaceholder,
+  noResultsText,
+  disabled = false,
+  className = '',
+}: SearchableSelectProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selectedOption = options.find((opt) => getOptionValue(opt) === value);
+  const displayText = selectedOption ? getOptionLabel(selectedOption) : '';
+
+  const filteredOptions = options.filter((opt) =>
+    getOptionLabel(opt).toLowerCase().includes(search.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen(!isOpen)}
+        disabled={disabled}
+        className={`w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-left text-sm transition-all flex items-center justify-between ${
+          disabled ? 'opacity-50 cursor-not-allowed' : 'hover:border-slate-300 focus:ring-2 focus:ring-indigo-500 focus:bg-white'
+        } ${isOpen ? 'ring-2 ring-indigo-500 bg-white' : ''}`}
+      >
+        <span className={displayText ? 'text-slate-800' : 'text-slate-400'}>
+          {displayText || placeholder}
+        </span>
+        <i className={`bi bi-chevron-down text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative">
+              <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-slate-400 text-center">{noResultsText}</div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const optValue = getOptionValue(opt);
+                const isSelected = optValue === value;
+                return (
+                  <button
+                    key={optValue}
+                    type="button"
+                    onClick={() => handleSelect(optValue)}
+                    className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-indigo-50 text-indigo-700 font-medium'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {getOptionLabel(opt)}
+                    {isSelected && <i className="bi bi-check ml-2 text-indigo-600" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Main Form Component ───────────────────────────────────
+function ApplyForm() {
+  const searchParams = useSearchParams();
+  const jobParam = searchParams.get('job');
+
   const [form, setForm] = useState({
     language: 'ja',
     name: '',
@@ -199,7 +361,18 @@ export default function ApplyPage() {
   useEffect(() => {
     fetch('/api/job-categories/public')
       .then((r) => r.json())
-      .then((data) => setJobCategories(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const categories = Array.isArray(data) ? data : [];
+        setJobCategories(categories);
+        
+        // URLパラメータから職種IDを設定
+        if (jobParam && categories.length > 0) {
+          const jobId = parseInt(jobParam, 10);
+          if (!isNaN(jobId) && categories.some((c: JobCategory) => c.id === jobId)) {
+            setForm((prev) => ({ ...prev, jobCategoryId: String(jobId) }));
+          }
+        }
+      })
       .catch(() => setJobCategories([]))
       .finally(() => setLoadingCategories(false));
 
@@ -215,12 +388,36 @@ export default function ApplyPage() {
       .catch(() => setVisaTypes([]))
       .finally(() => setLoadingVisaTypes(false));
 
-    fetch('/api/interview-slots/available')
-      .then((r) => r.json())
-      .then((data) => setSlots(data.slots || []))
-      .catch(() => setSlots([]))
-      .finally(() => setLoadingSlots(false));
+  }, [jobParam]);
+
+  // ─── Fetch slots when job category changes ───────────────
+  const fetchSlots = useCallback(async (jobCatId?: string) => {
+    setLoadingSlots(true);
+    try {
+      const url = jobCatId
+        ? `/api/interview-slots/available?jobCategoryId=${jobCatId}`
+        : '/api/interview-slots/available';
+      const res = await fetch(url);
+      const data = await res.json();
+      setSlots(data.slots || []);
+      setSelectedDate(null);
+      setForm(prev => ({ ...prev, interviewSlotId: '' }));
+    } catch {
+      setSlots([]);
+    }
+    setLoadingSlots(false);
   }, []);
+
+  // Fetch slots when job category changes
+  useEffect(() => {
+    if (form.jobCategoryId) {
+      fetchSlots(form.jobCategoryId);
+    } else {
+      setSlots([]);
+      setLoadingSlots(false);
+    }
+  }, [form.jobCategoryId, fetchSlots]);
+
 
   // ─── Postal code auto-lookup ─────────────────────────
   const lookupPostalCode = useCallback(async (code: string) => {
@@ -244,9 +441,12 @@ export default function ApplyPage() {
     }
   }, []);
 
+  // ─── Filter selectable slots ─────────────────────────
+  const selectableSlots = slots.filter((slot) => isSlotSelectable(slot.startTime));
+
   // ─── Group slots by date ─────────────────────────────
   const slotsByDate: Record<string, InterviewSlot[]> = {};
-  slots.forEach((slot) => {
+  selectableSlots.forEach((slot) => {
     const dateStr = new Date(slot.startTime).toLocaleDateString(
       isEn ? 'en-US' : 'ja-JP',
       { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }
@@ -398,7 +598,7 @@ export default function ApplyPage() {
         <div className="flex items-center gap-3">
           <div className="relative w-[140px] h-[42px]">
             <Image
-              src="/logo/logo_dark_transparent.png"
+              src="/logo/logo_light_transparent.png"
               alt="Logo"
               fill
               className="object-contain"
@@ -573,34 +773,29 @@ export default function ApplyPage() {
               {t.nationalityVisa}
             </div>
             <div className="space-y-4">
-              {/* Country */}
+              {/* Country - Searchable */}
               <div>
                 <label className={labelClass}>{t.country}</label>
-                <select
+                <SearchableSelect
+                  options={countries}
                   value={form.countryId}
-                  onChange={(e) =>
+                  onChange={(val) =>
                     setForm((prev) => ({
                       ...prev,
-                      countryId: e.target.value,
+                      countryId: val,
                       visaTypeId: '', // reset visa when country changes
                     }))
                   }
-                  className={inputClass}
-                >
-                  <option value="">
-                    {loadingCountries
-                      ? t.loadingCategories
-                      : t.countryPlaceholder}
-                  </option>
-                  {countries.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {isEn ? c.nameEn : c.name}
-                    </option>
-                  ))}
-                </select>
+                  getOptionValue={(c) => String(c.id)}
+                  getOptionLabel={(c) => (isEn ? c.nameEn : c.name)}
+                  placeholder={loadingCountries ? t.loadingCategories : t.countryPlaceholder}
+                  searchPlaceholder={t.searchPlaceholder}
+                  noResultsText={t.noResults}
+                  disabled={loadingCountries}
+                />
               </div>
 
-              {/* Visa Type (conditional) */}
+              {/* Visa Type (conditional) - Searchable */}
               {needsVisa && (
                 <div className="animate-in fade-in">
                   <label className={labelClass}>
@@ -609,28 +804,22 @@ export default function ApplyPage() {
                       {t.required}
                     </span>
                   </label>
-                  <select
+                  <SearchableSelect
+                    options={visaTypes}
                     value={form.visaTypeId}
-                    onChange={(e) =>
+                    onChange={(val) =>
                       setForm((prev) => ({
                         ...prev,
-                        visaTypeId: e.target.value,
+                        visaTypeId: val,
                       }))
                     }
-                    className={inputClass}
-                    required
-                  >
-                    <option value="">
-                      {loadingVisaTypes
-                        ? t.loadingCategories
-                        : t.visaTypePlaceholder}
-                    </option>
-                    {visaTypes.map((v) => (
-                      <option key={v.id} value={v.id}>
-                        {v.name}
-                      </option>
-                    ))}
-                  </select>
+                    getOptionValue={(v) => String(v.id)}
+                    getOptionLabel={(v) => v.name}
+                    placeholder={loadingVisaTypes ? t.loadingCategories : t.visaTypePlaceholder}
+                    searchPlaceholder={t.searchPlaceholder}
+                    noResultsText={t.noResults}
+                    disabled={loadingVisaTypes}
+                  />
                 </div>
               )}
             </div>
@@ -842,5 +1031,21 @@ export default function ApplyPage() {
       {/* Footer spacer */}
       <div className="h-8" />
     </div>
+  );
+}
+
+// ─── Page Component with Suspense ───────────────────────────
+export default function ApplyPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white flex items-center justify-center">
+        <div className="text-slate-400">
+          <i className="bi bi-arrow-repeat animate-spin mr-2" />
+          Loading...
+        </div>
+      </div>
+    }>
+      <ApplyForm />
+    </Suspense>
   );
 }

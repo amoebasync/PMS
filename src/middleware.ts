@@ -32,7 +32,9 @@ export function middleware(request: NextRequest) {
     path === '/api/interview-slots/available' ||
     path === '/api/job-categories/public' ||
     path === '/api/countries/public' ||
-    path === '/api/visa-types/public';
+    path === '/api/visa-types/public' ||
+    path === '/api/cron/generate-slots' ||
+    path === '/api/cron/generate-tasks';
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;

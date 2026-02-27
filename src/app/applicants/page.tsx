@@ -615,6 +615,13 @@ export default function ApplicantsPage() {
             <i className="bi bi-tags-fill text-indigo-500"></i>
             職種マスタ管理
           </button>
+          <a
+            href="/settings?tab=interviewSlot"
+            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
+          >
+            <i className="bi bi-gear-fill text-slate-500"></i>
+            スロット設定
+          </a>
         </div>
 
         {/* ── タブ ── */}
@@ -667,7 +674,7 @@ export default function ApplicantsPage() {
                 <FullCalendar
                   ref={calendarRef}
                   plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                  initialView="dayGridMonth"
+                  initialView="timeGridWeek"
                   locale="ja"
                   headerToolbar={{
                     left: 'prev,next today',

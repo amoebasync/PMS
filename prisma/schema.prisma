@@ -171,8 +171,9 @@ model Employee {
 
   // CRM
   activities     CustomerActivity[] @relation("ActivityEmployee")
-  assignedTasks  Task[]             @relation("TaskAssignee")
-  createdTasks   Task[]             @relation("TaskCreator")
+  assignedTasks    Task[]             @relation("TaskAssignee")
+  createdTasks     Task[]             @relation("TaskCreator")
+  taskAssignments  TaskAssignee[]     @relation("TaskAssigneeEmployee")
   leads          Lead[]
 
   announcements  Announcement[]
@@ -325,7 +326,8 @@ model Department {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション
-  employees Employee[]
+  employees     Employee[]
+  taskAssignees TaskAssignee[]
 
   @@map("departments")
 }
@@ -468,8 +470,9 @@ model Customer {
   qrCodes  QrCode[]
   deliveryAddresses CustomerDeliveryAddress[]
   activities CustomerActivity[]
-  tasks      Task[]
-  campaign   Campaign? @relation(fields: [campaignId], references: [id])
+  tasks          Task[]
+  taskTemplates  TaskTemplate[]
+  campaign       Campaign? @relation(fields: [campaignId], references: [id])
   leads      Lead[]    @relation("LeadConversion")
   billingStatements BillingStatement[]
 
@@ -704,9 +707,12 @@ model Branch {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション（この支店に所属する配布員）
-  distributors FlyerDistributor[]
-  schedules    DistributionSchedule[]
-  employees   Employee[] @relation("BranchEmployees")
+  distributors   FlyerDistributor[]
+  schedules      DistributionSchedule[]
+  employees      Employee[] @relation("BranchEmployees")
+  tasksByBranch  Task[]     @relation("TaskBranch")
+  taskAssignees  TaskAssignee[] @relation("TaskAssigneeBranch")
+  taskTemplates  TaskTemplate[] @relation("TaskTemplateBranch")
 
   @@map("branches")
 }
@@ -747,7 +753,9 @@ model DistributionSchedule {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション (What: このスケジュールで配る最大6種類のチラシ)
-  items DistributionItem[]
+  items          DistributionItem[]
+  tasks          Task[]
+  taskTemplates  TaskTemplate[]
 
   @@map("distribution_schedules")
 }
@@ -1587,6 +1595,26 @@ model CustomerActivity {
   @@map("customer_activities")
 }
 
+// --- タスク関連 Enum ---
+enum TaskCategory {
+  SALES // 営業
+  FIELD // 現場
+  ADMIN // アドミン
+}
+
+enum RecurrenceType {
+  ONCE    // 一回のみ
+  DAILY   // 毎日
+  WEEKLY  // 毎週
+  MONTHLY // 毎月
+  YEARLY  // 毎年
+}
+
+enum TaskCompletionRule {
+  SHARED     // 1つのタスクを複数人で共有（誰か1人が完了すればOK）
+  INDIVIDUAL // 担当者ごとに独立タスクを生成
+}
+
 model Task {
   id             Int               @id @default(autoincrement())
   customerId     Int?              @map("customer_id")
@@ -1605,7 +1633,75 @@ model Task {
   createdAt      DateTime          @default(now()) @map("created_at")
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
+  // --- 追加フィールド ---
+  category       TaskCategory?     @map("category")
+  branchId       Int?              @map("branch_id")
+  branch         Branch?           @relation("TaskBranch", fields: [branchId], references: [id])
+  scheduleId     Int?              @map("schedule_id")
+  schedule       DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+  templateId     Int?              @map("template_id")
+  template       TaskTemplate?     @relation(fields: [templateId], references: [id])
+
+  // 複数担当者
+  assignees      TaskAssignee[]
+
+  @@index([category])
+  @@index([templateId])
   @@map("tasks")
+}
+
+// --- タスク×担当者 中間テーブル ---
+model TaskAssignee {
+  id           Int          @id @default(autoincrement())
+  taskId       Int          @map("task_id")
+  task         Task         @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  employeeId   Int?         @map("employee_id")
+  employee     Employee?    @relation("TaskAssigneeEmployee", fields: [employeeId], references: [id])
+  departmentId Int?         @map("department_id")
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  branchId     Int?         @map("branch_id")
+  branch       Branch?      @relation("TaskAssigneeBranch", fields: [branchId], references: [id])
+
+  @@unique([taskId, employeeId, departmentId, branchId])
+  @@map("task_assignees")
+}
+
+// --- 定期タスクテンプレート ---
+model TaskTemplate {
+  id               Int                @id @default(autoincrement())
+  title            String             @db.VarChar(200)
+  description      String?            @db.Text
+  category         TaskCategory
+  priority         String             @default("MEDIUM") @db.VarChar(10)
+  completionRule   TaskCompletionRule @default(SHARED) @map("completion_rule")
+
+  // 紐付け（カテゴリに応じて使い分け）
+  customerId       Int?               @map("customer_id")
+  customer         Customer?          @relation(fields: [customerId], references: [id])
+  branchId         Int?               @map("branch_id")
+  branch           Branch?            @relation("TaskTemplateBranch", fields: [branchId], references: [id])
+  scheduleId       Int?               @map("schedule_id")
+  schedule         DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+
+  // サイクル設定
+  recurrenceType   RecurrenceType     @default(ONCE) @map("recurrence_type")
+  recurrenceValue  String?            @map("recurrence_value") @db.VarChar(100)
+
+  // 担当者設定（JSON配列）
+  targetEmployeeIds   Json?  @map("target_employee_ids")
+  targetDepartmentIds Json?  @map("target_department_ids")
+  targetBranchIds     Json?  @map("target_branch_ids")
+
+  // 制御
+  isActive         Boolean  @default(true) @map("is_active")
+  lastGeneratedAt  DateTime? @map("last_generated_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // 生成されたタスクへの逆参照
+  tasks            Task[]
+
+  @@map("task_templates")
 }
 
 // ==========================================
@@ -1860,7 +1956,9 @@ model JobCategory {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  applicants Applicant[]
+  applicants     Applicant[]
+  interviewSlots InterviewSlot[]
+  defaultSlots   DefaultSlotJobCategory[]
 
   @@map("job_categories")
 }
@@ -1876,11 +1974,17 @@ model InterviewSlot {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // 1:1 with Applicant (optional)
+
+  // 職種（nullの場合は全職種対応）
+  jobCategoryId Int?         @map("job_category_id")
+  jobCategory   JobCategory? @relation(fields: [jobCategoryId], references: [id])
+
   applicantId Int?       @unique @map("applicant_id")
   applicant   Applicant? @relation(fields: [applicantId], references: [id])
 
   @@index([startTime])
   @@index([isBooked])
+  @@index([jobCategoryId])
   @@map("interview_slots")
 }
 
@@ -1933,4 +2037,34 @@ model Applicant {
   @@index([hiringStatus])
   @@index([createdAt])
   @@map("applicants")
+}
+// --- デフォルト面接スロット設定（曜日ごと） ---
+model DefaultInterviewSlot {
+  id              Int      @id @default(autoincrement())
+  dayOfWeek       Int      @map("day_of_week") // 0=日曜, 1=月曜, ..., 6=土曜
+  startTime       String   @map("start_time") @db.VarChar(5) // "09:00" 形式
+  endTime         String   @map("end_time") @db.VarChar(5)   // "17:00" 形式
+  intervalMinutes Int      @default(60) @map("interval_minutes")
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  // 多対多: 職種
+  jobCategories DefaultSlotJobCategory[]
+
+  @@unique([dayOfWeek])
+  @@map("default_interview_slots")
+}
+
+// --- デフォルトスロット × 職種 中間テーブル ---
+model DefaultSlotJobCategory {
+  id                     Int @id @default(autoincrement())
+  defaultInterviewSlotId Int @map("default_interview_slot_id")
+  jobCategoryId          Int @map("job_category_id")
+
+  defaultInterviewSlot DefaultInterviewSlot @relation(fields: [defaultInterviewSlotId], references: [id], onDelete: Cascade)
+  jobCategory          JobCategory          @relation(fields: [jobCategoryId], references: [id], onDelete: Cascade)
+
+  @@unique([defaultInterviewSlotId, jobCategoryId])
+  @@map("default_slot_job_categories")
 }
