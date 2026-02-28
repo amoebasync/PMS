@@ -5,6 +5,8 @@ import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 const templateInclude = {
   customer: { select: { id: true, name: true } },
+  distributor: { select: { id: true, name: true, staffId: true } },
+  taskCategory: { select: { id: true, name: true, code: true, icon: true, colorCls: true } },
   branch: { select: { id: true, nameJa: true } },
   schedule: { select: { id: true, jobNumber: true } },
 };
@@ -64,14 +66,16 @@ export async function PUT(
         data: {
           title: body.title,
           description: body.description ?? null,
-          category: body.category,
+          categoryId: body.categoryId ? Number(body.categoryId) : null,
           priority: body.priority || 'MEDIUM',
           completionRule: body.completionRule || 'SHARED',
           customerId: body.customerId ? Number(body.customerId) : null,
+          distributorId: body.distributorId ? Number(body.distributorId) : null,
           branchId: body.branchId ? Number(body.branchId) : null,
           scheduleId: body.scheduleId ? Number(body.scheduleId) : null,
           recurrenceType: body.recurrenceType || 'ONCE',
           recurrenceValue: body.recurrenceValue ?? null,
+          dueTime: body.dueTime || null,
           targetEmployeeIds: body.targetEmployeeIds ?? null,
           targetDepartmentIds: body.targetDepartmentIds ?? null,
           targetBranchIds: body.targetBranchIds ?? null,

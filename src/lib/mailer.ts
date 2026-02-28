@@ -446,14 +446,31 @@ export const sendApplicantConfirmationEmail = async (
   interviewTime: string,
   meetUrl: string | null,
   jobCategoryName: string,
+  managementToken?: string | null,
 ) => {
   const isEn = language === 'en';
+  const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
+  const manageUrl = managementToken ? `${siteUrl}/apply/manage/${managementToken}` : null;
 
   const meetSection = meetUrl
     ? `<tr>
         <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
         <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
        </tr>`
+    : '';
+
+  const manageSection = manageUrl
+    ? `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#0369a1;">
+          ${isEn ? '📅 Need to change or cancel?' : '📅 面接の変更・キャンセル'}
+        </p>
+        <p style="margin:0 0 12px;font-size:13px;color:#475569;">
+          ${isEn ? 'You can reschedule or cancel your interview using the link below.' : '以下のリンクから面接時間の変更やキャンセルが可能です。'}
+        </p>
+        <a href="${manageUrl}" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:bold;font-size:13px;padding:10px 24px;border-radius:8px;text-decoration:none;">
+          ${isEn ? 'Manage Interview' : '面接の変更・キャンセル'}
+        </a>
+      </div>`
     : '';
 
   const contentHtml = isEn
@@ -487,6 +504,8 @@ export const sendApplicantConfirmationEmail = async (
     ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
       <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Join Google Meet</a>
     </div>` : ''}
+
+    ${manageSection}
 
     <p style="margin:0;color:#64748b;font-size:13px;">
       Please be on time for your interview. If you have any questions, please contact us at info@tiramis.co.jp.
@@ -524,6 +543,8 @@ export const sendApplicantConfirmationEmail = async (
       <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Meetに参加する</a>
     </div>` : ''}
 
+    ${manageSection}
+
     <p style="margin:0;color:#64748b;font-size:13px;">
       面接当日はお時間に余裕を持ってご参加ください。<br>
       ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
@@ -534,9 +555,15 @@ export const sendApplicantConfirmationEmail = async (
     ? '[Tiramis] Interview Appointment Confirmed'
     : '【Tiramis】面接のご予約を承りました';
 
+  const manageText = manageUrl
+    ? (isEn
+      ? `\nTo change or cancel your interview: ${manageUrl}\n`
+      : `\n面接の変更・キャンセル: ${manageUrl}\n`)
+    : '';
+
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nPlease be on time. Contact info@tiramis.co.jp for questions.`
-    : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\n面接当日はお時間に余裕を持ってご参加ください。`;
+    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\n面接当日はお時間に余裕を持ってご参加ください。`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
@@ -683,5 +710,238 @@ export const sendPasswordResetEmail = async (
     subject: '【Tiramis PMS Pro】パスワードリセットのご案内',
     html: htmlWrapper(contentHtml),
     text: `${lastName} ${firstName} さん\n\nパスワードリセットのリクエストを受け付けました。\n\n以下のURLをクリックして新しいパスワードを設定してください（1時間以内・1回限り有効）。\n\n${resetUrl}\n\n心当たりがない場合はこのメールを無視してください。`,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
+// 9. 面接時間変更通知メール（応募者向け ja/en）
+// ─────────────────────────────────────────────────────────
+export const sendInterviewChangeEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  newDate: string,
+  newTime: string,
+  meetUrl: string | null,
+  jobCategoryName: string,
+  managementToken: string,
+) => {
+  const isEn = language === 'en';
+  const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
+  const manageUrl = `${siteUrl}/apply/manage/${managementToken}`;
+
+  const meetSection = meetUrl
+    ? `<tr>
+        <td style="padding:6px 0;color:#64748b;width:160px;">Google Meet URL</td>
+        <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+       </tr>`
+    : '';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Your interview has been rescheduled. Please see the updated details below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">
+          <span style="background:#fef3c7;color:#92400e;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Updated</span>
+          &nbsp;New Interview Details
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Date</td>
+            <td style="padding:6px 0;font-weight:bold;">${newDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Time</td>
+            <td style="padding:6px 0;font-weight:bold;">${newTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Join Google Meet</a>
+    </div>` : ''}
+
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#0369a1;">📅 Need to make further changes?</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#475569;">You can reschedule or cancel your interview using the link below.</p>
+      <a href="${manageUrl}" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:bold;font-size:13px;padding:10px 24px;border-radius:8px;text-decoration:none;">Manage Interview</a>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      Please be on time for your interview. If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      面接日時の変更が完了しました。<br>
+      新しい面接日時は以下の通りです。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fffbeb;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">
+          <span style="background:#fef3c7;color:#92400e;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">変更済み</span>
+          &nbsp;新しい面接情報
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接日</td>
+            <td style="padding:6px 0;font-weight:bold;">${newDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接時間</td>
+            <td style="padding:6px 0;font-weight:bold;">${newTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Meetに参加する</a>
+    </div>` : ''}
+
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
+      <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#0369a1;">📅 面接の変更・キャンセル</p>
+      <p style="margin:0 0 12px;font-size:13px;color:#475569;">さらに変更が必要な場合は、以下のリンクから変更・キャンセルが可能です。</p>
+      <a href="${manageUrl}" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:bold;font-size:13px;padding:10px 24px;border-radius:8px;text-decoration:none;">面接の変更・キャンセル</a>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      面接当日はお時間に余裕を持ってご参加ください。<br>
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Interview Rescheduled'
+    : '【Tiramis】面接日時が変更されました';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nYour interview has been rescheduled.\n\nPosition: ${jobCategoryName}\nNew Date: ${newDate}\nNew Time: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nManage your interview: ${manageUrl}\n\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\n面接日時の変更が完了しました。\n\n応募職種: ${jobCategoryName}\n新しい面接日: ${newDate}\n新しい面接時間: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\n面接の変更・キャンセル: ${manageUrl}\n\n面接当日はお時間に余裕を持ってご参加ください。`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
+// 10. 面接キャンセル確認メール（応募者向け ja/en）
+// ─────────────────────────────────────────────────────────
+export const sendInterviewCancelEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  jobCategoryName: string,
+) => {
+  const isEn = language === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Your interview has been cancelled as requested.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">
+          <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Cancelled</span>
+          &nbsp;Interview Cancellation
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Status</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Cancelled</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      If you'd like to reapply in the future, please visit our application page.
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      面接のキャンセルが完了しました。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">
+          <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">キャンセル済み</span>
+          &nbsp;面接キャンセル
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">ステータス</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">キャンセル済み</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      今後改めてご応募いただける場合は、応募ページよりお手続きをお願いいたします。
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Interview Cancelled'
+    : '【Tiramis】面接キャンセルのお知らせ';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nYour interview for the position of ${jobCategoryName} has been cancelled as requested.\n\nIf you'd like to reapply in the future, please visit our application page.\n\nContact: info@tiramis.co.jp`
+    : `${applicantName} 様\n\n面接のキャンセルが完了しました。\n\n応募職種: ${jobCategoryName}\n\n今後改めてご応募いただける場合は、応募ページよりお手続きをお願いいたします。\nお問い合わせ: info@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
   });
 };

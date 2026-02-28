@@ -93,7 +93,7 @@ export default function Dashboard() {
       </div>
 
       {/* --- ★ アラートエリア (要対応タスク) --- */}
-      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0) && (
+      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0 || data.quality?.unresolvedComplaintCount > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.alerts.orders > 0 && (
             <Link href="/orders" className="bg-orange-50 border border-orange-200 p-4 rounded-xl shadow-sm flex items-center justify-between group hover:bg-orange-100 transition-colors">
@@ -135,6 +135,20 @@ export default function Dashboard() {
                 </div>
               </div>
               <i className="bi bi-chevron-right text-red-400 group-hover:text-red-600"></i>
+            </Link>
+          )}
+          {data.quality?.unresolvedComplaintCount > 0 && (
+            <Link href="/quality/complaints" className="bg-purple-50 border border-purple-200 p-4 rounded-xl shadow-sm flex items-center justify-between group hover:bg-purple-100 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-lg shadow-inner shrink-0">
+                  <i className="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div>
+                  <h4 className="font-bold text-purple-800 text-sm">未対応クレーム</h4>
+                  <p className="text-xs text-purple-600 mt-0.5">未対応のクレームが <span className="font-black text-base">{data.quality.unresolvedComplaintCount}</span> 件あります</p>
+                </div>
+              </div>
+              <i className="bi bi-chevron-right text-purple-400 group-hover:text-purple-600"></i>
             </Link>
           )}
         </div>

@@ -12,6 +12,7 @@ export async function GET() {
         code: true,
         name: true,
         nameEn: true,
+        aliases: true,
       },
     });
 

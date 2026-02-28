@@ -84,7 +84,12 @@ export async function GET() {
       where: { lastLoginAt: { gte: oneHourAgo } } // 直近1時間のログインをアクティブとみなす
     });
 
-    // 5. CRM タスク集計
+    // 5. 未対応クレーム件数
+    const unresolvedComplaintCount = await prisma.complaint.count({
+      where: { status: 'UNRESOLVED' },
+    });
+
+    // 6. CRM タスク集計
     const overdueTaskCount = await prisma.task.count({
       where: {
         status: { in: ['PENDING', 'IN_PROGRESS'] },
@@ -130,6 +135,9 @@ export async function GET() {
         overdueTaskCount,
         dueTodayTaskCount,
         myTasks,
+      },
+      quality: {
+        unresolvedComplaintCount,
       },
     });
   } catch (error) {

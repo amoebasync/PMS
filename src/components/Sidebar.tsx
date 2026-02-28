@@ -98,6 +98,13 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
       ]
     },
     {
+      title: 'QUALITY',
+      items: [
+        { name: 'クレーム管理', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
+        { name: '配布禁止物件', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
+      ]
+    },
+    {
       title: 'ORGANIZATION',
       items: [
         { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },

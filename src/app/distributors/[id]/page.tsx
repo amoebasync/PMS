@@ -90,6 +90,15 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [bankInputText, setBankInputText] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+  // アプリ配信モーダル
+  const [isAppDistOpen, setIsAppDistOpen] = useState(false);
+  const [appDistEmail, setAppDistEmail] = useState('');
+  const [appDistPlatform, setAppDistPlatform] = useState<'APPLE' | 'ANDROID'>('APPLE');
+  const [appDistSending, setAppDistSending] = useState(false);
+  const [appDistHistory, setAppDistHistory] = useState<any[]>([]);
+  const [appDistHistoryLoading, setAppDistHistoryLoading] = useState(false);
+  const [hasAppDistributed, setHasAppDistributed] = useState(false);
+
   const initialForm = {
     staffId: '', name: '', branchId: '', phone: '', email: '',
     language: 'ja',
@@ -120,6 +129,53 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setLoading(false);
   };
 
+  // アプリ配信履歴読み込み
+  const loadDistHistory = async () => {
+    setAppDistHistoryLoading(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/app-distribution`);
+      if (res.ok) {
+        const data = await res.json();
+        setAppDistHistory(data);
+        setHasAppDistributed(data.some((l: any) => l.status === 'SENT'));
+      }
+    } catch { /* ignore */ }
+    setAppDistHistoryLoading(false);
+  };
+
+  const openAppDist = () => {
+    setAppDistEmail(distributor?.email || '');
+    setAppDistPlatform('APPLE');
+    setIsAppDistOpen(true);
+    loadDistHistory();
+  };
+
+  const sendAppDistribution = async () => {
+    if (!appDistEmail) {
+      showToast('メールアドレスを入力してください', 'warning');
+      return;
+    }
+    if (appDistPlatform === 'ANDROID') {
+      showToast('Android配信は準備中です', 'warning');
+      return;
+    }
+    setAppDistSending(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/app-distribution`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ platform: appDistPlatform, email: appDistEmail }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '送信に失敗しました');
+      showToast(data.message || 'TestFlight招待を送信しました', 'success');
+      loadDistHistory();
+    } catch (e: unknown) {
+      showToast(e instanceof Error ? e.message : '送信に失敗しました', 'error');
+    }
+    setAppDistSending(false);
+  };
+
   useEffect(() => {
     Promise.all([
       fetch('/api/branches').then(r => r.json()),
@@ -133,6 +189,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       setBanks(Array.isArray(bk) ? bk : []);
     });
     loadDistributor();
+    loadDistHistory();
   }, [id]);
 
   const japanId = useMemo(() => countries.find((c: any) => c.code === 'JP')?.id?.toString() || '', [countries]);
@@ -322,11 +379,22 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                   <i className="bi bi-key-fill"></i> PW未変更
                 </span>
               )}
+              {hasAppDistributed && (
+                <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-600 text-xs font-bold rounded-full flex items-center gap-1">
+                  <i className="bi bi-phone-fill"></i> アプリ配信済
+                </span>
+              )}
             </div>
             <p className="text-sm text-slate-400 font-mono mt-0.5">{d.staffId}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={openAppDist}
+            className="flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
+          >
+            <i className="bi bi-phone-fill"></i> 配布アプリ配信
+          </button>
           <button
             onClick={() => { setResetPwMsg(null); setIsResetPasswordOpen(true); }}
             className="flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-amber-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
@@ -839,6 +907,126 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-sm transition-colors">
                 削除する
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* アプリ配信モーダル */}
+      {isAppDistOpen && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50" onClick={() => setIsAppDistOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* ヘッダー */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <i className="bi bi-phone-fill text-indigo-500"></i> 配布アプリ配信
+              </h3>
+              <button onClick={() => setIsAppDistOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <div className="px-6 py-5 overflow-y-auto flex-1 space-y-5">
+              {/* プラットフォーム選択 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">プラットフォーム</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setAppDistPlatform('APPLE')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
+                      appDistPlatform === 'APPLE'
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-300'
+                        : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <i className="bi bi-apple"></i> Apple (TestFlight)
+                  </button>
+                  <button
+                    disabled
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                  >
+                    <i className="bi bi-google-play"></i> Android
+                    <span className="text-[10px] bg-slate-200 text-slate-400 px-1.5 py-0.5 rounded-full">準備中</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* メールアドレス入力 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">メールアドレス</label>
+                <input
+                  type="email"
+                  value={appDistEmail}
+                  onChange={e => setAppDistEmail(e.target.value)}
+                  placeholder="tester@example.com"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                />
+                <p className="text-xs text-slate-400 mt-1">TestFlight招待メールがこのアドレスに送信されます</p>
+              </div>
+
+              {/* 送信ボタン */}
+              <button
+                onClick={sendAppDistribution}
+                disabled={appDistSending || !appDistEmail}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {appDistSending ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 送信中...</>
+                ) : (
+                  <><i className="bi bi-send-fill"></i> 招待を送信</>
+                )}
+              </button>
+
+              {/* 配信履歴 */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
+                  <i className="bi bi-clock-history"></i> 配信履歴
+                </h4>
+                {appDistHistoryLoading ? (
+                  <div className="flex justify-center py-4">
+                    <div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : appDistHistory.length === 0 ? (
+                  <p className="text-sm text-slate-400 text-center py-4">配信履歴はありません</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {appDistHistory.map((log: any) => (
+                      <div key={log.id} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg text-sm">
+                        <div className="shrink-0">
+                          {log.status === 'SENT' ? (
+                            <span className="w-6 h-6 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center">
+                              <i className="bi bi-check-lg text-xs"></i>
+                            </span>
+                          ) : log.status === 'FAILED' ? (
+                            <span className="w-6 h-6 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center">
+                              <i className="bi bi-x-lg text-xs"></i>
+                            </span>
+                          ) : (
+                            <span className="w-6 h-6 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center">
+                              <i className="bi bi-hourglass-split text-xs"></i>
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-slate-700 truncate">{log.email}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${
+                              log.platform === 'APPLE' ? 'bg-slate-100 text-slate-600' : 'bg-green-100 text-green-600'
+                            }`}>
+                              {log.platform === 'APPLE' ? 'iOS' : 'Android'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                            <span>{new Date(log.createdAt).toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                            {log.sentBy && <span>by {log.sentBy.lastNameJa}{log.sentBy.firstNameJa}</span>}
+                            {log.errorMessage && <span className="text-rose-400 truncate">{log.errorMessage}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

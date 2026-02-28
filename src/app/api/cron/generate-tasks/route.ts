@@ -57,15 +57,23 @@ export async function GET(request: Request) {
       if (tmpl.completionRule === 'SHARED') {
         // SHARED: 1つのタスクを作成し、複数担当者を紐付け
         await prisma.$transaction(async (tx) => {
+          // dueDate にテンプレートの dueTime を適用
+          const dueDate = new Date(today);
+          if (tmpl.dueTime) {
+            const [h, m] = tmpl.dueTime.split(':').map(Number);
+            dueDate.setHours(h, m, 0, 0);
+          }
+
           const task = await tx.task.create({
             data: {
               title: tmpl.title,
               description: tmpl.description,
-              dueDate: today,
+              dueDate,
               priority: tmpl.priority,
               status: 'PENDING',
-              category: tmpl.category,
+              categoryId: tmpl.categoryId,
               customerId: tmpl.customerId,
+              distributorId: tmpl.distributorId,
               branchId: tmpl.branchId,
               scheduleId: tmpl.scheduleId,
               templateId: tmpl.id,
@@ -108,16 +116,24 @@ export async function GET(request: Request) {
         }
 
         // 各社員ごとにタスク作成
+        // dueDate にテンプレートの dueTime を適用
+        const indDueDate = new Date(today);
+        if (tmpl.dueTime) {
+          const [h, m] = tmpl.dueTime.split(':').map(Number);
+          indDueDate.setHours(h, m, 0, 0);
+        }
+
         for (const empId of targetEmployees) {
           await prisma.task.create({
             data: {
               title: tmpl.title,
               description: tmpl.description,
-              dueDate: today,
+              dueDate: indDueDate,
               priority: tmpl.priority,
               status: 'PENDING',
-              category: tmpl.category,
+              categoryId: tmpl.categoryId,
               customerId: tmpl.customerId,
+              distributorId: tmpl.distributorId,
               branchId: tmpl.branchId,
               scheduleId: tmpl.scheduleId,
               templateId: tmpl.id,

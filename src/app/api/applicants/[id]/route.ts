@@ -26,6 +26,7 @@ export async function GET(
         country: true,
         visaType: true,
         interviewSlot: true,
+        recruitingMedia: true,
       },
     });
 
@@ -93,6 +94,7 @@ export async function PUT(
     if (body.communicationScore !== undefined) updateData.communicationScore = body.communicationScore != null ? Number(body.communicationScore) : null;
     if (body.impressionScore !== undefined) updateData.impressionScore = body.impressionScore != null ? Number(body.impressionScore) : null;
     if (body.interviewNotes !== undefined) updateData.interviewNotes = body.interviewNotes || null;
+    if (body.recruitingMediaId !== undefined) updateData.recruitingMediaId = body.recruitingMediaId ? Number(body.recruitingMediaId) : null;
 
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.applicant.update({
@@ -103,6 +105,7 @@ export async function PUT(
           country: true,
           visaType: true,
           interviewSlot: true,
+          recruitingMedia: true,
         },
       });
 

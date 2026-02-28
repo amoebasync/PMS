@@ -56,6 +56,7 @@ export async function GET(request: Request) {
               isBooked: true,
             },
           },
+          recruitingMedia: { select: { id: true, nameJa: true, nameEn: true, code: true } },
         },
       }),
     ]);

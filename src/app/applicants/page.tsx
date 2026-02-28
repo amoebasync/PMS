@@ -38,6 +38,7 @@ type InterviewSlot = {
 
 type Country = { id: number; code: string; name: string; nameEn: string };
 type VisaType = { id: number; name: string };
+type RecruitingMedia = { id: number; nameJa: string; nameEn: string | null; code: string };
 
 type Applicant = {
   id: number;
@@ -54,6 +55,8 @@ type Applicant = {
   postalCode: string | null;
   address: string | null;
   building: string | null;
+  recruitingMediaId: number | null;
+  recruitingMedia: RecruitingMedia | null;
   interviewSlot: {
     id: number;
     startTime: string;
@@ -98,19 +101,27 @@ const LIMIT = 20;
 const ScoreSelector = ({ value, onChange, label }: { value: number | null; onChange: (v: number) => void; label: string }) => (
   <div>
     <label className="block text-xs font-bold text-slate-500 mb-1.5">{label}</label>
-    <div className="flex gap-1">
+    <div className="flex gap-1 items-end">
+      <span className="text-[10px] text-slate-400 pb-2.5 mr-0.5">低</span>
       {[1, 2, 3, 4, 5].map(n => (
         <button
           key={n}
           type="button"
           onClick={() => onChange(n)}
           className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
-            value === n ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            value === n
+              ? n <= 2
+                ? 'bg-rose-500 text-white shadow-md'
+                : n === 3
+                ? 'bg-amber-500 text-white shadow-md'
+                : 'bg-emerald-500 text-white shadow-md'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
           }`}
         >
           {n}
         </button>
       ))}
+      <span className="text-[10px] text-slate-400 pb-2.5 ml-0.5">高</span>
     </div>
   </div>
 );
@@ -151,6 +162,12 @@ export default function ApplicantsPage() {
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalSaving, setEvalSaving] = useState(false);
 
+  // ── 面接日程変更 ──
+  const [showReschedulePanel, setShowReschedulePanel] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<{id: number; startTime: string; endTime: string}[]>([]);
+  const [selectedNewSlotId, setSelectedNewSlotId] = useState<number | null>(null);
+  const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
   // ── スロット作成フォーム ──
   const [slotForm, setSlotForm] = useState({
     date: '',
@@ -179,6 +196,7 @@ export default function ApplicantsPage() {
     interviewNotes: '',
     flowStatus: 'INTERVIEW_WAITING',
     hiringStatus: 'IN_PROGRESS',
+    recruitingMediaId: '' as string | number,
   });
 
   // ── 職種マスタ ──
@@ -190,6 +208,7 @@ export default function ApplicantsPage() {
   // ── マスターデータ ──
   const [countries, setCountries] = useState<Country[]>([]);
   const [visaTypes, setVisaTypes] = useState<VisaType[]>([]);
+  const [recruitingMediaList, setRecruitingMediaList] = useState<RecruitingMedia[]>([]);
 
   // ──────────────────────────────────────────
   // データ取得
@@ -251,9 +270,10 @@ export default function ApplicantsPage() {
 
   const fetchMasterData = useCallback(async () => {
     try {
-      const [countriesRes, visaTypesRes] = await Promise.all([
+      const [countriesRes, visaTypesRes, rmRes] = await Promise.all([
         fetch('/api/countries/public'),
         fetch('/api/visa-types/public'),
+        fetch('/api/recruiting-media'),
       ]);
       if (countriesRes.ok) {
         const data = await countriesRes.json();
@@ -262,6 +282,10 @@ export default function ApplicantsPage() {
       if (visaTypesRes.ok) {
         const data = await visaTypesRes.json();
         setVisaTypes(data || []);
+      }
+      if (rmRes.ok) {
+        const data = await rmRes.json();
+        setRecruitingMediaList(data || []);
       }
     } catch {
       // silently fail
@@ -423,6 +447,7 @@ export default function ApplicantsPage() {
         interviewNotes: data.interviewNotes || '',
         flowStatus: data.flowStatus,
         hiringStatus: data.hiringStatus,
+        recruitingMediaId: data.recruitingMediaId || '',
       });
     } catch {
       showToast('応募者情報の取得に失敗しました', 'error');
@@ -456,6 +481,7 @@ export default function ApplicantsPage() {
           interviewNotes: evalForm.interviewNotes || null,
           flowStatus: evalForm.flowStatus,
           hiringStatus: evalForm.hiringStatus,
+          recruitingMediaId: evalForm.recruitingMediaId || null,
         }),
       });
       if (!res.ok) {
@@ -471,6 +497,76 @@ export default function ApplicantsPage() {
       showToast(e.message || '保存に失敗しました', 'error');
     } finally {
       setEvalSaving(false);
+    }
+  };
+
+  // 面接キャンセル（管理者）
+  const handleCancelInterview = async () => {
+    if (!selectedApplicant) return;
+    const ok = await showConfirm(
+      `「${selectedApplicant.name}」の面接をキャンセルしますか？\nスロットが解放されます。`,
+      { variant: 'danger', confirmLabel: 'キャンセルする', title: '面接キャンセル' }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-interview`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'キャンセルに失敗しました');
+      }
+      showToast('面接をキャンセルしました', 'success');
+      openEvalModal(selectedApplicant.id);
+      fetchSlots();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '面接キャンセルに失敗しました', 'error');
+    }
+  };
+
+  // 日程変更パネル表示
+  const openReschedulePanel = async () => {
+    if (!selectedApplicant) return;
+    setShowReschedulePanel(true);
+    setSelectedNewSlotId(null);
+    setRescheduleLoading(true);
+    try {
+      const jobCatId = selectedApplicant.jobCategoryId;
+      const url = jobCatId
+        ? `/api/interview-slots/available?jobCategoryId=${jobCatId}`
+        : '/api/interview-slots/available';
+      const res = await fetch(url);
+      const data = await res.json();
+      setAvailableSlots(data.slots || []);
+    } catch {
+      setAvailableSlots([]);
+    } finally {
+      setRescheduleLoading(false);
+    }
+  };
+
+  // 面接日程変更実行
+  const handleReschedule = async () => {
+    if (!selectedApplicant || !selectedNewSlotId) return;
+    setRescheduleLoading(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/reschedule`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newSlotId: selectedNewSlotId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || '日程変更に失敗しました');
+      }
+      showToast('面接日程を変更しました', 'success');
+      setShowReschedulePanel(false);
+      openEvalModal(selectedApplicant.id);
+      fetchSlots();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '面接日程変更に失敗しました', 'error');
+    } finally {
+      setRescheduleLoading(false);
     }
   };
 
@@ -1093,9 +1189,9 @@ export default function ApplicantsPage() {
                                   href={selectedApplicant.interviewSlot.meetUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-4 py-2 inline-flex items-center gap-2 text-xs font-bold transition-colors"
+                                  className="text-blue-500 hover:text-blue-700 inline-flex items-center gap-1 text-xs font-medium hover:underline transition-colors"
                                 >
-                                  <i className="bi bi-camera-video-fill"></i>
+                                  <i className="bi bi-camera-video text-xs"></i>
                                   Meet
                                 </a>
                               )}
@@ -1104,7 +1200,92 @@ export default function ApplicantsPage() {
                             <p className="text-sm text-slate-400">未設定</p>
                           )}
                         </div>
+                        {/* 応募経路 */}
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">応募経路</p>
+                          <select
+                            value={evalForm.recruitingMediaId}
+                            onChange={e => setEvalForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                          >
+                            <option value="">未設定</option>
+                            {recruitingMediaList.map(m => (
+                              <option key={m.id} value={m.id}>{m.nameJa}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
+
+                      {/* 面接操作ボタン */}
+                      {selectedApplicant.interviewSlot && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => openReschedulePanel()}
+                            className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
+                          >
+                            <i className="bi bi-calendar-plus"></i>日程変更
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelInterview}
+                            className="text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-200 transition-colors inline-flex items-center gap-1"
+                          >
+                            <i className="bi bi-x-circle"></i>面接キャンセル
+                          </button>
+                        </div>
+                      )}
+
+                      {/* 日程変更パネル */}
+                      {showReschedulePanel && (
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-xs font-black text-indigo-700">新しい日程を選択</h4>
+                            <button type="button" onClick={() => setShowReschedulePanel(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                              <i className="bi bi-x-lg"></i>
+                            </button>
+                          </div>
+                          {rescheduleLoading ? (
+                            <div className="flex items-center justify-center py-4">
+                              <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          ) : availableSlots.length === 0 ? (
+                            <p className="text-xs text-slate-400 py-2">空きスロットがありません</p>
+                          ) : (
+                            <>
+                              <div className="max-h-48 overflow-y-auto space-y-1">
+                                {availableSlots.map(slot => {
+                                  const d = new Date(slot.startTime);
+                                  const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+                                  const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                  return (
+                                    <button
+                                      key={slot.id}
+                                      type="button"
+                                      onClick={() => setSelectedNewSlotId(slot.id)}
+                                      className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
+                                        selectedNewSlotId === slot.id
+                                          ? 'bg-indigo-100 border-indigo-300 border text-indigo-800 font-bold'
+                                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                      }`}
+                                    >
+                                      <span className="font-bold">{dateStr}</span> {timeStr}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={handleReschedule}
+                                disabled={!selectedNewSlotId || rescheduleLoading}
+                                className="mt-2 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors"
+                              >
+                                {rescheduleLoading ? '変更中...' : 'この日程に変更する'}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 

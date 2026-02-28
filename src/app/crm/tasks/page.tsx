@@ -17,6 +17,8 @@ type TaskAssigneeData = {
   branch: { id: number; nameJa: string } | null;
 };
 
+type TaskCategoryInfo = { id: number; name: string; code: string; icon: string | null; colorCls: string | null };
+
 type Task = {
   id: number;
   title: string;
@@ -24,7 +26,8 @@ type Task = {
   dueDate: string;
   priority: string;
   status: string;
-  category: string | null;
+  categoryId: number | null;
+  taskCategory: TaskCategoryInfo | null;
   customer: Customer | null;
   distributor: Distributor | null;
   assignee: Employee | null;
@@ -39,17 +42,21 @@ type TaskTemplate = {
   id: number;
   title: string;
   description: string | null;
-  category: string;
+  categoryId: number | null;
+  taskCategory: TaskCategoryInfo | null;
   priority: string;
   completionRule: string;
   customerId: number | null;
   customer: Customer | null;
+  distributorId: number | null;
+  distributor: Distributor | null;
   branchId: number | null;
   branch: BranchInfo | null;
   scheduleId: number | null;
   schedule: { id: number; jobNumber: string } | null;
   recurrenceType: string;
   recurrenceValue: string | null;
+  dueTime: string | null;
   targetEmployeeIds: number[] | null;
   targetDepartmentIds: number[] | null;
   targetBranchIds: number[] | null;
@@ -83,12 +90,6 @@ const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
   PENDING:     { label: '未着手', cls: 'bg-slate-100 text-slate-600' },
   IN_PROGRESS: { label: '進行中', cls: 'bg-blue-100 text-blue-700' },
   DONE:        { label: '完了',   cls: 'bg-green-100 text-green-700' },
-};
-
-const CATEGORY_CONFIG: Record<string, { label: string; cls: string; icon: string }> = {
-  SALES: { label: '営業', cls: 'bg-blue-100 text-blue-700 border border-blue-200', icon: 'bi-briefcase-fill' },
-  FIELD: { label: '現場', cls: 'bg-emerald-100 text-emerald-700 border border-emerald-200', icon: 'bi-geo-alt-fill' },
-  ADMIN: { label: 'アドミン', cls: 'bg-slate-200 text-slate-600 border border-slate-300', icon: 'bi-gear-fill' },
 };
 
 const RECURRENCE_LABELS: Record<string, string> = {
@@ -357,6 +358,7 @@ export default function CrmTasksPage() {
   const [deptMap, setDeptMap] = useState<Record<number, string>>({});
   const [branchMap, setBranchMap] = useState<Record<number, string>>({});
   const [branchList, setBranchList] = useState<BranchInfo[]>([]);
+  const [taskCategories, setTaskCategories] = useState<TaskCategoryInfo[]>([]);
 
   // ----- タスク一覧 -----
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -366,7 +368,7 @@ export default function CrmTasksPage() {
   const [filterPriority, setFilterPriority] = useState('');
   const [filterDue, setFilterDue] = useState('');
   const [filterKeyword, setFilterKeyword] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterMyTasks, setFilterMyTasks] = useState(false);
 
   // タスクモーダル
@@ -375,7 +377,7 @@ export default function CrmTasksPage() {
   const [taskForm, setTaskForm] = useState({
     title: '', description: '', dueDate: new Date().toISOString().slice(0, 10),
     dueTime: '' as string, isAllDay: true,
-    priority: 'MEDIUM', status: 'PENDING', category: '' as string,
+    priority: 'MEDIUM', status: 'PENDING', categoryId: '' as string,
     customerId: '' as string, distributorId: '' as string, branchId: '' as string,
   });
   const [taskAssignees, setTaskAssignees] = useState<SelectedAssignee[]>([]);
@@ -391,15 +393,16 @@ export default function CrmTasksPage() {
   const [isTmplModalOpen, setIsTmplModalOpen] = useState(false);
   const [editingTmpl, setEditingTmpl] = useState<TaskTemplate | null>(null);
   const [tmplForm, setTmplForm] = useState({
-    title: '', description: '', category: 'SALES' as string,
+    title: '', description: '', categoryId: '' as string,
     priority: 'MEDIUM', completionRule: 'SHARED',
-    customerId: '' as string, branchId: '' as string,
+    customerId: '' as string, distributorId: '' as string, branchId: '' as string,
     recurrenceType: 'ONCE', weeklyDays: [] as number[],
     monthlyDay: '1', yearlyMonth: '01', yearlyDay: '01',
-    isActive: true,
+    dueTime: '' as string, isActive: true,
   });
   const [tmplAssignees, setTmplAssignees] = useState<SelectedAssignee[]>([]);
   const [tmplCustomerName, setTmplCustomerName] = useState('');
+  const [tmplDistributorName, setTmplDistributorName] = useState('');
   const [isSubmittingTmpl, setIsSubmittingTmpl] = useState(false);
 
   // ===== データフェッチ =====
@@ -423,6 +426,10 @@ export default function CrmTasksPage() {
       });
       setBranchMap(bm);
     });
+    // タスク種類（DB）
+    fetch('/api/task-categories').then(r => r.ok ? r.json() : []).then(data => {
+      if (Array.isArray(data)) setTaskCategories(data.filter((c: any) => c.isActive));
+    });
     // 支店一覧（ドロップダウン用）
     fetch('/api/branches').then(r => r.ok ? r.json() : []).then(data => {
       if (Array.isArray(data)) {
@@ -444,7 +451,7 @@ export default function CrmTasksPage() {
     if (filterStatus) p.set('status', filterStatus);
     if (filterAssignee) p.set('assigneeId', filterAssignee);
     if (filterDue) p.set('dueDate', filterDue);
-    if (filterCategory) p.set('category', filterCategory);
+    if (filterCategoryId) p.set('category', filterCategoryId);
     if (filterMyTasks) p.set('myTasks', 'true');
     const res = await fetch(`/api/tasks?${p.toString()}`);
     if (res.ok) {
@@ -453,7 +460,7 @@ export default function CrmTasksPage() {
       setTasks(data);
     }
     setIsLoadingTasks(false);
-  }, [filterStatus, filterAssignee, filterPriority, filterDue, filterCategory, filterMyTasks]);
+  }, [filterStatus, filterAssignee, filterPriority, filterDue, filterCategoryId, filterMyTasks]);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
@@ -470,12 +477,19 @@ export default function CrmTasksPage() {
   }, [activeTab, fetchTemplates]);
 
   // ===== タスク操作 =====
+  // Helper: get category code from ID
+  const getCategoryCode = (catId: string | number | null): string => {
+    if (!catId) return '';
+    const cat = taskCategories.find(c => c.id === Number(catId));
+    return cat?.code || '';
+  };
+
   const openTaskCreate = () => {
     setEditingTask(null);
     setTaskForm({
       title: '', description: '', dueDate: new Date().toISOString().slice(0, 10),
       dueTime: '', isAllDay: true,
-      priority: 'MEDIUM', status: 'PENDING', category: '',
+      priority: 'MEDIUM', status: 'PENDING', categoryId: '',
       customerId: '', distributorId: '', branchId: '',
     });
     setTaskAssignees([]);
@@ -500,7 +514,7 @@ export default function CrmTasksPage() {
       isAllDay: !hasTime,
       priority: task.priority,
       status: task.status,
-      category: task.category || '',
+      categoryId: task.categoryId?.toString() || '',
       customerId: task.customer?.id.toString() || '',
       distributorId: task.distributor?.id.toString() || '',
       branchId: task.branch?.id.toString() || '',
@@ -533,7 +547,7 @@ export default function CrmTasksPage() {
     const body: any = {
       ...taskForm,
       dueDate: dueDateValue,
-      category: taskForm.category || null,
+      category: taskForm.categoryId || null,
       customerId: taskForm.customerId || null,
       distributorId: taskForm.distributorId || null,
       branchId: taskForm.branchId || null,
@@ -543,6 +557,7 @@ export default function CrmTasksPage() {
     // 不要なフィールドを除外
     delete body.dueTime;
     delete body.isAllDay;
+    delete body.categoryId;
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     if (res.ok) {
       setIsTaskModalOpen(false);
@@ -590,13 +605,15 @@ export default function CrmTasksPage() {
   const openTmplCreate = () => {
     setEditingTmpl(null);
     setTmplForm({
-      title: '', description: '', category: 'SALES', priority: 'MEDIUM',
-      completionRule: 'SHARED', customerId: '', branchId: '',
+      title: '', description: '', categoryId: taskCategories.length > 0 ? taskCategories[0].id.toString() : '',
+      priority: 'MEDIUM',
+      completionRule: 'SHARED', customerId: '', distributorId: '', branchId: '',
       recurrenceType: 'ONCE', weeklyDays: [], monthlyDay: '1',
-      yearlyMonth: '01', yearlyDay: '01', isActive: true,
+      yearlyMonth: '01', yearlyDay: '01', dueTime: '', isActive: true,
     });
     setTmplAssignees([]);
     setTmplCustomerName('');
+    setTmplDistributorName('');
     setIsTmplModalOpen(true);
   };
 
@@ -618,17 +635,20 @@ export default function CrmTasksPage() {
     setTmplForm({
       title: tmpl.title,
       description: tmpl.description || '',
-      category: tmpl.category,
+      categoryId: tmpl.categoryId?.toString() || '',
       priority: tmpl.priority,
       completionRule: tmpl.completionRule,
       customerId: tmpl.customerId?.toString() || '',
+      distributorId: tmpl.distributorId?.toString() || '',
       branchId: tmpl.branchId?.toString() || '',
       recurrenceType: tmpl.recurrenceType,
       weeklyDays, monthlyDay, yearlyMonth, yearlyDay,
+      dueTime: tmpl.dueTime || '',
       isActive: tmpl.isActive,
     });
     setTmplAssignees(resolveAssignees(tmpl));
     setTmplCustomerName(tmpl.customer?.name || '');
+    setTmplDistributorName(tmpl.distributor ? `${tmpl.distributor.name} (${tmpl.distributor.staffId})` : '');
     setIsTmplModalOpen(true);
   };
 
@@ -650,16 +670,19 @@ export default function CrmTasksPage() {
     setIsSubmittingTmpl(true);
     const method = editingTmpl ? 'PUT' : 'POST';
     const url = editingTmpl ? `/api/task-templates/${editingTmpl.id}` : '/api/task-templates';
+    const catCode = getCategoryCode(tmplForm.categoryId);
     const body: any = {
       title: tmplForm.title,
       description: tmplForm.description || null,
-      category: tmplForm.category,
+      categoryId: tmplForm.categoryId || null,
       priority: tmplForm.priority,
       completionRule: tmplForm.completionRule,
-      customerId: tmplForm.category === 'SALES' ? (tmplForm.customerId || null) : null,
-      branchId: tmplForm.category === 'FIELD' ? (tmplForm.branchId || null) : null,
+      customerId: catCode === 'SALES' ? (tmplForm.customerId || null) : null,
+      distributorId: catCode === 'FIELD' ? (tmplForm.distributorId || null) : null,
+      branchId: tmplForm.branchId || null,
       recurrenceType: tmplForm.recurrenceType,
       recurrenceValue: buildRecurrenceValue(),
+      dueTime: tmplForm.dueTime || null,
       targetEmployeeIds: tmplAssignees.filter(a => a.type === 'employee').map(a => a.id),
       targetDepartmentIds: tmplAssignees.filter(a => a.type === 'department').map(a => a.id),
       targetBranchIds: tmplAssignees.filter(a => a.type === 'branch').map(a => a.id),
@@ -729,7 +752,7 @@ export default function CrmTasksPage() {
       )
     : tasks;
 
-  const hasFilter = filterStatus || filterPriority || filterAssignee || filterDue || filterKeyword || filterCategory || filterMyTasks;
+  const hasFilter = filterStatus || filterPriority || filterAssignee || filterDue || filterKeyword || filterCategoryId || filterMyTasks;
 
   const renderAssignees = (task: Task) => {
     if (task.assignees && task.assignees.length > 0) {
@@ -837,12 +860,12 @@ export default function CrmTasksPage() {
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-500 mb-1">カテゴリ</label>
-              <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
+              <select value={filterCategoryId} onChange={e => setFilterCategoryId(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[110px] bg-white cursor-pointer">
                 <option value="">すべて</option>
-                <option value="SALES">営業</option>
-                <option value="FIELD">現場</option>
-                <option value="ADMIN">アドミン</option>
+                {taskCategories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -896,7 +919,7 @@ export default function CrmTasksPage() {
             </button>
             {hasFilter && (
               <button
-                onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterDue(''); setFilterKeyword(''); setFilterCategory(''); setFilterMyTasks(false); }}
+                onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterDue(''); setFilterKeyword(''); setFilterCategoryId(''); setFilterMyTasks(false); }}
                 className="text-slate-500 hover:text-slate-700 text-sm flex items-center gap-1 pb-0.5">
                 <i className="bi bi-x-circle"></i> リセット
               </button>
@@ -933,7 +956,7 @@ export default function CrmTasksPage() {
                     {displayTasks.map(task => {
                       const pcfg = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
                       const scfg = STATUS_CONFIG[task.status] || STATUS_CONFIG.PENDING;
-                      const ccfg = task.category ? CATEGORY_CONFIG[task.category] : null;
+                      const tc = task.taskCategory;
                       const dueDate = new Date(task.dueDate); dueDate.setHours(0, 0, 0, 0);
                       const isOverdue = task.status !== 'DONE' && dueDate < today;
                       const isDueToday = task.status !== 'DONE' && dueDate.getTime() === today.getTime();
@@ -954,9 +977,9 @@ export default function CrmTasksPage() {
                             {task.description && <p className="text-xs text-slate-400 truncate mt-0.5">{task.description}</p>}
                           </td>
                           <td className="px-4 py-3">
-                            {ccfg ? (
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ccfg.cls}`}>
-                                <i className={`${ccfg.icon} mr-0.5`}></i>{ccfg.label}
+                            {tc ? (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tc.colorCls || 'bg-slate-100 text-slate-600'}`}>
+                                {tc.icon && <i className={`bi ${tc.icon} mr-0.5`}></i>}{tc.name}
                               </span>
                             ) : (
                               <span className="text-slate-300 text-xs">—</span>
@@ -1069,7 +1092,7 @@ export default function CrmTasksPage() {
                 </thead>
                 <tbody>
                   {templates.map(tmpl => {
-                    const ccfg = CATEGORY_CONFIG[tmpl.category];
+                    const tc = tmpl.taskCategory;
                     const pcfg = PRIORITY_CONFIG[tmpl.priority] || PRIORITY_CONFIG.MEDIUM;
                     const cnt = countAssignees(tmpl);
                     return (
@@ -1079,9 +1102,9 @@ export default function CrmTasksPage() {
                           {tmpl.description && <p className="text-xs text-slate-400 truncate mt-0.5 max-w-[200px]">{tmpl.description}</p>}
                         </td>
                         <td className="px-4 py-3">
-                          {ccfg && (
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ccfg.cls}`}>
-                              <i className={`${ccfg.icon} mr-0.5`}></i>{ccfg.label}
+                          {tc && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tc.colorCls || 'bg-slate-100 text-slate-600'}`}>
+                              {tc.icon && <i className={`bi ${tc.icon} mr-0.5`}></i>}{tc.name}
                             </span>
                           )}
                         </td>
@@ -1155,14 +1178,24 @@ export default function CrmTasksPage() {
               {/* カテゴリ */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">タスク種類</label>
-                <div className="flex gap-2">
-                  {[{ value: '', label: '指定なし' }, { value: 'SALES', label: '営業' }, { value: 'FIELD', label: '現場' }, { value: 'ADMIN', label: 'アドミン' }].map(opt => (
-                    <button key={opt.value} type="button"
-                      onClick={() => setTaskForm(f => ({ ...f, category: opt.value, customerId: '', distributorId: '', branchId: '' }))}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                        taskForm.category === opt.value ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                <div className="flex flex-wrap gap-2">
+                  <button type="button"
+                    onClick={() => setTaskForm(f => ({ ...f, categoryId: '', customerId: '', distributorId: '', branchId: '' }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                      !taskForm.categoryId ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                    }`}>
+                    指定なし
+                  </button>
+                  {taskCategories.map(cat => (
+                    <button key={cat.id} type="button"
+                      onClick={() => setTaskForm(f => ({ ...f, categoryId: cat.id.toString(), customerId: '', distributorId: '', branchId: '' }))}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                        taskForm.categoryId === cat.id.toString()
+                          ? (cat.colorCls || 'bg-indigo-600 text-white') + ' border-current ring-2 ring-indigo-300'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
                       }`}>
-                      {opt.label}
+                      {cat.icon && <i className={`bi ${cat.icon}`}></i>}
+                      {cat.name}
                     </button>
                   ))}
                 </div>
@@ -1204,54 +1237,58 @@ export default function CrmTasksPage() {
                 </select>
               </div>
               {/* 関連先（カテゴリに応じて変化）*/}
-              <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-3">
-                <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                  <i className="bi bi-link-45deg"></i> 関連先
-                </p>
-                {taskForm.category === 'SALES' && (
-                  <AutocompleteInput
-                    value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
-                    fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
-                    onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id })); setFormCustomerName(name); }}
-                    onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
-                    displayText={formCustomerName}
-                  />
-                )}
-                {taskForm.category === 'FIELD' && (
-                  <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">支店</label>
-                    <select value={taskForm.branchId} onChange={e => setTaskForm(f => ({ ...f, branchId: e.target.value }))}
-                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                      <option value="">選択なし</option>
-                      {branchList.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
-                    </select>
+              {(() => {
+                const catCode = getCategoryCode(taskForm.categoryId);
+                return (
+                  <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-3">
+                    <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                      <i className="bi bi-link-45deg"></i> 関連先
+                    </p>
+                    {catCode === 'SALES' && (
+                      <AutocompleteInput
+                        value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                        fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
+                        onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id })); setFormCustomerName(name); }}
+                        onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
+                        displayText={formCustomerName}
+                      />
+                    )}
+                    {catCode === 'FIELD' && (
+                      <AutocompleteInput
+                        value={taskForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                        fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
+                        onSelect={(id, name) => { setTaskForm(f => ({ ...f, distributorId: id })); setFormDistributorName(name); }}
+                        onClear={() => { setTaskForm(f => ({ ...f, distributorId: '' })); setFormDistributorName(''); }}
+                        displayText={formDistributorName}
+                      />
+                    )}
+                    {!catCode && (
+                      <>
+                        <AutocompleteInput
+                          value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                          fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
+                          onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id, distributorId: '' })); setFormCustomerName(name); setFormDistributorName(''); }}
+                          onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
+                          displayText={formCustomerName}
+                        />
+                        <div className="flex items-center gap-2 text-xs text-slate-400">
+                          <div className="flex-1 border-t border-slate-200"></div><span>または</span><div className="flex-1 border-t border-slate-200"></div>
+                        </div>
+                        <AutocompleteInput
+                          value={taskForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                          fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
+                          onSelect={(id, name) => { setTaskForm(f => ({ ...f, distributorId: id, customerId: '' })); setFormDistributorName(name); setFormCustomerName(''); }}
+                          onClear={() => { setTaskForm(f => ({ ...f, distributorId: '' })); setFormDistributorName(''); }}
+                          displayText={formDistributorName}
+                        />
+                      </>
+                    )}
+                    {catCode === 'ADMIN' && (
+                      <p className="text-xs text-slate-400 italic">アドミンタスクには関連先がありません</p>
+                    )}
                   </div>
-                )}
-                {(!taskForm.category || taskForm.category === '') && (
-                  <>
-                    <AutocompleteInput
-                      value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
-                      fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
-                      onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id, distributorId: '' })); setFormCustomerName(name); setFormDistributorName(''); }}
-                      onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
-                      displayText={formCustomerName}
-                    />
-                    <div className="flex items-center gap-2 text-xs text-slate-400">
-                      <div className="flex-1 border-t border-slate-200"></div><span>または</span><div className="flex-1 border-t border-slate-200"></div>
-                    </div>
-                    <AutocompleteInput
-                      value={taskForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
-                      fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
-                      onSelect={(id, name) => { setTaskForm(f => ({ ...f, distributorId: id, customerId: '' })); setFormDistributorName(name); setFormCustomerName(''); }}
-                      onClear={() => { setTaskForm(f => ({ ...f, distributorId: '' })); setFormDistributorName(''); }}
-                      displayText={formDistributorName}
-                    />
-                  </>
-                )}
-                {taskForm.category === 'ADMIN' && (
-                  <p className="text-xs text-slate-400 italic">アドミンタスクには関連先がありません</p>
-                )}
-              </div>
+                );
+              })()}
               {/* 担当者マルチセレクト */}
               <AssigneeMultiSelect selected={taskAssignees} onChange={setTaskAssignees} />
               {/* ボタン */}
@@ -1280,6 +1317,24 @@ export default function CrmTasksPage() {
               </button>
             </div>
             <form onSubmit={handleTmplSubmit} className="p-6 space-y-4">
+              {/* タスク種類 — 一番上にボタン表示 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">タスク種類 <span className="text-red-500">*</span></label>
+                <div className="flex flex-wrap gap-2">
+                  {taskCategories.map(cat => (
+                    <button key={cat.id} type="button"
+                      onClick={() => setTmplForm(f => ({ ...f, categoryId: cat.id.toString(), customerId: '', distributorId: '', branchId: '' }))}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                        tmplForm.categoryId === cat.id.toString()
+                          ? (cat.colorCls || 'bg-indigo-100 text-indigo-700') + ' border-current shadow-sm'
+                          : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                      }`}>
+                      {cat.icon && <i className={`bi ${cat.icon}`}></i>}
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
               {/* タイトル */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">タイトル <span className="text-red-500">*</span></label>
@@ -1292,43 +1347,40 @@ export default function CrmTasksPage() {
                 <textarea value={tmplForm.description} onChange={e => setTmplForm(f => ({ ...f, description: e.target.value }))}
                   rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
-              {/* カテゴリ + 優先度 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">タスク種類 <span className="text-red-500">*</span></label>
-                  <select value={tmplForm.category} onChange={e => setTmplForm(f => ({ ...f, category: e.target.value, customerId: '', branchId: '' }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="SALES">営業</option><option value="FIELD">現場</option><option value="ADMIN">アドミン</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">優先度</label>
-                  <select value={tmplForm.priority} onChange={e => setTmplForm(f => ({ ...f, priority: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="HIGH">高</option><option value="MEDIUM">中</option><option value="LOW">低</option>
-                  </select>
-                </div>
+              {/* 優先度 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">優先度</label>
+                <select value={tmplForm.priority} onChange={e => setTmplForm(f => ({ ...f, priority: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                  <option value="HIGH">高</option><option value="MEDIUM">中</option><option value="LOW">低</option>
+                </select>
               </div>
               {/* 関連先（カテゴリ依存） */}
-              {tmplForm.category === 'SALES' && (
-                <AutocompleteInput
-                  value={tmplForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
-                  fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
-                  onSelect={(id, name) => { setTmplForm(f => ({ ...f, customerId: id })); setTmplCustomerName(name); }}
-                  onClear={() => { setTmplForm(f => ({ ...f, customerId: '' })); setTmplCustomerName(''); }}
-                  displayText={tmplCustomerName}
-                />
-              )}
-              {tmplForm.category === 'FIELD' && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">支店</label>
-                  <select value={tmplForm.branchId} onChange={e => setTmplForm(f => ({ ...f, branchId: e.target.value }))}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="">選択なし</option>
-                    {branchList.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
-                  </select>
-                </div>
-              )}
+              {(() => {
+                const catCode = getCategoryCode(tmplForm.categoryId);
+                return (
+                  <>
+                    {catCode === 'SALES' && (
+                      <AutocompleteInput
+                        value={tmplForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                        fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
+                        onSelect={(id, name) => { setTmplForm(f => ({ ...f, customerId: id })); setTmplCustomerName(name); }}
+                        onClear={() => { setTmplForm(f => ({ ...f, customerId: '' })); setTmplCustomerName(''); }}
+                        displayText={tmplCustomerName}
+                      />
+                    )}
+                    {catCode === 'FIELD' && (
+                      <AutocompleteInput
+                        value={tmplForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                        fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
+                        onSelect={(id, name) => { setTmplForm(f => ({ ...f, distributorId: id })); setTmplDistributorName(name); }}
+                        onClear={() => { setTmplForm(f => ({ ...f, distributorId: '' })); setTmplDistributorName(''); }}
+                        displayText={tmplDistributorName}
+                      />
+                    )}
+                  </>
+                );
+              })()}
 
               {/* サイクル設定 */}
               <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-3">
@@ -1407,6 +1459,25 @@ export default function CrmTasksPage() {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* 期限時刻設定 */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  <i className="bi bi-clock mr-1"></i>期限時刻
+                </label>
+                <div className="flex items-center gap-3">
+                  <input type="time" value={tmplForm.dueTime}
+                    onChange={e => setTmplForm(f => ({ ...f, dueTime: e.target.value }))}
+                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  {tmplForm.dueTime && (
+                    <button type="button" onClick={() => setTmplForm(f => ({ ...f, dueTime: '' }))}
+                      className="text-xs text-slate-400 hover:text-slate-600">
+                      <i className="bi bi-x-circle mr-0.5"></i>クリア
+                    </button>
+                  )}
+                  <span className="text-xs text-slate-400">※未設定の場合は終日タスクとして生成</span>
+                </div>
               </div>
 
               {/* 担当者マルチセレクト */}

@@ -99,13 +99,128 @@ npm start
 
 ### 公開API（認証不要）
 - `GET /api/interview-slots/available` — 空きスロット一覧
-- `POST /api/apply` — 応募送信（トランザクション処理）
+- `POST /api/apply` — 応募送信（トランザクション処理、recruitingMediaId対応）
 - `GET /api/job-categories/public`, `GET /api/countries/public`, `GET /api/visa-types/public` — マスタ参照
+- `GET /api/recruiting-media/public?code=xxx` — 求人媒体コード→ID解決
 
 ### 管理者API（pms_session必須）
 - `GET/POST /api/interview-slots` — スロット一覧・一括作成
 - `DELETE /api/interview-slots/[id]` — スロット削除
 - `GET /api/applicants`, `GET/PUT /api/applicants/[id]` — 応募者一覧・詳細・更新
+- `POST /api/applicants/[id]/cancel-interview` — 面接キャンセル（スロット解放）
+- `POST /api/applicants/[id]/reschedule` — 面接日程変更
+- `GET/POST/PUT/DELETE /api/recruiting-media` — 求人媒体マスタCRUD
+
+## 求人媒体トラッキング機能（2026-02-28 追加）
+
+### 概要
+応募フォーム（`/apply`）のURLパラメータ `?source=xxx` で求人媒体を自動追跡する。
+管理者は `/settings` で求人媒体マスタを管理し、`/applicants` の評価モーダルで応募経路を確認・変更できる。
+
+### データモデル
+- `recruiting_media` テーブル: `id`, `nameJa`, `nameEn`, `code`（URLパラメータ値、unique）, `isActive`, `sortOrder`
+- `applicants.recruiting_media_id`: nullable FK で求人媒体を紐付け
+
+### 使い方
+1. `/settings` → 求人媒体タブで媒体を登録（例: code=`indeed`, nameJa=`Indeed`）
+2. 応募フォームのURLに `?source=indeed` を付与して求人広告に掲載
+3. 応募者がそのURLからアクセスすると、自動的に `recruitingMediaId` が保存される
+4. `/applicants` の評価モーダルで「応募経路」ドロップダウンから確認・変更可能
+
+### API
+- `GET/POST/PUT/DELETE /api/recruiting-media` — 管理者CRUD（pms_session必須）
+- `GET /api/recruiting-media/public?code=xxx` — 公開API（code→ID解決）
+
+### 注意事項
+- 応募フォームのUIには媒体選択欄は表示しない（URLパラメータのみで裏側追跡）
+- `src/middleware.ts` に `/api/recruiting-media/public` を公開パスとして追加済み
+- `code` は自動的に小文字に正規化される
+
+## 国名エイリアス機能（2026-02-28 追加）
+
+### 概要
+国マスタに別名（aliases）フィールドを追加し、応募フォームの国検索で日本語・英語・通称すべてでマッチするようにした。
+
+### データモデル
+- `countries.aliases`: TEXT型、カンマ区切りで複数の別名を格納
+  - 例: 韓国 → `"韓国,大韓民国,Republic of Korea,South Korea"`
+
+### 初期データ投入
+```bash
+npx tsx scripts/seed-country-aliases.ts
+```
+34カ国の別名を一括登録する。既にエイリアスが設定済みの国はスキップ。
+
+### 管理
+- `/settings` → 国籍タブの作成/編集モーダルに「別名（エイリアス）」テキスト入力欄
+- プレースホルダー: `韓国,大韓民国,Korea (カンマ区切り)`
+
+### 検索ロジック（`/apply` の国選択）
+SearchableSelect の `filterFn` で以下の順にマッチ:
+1. `country.name`（日本語名）
+2. `country.nameEn`（英語名）
+3. `country.aliases`（別名、カンマ区切りを分割して各要素と照合）
+
+## 管理者面接キャンセル・日程変更機能（2026-02-28 追加）
+
+### 概要
+管理者が `/applicants` の評価モーダルから応募者の面接をキャンセルまたは日程変更できる。
+
+### API
+- `POST /api/applicants/[id]/cancel-interview` — 面接キャンセル（スロット解放、ステータスは変更しない）
+- `POST /api/applicants/[id]/reschedule` body: `{ newSlotId }` — 面接日程変更（旧スロット解放+新スロット予約+Google Meet自動生成）
+
+### UI（`/applicants` 評価モーダル）
+- 面接情報の横に「日程変更」「面接キャンセル」ボタン
+- 日程変更: パネルが開き、空きスロット一覧から新しい日程を選択
+- キャンセル: 確認ダイアログ後に実行
+- 評価スケール（ScoreSelector）: 低/高ラベル付き、1-2=赤、3=黄、4-5=緑のカラーコーディング
+
+## クレーム管理・配布禁止物件DB（2026-02-28 実装済み）
+
+設計書: ~/Downloads/PMS_設計書/PMS_クレーム管理・配布禁止物件_設計書.docx
+
+### 概要
+- クレーム発生時に物件を配布禁止として登録し、今後の配布で誤配を防止
+- 既存CSVデータ（約2万件）のインポート対応
+- クレームから禁止物件への自動登録フロー
+- 物件写真のS3アップロード
+- ポリラインからGeoJSONへの変換（地図表示用）
+
+### DB
+- Enum: `ComplaintStatus`（UNRESOLVED / IN_PROGRESS / RESOLVED）
+- テーブル: `prohibited_reasons`（禁止理由マスタ）、`complaint_types`（クレーム種別マスタ）
+- テーブル: `prohibited_properties`（配布禁止物件）、`complaints`（クレーム）、`complaint_responses`（対応履歴）
+
+### 公開パス
+なし（全API管理者認証必須）
+
+### 管理者API（pms_session必須）
+- `GET/POST/PUT/DELETE /api/prohibited-reasons` — 禁止理由マスタ CRUD
+- `GET/POST/PUT/DELETE /api/complaint-types` — クレーム種別マスタ CRUD
+- `GET/POST/PUT/DELETE /api/prohibited-properties` — 禁止物件 CRUD（DELETEは論理削除）
+- `GET/PUT /api/prohibited-properties/[id]` — 禁止物件 詳細・更新
+- `POST/DELETE /api/prohibited-properties/[id]/images` — 画像アップロード（S3）
+- `POST /api/prohibited-properties/import` — CSVインポート（polylineデコード含む）
+- `GET /api/prohibited-properties/map` — 地図用データ取得
+- `GET/POST /api/complaints` — クレーム一覧・作成
+- `GET/PUT /api/complaints/[id]` — クレーム詳細・更新
+- `GET/POST /api/complaints/[id]/responses` — 対応履歴
+- `POST /api/complaints/[id]/register-prohibited` — クレーム→禁止物件登録
+- `POST/DELETE /api/complaints/[id]/images` — クレーム画像
+
+### フロントエンド
+- `/quality/complaints` — クレーム管理（一覧 + 詳細モーダル + 対応履歴 + 禁止物件登録）
+- `/quality/prohibited-properties` — 配布禁止物件（一覧 + 地図 + CSVインポート）
+- `/settings` — 禁止理由タブ + クレーム種別タブ
+- サイドバー: QUALITYグループ（クレーム管理、配布禁止物件）
+- ダッシュボード: 未対応クレームアラートカード
+
+### CSVインポート
+- `@mapbox/polyline` でサーバーサイドポリラインデコード
+- CLIENT_CD空欄 = 全顧客対象の完全禁止（customerId: null）
+- ADDRESS_CDからArea/Prefecture/City を自動解決
+- 画像はS3の `uploads/prohibited-properties/{id}/` に保存
 
 ## 設計書について
 

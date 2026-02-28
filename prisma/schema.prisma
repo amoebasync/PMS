@@ -13,6 +13,7 @@ model Prefecture {
   name      String @unique
   name_kana String
   areas     Area[] // リレーション
+  prohibitedProperties ProhibitedProperty[]
 
   @@map("prefectures") // 実際のテーブル名が複数形なら合わせる
 }
@@ -25,6 +26,7 @@ model City {
   name_kana             String
   areas                 Area[] // リレーション
   distributionSchedules DistributionSchedule[]
+  prohibitedProperties  ProhibitedProperty[]
 
   @@map("cities")
 }
@@ -62,6 +64,7 @@ model Area {
   areaRank              AreaRank?              @relation(fields: [area_rank_id], references: [id])
   distributionSchedules DistributionSchedule[]
   orderDistributions OrderDistributionArea[]
+  prohibitedProperties ProhibitedProperty[]
 
   @@map("areas")
 }
@@ -179,6 +182,13 @@ model Employee {
   announcements  Announcement[]
 
   passwordResetTokens PasswordResetToken[]
+
+  // クレーム管理
+  assignedComplaints   Complaint[]         @relation("ComplaintAssignee")
+  complaintResponses   ComplaintResponse[] @relation("ComplaintResponder")
+
+  // アプリ配信
+  appDistributionsSent AppDistributionLog[] @relation("AppDistributionSender")
 
   @@map("employees")
 }
@@ -306,6 +316,7 @@ model Country {
   code      String   @unique @db.Char(2) // 'JP', 'US' など
   name      String   @db.VarChar(50) // '日本'
   nameEn    String?  @map("name_en") @db.VarChar(50) // 'Japan'
+  aliases   String?  @db.Text // カンマ区切り別名: "韓国,大韓民国,Korea,South Korea"
   sortOrder Int      @default(100) @map("sort_order") // 表示順（小さいほど上位）
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -475,6 +486,8 @@ model Customer {
   campaign       Campaign? @relation(fields: [campaignId], references: [id])
   leads      Lead[]    @relation("LeadConversion")
   billingStatements BillingStatement[]
+  complaints           Complaint[]
+  prohibitedProperties ProhibitedProperty[]
 
   @@map("customers")
 }
@@ -630,6 +643,9 @@ model FlyerDistributor {
   expenses       DistributorExpense[]
   payrollRecords DistributorPayrollRecord[]
   tasks          Task[]
+  taskTemplates  TaskTemplate[]
+  complaints            Complaint[]
+  appDistributionLogs   AppDistributionLog[]
 
   @@map("flyer_distributors")
 }
@@ -713,6 +729,7 @@ model Branch {
   tasksByBranch  Task[]     @relation("TaskBranch")
   taskAssignees  TaskAssignee[] @relation("TaskAssigneeBranch")
   taskTemplates  TaskTemplate[] @relation("TaskTemplateBranch")
+  complaints     Complaint[]
 
   @@map("branches")
 }
@@ -756,6 +773,7 @@ model DistributionSchedule {
   items          DistributionItem[]
   tasks          Task[]
   taskTemplates  TaskTemplate[]
+  complaints     Complaint[]
 
   @@map("distribution_schedules")
 }
@@ -985,6 +1003,7 @@ model Partner {
   printings         OrderPrinting[]
   newspaperInserts  OrderNewspaperInsert[]
   designs           OrderDesign[]
+  complaints        Complaint[]
 
   @@map("partners")
 }
@@ -1595,11 +1614,22 @@ model CustomerActivity {
   @@map("customer_activities")
 }
 
-// --- タスク関連 Enum ---
-enum TaskCategory {
-  SALES // 営業
-  FIELD // 現場
-  ADMIN // アドミン
+// --- タスク種類マスタ ---
+model TaskCategoryMaster {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(50)   // 表示名（例: 営業, 現場, アドミン）
+  code      String   @unique @db.VarChar(20) // コード（例: SALES, FIELD, ADMIN）
+  icon      String?  @db.VarChar(50)   // Bootstrap icon class
+  colorCls  String?  @map("color_cls") @db.VarChar(100) // Tailwind CSS classes
+  sortOrder Int      @default(100) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tasks         Task[]
+  taskTemplates TaskTemplate[]
+
+  @@map("task_category_masters")
 }
 
 enum RecurrenceType {
@@ -1634,7 +1664,8 @@ model Task {
   updatedAt      DateTime          @updatedAt @map("updated_at")
 
   // --- 追加フィールド ---
-  category       TaskCategory?     @map("category")
+  categoryId     Int?              @map("category_id")
+  taskCategory   TaskCategoryMaster? @relation(fields: [categoryId], references: [id])
   branchId       Int?              @map("branch_id")
   branch         Branch?           @relation("TaskBranch", fields: [branchId], references: [id])
   scheduleId     Int?              @map("schedule_id")
@@ -1642,11 +1673,16 @@ model Task {
   templateId     Int?              @map("template_id")
   template       TaskTemplate?     @relation(fields: [templateId], references: [id])
 
+  // クレーム紐付け
+  complaintId    Int?              @map("complaint_id")
+  complaint      Complaint?        @relation(fields: [complaintId], references: [id])
+
   // 複数担当者
   assignees      TaskAssignee[]
 
-  @@index([category])
+  @@index([categoryId])
   @@index([templateId])
+  @@index([complaintId])
   @@map("tasks")
 }
 
@@ -1671,13 +1707,16 @@ model TaskTemplate {
   id               Int                @id @default(autoincrement())
   title            String             @db.VarChar(200)
   description      String?            @db.Text
-  category         TaskCategory
+  categoryId       Int?               @map("category_id")
+  taskCategory     TaskCategoryMaster? @relation(fields: [categoryId], references: [id])
   priority         String             @default("MEDIUM") @db.VarChar(10)
   completionRule   TaskCompletionRule @default(SHARED) @map("completion_rule")
 
   // 紐付け（カテゴリに応じて使い分け）
   customerId       Int?               @map("customer_id")
   customer         Customer?          @relation(fields: [customerId], references: [id])
+  distributorId    Int?               @map("distributor_id")
+  distributor      FlyerDistributor?  @relation(fields: [distributorId], references: [id])
   branchId         Int?               @map("branch_id")
   branch           Branch?            @relation("TaskTemplateBranch", fields: [branchId], references: [id])
   scheduleId       Int?               @map("schedule_id")
@@ -1686,6 +1725,7 @@ model TaskTemplate {
   // サイクル設定
   recurrenceType   RecurrenceType     @default(ONCE) @map("recurrence_type")
   recurrenceValue  String?            @map("recurrence_value") @db.VarChar(100)
+  dueTime          String?            @map("due_time") @db.VarChar(5) // "HH:MM" 形式
 
   // 担当者設定（JSON配列）
   targetEmployeeIds   Json?  @map("target_employee_ids")
@@ -2013,6 +2053,13 @@ model Applicant {
   address    String? @db.Text
   building   String? @db.VarChar(200)
 
+  // 面接管理トークン（変更・キャンセル用）
+  managementToken String? @unique @map("management_token") @db.VarChar(64)
+
+  // 求人媒体
+  recruitingMediaId Int?              @map("recruiting_media_id")
+  recruitingMedia   RecruitingMedia?  @relation(fields: [recruitingMediaId], references: [id])
+
   // 面接スロット (1:1 逆参照)
   interviewSlot InterviewSlot?
 
@@ -2038,6 +2085,22 @@ model Applicant {
   @@index([createdAt])
   @@map("applicants")
 }
+// --- 求人媒体マスタ ---
+model RecruitingMedia {
+  id        Int      @id @default(autoincrement())
+  nameJa    String   @map("name_ja") @db.VarChar(100)
+  nameEn    String?  @map("name_en") @db.VarChar(100)
+  code      String   @unique @db.VarChar(50) // URLパラメータ値: "indeed", "mynavi" 等
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(100) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  applicants Applicant[]
+
+  @@map("recruiting_media")
+}
+
 // --- デフォルト面接スロット設定（曜日ごと） ---
 model DefaultInterviewSlot {
   id              Int      @id @default(autoincrement())
@@ -2067,4 +2130,228 @@ model DefaultSlotJobCategory {
 
   @@unique([defaultInterviewSlotId, jobCategoryId])
   @@map("default_slot_job_categories")
+}
+
+// ================================================================
+// クレーム管理 + 配布禁止物件DB
+// ================================================================
+
+enum ComplaintStatus {
+  UNRESOLVED    // 未対応
+  IN_PROGRESS   // 対応中
+  RESOLVED      // 解決済み
+}
+
+enum ComplaintSource {
+  CUSTOMER    // 顧客
+  RESIDENT    // 住人
+  MANAGER     // 管理人
+  PARTNER     // 外注先
+  OTHER       // その他
+}
+
+// --- 禁止理由マスタ ---
+model ProhibitedReason {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  sortOrder Int      @default(100) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  prohibitedProperties ProhibitedProperty[]
+
+  @@map("prohibited_reasons")
+}
+
+// --- クレーム種別マスタ ---
+model ComplaintType {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  sortOrder Int      @default(100) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  complaints Complaint[]
+
+  @@map("complaint_types")
+}
+
+// --- 配布禁止物件 ---
+model ProhibitedProperty {
+  id                   Int       @id @default(autoincrement())
+
+  // 物件特定情報
+  prefectureId         Int?      @map("prefecture_id")
+  cityId               Int?      @map("city_id")
+  areaId               Int?      @map("area_id")
+  postalCode           String?   @map("postal_code") @db.VarChar(8)
+  address              String    @db.VarChar(500)
+  buildingName         String?   @map("building_name") @db.VarChar(200)
+  roomNumber           String?   @map("room_number") @db.VarChar(50)
+  residentName         String?   @map("resident_name") @db.VarChar(100)
+
+  // 座標
+  latitude             Float?
+  longitude            Float?
+
+  // ポリゴン情報（polyline → GeoJSON変換後保存）
+  boundaryGeojson      String?   @map("boundary_geojson") @db.LongText
+
+  // 配布可能枚数（禁止前のポスト数。エリア配布可能数の減算に使用）
+  unitCount            Int?      @map("unit_count")
+
+  // 顧客限定禁止（null = 全顧客禁止）
+  customerId           Int?      @map("customer_id")
+
+  // 重要度（1=低 〜 5=最高。誤配時のリスクレベル）
+  severity             Int?      @default(3)
+
+  // 禁止理由
+  prohibitedReasonId   Int?      @map("prohibited_reason_id")
+  reasonDetail         String?   @map("reason_detail") @db.Text
+
+  // CSVからの情報
+  originalCode         String?   @map("original_code") @db.VarChar(50)
+  externalCustomerCode String?   @map("external_customer_code") @db.VarChar(20)
+
+  // 画像（S3 URL、JSON配列）
+  imageUrls            String?   @map("image_urls") @db.Text
+
+  // 状態管理
+  isActive             Boolean   @default(true) @map("is_active")
+  deactivatedAt        DateTime? @map("deactivated_at")
+  deactivateReason     String?   @map("deactivate_reason") @db.Text
+
+  // 登録元クレーム
+  complaintId          Int?      @map("complaint_id")
+
+  // CSVインポート日時
+  importedAt           DateTime? @map("imported_at")
+
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  // リレーション
+  prefecture       Prefecture?       @relation(fields: [prefectureId], references: [id])
+  city             City?             @relation(fields: [cityId], references: [id])
+  area             Area?             @relation(fields: [areaId], references: [id])
+  customer         Customer?         @relation(fields: [customerId], references: [id])
+  prohibitedReason ProhibitedReason? @relation(fields: [prohibitedReasonId], references: [id])
+  complaint        Complaint?        @relation(fields: [complaintId], references: [id])
+
+  @@map("prohibited_properties")
+}
+
+// --- クレーム ---
+model Complaint {
+  id              Int              @id @default(autoincrement())
+
+  // 発生情報
+  occurredAt      DateTime         @map("occurred_at") @db.Date
+  receivedAt      DateTime         @default(now()) @map("received_at")
+
+  // 種別
+  complaintTypeId Int?             @map("complaint_type_id")
+
+  // 対象
+  customerId      Int?             @map("customer_id")
+  distributorId   Int?             @map("distributor_id")
+  scheduleId      Int?             @map("schedule_id")
+  branchId        Int?             @map("branch_id")
+
+  // 物件情報
+  address         String           @db.VarChar(500)
+  buildingName    String?          @map("building_name") @db.VarChar(200)
+  roomNumber      String?          @map("room_number") @db.VarChar(50)
+  latitude        Float?
+  longitude       Float?
+
+  // クレーム内容
+  title           String           @db.VarChar(200)
+  description     String           @db.Text
+
+  // クレーム元
+  source              ComplaintSource?
+  sourceContactName   String?          @map("source_contact_name") @db.VarChar(100)
+  sourceContactPhone  String?          @map("source_contact_phone") @db.VarChar(20)
+  sourcePartnerId     Int?             @map("source_partner_id")
+
+  // タスク連携チェック
+  needsResponse       Boolean          @default(false) @map("needs_response")
+  needsCustomerReport Boolean          @default(false) @map("needs_customer_report")
+
+  // 対応状況
+  status          ComplaintStatus  @default(UNRESOLVED)
+  assigneeId      Int?             @map("assignee_id")
+
+  // 画像
+  imageUrls       String?          @map("image_urls") @db.Text
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  // リレーション
+  complaintType        ComplaintType?        @relation(fields: [complaintTypeId], references: [id])
+  customer             Customer?             @relation(fields: [customerId], references: [id])
+  distributor          FlyerDistributor?     @relation(fields: [distributorId], references: [id])
+  schedule             DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+  branch               Branch?               @relation(fields: [branchId], references: [id])
+  assignee             Employee?             @relation("ComplaintAssignee", fields: [assigneeId], references: [id])
+  sourcePartner        Partner?              @relation(fields: [sourcePartnerId], references: [id])
+
+  responses            ComplaintResponse[]
+  prohibitedProperties ProhibitedProperty[]
+  tasks                Task[]
+
+  @@map("complaints")
+}
+
+// --- クレーム対応履歴 ---
+model ComplaintResponse {
+  id          Int      @id @default(autoincrement())
+  complaintId Int      @map("complaint_id")
+  responderId Int?     @map("responder_id")
+  content     String   @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  complaint Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  responder Employee? @relation("ComplaintResponder", fields: [responderId], references: [id])
+
+  @@map("complaint_responses")
+}
+
+// ==========================================
+// アプリ配信ログ（TestFlight / Android ベータ招待）
+// ==========================================
+
+enum AppDistributionPlatform {
+  APPLE     // TestFlight (iOS)
+  ANDROID   // Google Play (Android)
+}
+
+enum AppDistributionStatus {
+  PENDING   // 送信中
+  SENT      // 送信完了
+  FAILED    // 送信失敗
+}
+
+model AppDistributionLog {
+  id             Int                       @id @default(autoincrement())
+  distributorId  Int                       @map("distributor_id")
+  platform       AppDistributionPlatform
+  email          String                    @db.VarChar(100)
+  status         AppDistributionStatus     @default(PENDING)
+  errorMessage   String?                   @map("error_message") @db.Text
+  sentAt         DateTime?                 @map("sent_at")
+  sentById       Int?                      @map("sent_by_id")
+  createdAt      DateTime                  @default(now()) @map("created_at")
+
+  distributor    FlyerDistributor          @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  sentBy         Employee?                 @relation("AppDistributionSender", fields: [sentById], references: [id])
+
+  @@index([distributorId])
+  @@index([platform, status])
+  @@map("app_distribution_logs")
 }

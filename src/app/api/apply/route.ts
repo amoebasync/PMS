@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 import { sendApplicantConfirmationEmail } from '@/lib/mailer';
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
       address,
       building,
       interviewSlotId,
+      recruitingMediaId,
     } = body;
 
     // バリデーション
@@ -78,6 +80,9 @@ export async function POST(request: Request) {
         );
       }
 
+      // 面接管理トークン生成
+      const managementToken = crypto.randomBytes(32).toString('hex');
+
       // 応募者レコード作成
       const applicant = await tx.applicant.create({
         data: {
@@ -91,6 +96,8 @@ export async function POST(request: Request) {
           postalCode: postalCode || null,
           address: address || null,
           building: building || null,
+          managementToken,
+          recruitingMediaId: recruitingMediaId ? Number(recruitingMediaId) : null,
         },
       });
 
@@ -143,6 +150,7 @@ export async function POST(request: Request) {
       interviewTime,
       result.slot.meetUrl,
       isEn ? (jobCategory?.nameEn || jobCategory?.nameJa || '') : (jobCategory?.nameJa || ''),
+      result.applicant.managementToken,
     ).catch((err) => console.error('Applicant confirmation email failed:', err));
 
     return NextResponse.json({

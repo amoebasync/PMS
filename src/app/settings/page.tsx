@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
 import DefaultSlotSettings from '@/components/settings/DefaultSlotSettings';
@@ -11,6 +11,8 @@ type Country = { id: number; code: string; name: string; nameEn: string | null; 
 type VisaType = { id: number; name: string; sortOrder: number; _count: { distributors: number } };
 type Bank = { id: number; code: string; name: string; nameKana: string | null; sortOrder: number };
 type DistributionMethod = { id: number; name: string; capacityType: string; priceAddon: number; sortOrder: number; isActive: boolean };
+type TaskCategory = { id: number; name: string; code: string; icon: string | null; colorCls: string | null; sortOrder: number; isActive: boolean };
+type RecruitingMedia = { id: number; nameJa: string; nameEn: string | null; code: string; isActive: boolean; sortOrder: number; _count?: { applicants: number } };
 type CompanySetting = {
   companyName: string; companyNameKana: string; postalCode: string; address: string;
   phone: string; fax: string; email: string; website: string;
@@ -38,7 +40,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -89,12 +91,247 @@ export default function SettingsPage() {
   const [visaTypes, setVisaTypes] = useState<VisaType[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [distributionMethods, setDistributionMethods] = useState<DistributionMethod[]>([]);
+  const [taskCategories, setTaskCategories] = useState<TaskCategory[]>([]);
+  const [recruitingMedia, setRecruitingMedia] = useState<RecruitingMedia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState<'create' | 'edit' | null>(null);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [form, setForm] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+
+  // タスク種類管理
+  const [tcModal, setTcModal] = useState<'create' | 'edit' | null>(null);
+  const [tcForm, setTcForm] = useState<{ id?: number; name: string; code: string; icon: string; colorCls: string; sortOrder: number; isActive: boolean }>({ name: '', code: '', icon: '', colorCls: '', sortOrder: 100, isActive: true });
+  const [tcSubmitting, setTcSubmitting] = useState(false);
+
+  // 求人媒体管理
+  const [rmModal, setRmModal] = useState<'create' | 'edit' | null>(null);
+  const [rmForm, setRmForm] = useState<{ id?: number; nameJa: string; nameEn: string; code: string; sortOrder: number; isActive: boolean }>({ nameJa: '', nameEn: '', code: '', sortOrder: 100, isActive: true });
+  const [rmSubmitting, setRmSubmitting] = useState(false);
+
+  // 禁止理由管理
+  const [prohibitedReasons, setProhibitedReasons] = useState<any[]>([]);
+  const [prForm, setPrForm] = useState({ name: '', sortOrder: 100, isActive: true });
+  const [prEditing, setPrEditing] = useState<number | null>(null);
+  const [prSubmitting, setPrSubmitting] = useState(false);
+
+  // クレーム種別管理
+  const [complaintTypes, setComplaintTypes] = useState<any[]>([]);
+  const [ctForm, setCtForm] = useState({ name: '', sortOrder: 100, isActive: true });
+  const [ctEditing, setCtEditing] = useState<number | null>(null);
+  const [ctSubmitting, setCtSubmitting] = useState(false);
+
+  const ICON_OPTIONS = [
+    { value: 'bi-briefcase-fill', label: '💼 営業' },
+    { value: 'bi-truck', label: '🚛 現場' },
+    { value: 'bi-gear-fill', label: '⚙️ 管理' },
+    { value: 'bi-clipboard-check', label: '📋 チェック' },
+    { value: 'bi-calendar-event', label: '📅 予定' },
+    { value: 'bi-megaphone-fill', label: '📢 広報' },
+    { value: 'bi-people-fill', label: '👥 人事' },
+    { value: 'bi-box-seam-fill', label: '📦 物流' },
+  ];
+  const COLOR_OPTIONS = [
+    { value: 'bg-blue-100 text-blue-700', label: '青' },
+    { value: 'bg-green-100 text-green-700', label: '緑' },
+    { value: 'bg-slate-100 text-slate-700', label: 'グレー' },
+    { value: 'bg-amber-100 text-amber-700', label: 'オレンジ' },
+    { value: 'bg-rose-100 text-rose-700', label: '赤' },
+    { value: 'bg-purple-100 text-purple-700', label: '紫' },
+    { value: 'bg-cyan-100 text-cyan-700', label: 'シアン' },
+    { value: 'bg-pink-100 text-pink-700', label: 'ピンク' },
+  ];
+
+  const handleTcSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTcSubmitting(true);
+    try {
+      const method = tcModal === 'create' ? 'POST' : 'PUT';
+      const res = await fetch('/api/task-categories', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tcForm),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '保存に失敗しました', 'error');
+        return;
+      }
+      showToast(tcModal === 'create' ? 'タスク種類を追加しました' : 'タスク種類を更新しました', 'success');
+      setTcModal(null);
+      // re-fetch
+      const catRes = await fetch('/api/task-categories');
+      if (catRes.ok) setTaskCategories(await catRes.json());
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setTcSubmitting(false);
+    }
+  };
+
+  const handleTcDelete = async (cat: TaskCategory) => {
+    const ok = await showConfirm(`「${cat.name}」を削除しますか？使用中のタスク・テンプレートがある場合は削除できません。`);
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/task-categories?id=${cat.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '削除に失敗しました', 'error');
+        return;
+      }
+      showToast('削除しました', 'success');
+      const catRes = await fetch('/api/task-categories');
+      if (catRes.ok) setTaskCategories(await catRes.json());
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
+  const handleRmSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRmSubmitting(true);
+    try {
+      const method = rmModal === 'create' ? 'POST' : 'PUT';
+      const url = rmModal === 'edit' && rmForm.id ? `/api/recruiting-media?id=${rmForm.id}` : '/api/recruiting-media';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rmForm),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '保存に失敗しました', 'error');
+        return;
+      }
+      showToast(rmModal === 'create' ? '求人媒体を追加しました' : '求人媒体を更新しました', 'success');
+      setRmModal(null);
+      const rmRes = await fetch('/api/recruiting-media');
+      if (rmRes.ok) setRecruitingMedia(await rmRes.json());
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setRmSubmitting(false);
+    }
+  };
+
+  const handleRmDelete = async (media: RecruitingMedia) => {
+    const ok = await showConfirm(`「${media.nameJa}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/recruiting-media?id=${media.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '削除に失敗しました', 'error');
+        return;
+      }
+      showToast('削除しました', 'success');
+      const rmRes = await fetch('/api/recruiting-media');
+      if (rmRes.ok) setRecruitingMedia(await rmRes.json());
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
+  // 禁止理由 fetch & CRUD
+  const fetchProhibitedReasons = useCallback(async () => {
+    const res = await fetch('/api/prohibited-reasons');
+    if (res.ok) setProhibitedReasons(await res.json());
+  }, []);
+
+  const handleSavePR = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPrSubmitting(true);
+    try {
+      const method = prEditing ? 'PUT' : 'POST';
+      const url = prEditing ? `/api/prohibited-reasons?id=${prEditing}` : '/api/prohibited-reasons';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(prForm),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '保存に失敗しました', 'error');
+        return;
+      }
+      showToast(prEditing ? '禁止理由を更新しました' : '禁止理由を追加しました', 'success');
+      setPrEditing(null);
+      setPrForm({ name: '', sortOrder: 100, isActive: true });
+      await fetchProhibitedReasons();
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setPrSubmitting(false);
+    }
+  };
+
+  const handleDeletePR = async (item: any) => {
+    const ok = await showConfirm(`「${item.name}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/prohibited-reasons?id=${item.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '削除に失敗しました', 'error');
+        return;
+      }
+      showToast('削除しました', 'success');
+      await fetchProhibitedReasons();
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
+  // クレーム種別 fetch & CRUD
+  const fetchComplaintTypes = useCallback(async () => {
+    const res = await fetch('/api/complaint-types');
+    if (res.ok) setComplaintTypes(await res.json());
+  }, []);
+
+  const handleSaveCT = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCtSubmitting(true);
+    try {
+      const method = ctEditing ? 'PUT' : 'POST';
+      const url = ctEditing ? `/api/complaint-types?id=${ctEditing}` : '/api/complaint-types';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ctForm),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '保存に失敗しました', 'error');
+        return;
+      }
+      showToast(ctEditing ? 'クレーム種別を更新しました' : 'クレーム種別を追加しました', 'success');
+      setCtEditing(null);
+      setCtForm({ name: '', sortOrder: 100, isActive: true });
+      await fetchComplaintTypes();
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setCtSubmitting(false);
+    }
+  };
+
+  const handleDeleteCT = async (item: any) => {
+    const ok = await showConfirm(`「${item.name}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/complaint-types?id=${item.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '削除に失敗しました', 'error');
+        return;
+      }
+      showToast('削除しました', 'success');
+      await fetchComplaintTypes();
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
 
   const fetchSystemSettings = async () => {
     try {
@@ -105,9 +342,11 @@ export default function SettingsPage() {
 
   const fetchData = async () => {
     try {
-      const [mastersRes, pricingRes] = await Promise.all([
+      const [mastersRes, pricingRes, taskCatRes, rmRes] = await Promise.all([
         fetch('/api/settings/masters'),
         fetch('/api/pricing'),
+        fetch('/api/task-categories'),
+        fetch('/api/recruiting-media'),
       ]);
       if (mastersRes.ok) {
         const d = await mastersRes.json();
@@ -120,6 +359,13 @@ export default function SettingsPage() {
       if (pricingRes.ok) {
         const d = await pricingRes.json();
         setDistributionMethods(d.distributionMethods ?? []);
+      }
+      if (taskCatRes.ok) {
+        const d = await taskCatRes.json();
+        setTaskCategories(d);
+      }
+      if (rmRes.ok) {
+        setRecruitingMedia(await rmRes.json());
       }
     } catch (e) { console.error(e); }
     setIsLoading(false);
@@ -148,7 +394,7 @@ export default function SettingsPage() {
   const getDefaultForm = () => {
     if (tab === 'department') return { code: '', name: '' };
     if (tab === 'industry') return { name: '' };
-    if (tab === 'country') return { code: '', name: '', nameEn: '', sortOrder: 100 };
+    if (tab === 'country') return { code: '', name: '', nameEn: '', aliases: '', sortOrder: 100 };
     if (tab === 'visaType') return { name: '', sortOrder: 100 };
     if (tab === 'bank') return { code: '', name: '', nameKana: '', sortOrder: 100 };
     if (tab === 'distributionMethod') return { name: '', capacityType: 'all', priceAddon: 0, sortOrder: 100, isActive: true };
@@ -165,7 +411,7 @@ export default function SettingsPage() {
     setEditTarget(item);
     if (tab === 'department') setForm({ code: item.code || '', name: item.name });
     else if (tab === 'industry') setForm({ name: item.name });
-    else if (tab === 'country') setForm({ code: item.code, name: item.name, nameEn: item.nameEn || '', sortOrder: item.sortOrder });
+    else if (tab === 'country') setForm({ code: item.code, name: item.name, nameEn: item.nameEn || '', aliases: item.aliases || '', sortOrder: item.sortOrder });
     else if (tab === 'visaType') setForm({ name: item.name, sortOrder: item.sortOrder });
     else if (tab === 'bank') setForm({ code: item.code || '', name: item.name, nameKana: item.nameKana || '', sortOrder: item.sortOrder });
     else if (tab === 'distributionMethod') setForm({ name: item.name, capacityType: item.capacityType, priceAddon: item.priceAddon, sortOrder: item.sortOrder, isActive: item.isActive });
@@ -222,13 +468,17 @@ export default function SettingsPage() {
     { key: 'distributionMethod', label: '配布方法',    icon: 'bi-signpost-2' },
     { key: 'company',            label: '自社情報',    icon: 'bi-building' },
     { key: 'interviewSlot',      label: '面接スロット', icon: 'bi-calendar-check' },
+    { key: 'taskCategory',        label: 'タスク種類',  icon: 'bi-list-check' },
+    { key: 'recruitingMedia',     label: '求人媒体',    icon: 'bi-megaphone-fill' },
+    { key: 'prohibitedReason',   label: '禁止理由',    icon: 'bi-shield-x' },
+    { key: 'complaintType',      label: 'クレーム種別', icon: 'bi-exclamation-circle' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType';
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
-      <div className="max-w-4xl mx-auto px-4 py-10">
+      <div className="max-w-5xl mx-auto px-4 py-10">
         <div className="mb-8">
           <h1 className="text-2xl font-black text-slate-800">システム設定</h1>
           <p className="text-sm text-slate-500 mt-1">各種マスタデータと全般設定を管理します。</p>
@@ -245,11 +495,11 @@ export default function SettingsPage() {
         )}
 
         {/* タブ */}
-        <div className="flex flex-wrap gap-1 mb-6 bg-slate-200 p-1 rounded-xl w-fit">
+        <div className="flex flex-wrap gap-1 mb-6 bg-slate-200 p-1 rounded-xl">
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); }}
+              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); }}
               className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === t.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${t.icon}`}></i> {t.label}
@@ -628,10 +878,369 @@ export default function SettingsPage() {
             )}
           </div>
         )}
-      </div>
 
         {/* 面接スロット設定タブ */}
         {tab === 'interviewSlot' && (<DefaultSlotSettings />)}
+
+        {/* タスク種類設定タブ */}
+        {tab === 'taskCategory' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-list-check mr-2"></i>タスク種類マスタ</h2>
+              <button onClick={() => { setTcForm({ name: '', code: '', icon: 'bi-briefcase-fill', colorCls: 'bg-blue-100 text-blue-700', sortOrder: 100, isActive: true }); setTcModal('create'); }} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition">
+                <i className="bi bi-plus-lg"></i>追加
+              </button>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-3 text-left">名前</th>
+                  <th className="px-5 py-3 text-left">コード</th>
+                  <th className="px-5 py-3 text-left">プレビュー</th>
+                  <th className="px-5 py-3 text-center">並び順</th>
+                  <th className="px-5 py-3 text-center">有効</th>
+                  <th className="px-5 py-3 text-center w-20">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {taskCategories.map(cat => (
+                  <tr key={cat.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-bold text-slate-800">{cat.name}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-slate-500">{cat.code}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${cat.colorCls || 'bg-slate-100 text-slate-700'}`}>
+                        {cat.icon && <i className={`bi ${cat.icon}`}></i>}
+                        {cat.name}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-center text-slate-500">{cat.sortOrder}</td>
+                    <td className="px-5 py-3 text-center">
+                      {cat.isActive ? <span className="text-emerald-600 font-bold text-xs">✓ 有効</span> : <span className="text-slate-400 text-xs">無効</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <button onClick={() => { setTcForm({ id: cat.id, name: cat.name, code: cat.code, icon: cat.icon || '', colorCls: cat.colorCls || '', sortOrder: cat.sortOrder, isActive: cat.isActive }); setTcModal('edit'); }} className="text-indigo-500 hover:text-indigo-700 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button>
+                        <button onClick={() => handleTcDelete(cat)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {taskCategories.length === 0 && (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-400">タスク種類がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* タスク種類モーダル */}
+        {tcModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-black text-slate-800 text-lg">
+                  {tcModal === 'create' ? '追加' : '編集'} — タスク種類
+                </h2>
+                <button onClick={() => setTcModal(null)} className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center">
+                  <i className="bi bi-x text-xl"></i>
+                </button>
+              </div>
+              <form onSubmit={handleTcSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">名前 <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={tcForm.name} onChange={e => setTcForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 営業, 現場" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">コード <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={tcForm.code} onChange={e => setTcForm(p => ({ ...p, code: e.target.value.toUpperCase() }))} className={inp + ' font-mono'} placeholder="例: SALES, FIELD" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">アイコン</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {ICON_OPTIONS.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setTcForm(p => ({ ...p, icon: opt.value }))} className={`p-2 rounded-xl text-xs text-center border-2 transition ${tcForm.icon === opt.value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                        <i className={`bi ${opt.value} block text-lg mb-0.5`}></i>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">カラー</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {COLOR_OPTIONS.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setTcForm(p => ({ ...p, colorCls: opt.value }))} className={`px-3 py-2 rounded-xl text-xs font-bold border-2 transition ${opt.value} ${tcForm.colorCls === opt.value ? 'border-indigo-500 ring-2 ring-indigo-300' : 'border-transparent'}`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">並び順</label>
+                    <input type="number" value={tcForm.sortOrder} onChange={e => setTcForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className={inp} />
+                  </div>
+                  <div className="flex-1 flex items-end pb-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={tcForm.isActive} onChange={e => setTcForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      <span className="text-sm font-bold text-slate-700">有効</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="pt-2">
+                  <label className="block text-sm font-bold text-slate-700 mb-1">プレビュー</label>
+                  <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-bold ${tcForm.colorCls || 'bg-slate-100 text-slate-700'}`}>
+                    {tcForm.icon && <i className={`bi ${tcForm.icon}`}></i>}
+                    {tcForm.name || 'タスク種類'}
+                  </span>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setTcModal(null)} className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition">キャンセル</button>
+                  <button type="submit" disabled={tcSubmitting} className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition">
+                    {tcSubmitting ? '保存中…' : '保存'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 求人媒体設定タブ */}
+        {tab === 'recruitingMedia' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-megaphone-fill mr-2"></i>求人媒体マスタ</h2>
+              <button onClick={() => { setRmForm({ nameJa: '', nameEn: '', code: '', sortOrder: 100, isActive: true }); setRmModal('create'); }} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition">
+                <i className="bi bi-plus-lg"></i>追加
+              </button>
+            </div>
+            <div className="px-6 py-3 bg-slate-50 border-b border-slate-100">
+              <p className="text-xs text-slate-500"><i className="bi bi-info-circle mr-1"></i>応募ページのURLに <code className="bg-slate-200 px-1.5 py-0.5 rounded text-xs font-mono">?source=コード</code> を付けると、その媒体経由の応募として記録されます。</p>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-3 text-left">コード</th>
+                  <th className="px-5 py-3 text-left">媒体名（日）</th>
+                  <th className="px-5 py-3 text-left">媒体名（英）</th>
+                  <th className="px-5 py-3 text-center">並び順</th>
+                  <th className="px-5 py-3 text-center">有効</th>
+                  <th className="px-5 py-3 text-center">応募数</th>
+                  <th className="px-5 py-3 text-center w-20">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {recruitingMedia.map(m => (
+                  <tr key={m.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-mono text-xs font-bold text-indigo-600">{m.code}</td>
+                    <td className="px-5 py-3 font-bold text-slate-800">{m.nameJa}</td>
+                    <td className="px-5 py-3 text-slate-500">{m.nameEn || '-'}</td>
+                    <td className="px-5 py-3 text-center text-slate-500">{m.sortOrder}</td>
+                    <td className="px-5 py-3 text-center">
+                      {m.isActive ? <span className="text-emerald-600 font-bold text-xs">✓ 有効</span> : <span className="text-slate-400 text-xs">無効</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center text-slate-500">{m._count?.applicants ?? 0}</td>
+                    <td className="px-5 py-3 text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <button onClick={() => { setRmForm({ id: m.id, nameJa: m.nameJa, nameEn: m.nameEn || '', code: m.code, sortOrder: m.sortOrder, isActive: m.isActive }); setRmModal('edit'); }} className="text-indigo-500 hover:text-indigo-700 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button>
+                        <button onClick={() => handleRmDelete(m)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {recruitingMedia.length === 0 && (
+                  <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-400">求人媒体がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* 求人媒体モーダル */}
+        {rmModal && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-black text-slate-800 text-lg">
+                  {rmModal === 'create' ? '追加' : '編集'} — 求人媒体
+                </h2>
+                <button onClick={() => setRmModal(null)} className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center">
+                  <i className="bi bi-x text-xl"></i>
+                </button>
+              </div>
+              <form onSubmit={handleRmSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">媒体名（日本語） <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={rmForm.nameJa} onChange={e => setRmForm(p => ({ ...p, nameJa: e.target.value }))} className={inp} placeholder="例: Indeed, マイナビ" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">媒体名（英語）<span className="text-slate-400 font-normal text-xs ml-1">（任意）</span></label>
+                  <input type="text" value={rmForm.nameEn} onChange={e => setRmForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="例: Indeed, MyNavi" />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">コード <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={rmForm.code} onChange={e => setRmForm(p => ({ ...p, code: e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, '') }))} className={inp + ' font-mono'} placeholder="例: indeed, mynavi" />
+                  <p className="text-xs text-slate-400 mt-1">URLパラメータに使用（英数小文字・ハイフン・アンダースコアのみ）</p>
+                </div>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">並び順</label>
+                    <input type="number" value={rmForm.sortOrder} onChange={e => setRmForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className={inp} />
+                  </div>
+                  <div className="flex-1 flex items-end pb-1">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox" checked={rmForm.isActive} onChange={e => setRmForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                      <span className="text-sm font-bold text-slate-700">有効</span>
+                    </label>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="button" onClick={() => setRmModal(null)} className="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition">キャンセル</button>
+                  <button type="submit" disabled={rmSubmitting} className="flex-1 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition">
+                    {rmSubmitting ? '保存中…' : '保存'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* 禁止理由設定タブ */}
+        {tab === 'prohibitedReason' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-shield-x mr-2"></i>禁止理由マスタ</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-3 text-left">名前</th>
+                  <th className="px-5 py-3 text-center">表示順</th>
+                  <th className="px-5 py-3 text-center">有効/無効</th>
+                  <th className="px-5 py-3 text-center w-20">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {prohibitedReasons.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-bold text-slate-800">{item.name}</td>
+                    <td className="px-5 py-3 text-center text-slate-500">{item.sortOrder}</td>
+                    <td className="px-5 py-3 text-center">
+                      {item.isActive ? <span className="text-emerald-600 font-bold text-xs">有効</span> : <span className="text-slate-400 text-xs">無効</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <button onClick={() => { setPrEditing(item.id); setPrForm({ name: item.name, sortOrder: item.sortOrder, isActive: item.isActive }); }} className="text-indigo-500 hover:text-indigo-700 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button>
+                        <button onClick={() => handleDeletePR(item)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {prohibitedReasons.length === 0 && (
+                  <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">禁止理由がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-slate-100 p-6">
+              <h3 className="font-bold text-slate-700 text-sm mb-3">{prEditing ? '禁止理由を編集' : '禁止理由を追加'}</h3>
+              <form onSubmit={handleSavePR} className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">名前 <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={prForm.name} onChange={e => setPrForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 入居者クレーム" />
+                </div>
+                <div className="w-24">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">表示順</label>
+                  <input type="number" value={prForm.sortOrder} onChange={e => setPrForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className={inp} />
+                </div>
+                <div className="flex items-center gap-2 pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={prForm.isActive} onChange={e => setPrForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm font-bold text-slate-700">有効</span>
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  {prEditing && (
+                    <button type="button" onClick={() => { setPrEditing(null); setPrForm({ name: '', sortOrder: 100, isActive: true }); }} className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition">
+                      キャンセル
+                    </button>
+                  )}
+                  <button type="submit" disabled={prSubmitting} className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition flex items-center gap-1.5">
+                    {prSubmitting ? '保存中...' : prEditing ? '更新' : <><i className="bi bi-plus-lg"></i>追加</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* クレーム種別設定タブ */}
+        {tab === 'complaintType' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-exclamation-circle mr-2"></i>クレーム種別マスタ</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-3 text-left">名前</th>
+                  <th className="px-5 py-3 text-center">表示順</th>
+                  <th className="px-5 py-3 text-center">有効/無効</th>
+                  <th className="px-5 py-3 text-center w-20">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {complaintTypes.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-bold text-slate-800">{item.name}</td>
+                    <td className="px-5 py-3 text-center text-slate-500">{item.sortOrder}</td>
+                    <td className="px-5 py-3 text-center">
+                      {item.isActive ? <span className="text-emerald-600 font-bold text-xs">有効</span> : <span className="text-slate-400 text-xs">無効</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <button onClick={() => { setCtEditing(item.id); setCtForm({ name: item.name, sortOrder: item.sortOrder, isActive: item.isActive }); }} className="text-indigo-500 hover:text-indigo-700 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button>
+                        <button onClick={() => handleDeleteCT(item)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {complaintTypes.length === 0 && (
+                  <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">クレーム種別がありません</td></tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-slate-100 p-6">
+              <h3 className="font-bold text-slate-700 text-sm mb-3">{ctEditing ? 'クレーム種別を編集' : 'クレーム種別を追加'}</h3>
+              <form onSubmit={handleSaveCT} className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">名前 <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={ctForm.name} onChange={e => setCtForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 投函ミス, 破損" />
+                </div>
+                <div className="w-24">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">表示順</label>
+                  <input type="number" value={ctForm.sortOrder} onChange={e => setCtForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className={inp} />
+                </div>
+                <div className="flex items-center gap-2 pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={ctForm.isActive} onChange={e => setCtForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm font-bold text-slate-700">有効</span>
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  {ctEditing && (
+                    <button type="button" onClick={() => { setCtEditing(null); setCtForm({ name: '', sortOrder: 100, isActive: true }); }} className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition">
+                      キャンセル
+                    </button>
+                  )}
+                  <button type="submit" disabled={ctSubmitting} className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition flex items-center gap-1.5">
+                    {ctSubmitting ? '保存中...' : ctEditing ? '更新' : <><i className="bi bi-plus-lg"></i>追加</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* モーダル */}
       {showModal && (
@@ -689,6 +1298,11 @@ export default function SettingsPage() {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">国名（英語）<span className="text-slate-400 font-normal text-xs ml-1">（任意）</span></label>
                     <input type="text" value={form.nameEn || ''} onChange={e => setForm((p: any) => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="例: Japan" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">別名（エイリアス）<span className="text-slate-400 font-normal text-xs ml-1">（任意）</span></label>
+                    <input type="text" value={form.aliases || ''} onChange={e => setForm((p: any) => ({ ...p, aliases: e.target.value }))} className={inp} placeholder="韓国,大韓民国,Korea (カンマ区切り)" />
+                    <p className="text-xs text-slate-400 mt-1">カンマ区切りで複数の別名を登録。応募ページの検索時にもマッチします。</p>
                   </div>
                 </>
               )}

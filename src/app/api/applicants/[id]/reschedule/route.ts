@@ -1,0 +1,129 @@
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
+
+// POST /api/applicants/[id]/reschedule
+// 管理者: 面接日程を変更（旧スロット解放 → 新スロット予約）
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const applicantId = parseInt(id);
+    const body = await request.json();
+    const { newSlotId } = body;
+
+    if (!newSlotId) {
+      return NextResponse.json({ error: '新しいスロットIDが必要です' }, { status: 400 });
+    }
+
+    const { actorId, actorName } = await getAdminActorInfo();
+    const ip = getIpAddress(request);
+
+    // 応募者+現在のスロットを取得
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
+      include: { interviewSlot: true, jobCategory: true },
+    });
+
+    if (!applicant) {
+      return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
+    }
+
+    const oldSlotId = applicant.interviewSlot?.id;
+
+    // 新スロットの確認
+    const newSlot = await prisma.interviewSlot.findUnique({
+      where: { id: Number(newSlotId) },
+    });
+
+    if (!newSlot) {
+      return NextResponse.json({ error: '指定されたスロットが見つかりません' }, { status: 404 });
+    }
+
+    if (newSlot.isBooked) {
+      return NextResponse.json({ error: 'このスロットは既に予約されています' }, { status: 409 });
+    }
+
+    if (new Date(newSlot.startTime) <= new Date()) {
+      return NextResponse.json({ error: '過去のスロットは選択できません' }, { status: 400 });
+    }
+
+    // Google Meet生成
+    let meetUrl = newSlot.meetUrl;
+    if (!meetUrl && isGoogleMeetConfigured()) {
+      const jobName = applicant.jobCategory?.nameJa || '面接';
+      const meetTitle = `【ティラミス】${applicant.name}様 ${jobName} 面接`;
+      const meetDescription = `応募者: ${applicant.name}\nメール: ${applicant.email}\n職種: ${jobName}`;
+
+      meetUrl = await createGoogleMeetEvent(
+        meetTitle,
+        meetDescription,
+        newSlot.startTime,
+        newSlot.endTime,
+        applicant.email
+      );
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 旧スロット解放（存在する場合）
+      if (oldSlotId) {
+        await tx.interviewSlot.update({
+          where: { id: oldSlotId },
+          data: {
+            isBooked: false,
+            applicantId: null,
+          },
+        });
+      }
+
+      // 新スロット予約
+      await tx.interviewSlot.update({
+        where: { id: Number(newSlotId) },
+        data: {
+          isBooked: true,
+          applicantId: applicantId,
+          meetUrl: meetUrl || newSlot.meetUrl,
+        },
+      });
+
+      // 監査ログ
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'UPDATE',
+        targetModel: 'InterviewSlot',
+        targetId: Number(newSlotId),
+        ipAddress: ip,
+        description: `応募者「${applicant.name}」の面接を日程変更（旧スロットID: ${oldSlotId || 'なし'} → 新スロットID: ${newSlotId}）`,
+        tx,
+      });
+
+      // 更新後の応募者を返す
+      return tx.applicant.findUnique({
+        where: { id: applicantId },
+        include: {
+          jobCategory: true,
+          country: true,
+          visaType: true,
+          interviewSlot: true,
+          recruitingMedia: true,
+        },
+      });
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Reschedule Error:', error);
+    return NextResponse.json({ error: '日程変更に失敗しました' }, { status: 500 });
+  }
+}

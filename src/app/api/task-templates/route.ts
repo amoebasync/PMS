@@ -5,6 +5,8 @@ import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 const templateInclude = {
   customer: { select: { id: true, name: true } },
+  distributor: { select: { id: true, name: true, staffId: true } },
+  taskCategory: { select: { id: true, name: true, code: true, icon: true, colorCls: true } },
   branch: { select: { id: true, nameJa: true } },
   schedule: { select: { id: true, jobNumber: true } },
 };
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
     const isActive = searchParams.get('isActive');
 
     const where: any = {};
-    if (category) where.category = category;
+    if (category) where.categoryId = parseInt(category);
     if (isActive !== null && isActive !== undefined && isActive !== '') {
       where.isActive = isActive === 'true';
     }
@@ -52,8 +54,8 @@ export async function POST(request: Request) {
     const { actorId, actorName } = await getAdminActorInfo();
     const ip = getIpAddress(request);
 
-    if (!body.title || !body.category) {
-      return NextResponse.json({ error: 'タイトルとカテゴリは必須です' }, { status: 400 });
+    if (!body.title) {
+      return NextResponse.json({ error: 'タイトルは必須です' }, { status: 400 });
     }
 
     const template = await prisma.$transaction(async (tx) => {
@@ -61,14 +63,16 @@ export async function POST(request: Request) {
         data: {
           title: body.title,
           description: body.description || null,
-          category: body.category,
+          categoryId: body.categoryId ? Number(body.categoryId) : null,
           priority: body.priority || 'MEDIUM',
           completionRule: body.completionRule || 'SHARED',
           customerId: body.customerId ? Number(body.customerId) : null,
+          distributorId: body.distributorId ? Number(body.distributorId) : null,
           branchId: body.branchId ? Number(body.branchId) : null,
           scheduleId: body.scheduleId ? Number(body.scheduleId) : null,
           recurrenceType: body.recurrenceType || 'ONCE',
           recurrenceValue: body.recurrenceValue || null,
+          dueTime: body.dueTime || null,
           targetEmployeeIds: body.targetEmployeeIds || null,
           targetDepartmentIds: body.targetDepartmentIds || null,
           targetBranchIds: body.targetBranchIds || null,

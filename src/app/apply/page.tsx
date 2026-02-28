@@ -122,6 +122,7 @@ interface Country {
   code: string;
   name: string;
   nameEn: string;
+  aliases: string | null;
 }
 
 interface VisaType {
@@ -198,6 +199,7 @@ interface SearchableSelectProps<T> {
   noResultsText: string;
   disabled?: boolean;
   className?: string;
+  filterFn?: (option: T, search: string) => boolean;
 }
 
 function SearchableSelect<T>({
@@ -211,6 +213,7 @@ function SearchableSelect<T>({
   noResultsText,
   disabled = false,
   className = '',
+  filterFn,
 }: SearchableSelectProps<T>) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -221,7 +224,7 @@ function SearchableSelect<T>({
   const displayText = selectedOption ? getOptionLabel(selectedOption) : '';
 
   const filteredOptions = options.filter((opt) =>
-    getOptionLabel(opt).toLowerCase().includes(search.toLowerCase())
+    filterFn ? filterFn(opt, search) : getOptionLabel(opt).toLowerCase().includes(search.toLowerCase())
   );
 
   useEffect(() => {
@@ -347,6 +350,9 @@ function ApplyForm() {
   const [loadingVisaTypes, setLoadingVisaTypes] = useState(true);
   const [loadingSlots, setLoadingSlots] = useState(true);
 
+  // Recruiting media tracking
+  const [recruitingMediaId, setRecruitingMediaId] = useState<number | null>(null);
+
   // Interview slot selection
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -388,7 +394,18 @@ function ApplyForm() {
       .catch(() => setVisaTypes([]))
       .finally(() => setLoadingVisaTypes(false));
 
-  }, [jobParam]);
+    // Recruiting media tracking from URL parameter
+    const sourceParam = searchParams.get('source') || searchParams.get('media');
+    if (sourceParam) {
+      fetch(`/api/recruiting-media/public?code=${encodeURIComponent(sourceParam)}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data?.id) setRecruitingMediaId(data.id);
+        })
+        .catch(() => {});
+    }
+
+  }, [jobParam, searchParams]);
 
   // ─── Fetch slots when job category changes ───────────────
   const fetchSlots = useCallback(async (jobCatId?: string) => {
@@ -503,6 +520,7 @@ function ApplyForm() {
           address: form.address.trim() || undefined,
           building: form.building.trim() || undefined,
           interviewSlotId: Number(form.interviewSlotId),
+          recruitingMediaId: recruitingMediaId || undefined,
         }),
       });
 
@@ -792,6 +810,15 @@ function ApplyForm() {
                   searchPlaceholder={t.searchPlaceholder}
                   noResultsText={t.noResults}
                   disabled={loadingCountries}
+                  filterFn={(c: Country, search: string) => {
+                    const s = search.toLowerCase();
+                    if (c.name.toLowerCase().includes(s)) return true;
+                    if ((c.nameEn || '').toLowerCase().includes(s)) return true;
+                    if (c.aliases) {
+                      return c.aliases.split(',').some((a: string) => a.trim().toLowerCase().includes(s));
+                    }
+                    return false;
+                  }}
                 />
               </div>
 

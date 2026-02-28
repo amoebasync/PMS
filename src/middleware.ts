@@ -28,11 +28,13 @@ export function middleware(request: NextRequest) {
     path === '/staff/login' ||
     path === '/api/staff/auth/login' ||
     path === '/apply' ||
+    path.startsWith('/apply/manage') ||
     path.startsWith('/api/apply') ||
     path === '/api/interview-slots/available' ||
     path === '/api/job-categories/public' ||
     path === '/api/countries/public' ||
     path === '/api/visa-types/public' ||
+    path === '/api/recruiting-media/public' ||
     path === '/api/cron/generate-slots' ||
     path === '/api/cron/generate-tasks';
 

@@ -8,6 +8,7 @@ const taskInclude = {
   distributor: { select: { id: true, name: true, staffId: true } },
   assignee: { select: { id: true, lastNameJa: true, firstNameJa: true } },
   createdBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+  taskCategory: { select: { id: true, name: true, code: true, icon: true, colorCls: true } },
   branch: { select: { id: true, nameJa: true } },
   schedule: { select: { id: true, jobNumber: true } },
   assignees: {
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         customerId: customerId ? parseInt(customerId) : null,
         distributorId: distributorId ? parseInt(distributorId) : null,
         assigneeId: assigneeId ? parseInt(assigneeId) : null,
-        category: category || null,
+        categoryId: category ? parseInt(category) : null,
         branchId: branchId ? parseInt(branchId) : null,
         scheduleId: scheduleId ? parseInt(scheduleId) : null,
       },

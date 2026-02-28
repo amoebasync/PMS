@@ -2,9 +2,18 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const search = searchParams.get('search');
+
+    const where: Record<string, unknown> = {};
+    if (search) {
+      where.name = { contains: search };
+    }
+
     const partners = await prisma.partner.findMany({
+      where,
       orderBy: { id: 'desc' },
       include: { partnerType: true } // ★ マスタの名前も一緒に取得する
     });

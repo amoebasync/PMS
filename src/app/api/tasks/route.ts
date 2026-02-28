@@ -8,6 +8,7 @@ const taskInclude = {
   distributor: { select: { id: true, name: true, staffId: true } },
   assignee: { select: { id: true, lastNameJa: true, firstNameJa: true } },
   createdBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+  taskCategory: { select: { id: true, name: true, code: true, icon: true, colorCls: true } },
   branch: { select: { id: true, nameJa: true } },
   schedule: { select: { id: true, jobNumber: true } },
   template: { select: { id: true, title: true } },
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status;
   if (assigneeId) where.assigneeId = parseInt(assigneeId);
   if (customerId) where.customerId = parseInt(customerId);
-  if (category) where.category = category;
+  if (category) where.categoryId = parseInt(category);
 
   if (dueDate === 'today') {
     const today = new Date();
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
     title, description, dueDate, priority, status,
     customerId, distributorId, assigneeId,
     category, branchId, scheduleId, assignees,
+    complaintId,
   } = body;
 
   if (!title || !dueDate) {
@@ -111,9 +113,10 @@ export async function POST(req: NextRequest) {
         distributorId: distributorId ? parseInt(distributorId) : null,
         assigneeId: assigneeId ? parseInt(assigneeId) : null,
         createdById: parseInt(sessionId),
-        category: category || null,
+        categoryId: category ? parseInt(category) : null,
         branchId: branchId ? parseInt(branchId) : null,
         scheduleId: scheduleId ? parseInt(scheduleId) : null,
+        complaintId: complaintId ? parseInt(complaintId) : null,
       },
     });
 

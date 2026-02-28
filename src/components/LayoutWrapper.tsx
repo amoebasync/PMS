@@ -17,7 +17,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isPortalPage = pathname.startsWith('/portal');
   const isDistributorPage = pathname.startsWith('/staff');
   const isAppPrivacyPage = pathname.startsWith('/app-privacy');
-  const isApplyPage = pathname === '/apply';
+  const isApplyPage = pathname === '/apply' || pathname.startsWith('/apply/manage');
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
