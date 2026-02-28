@@ -1,7 +1,7 @@
 import React from 'react';
 
 export const metadata = {
-  title: 'プライバシーポリシー | Tiramis Posting App',
+  title: 'プライバシーポリシー | PMS Posting App',
 };
 
 export default function AppPrivacyPage() {
@@ -10,7 +10,7 @@ export default function AppPrivacyPage() {
       <div className="max-w-3xl mx-auto bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
 
         <div className="bg-slate-800 px-8 py-10 text-center">
-          <p className="text-slate-400 text-xs font-medium tracking-widest uppercase mb-2">Tiramis Posting App</p>
+          <p className="text-slate-400 text-xs font-medium tracking-widest uppercase mb-2">PMS Posting App</p>
           <h1 className="text-3xl font-black text-white tracking-widest mb-2">プライバシーポリシー</h1>
           <p className="text-slate-300 text-sm font-medium">個人情報の取り扱いについて</p>
         </div>
@@ -18,7 +18,7 @@ export default function AppPrivacyPage() {
         <div className="p-8 md:p-12 space-y-8 text-sm leading-loose text-slate-700">
 
           <p>
-            株式会社KP（以下、「当社」といいます）は、配布業務管理アプリ「Tiramis Posting App」（以下、「本アプリ」といいます）において、以下のとおり個人情報を取り扱います。
+            株式会社KP（以下、「当社」といいます）は、配布業務管理アプリ「PMS Posting App」（以下、「本アプリ」といいます）において、以下のとおり個人情報を取り扱います。
           </p>
 
           <section>
@@ -43,7 +43,14 @@ export default function AppPrivacyPage() {
                 <span className="text-slate-400 font-bold shrink-0">●</span>
                 <div>
                   <span className="font-bold text-slate-800">位置情報（GPS）</span><br />
-                  配布作業中の現在地を取得します。本アプリを使用中のみ取得し、業務管理の目的にのみ使用します。
+                  配布作業中（STARTからFINISHまで）の現在地を、バックグラウンドを含めて取得します。配布作業外では位置情報を取得しません。配布ルートの記録、リアルタイムの位置報告、配布禁止物件への接近警告（50m以内）の目的にのみ使用します。
+                </div>
+              </li>
+              <li className="flex gap-3">
+                <span className="text-slate-400 font-bold shrink-0">●</span>
+                <div>
+                  <span className="font-bold text-slate-800">モーション・フィットネスデータ</span><br />
+                  配布作業中の歩数、歩行距離、消費カロリーを計測します。業務実績の記録にのみ使用します。
                 </div>
               </li>
               <li className="flex gap-3">
