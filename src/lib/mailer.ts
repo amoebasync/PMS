@@ -945,3 +945,68 @@ export const sendInterviewCancelEmail = async (
     text: textContent,
   });
 };
+
+// ─────────────────────────────────────────────────────────
+// 12. Android内部テスト案内メール（配布員向け）
+// ─────────────────────────────────────────────────────────
+const ANDROID_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701181058894208136';
+
+export const sendAndroidTestInviteEmail = async (
+  toEmail: string,
+  distributorName: string,
+) => {
+  const contentHtml = `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${distributorName} さん</p>
+    <p style="margin:0 0 16px;">
+      配布アプリ（Android版）の内部テストにご招待いたします。<br>
+      以下の手順でアプリをインストールしてください。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 14px;font-size:14px;font-weight:bold;color:#166534;">
+          📱 インストール手順
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;width:32px;vertical-align:top;">1.</td>
+            <td style="padding:6px 0;">このメールを受信した<strong>Googleアカウント</strong>でログインした状態で、下のボタンをタップしてください</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">2.</td>
+            <td style="padding:6px 0;">「テスターになる」をタップして参加します</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">3.</td>
+            <td style="padding:6px 0;">Google Play Storeからアプリをインストールできるようになります</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${ANDROID_OPT_IN_URL}" style="display:inline-block;background:#16a34a;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">テストに参加する</a>
+    </div>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>⚠ 注意事項</strong><br>
+        ・このメールアドレス（${toEmail}）のGoogleアカウントでログインしている必要があります<br>
+        ・テスト版のため、予期しない動作が発生する場合があります
+      </p>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ボタンが機能しない場合は、以下のURLをブラウザにコピー＆ペーストしてください。<br>
+      <span style="color:#16a34a;word-break:break-all;">${ANDROID_OPT_IN_URL}</span>
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis PMS Pro" <noreply@tiramis.co.jp>',
+    to: toEmail,
+    subject: '【Tiramis】配布アプリ（Android版）テスト参加のご案内',
+    html: htmlWrapper(contentHtml),
+    text: `${distributorName} さん\n\n配布アプリ（Android版）の内部テストにご招待いたします。\n\n【インストール手順】\n1. このメールを受信したGoogleアカウントでログインした状態で、以下のURLにアクセスしてください\n2. 「テスターになる」をタップして参加します\n3. Google Play Storeからアプリをインストールできるようになります\n\nテスト参加URL:\n${ANDROID_OPT_IN_URL}\n\n※ このメールアドレス（${toEmail}）のGoogleアカウントでログインしている必要があります\n※ テスト版のため、予期しない動作が発生する場合があります`,
+  });
+};

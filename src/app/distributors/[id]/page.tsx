@@ -155,10 +155,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       showToast('メールアドレスを入力してください', 'warning');
       return;
     }
-    if (appDistPlatform === 'ANDROID') {
-      showToast('Android配信は準備中です', 'warning');
-      return;
-    }
     setAppDistSending(true);
     try {
       const res = await fetch(`/api/distributors/${id}/app-distribution`, {
@@ -168,7 +164,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '送信に失敗しました');
-      showToast(data.message || 'TestFlight招待を送信しました', 'success');
+      showToast(data.message || '送信しました', 'success');
       loadDistHistory();
     } catch (e: unknown) {
       showToast(e instanceof Error ? e.message : '送信に失敗しました', 'error');
@@ -942,11 +938,14 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                     <i className="bi bi-apple"></i> Apple (TestFlight)
                   </button>
                   <button
-                    disabled
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border bg-slate-50 text-slate-300 border-slate-200 cursor-not-allowed"
+                    onClick={() => setAppDistPlatform('ANDROID')}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold border transition-colors ${
+                      appDistPlatform === 'ANDROID'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                        : 'bg-white text-slate-400 border-slate-200 hover:bg-slate-50'
+                    }`}
                   >
-                    <i className="bi bi-google-play"></i> Android
-                    <span className="text-[10px] bg-slate-200 text-slate-400 px-1.5 py-0.5 rounded-full">準備中</span>
+                    <i className="bi bi-google-play"></i> Android (Google Play)
                   </button>
                 </div>
               </div>
@@ -961,7 +960,11 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                   placeholder="tester@example.com"
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                 />
-                <p className="text-xs text-slate-400 mt-1">TestFlight招待メールがこのアドレスに送信されます</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {appDistPlatform === 'APPLE'
+                    ? 'TestFlight招待メールがこのアドレスに送信されます'
+                    : 'Googleグループに追加され、Play Storeから内部テスト版をインストールできます'}
+                </p>
               </div>
 
               {/* 送信ボタン */}
