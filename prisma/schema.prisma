@@ -646,6 +646,8 @@ model FlyerDistributor {
   taskTemplates  TaskTemplate[]
   complaints            Complaint[]
   appDistributionLogs   AppDistributionLog[]
+  distributionSessions  DistributionSession[]
+  adminNotifications    AdminNotification[]
 
   @@map("flyer_distributors")
 }
@@ -770,10 +772,12 @@ model DistributionSchedule {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // リレーション (What: このスケジュールで配る最大6種類のチラシ)
-  items          DistributionItem[]
-  tasks          Task[]
-  taskTemplates  TaskTemplate[]
-  complaints     Complaint[]
+  items              DistributionItem[]
+  tasks              Task[]
+  taskTemplates      TaskTemplate[]
+  complaints         Complaint[]
+  session            DistributionSession?
+  adminNotifications AdminNotification[]
 
   @@map("distribution_schedules")
 }
@@ -824,9 +828,23 @@ model DistributionItem {
 }
 
 enum ScheduleStatus {
-  UNSTARTED // 未開始
-  IN_PROGRESS // 配布中
-  COMPLETED // 完了
+  UNSTARTED     // 未開始
+  IN_PROGRESS   // 進行中（管理者手動）
+  DISTRIBUTING  // 配布中（配布員がSTARTを押した、GPS追跡中）
+  COMPLETED     // 完了
+}
+
+// --- 配布セッション未完了理由 ---
+enum IncompleteReason {
+  AREA_DONE  // エリア終了（全戸配布済み）
+  GIVE_UP    // ギブアップ
+  OTHER      // その他
+}
+
+// --- 管理者通知種別 ---
+enum AdminNotificationType {
+  DISTRIBUTION_START    // 配布開始
+  DISTRIBUTION_FINISH   // 配布完了
 }
 
 // ==========================================
@@ -2240,6 +2258,7 @@ model ProhibitedProperty {
   customer         Customer?         @relation(fields: [customerId], references: [id])
   prohibitedReason ProhibitedReason? @relation(fields: [prohibitedReasonId], references: [id])
   complaint        Complaint?        @relation(fields: [complaintId], references: [id])
+  skipEvents       SkipEvent[]
 
   @@map("prohibited_properties")
 }
@@ -2354,4 +2373,114 @@ model AppDistributionLog {
   @@index([distributorId])
   @@index([platform, status])
   @@map("app_distribution_logs")
+}
+
+// ============================================================
+// GPS トラッキング関連
+// ============================================================
+
+// --- 配布作業セッション（START〜FINISH） ---
+model DistributionSession {
+  id              Int                @id @default(autoincrement())
+  scheduleId      Int                @unique @map("schedule_id")
+  distributorId   Int                @map("distributor_id")
+
+  startedAt       DateTime           @map("started_at")
+  finishedAt      DateTime?          @map("finished_at")
+
+  // フィットネス集計
+  totalSteps      Int                @default(0) @map("total_steps")
+  totalDistance    Float              @default(0) @map("total_distance")   // メートル
+  totalCalories   Float              @default(0) @map("total_calories")
+
+  // 終了情報
+  incompleteReason IncompleteReason? @map("incomplete_reason")
+  incompleteNote   String?           @map("incomplete_note") @db.Text
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  // リレーション
+  schedule        DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  distributor     FlyerDistributor     @relation(fields: [distributorId], references: [id])
+  gpsPoints       GpsPoint[]
+  progressEvents  ProgressEvent[]
+  skipEvents      SkipEvent[]
+
+  @@index([distributorId, startedAt])
+  @@map("distribution_sessions")
+}
+
+// --- GPS座標（10秒ごとの高頻度データ） ---
+model GpsPoint {
+  id         Int      @id @default(autoincrement())
+  sessionId  Int      @map("session_id")
+  latitude   Float
+  longitude  Float
+  accuracy   Float?   // GPS精度（メートル）
+  timestamp  DateTime // デバイス時刻
+
+  // 累積フィットネスデータ（オプション）
+  steps      Int?
+  distance   Float?   // 累積メートル
+  calories   Float?   // 累積カロリー
+
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  session    DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@map("gps_points")
+}
+
+// --- 進捗報告（500枚完了ごと） ---
+model ProgressEvent {
+  id           Int      @id @default(autoincrement())
+  sessionId    Int      @map("session_id")
+  mailboxCount Int      @map("mailbox_count") // 累積ポスト数
+  latitude     Float?
+  longitude    Float?
+  timestamp    DateTime
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  session      DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@map("progress_events")
+}
+
+// --- 配布禁止物件スキップ記録 ---
+model SkipEvent {
+  id                    Int      @id @default(autoincrement())
+  sessionId             Int      @map("session_id")
+  latitude              Float
+  longitude             Float
+  prohibitedPropertyId  Int?     @map("prohibited_property_id")
+  reason                String?  @db.Text
+  timestamp             DateTime
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  session              DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  prohibitedProperty   ProhibitedProperty? @relation(fields: [prohibitedPropertyId], references: [id])
+
+  @@index([sessionId])
+  @@map("skip_events")
+}
+
+// --- 管理者通知 ---
+model AdminNotification {
+  id             Int                    @id @default(autoincrement())
+  type           AdminNotificationType
+  title          String                 @db.VarChar(200)
+  message        String?                @db.Text
+  scheduleId     Int?                   @map("schedule_id")
+  distributorId  Int?                   @map("distributor_id")
+  isRead         Boolean                @default(false) @map("is_read")
+  createdAt      DateTime               @default(now()) @map("created_at")
+
+  schedule       DistributionSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  distributor    FlyerDistributor?      @relation(fields: [distributorId], references: [id])
+
+  @@index([isRead, createdAt])
+  @@map("admin_notifications")
 }

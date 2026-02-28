@@ -1,7 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+
+const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
 
 // 本日の日付を YYYY-MM-DD 形式で取得する関数
 const getTodayStr = () => {
@@ -39,6 +41,7 @@ export default function ScheduleListPage() {
 
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [remarksInput, setRemarksInput] = useState('');
+  const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(null);
 
   const fetchSchedules = async (dateStr: string) => {
     setIsLoading(true);
@@ -134,7 +137,8 @@ export default function ScheduleListPage() {
             >
               <option value="ALL">すべて</option>
               <option value="UNSTARTED">未開始</option>
-              <option value="IN_PROGRESS">配布中</option>
+              <option value="IN_PROGRESS">進行中</option>
+              <option value="DISTRIBUTING">配布中</option>
               <option value="COMPLETED">完了</option>
             </select>
           </div>
@@ -216,8 +220,9 @@ export default function ScheduleListPage() {
                 return (
                   <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors border-b border-slate-100">
                     <td className="border border-slate-200 px-3 py-2 text-center sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">
-                      {s.status === 'COMPLETED' ? <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">完了</span> : 
-                       s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">配布中</span> : 
+                      {s.status === 'COMPLETED' ? <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">完了</span> :
+                       s.status === 'DISTRIBUTING' ? <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>配布中</span> :
+                       s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">進行中</span> :
                        <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">未開始</span>}
                     </td>
                     
@@ -248,7 +253,17 @@ export default function ScheduleListPage() {
                     <td className="border border-slate-200 px-3 py-2 text-slate-400">-</td>
                     
                     <td className="border border-slate-200 px-2 py-2 text-center">
-                      <button className="text-slate-400 hover:text-emerald-500 transition-colors" title="GPSマップを開く (未実装)">
+                      <button
+                        onClick={() => (s.status === 'DISTRIBUTING' || s.status === 'COMPLETED') && setTrajectoryScheduleId(s.id)}
+                        className={`transition-colors ${
+                          s.status === 'DISTRIBUTING'
+                            ? 'text-emerald-500 hover:text-emerald-600 animate-pulse'
+                            : s.status === 'COMPLETED'
+                            ? 'text-blue-500 hover:text-blue-600'
+                            : 'text-slate-300 cursor-not-allowed'
+                        }`}
+                        title={s.status === 'DISTRIBUTING' ? 'リアルタイム軌跡を表示' : s.status === 'COMPLETED' ? '配布軌跡を表示' : 'セッション未開始'}
+                      >
                         <i className="bi bi-geo-alt-fill text-lg"></i>
                       </button>
                     </td>
@@ -297,6 +312,22 @@ export default function ScheduleListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {trajectoryScheduleId && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl p-8 text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+              <p className="text-slate-600 text-sm">読み込み中...</p>
+            </div>
+          </div>
+        }>
+          <TrajectoryViewer
+            scheduleId={trajectoryScheduleId}
+            onClose={() => setTrajectoryScheduleId(null)}
+          />
+        </Suspense>
       )}
     </div>
   );

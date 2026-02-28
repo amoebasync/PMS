@@ -489,3 +489,69 @@ GOOGLE_REFRESH_TOKEN=xxx
 - `src/middleware.ts` に `/api/cron/generate-tasks` を公開パスとして追加済み
 - テンプレートの targetEmployeeIds/targetDepartmentIds/targetBranchIds は JSON 配列として保存
 - CRON_SECRET 環境変数が必要（`.env` に設定済み）
+
+## GPSトラッキング＆軌跡ビューア機能
+
+2026-03-01 実装済み。
+
+### 概要
+配布員がモバイルアプリで配布作業を行う際のGPS位置情報をリアルタイムで記録し、管理者がスケジュール画面から配布軌跡を地図上で確認できる機能。
+- 配布員のライフサイクル: START → GPS送信（10秒間隔） → 進捗報告（500枚ごと） → スキップ記録 → FINISH
+- START時に `DistributionSchedule.status` → `DISTRIBUTING` に変更
+- FINISH時に `DistributionItem.actualCount` を更新 + `DistributionSchedule.status` → `COMPLETED`
+- START/FINISH時に管理者通知を作成（ポーリング方式 + ブラウザOS通知）
+
+### DB（Prisma スキーマ）
+- Enum: `IncompleteReason`（AREA_DONE / GIVE_UP / OTHER）
+- Enum: `AdminNotificationType`（DISTRIBUTION_START / DISTRIBUTION_FINISH）
+- `ScheduleStatus` に `DISTRIBUTING` を追加（UNSTARTED → IN_PROGRESS → DISTRIBUTING → COMPLETED）
+- テーブル: `distribution_sessions`（配布セッション、1スケジュール=1セッション）
+- テーブル: `gps_points`（GPS座標、10秒ごと、高頻度）
+- テーブル: `progress_events`（進捗報告、500枚ごと）
+- テーブル: `skip_events`（配布禁止物件スキップ記録）
+- テーブル: `admin_notifications`（管理者通知）
+
+### スタッフAPI（モバイルアプリ向け、pms_distributor_session認証）
+- `GET /api/staff/config` — GPS送信間隔・進捗マイルストーン取得（SystemSettingから）
+- `POST /api/staff/distribution/start` — 配布開始（セッション作成 + status→DISTRIBUTING + 初回GPS + 通知）
+- `POST /api/staff/distribution/gps` — GPS座標受信（⚡高頻度・最軽量設計、監査ログなし）
+- `POST /api/staff/distribution/progress` — 進捗マイルストーン報告
+- `POST /api/staff/distribution/skip` — 禁止物件スキップ記録
+- `POST /api/staff/distribution/finish` — 配布終了（actualCount更新 + status→COMPLETED + 通知 + 報酬計算）
+- `GET /api/staff/distribution/earnings` — 当日報酬表示
+
+### 管理者API（pms_session認証）
+- `GET /api/schedules/[id]/trajectory` — 軌跡データ全取得（GPS・進捗・スキップ・エリアGeoJSON・禁止物件）
+- `GET /api/schedules/[id]/trajectory/latest` — リアルタイム最新座標（ポーリング用）
+- `GET /api/admin/notifications` — 通知一覧（unreadOnly, limit, sinceIdフィルタ）
+- `PUT /api/admin/notifications/read` — 通知既読（ids指定 or all:true）
+
+### フロントエンド
+- `src/components/schedules/TrajectoryViewer.tsx` — GPS軌跡ビューアモーダル
+  - Google Maps上にエリアポリゴン、GPS軌跡ポリライン、進捗/スキップ/禁止物件マーカーを表示
+  - タイムスライダー＆再生アニメーション（1x/2x/5x/10x速度）
+  - パフォーマンス統計パネル（歩数・距離・カロリー・時間あたりメトリクス）
+  - アクティブセッション時は15秒ポーリングでリアルタイム更新
+- `src/components/NotificationBell.tsx` — 通知ベルコンポーネント
+  - 30秒ポーリングで未読通知を取得、バッジ表示
+  - ブラウザNotification APIでOS通知
+  - 通知クリックで該当スケジュールの軌跡ビューアを開く
+- `/schedules` ページ: GPSボタンの色分け（灰=未開始、緑点滅=配布中、青=完了）
+- `/settings` ページ: GPS設定セクション（送信間隔・進捗マイルストーン）
+- `LayoutWrapper.tsx`: ヘッダーにNotificationBell配置
+
+### 報酬計算ロジック
+```
+unitPrice = baseRate(rate1Type〜rate6Type) + areaUnitPrice + sizeUnitPrice
+earnedAmount = floor(unitPrice × max(actualCounts))
+```
+`distributor-payroll/generate/route.ts` と同じロジックを `finish/route.ts` 内で再利用。
+
+### データ量見積もり
+- 10秒間隔 × 8時間 = 約2,880ポイント/セッション
+- 50人/日 × 2,880 = 約14.4万行/日（gps_points）
+- 90日以上のデータはアーカイブ/削除を検討
+
+### SystemSetting キー
+- `gpsTrackingInterval`: GPS送信間隔（秒）、デフォルト "10"
+- `progressMilestone`: 進捗マイルストーン（枚）、デフォルト "500"

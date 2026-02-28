@@ -539,7 +539,7 @@ export default function SettingsPage() {
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between gap-6 pt-6">
+              <div className="flex items-center justify-between gap-6 pt-6 pb-6">
                 <div>
                   <p className="font-bold text-slate-800 text-sm">週の開始曜日</p>
                   <p className="text-xs text-slate-500 mt-0.5">給与計算（週次）の集計期間の開始曜日を設定します。</p>
@@ -556,6 +556,71 @@ export default function SettingsPage() {
                   </select>
                   <button
                     onClick={() => handleSaveSystemSetting('weekStartDay', systemSettings.weekStartDay ?? '1')}
+                    disabled={isSavingSystem}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {systemSaved ? <><i className="bi bi-check2"></i> 保存済</> : isSavingSystem ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+            </div>
+            {/* GPS設定 */}
+            <div className="p-5 border-t border-slate-200">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <i className="bi bi-geo-alt-fill text-emerald-500"></i>
+                GPS トラッキング設定
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">配布員のモバイルアプリで使用されるGPS関連の設定です。</p>
+            </div>
+            <div className="px-6 pb-6 divide-y divide-slate-100 space-y-0">
+              <div className="flex items-center justify-between gap-6 pb-6">
+                <div>
+                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i className="bi bi-broadcast text-blue-500"></i>
+                    GPS送信間隔（秒）
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">配布中にモバイルアプリがGPS座標を送信する間隔です。</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    value={systemSettings.gpsTrackingInterval ?? '10'}
+                    onChange={e => setSystemSettings(prev => ({ ...prev, gpsTrackingInterval: e.target.value }))}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-24 text-center"
+                  />
+                  <span className="text-sm text-slate-500">秒</span>
+                  <button
+                    onClick={() => handleSaveSystemSetting('gpsTrackingInterval', systemSettings.gpsTrackingInterval ?? '10')}
+                    disabled={isSavingSystem}
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {systemSaved ? <><i className="bi bi-check2"></i> 保存済</> : isSavingSystem ? '保存中...' : '保存'}
+                  </button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-6 pt-6">
+                <div>
+                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i className="bi bi-flag-fill text-amber-500"></i>
+                    進捗マイルストーン（枚）
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">配布員が進捗報告を行うポスト数の単位です（例: 500枚ごと）。</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <input
+                    type="number"
+                    min="100"
+                    max="2000"
+                    step="100"
+                    value={systemSettings.progressMilestone ?? '500'}
+                    onChange={e => setSystemSettings(prev => ({ ...prev, progressMilestone: e.target.value }))}
+                    className="border border-slate-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-24 text-center"
+                  />
+                  <span className="text-sm text-slate-500">枚</span>
+                  <button
+                    onClick={() => handleSaveSystemSetting('progressMilestone', systemSettings.progressMilestone ?? '500')}
                     disabled={isSavingSystem}
                     className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center gap-1.5"
                   >

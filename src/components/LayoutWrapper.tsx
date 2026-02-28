@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/NotificationBell';
 import { useState, useEffect } from 'react';
 import { NotificationProvider } from '@/components/ui/NotificationProvider';
 
@@ -49,9 +50,15 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           >
             <i className="bi bi-list text-2xl" />
           </button>
-          <span className="font-extrabold text-white tracking-wide">
+          <span className="font-extrabold text-white tracking-wide flex-1">
             PMS <span className="text-blue-400">Pro</span>
           </span>
+          <NotificationBell />
+        </div>
+
+        {/* デスクトップ用通知ベル（右上固定） */}
+        <div className="hidden md:flex fixed top-3 right-6 z-[1100]">
+          <NotificationBell />
         </div>
 
         <Sidebar
