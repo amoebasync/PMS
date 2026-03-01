@@ -825,23 +825,34 @@ export default function ApplicantsPage() {
               <p className="text-xs text-slate-500">面接スロット・応募者評価管理</p>
             </div>
           </div>
-          <button
-            onClick={() => {
-              fetchJobCategories();
-              setShowJobCatModal(true);
-            }}
-            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            <i className="bi bi-tags-fill text-indigo-500"></i>
-            職種マスタ管理
-          </button>
-          <a
-            href="/settings?tab=interviewSlot"
-            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
-          >
-            <i className="bi bi-gear-fill text-slate-500"></i>
-            スロット設定
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href="/apply"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
+            >
+              <i className="bi bi-box-arrow-up-right"></i>
+              応募ページ
+            </a>
+            <button
+              onClick={() => {
+                fetchJobCategories();
+                setShowJobCatModal(true);
+              }}
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <i className="bi bi-tags-fill text-indigo-500"></i>
+              職種マスタ
+            </button>
+            <a
+              href="/settings?tab=interviewSlot"
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
+            >
+              <i className="bi bi-gear-fill text-slate-500"></i>
+              スロット設定
+            </a>
+          </div>
         </div>
 
         {/* ── タブ ── */}
