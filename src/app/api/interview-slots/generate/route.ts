@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
-import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
 
 const DAYS_AHEAD = 14;
 
@@ -45,7 +44,6 @@ export async function POST(request: Request) {
 
     let totalCreated = 0;
     let totalSkipped = 0;
-    const meetConfigured = isGoogleMeetConfigured();
 
     for (const date of targetDates) {
       const dayOfWeek = date.getDay();
@@ -88,34 +86,12 @@ export async function POST(request: Request) {
             continue;
           }
 
-          let meetUrl: string | null = null;
-          if (meetConfigured) {
-            const dateStr = slotStart.toLocaleDateString('ja-JP', {
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            });
-            const timeStr = `${slotStart.toLocaleTimeString('ja-JP', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })} - ${slotEnd.toLocaleTimeString('ja-JP', {
-              hour: '2-digit',
-              minute: '2-digit',
-            })}`;
-            meetUrl = await createGoogleMeetEvent(
-              `【ティラミス】面接枠 ${dateStr} ${timeStr}`,
-              `自動生成された面接スロット`,
-              slotStart,
-              slotEnd
-            );
-          }
-
+          // Google Meet URL は応募者が予約した時点（/api/apply）で生成するため、ここでは作成しない
           await prisma.interviewSlot.create({
             data: {
               startTime: slotStart,
               endTime: slotEnd,
               jobCategoryId: jcId,
-              meetUrl,
             },
           });
           totalCreated++;
