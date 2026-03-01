@@ -29,8 +29,7 @@ export async function GET(request: Request) {
       include: {
         _count: { select: { applicants: true } },
         applicants: {
-          select: { id: true, name: true },
-          take: 5,
+          select: { id: true, name: true, flowStatus: true, hiringStatus: true, phone: true },
           orderBy: { id: 'asc' },
         },
       },
@@ -47,7 +46,7 @@ export async function GET(request: Request) {
       updatedAt: slot.updatedAt,
       bookedCount: slot._count.applicants,
       remainingCapacity: slot.capacity - slot._count.applicants,
-      applicants: slot.applicants,
+      applicants: slot.applicants as { id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null }[],
     }));
 
     return NextResponse.json({ data, total: slots.length });
