@@ -115,6 +115,8 @@ export async function POST(
 
       const trainingTime = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')} - ${String(slotEnd.getHours()).padStart(2, '0')}:${String(slotEnd.getMinutes()).padStart(2, '0')}`;
 
+      const jobName = updated.jobCategory?.nameJa || updated.jobCategory?.nameEn || '';
+
       sendTrainingConfirmationEmail(
         updated.email,
         updated.name,
@@ -122,7 +124,10 @@ export async function POST(
         trainingDate,
         trainingTime,
         trainingSlot.location,
-        null
+        null,
+        jobName,
+        trainingSlot.startTime,
+        trainingSlot.endTime,
       ).catch((err) => console.error('Training confirmation email failed:', err));
     }
 

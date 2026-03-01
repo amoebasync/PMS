@@ -25,8 +25,13 @@ export async function GET(
         jobCategory: true,
         country: true,
         visaType: true,
-        interviewSlot: true,
+        interviewSlot: {
+          include: {
+            interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+          },
+        },
         recruitingMedia: true,
+        trainingSlot: true,
       },
     });
 
@@ -38,6 +43,66 @@ export async function GET(
   } catch (error) {
     console.error('Applicant Detail Error:', error);
     return NextResponse.json({ error: '応募者の取得に失敗しました' }, { status: 500 });
+  }
+}
+
+// DELETE /api/applicants/[id]
+// 管理者: 応募者削除（面接スロット解放含む）
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const applicantId = parseInt(id);
+    const { actorId, actorName } = await getAdminActorInfo();
+    const ip = getIpAddress(request);
+
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
+      include: { interviewSlot: true },
+    });
+
+    if (!applicant) {
+      return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 面接スロットが紐付いている場合は解放
+      if (applicant.interviewSlot) {
+        await tx.interviewSlot.update({
+          where: { id: applicant.interviewSlot.id },
+          data: { applicantId: null, isBooked: false },
+        });
+      }
+
+      // 応募者を削除
+      await tx.applicant.delete({ where: { id: applicantId } });
+
+      // 監査ログ
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'DELETE',
+        targetModel: 'Applicant',
+        targetId: applicantId,
+        beforeData: applicant as unknown as Record<string, unknown>,
+        ipAddress: ip,
+        description: `応募者「${applicant.name}」を削除`,
+        tx,
+      });
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Applicant Delete Error:', error);
+    return NextResponse.json({ error: '応募者の削除に失敗しました' }, { status: 500 });
   }
 }
 
@@ -104,8 +169,13 @@ export async function PUT(
           jobCategory: true,
           country: true,
           visaType: true,
-          interviewSlot: true,
+          interviewSlot: {
+            include: {
+              interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+            },
+          },
           recruitingMedia: true,
+          trainingSlot: true,
         },
       });
 

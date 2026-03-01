@@ -1,0 +1,103 @@
+import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { sendTrainingCancellationEmail } from '@/lib/mailer';
+
+// POST /api/applicants/[id]/cancel-training
+// 管理者: 研修スロット予約をキャンセル
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const { id } = await params;
+    const applicantId = parseInt(id);
+    const { actorId, actorName } = await getAdminActorInfo();
+    const ip = getIpAddress(request);
+
+    const applicant = await prisma.applicant.findUnique({
+      where: { id: applicantId },
+      include: { trainingSlot: true, jobCategory: true },
+    });
+
+    if (!applicant) {
+      return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
+    }
+
+    if (!applicant.trainingSlotId) {
+      return NextResponse.json({ error: '研修スロットが紐付いていません' }, { status: 400 });
+    }
+
+    const oldSlotId = applicant.trainingSlotId;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const result = await tx.applicant.update({
+        where: { id: applicantId },
+        data: { trainingSlotId: null },
+        include: {
+          jobCategory: true,
+          country: true,
+          visaType: true,
+          interviewSlot: {
+            include: { interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } } },
+          },
+          recruitingMedia: true,
+          trainingSlot: true,
+        },
+      });
+
+      await writeAuditLog({
+        actorType: 'EMPLOYEE',
+        actorId,
+        actorName,
+        action: 'UPDATE',
+        targetModel: 'Applicant',
+        targetId: applicantId,
+        beforeData: applicant as unknown as Record<string, unknown>,
+        afterData: result as unknown as Record<string, unknown>,
+        ipAddress: ip,
+        description: `応募者「${applicant.name}」の研修予約をキャンセル（スロットID: ${oldSlotId}）`,
+        tx,
+      });
+
+      return result;
+    });
+
+    // キャンセル通知メール送信
+    if (applicant.email && applicant.trainingSlot) {
+      const lang = applicant.language || 'ja';
+      const slotStart = new Date(applicant.trainingSlot.startTime);
+      const slotEnd = new Date(applicant.trainingSlot.endTime);
+
+      const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
+
+      const trainingDate = lang === 'en'
+        ? slotStart.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
+        : `${slotStart.getFullYear()}年${slotStart.getMonth() + 1}月${slotStart.getDate()}日（${WEEKDAYS_JA[slotStart.getDay()]}）`;
+
+      const trainingTime = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')} - ${String(slotEnd.getHours()).padStart(2, '0')}:${String(slotEnd.getMinutes()).padStart(2, '0')}`;
+
+      const jobName = applicant.jobCategory?.nameJa || applicant.jobCategory?.nameEn || '';
+
+      sendTrainingCancellationEmail(
+        applicant.email,
+        applicant.name,
+        lang,
+        trainingDate,
+        trainingTime,
+        jobName,
+      ).catch((err) => console.error('Training cancellation email failed:', err));
+    }
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error('Cancel Training Error:', error);
+    return NextResponse.json({ error: '研修キャンセルに失敗しました' }, { status: 500 });
+  }
+}
