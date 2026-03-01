@@ -540,12 +540,9 @@ export default function ApplicantsPage() {
     setSavingCapacity(false);
   };
 
-  // 研修スロット詳細パネルを閉じ、カレンダーサイズを再計算
+  // 研修スロット詳細モーダルを閉じる
   const closeTrainingSlotPanel = () => {
     setSelectedTrainingSlot(null);
-    setTimeout(() => {
-      trainingCalendarRef.current?.getApi().updateSize();
-    }, 50);
   };
 
   // 研修スロット: 削除
@@ -1294,235 +1291,240 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              {/* カレンダー + 詳細パネル */}
-              <div className="flex">
-                {/* FullCalendar */}
-                <div className={`p-6 transition-all ${selectedTrainingSlot ? 'w-[60%]' : 'w-full'}`}>
-                  {trainingMgmtLoading && trainingMgmtSlots.length === 0 ? (
-                    <div className="flex items-center justify-center py-20">
-                      <div className="flex items-center gap-3 text-slate-400">
-                        <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span className="text-sm font-medium">読み込み中...</span>
-                      </div>
+              {/* カレンダー */}
+              <div className="p-6">
+                {trainingMgmtLoading && trainingMgmtSlots.length === 0 ? (
+                  <div className="flex items-center justify-center py-20">
+                    <div className="flex items-center gap-3 text-slate-400">
+                      <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-sm font-medium">読み込み中...</span>
                     </div>
-                  ) : (
-                    <FullCalendar
-                      ref={trainingCalendarRef}
-                      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-                      initialView="timeGridWeek"
-                      locale="ja"
-                      headerToolbar={{
-                        left: 'prev,next today',
-                        center: 'title',
-                        right: 'dayGridMonth,timeGridWeek',
-                      }}
-                      buttonText={{ today: '今日', month: '月', week: '週' }}
-                      events={trainingCalendarEvents}
-                      eventClick={handleTrainingEventClick}
-                      datesSet={handleTrainingDatesSet}
-                      slotMinTime="08:00:00"
-                      slotMaxTime="23:00:00"
-                      allDaySlot={false}
-                      height="auto"
-                      nowIndicator={true}
-                      eventContent={(arg) => {
-                        const slot = arg.event.extendedProps.slot as TrainingSlotManagement;
-                        const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
-                        return (
-                          <div className="px-1 py-0.5 overflow-hidden h-full flex flex-col gap-0.5">
-                            <div className="flex items-center justify-between gap-1">
-                              <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
-                              <div className="text-[11px] shrink-0 opacity-90">{slot.bookedCount}/{slot.capacity}名</div>
+                  </div>
+                ) : (
+                  <FullCalendar
+                    ref={trainingCalendarRef}
+                    plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                    initialView="timeGridWeek"
+                    locale="ja"
+                    headerToolbar={{
+                      left: 'prev,next today',
+                      center: 'title',
+                      right: 'dayGridMonth,timeGridWeek',
+                    }}
+                    buttonText={{ today: '今日', month: '月', week: '週' }}
+                    events={trainingCalendarEvents}
+                    eventClick={handleTrainingEventClick}
+                    datesSet={handleTrainingDatesSet}
+                    slotMinTime="08:00:00"
+                    slotMaxTime="23:00:00"
+                    allDaySlot={false}
+                    height="auto"
+                    nowIndicator={true}
+                    eventContent={(arg) => {
+                      const slot = arg.event.extendedProps.slot as TrainingSlotManagement;
+                      const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+                      return (
+                        <div className="px-1 py-0.5 overflow-hidden h-full flex flex-col gap-0.5 cursor-pointer">
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
+                            <div className="text-[11px] shrink-0 opacity-90">{slot.bookedCount}/{slot.capacity}名</div>
+                          </div>
+                          {slot.location && <div className="text-[10px] truncate opacity-80"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</div>}
+                          {slot.capacity > 0 && (
+                            <div className="h-1 bg-white/30 rounded-full overflow-hidden">
+                              <div className="h-full bg-white/80 rounded-full" style={{ width: `${Math.min(fillRate, 100)}%` }}></div>
                             </div>
-                            {slot.location && <div className="text-[10px] truncate opacity-80"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</div>}
-                            {slot.capacity > 0 && (
-                              <div className="h-1 bg-white/30 rounded-full overflow-hidden">
-                                <div className="h-full bg-white/80 rounded-full" style={{ width: `${Math.min(fillRate, 100)}%` }}></div>
-                              </div>
-                            )}
-                            {slot.applicants.length > 0 && (
-                              <div className="flex flex-col gap-0.5 mt-0.5">
-                                {slot.applicants.map(app => {
-                                  const isDone = app.flowStatus === 'TRAINING_COMPLETED';
-                                  return (
-                                    <div key={app.id} className={`text-[10px] truncate px-1 py-0.5 rounded bg-white/20 leading-tight ${isDone ? 'opacity-60 line-through' : ''}`}>
-                                      {isDone && <span className="mr-0.5">✓</span>}{app.name}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                  )}
-                </div>
-
-                {/* スロット詳細パネル */}
-                {selectedTrainingSlot && (() => {
-                  const slot = selectedTrainingSlot;
-                  const start = new Date(slot.startTime);
-                  const end = new Date(slot.endTime);
-                  const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
-                  const canDelete = slot.bookedCount === 0;
-                  return (
-                    <div className="w-[40%] border-l border-slate-200 flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
-                      {/* ヘッダー */}
-                      <div className="sticky top-0 bg-white px-5 py-4 border-b border-slate-200 flex items-start justify-between z-10">
-                        <div>
-                          <div className="text-sm font-black text-slate-800">
-                            {start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-0.5">
-                            {start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 {end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
-                          </div>
-                          {slot.location && (
-                            <div className="text-xs text-slate-400 mt-1">
-                              <i className="bi bi-geo-alt mr-1"></i>{slot.location}
+                          )}
+                          {slot.applicants.length > 0 && (
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                              {slot.applicants.map(app => {
+                                const isDone = app.flowStatus === 'TRAINING_COMPLETED';
+                                return (
+                                  <div key={app.id} className={`text-[10px] truncate px-1 py-0.5 rounded bg-white/20 leading-tight ${isDone ? 'opacity-60 line-through' : ''}`}>
+                                    {isDone && <span className="mr-0.5">✓</span>}{app.name}
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
-                        <button
-                          onClick={closeTrainingSlotPanel}
-                          className="text-slate-400 hover:text-slate-600 transition-colors mt-0.5"
-                        >
-                          <i className="bi bi-x-lg text-base"></i>
-                        </button>
-                      </div>
-
-                      {/* 定員設定 */}
-                      <div className="px-5 py-4 border-b border-slate-100">
-                        <div className="text-xs font-bold text-slate-500 mb-2">定員</div>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => setEditCapacity(v => Math.max(1, v - 1))}
-                            className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
-                          >
-                            <i className="bi bi-dash text-sm"></i>
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={editCapacity}
-                            onChange={e => setEditCapacity(Math.max(1, Math.min(100, Number(e.target.value))))}
-                            className="w-16 text-center border border-slate-200 rounded-lg py-1.5 text-sm font-bold focus:ring-2 focus:ring-indigo-400 focus:outline-none"
-                          />
-                          <button
-                            onClick={() => setEditCapacity(v => Math.min(100, v + 1))}
-                            className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
-                          >
-                            <i className="bi bi-plus text-sm"></i>
-                          </button>
-                          <span className="text-sm text-slate-500">名</span>
-                          <button
-                            onClick={handleSaveCapacity}
-                            disabled={savingCapacity || editCapacity === slot.capacity}
-                            className="ml-auto flex items-center gap-1.5 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
-                          >
-                            {savingCapacity ? (
-                              <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block"></span>
-                            ) : (
-                              <i className="bi bi-check2"></i>
-                            )}
-                            保存
-                          </button>
-                        </div>
-                        {/* 埋まり具合バー */}
-                        <div className="mt-3 flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${fillRate >= 100 ? 'bg-rose-500' : fillRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
-                              style={{ width: `${Math.min(fillRate, 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs font-bold text-slate-600 shrink-0">
-                            {slot.bookedCount}/{slot.capacity}名
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* 参加者リスト */}
-                      <div className="px-5 py-4 flex-1">
-                        <div className="text-xs font-bold text-slate-500 mb-2">参加者</div>
-                        {slot.applicants.length === 0 ? (
-                          <p className="text-xs text-slate-400 italic">参加者なし</p>
-                        ) : (
-                          <div className="space-y-2">
-                            {slot.applicants.map(app => {
-                              const flow = FLOW_STATUS_MAP[app.flowStatus];
-                              const isCompleted = app.flowStatus === 'TRAINING_COMPLETED';
-                              return (
-                                <div
-                                  key={app.id}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
-                                >
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
-                                      <i className={`bi ${isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
-                                    </div>
-                                    <div className="min-w-0">
-                                      <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
-                                      {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
-                                    </div>
-                                    {flow && (
-                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
-                                        {flow.label}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {!isCompleted && (
-                                    <button
-                                      onClick={() => handleMarkTrainingComplete(app.id)}
-                                      disabled={markingComplete === app.id}
-                                      className="flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
-                                    >
-                                      {markingComplete === app.id ? (
-                                        <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
-                                      ) : (
-                                        <i className="bi bi-check2-circle"></i>
-                                      )}
-                                      完了
-                                    </button>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* 削除ボタン */}
-                      <div className="px-5 py-4 border-t border-slate-100">
-                        {canDelete ? (
-                          <button
-                            onClick={handleDeleteTrainingSlot}
-                            disabled={deletingSlot}
-                            className="w-full flex items-center justify-center gap-2 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
-                          >
-                            {deletingSlot ? (
-                              <span className="w-4 h-4 border border-rose-500 border-t-transparent rounded-full animate-spin inline-block"></span>
-                            ) : (
-                              <i className="bi bi-trash3"></i>
-                            )}
-                            この枠を削除
-                          </button>
-                        ) : (
-                          <p className="text-xs text-slate-400 text-center">
-                            <i className="bi bi-info-circle mr-1"></i>
-                            参加者がいる枠は削除できません
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
+                      );
+                    }}
+                  />
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* ════════════════════════════════════════════
+          モーダル: 研修スロット詳細
+         ════════════════════════════════════════════ */}
+      {selectedTrainingSlot && (() => {
+        const slot = selectedTrainingSlot;
+        const start = new Date(slot.startTime);
+        const end = new Date(slot.endTime);
+        const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+        const canDelete = slot.bookedCount === 0;
+        return (
+          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[80vh]">
+              {/* ヘッダー */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
+                    <i className="bi bi-mortarboard-fill text-indigo-600"></i>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-black text-slate-800">
+                      {start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })}
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      {start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 {end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                      {slot.location && <span className="ml-2"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</span>}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeTrainingSlotPanel}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  <i className="bi bi-x-lg text-lg"></i>
+                </button>
+              </div>
+
+              {/* ボディ */}
+              <div className="overflow-y-auto flex-1">
+                {/* 定員設定 */}
+                <div className="px-6 py-4 border-b border-slate-100">
+                  <div className="text-xs font-bold text-slate-500 mb-2">定員設定</div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setEditCapacity(v => Math.max(1, v - 1))}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
+                    >
+                      <i className="bi bi-dash text-sm"></i>
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={editCapacity}
+                      onChange={e => setEditCapacity(Math.max(1, Math.min(100, Number(e.target.value))))}
+                      className="w-16 text-center border border-slate-200 rounded-lg py-1.5 text-sm font-bold focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                    />
+                    <button
+                      onClick={() => setEditCapacity(v => Math.min(100, v + 1))}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
+                    >
+                      <i className="bi bi-plus text-sm"></i>
+                    </button>
+                    <span className="text-sm text-slate-500">名</span>
+                    <button
+                      onClick={handleSaveCapacity}
+                      disabled={savingCapacity || editCapacity === slot.capacity}
+                      className="ml-auto flex items-center gap-1.5 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                    >
+                      {savingCapacity ? (
+                        <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+                      ) : (
+                        <i className="bi bi-check2"></i>
+                      )}
+                      保存
+                    </button>
+                  </div>
+                  {/* 埋まり具合バー */}
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${fillRate >= 100 ? 'bg-rose-500' : fillRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${Math.min(fillRate, 100)}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs font-bold text-slate-600 shrink-0">
+                      {slot.bookedCount}/{slot.capacity}名
+                    </span>
+                  </div>
+                </div>
+
+                {/* 参加者リスト */}
+                <div className="px-6 py-4">
+                  <div className="text-xs font-bold text-slate-500 mb-2">参加者</div>
+                  {slot.applicants.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">参加者なし</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {slot.applicants.map(app => {
+                        const flow = FLOW_STATUS_MAP[app.flowStatus];
+                        const isCompleted = app.flowStatus === 'TRAINING_COMPLETED';
+                        return (
+                          <div
+                            key={app.id}
+                            className={`flex items-center justify-between px-3 py-2 rounded-lg ${isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
+                                <i className={`bi ${isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
+                                {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
+                              </div>
+                              {flow && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
+                                  {flow.label}
+                                </span>
+                              )}
+                            </div>
+                            {!isCompleted && (
+                              <button
+                                onClick={() => handleMarkTrainingComplete(app.id)}
+                                disabled={markingComplete === app.id}
+                                className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
+                              >
+                                {markingComplete === app.id ? (
+                                  <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
+                                ) : (
+                                  <i className="bi bi-check2-circle"></i>
+                                )}
+                                研修完了
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* フッター */}
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
+                {canDelete ? (
+                  <button
+                    onClick={handleDeleteTrainingSlot}
+                    disabled={deletingSlot}
+                    className="w-full flex items-center justify-center gap-2 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {deletingSlot ? (
+                      <span className="w-4 h-4 border border-rose-500 border-t-transparent rounded-full animate-spin inline-block"></span>
+                    ) : (
+                      <i className="bi bi-trash3"></i>
+                    )}
+                    この枠を削除
+                  </button>
+                ) : (
+                  <p className="text-xs text-slate-400 text-center">
+                    <i className="bi bi-info-circle mr-1"></i>
+                    参加者がいる枠は削除できません
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ════════════════════════════════════════════
           モーダル: スロット作成
