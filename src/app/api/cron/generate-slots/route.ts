@@ -45,9 +45,19 @@ export async function GET(request: Request) {
     let totalCreated = 0;
     let totalSkipped = 0;
 
+    // JST（+09:00）で指定分数を Date に変換（サーバータイムゾーン非依存）
+    const toJSTTime = (date: Date, totalMinutes: number): Date => {
+      const h = Math.floor(totalMinutes / 60);
+      const m = totalMinutes % 60;
+      const yyyy = date.getUTCFullYear();
+      const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(date.getUTCDate()).padStart(2, '0');
+      return new Date(`${yyyy}-${mm}-${dd}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`);
+    };
+
     // 各日付に対して処理
     for (const date of targetDates) {
-      const dayOfWeek = date.getDay(); // 0=日, 1=月, ..., 6=土
+      const dayOfWeek = date.getUTCDay(); // 0=日, 1=月, ..., 6=土（UTC基準）
       const defaultSlot = defaultSlots.find((s) => s.dayOfWeek === dayOfWeek);
       if (!defaultSlot) continue;
 
@@ -64,16 +74,8 @@ export async function GET(request: Request) {
       const categoryList = jobCategoryIds.length > 0 ? jobCategoryIds : [null];
 
       while (currentMinutes + interval <= endMinutes) {
-        const slotStart = new Date(date);
-        slotStart.setHours(Math.floor(currentMinutes / 60), currentMinutes % 60, 0, 0);
-
-        const slotEnd = new Date(date);
-        slotEnd.setHours(
-          Math.floor((currentMinutes + interval) / 60),
-          (currentMinutes + interval) % 60,
-          0,
-          0
-        );
+        const slotStart = toJSTTime(date, currentMinutes);
+        const slotEnd = toJSTTime(date, currentMinutes + interval);
 
         // 各職種ごとにスロットを作成
         for (const jcId of categoryList) {

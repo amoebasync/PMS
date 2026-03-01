@@ -198,7 +198,17 @@ export async function POST(request: Request) {
     // ② 適用開始日が指定されている場合、不一致の未予約スロットを削除して再生成
     if (effectiveFrom) {
       const startDate = new Date(effectiveFrom);
-      startDate.setHours(0, 0, 0, 0);
+      startDate.setUTCHours(0, 0, 0, 0);
+
+      // JST（+09:00）で指定分数を Date に変換（サーバータイムゾーン非依存）
+      const toJSTTime = (date: Date, totalMinutes: number): Date => {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        const yyyy = date.getUTCFullYear();
+        const mm = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const dd = String(date.getUTCDate()).padStart(2, '0');
+        return new Date(`${yyyy}-${mm}-${dd}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`);
+      };
 
       // 保存後のマスタ設定を取得
       const masterSlots = await prisma.defaultInterviewSlot.findMany({
@@ -211,13 +221,12 @@ export async function POST(request: Request) {
       // 適用開始日から14日間処理
       for (let i = 0; i < 14; i++) {
         const currentDate = new Date(startDate);
-        currentDate.setDate(currentDate.getDate() + i);
-        const dayOfWeek = currentDate.getDay();
+        currentDate.setUTCDate(currentDate.getUTCDate() + i);
+        const dayOfWeek = currentDate.getUTCDay();
 
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(0, 0, 0, 0);
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(23, 59, 59, 999);
+        // JST日の開始・終了をUTCで表現（JST 00:00〜23:59 = UTC 前日15:00〜当日14:59）
+        const dayStart = toJSTTime(currentDate, 0);          // JST 00:00
+        const dayEnd = toJSTTime(currentDate, 23 * 60 + 59); // JST 23:59
 
         const master = masterSlots.find((s) => s.dayOfWeek === dayOfWeek && s.isEnabled);
 
@@ -245,15 +254,8 @@ export async function POST(request: Request) {
 
           while (currentMinutes + interval <= endMinutes) {
             for (const jcId of categoryList) {
-              const slotStart = new Date(currentDate);
-              slotStart.setHours(Math.floor(currentMinutes / 60), currentMinutes % 60, 0, 0);
-              const slotEnd = new Date(currentDate);
-              slotEnd.setHours(
-                Math.floor((currentMinutes + interval) / 60),
-                (currentMinutes + interval) % 60,
-                0,
-                0
-              );
+              const slotStart = toJSTTime(currentDate, currentMinutes);
+              const slotEnd = toJSTTime(currentDate, currentMinutes + interval);
               validSlots.push({ startTime: slotStart, endTime: slotEnd, jobCategoryId: jcId });
             }
             currentMinutes += interval;
