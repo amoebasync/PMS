@@ -30,6 +30,8 @@ export async function POST(request: Request) {
       data: {
         nameJa: body.nameJa,
         nameEn: body.nameEn,
+        prefix: body.prefix || null,
+        staffIdSeq: body.staffIdSeq !== undefined ? Number(body.staffIdSeq) : 0,
         address: body.address,
         googleMapUrl: body.googleMapUrl,
         openingTime: body.openingTime,

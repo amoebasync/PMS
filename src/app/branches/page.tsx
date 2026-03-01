@@ -17,7 +17,7 @@ export default function BranchPage() {
   const [currentId, setCurrentId] = useState<number | null>(null);
 
   const initialForm = {
-    nameJa: '', nameEn: '', address: '', googleMapUrl: '', 
+    nameJa: '', nameEn: '', prefix: '', staffIdSeq: '0', address: '', googleMapUrl: '',
     openingTime: '', closedDays: '',
     manager1Id: '', manager2Id: '', manager3Id: '', manager4Id: ''
   };
@@ -56,6 +56,8 @@ export default function BranchPage() {
       setFormData({
         nameJa: branch.nameJa || '',
         nameEn: branch.nameEn || '',
+        prefix: branch.prefix || '',
+        staffIdSeq: String(branch.staffIdSeq ?? 0),
         address: branch.address || '',
         googleMapUrl: branch.googleMapUrl || '',
         openingTime: branch.openingTime || '',
@@ -138,6 +140,11 @@ export default function BranchPage() {
                   <td className="px-6 py-4">
                     <div className="font-bold text-slate-800 text-base">{b.nameJa}</div>
                     <div className="font-mono text-xs text-slate-400">{b.nameEn}</div>
+                    {b.prefix && (
+                      <span className="inline-block mt-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
+                        {b.prefix} — 次: {b.prefix}{String((b.staffIdSeq ?? 0) + 1).padStart(3, '0')}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-slate-700"><i className="bi bi-clock mr-1 text-slate-400"></i> {b.openingTime || '-'}</div>
@@ -190,6 +197,26 @@ export default function BranchPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div><label className="text-xs font-bold text-slate-600">支店名 (日本語) *</label><input required name="nameJa" value={formData.nameJa} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 高田馬場" /></div>
                   <div><label className="text-xs font-bold text-slate-600">支店名 (英語) *</label><input required name="nameEn" value={formData.nameEn} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono" placeholder="例: Takadanobaba" /></div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">スタッフIDプレフィックス</label>
+                    <input name="prefix" value={(formData as any).prefix} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono uppercase" placeholder="例: MBF" maxLength={10} />
+                    <p className="text-[10px] text-slate-400 mt-1">配布員登録時のスタッフID自動生成に使用（例: MBF001）</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">現在のシーケンス番号</label>
+                    <input
+                      type="number"
+                      name="staffIdSeq"
+                      min={0}
+                      value={(formData as any).staffIdSeq}
+                      onChange={handleInputChange}
+                      className="w-full border p-2 rounded-lg text-sm font-mono"
+                      placeholder="0"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      次のスタッフIDは {(formData as any).prefix || 'PREFIX'}{String(Number((formData as any).staffIdSeq ?? 0) + 1).padStart(3, '0')} になります
+                    </p>
+                  </div>
                   <div className="col-span-2"><label className="text-xs font-bold text-slate-600">住所</label><input name="address" value={formData.address} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
                   <div className="col-span-2"><label className="text-xs font-bold text-slate-600">Google Map URL</label><input name="googleMapUrl" value={formData.googleMapUrl} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="https://maps.app.goo.gl/..." /></div>
                   <div><label className="text-xs font-bold text-slate-600">開店時間</label><input type="time" name="openingTime" value={formData.openingTime} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>

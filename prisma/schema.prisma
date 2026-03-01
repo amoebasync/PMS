@@ -193,6 +193,10 @@ model Employee {
   // アプリ配信
   appDistributionsSent AppDistributionLog[] @relation("AppDistributionSender")
 
+  // 面接担当スロット
+  interviewSlots              InterviewSlot[]      @relation("InterviewerSlots")
+  defaultInterviewSlots       DefaultInterviewSlot[] @relation("DefaultSlotInterviewer")
+
   @@map("employees")
 }
 
@@ -211,9 +215,9 @@ model PasswordResetToken {
 
 // --- 雇用形態 ---
 enum EmploymentType {
-  FULL_TIME   @map("正社員")
-  PART_TIME   @map("アルバイト・パート")
-  OUTSOURCE   @map("業務委託")
+  FULL_TIME
+  PART_TIME
+  OUTSOURCE
 }
 
 // --- 給与形態 ---
@@ -708,6 +712,8 @@ model Branch {
   nameEn String @map("name_en") @db.VarChar(100) // 英語名 (例: Takadanobaba)
 
   // 店舗情報
+  prefix       String? @db.VarChar(10) // スタッフIDプレフィックス (例: "MBF")
+  staffIdSeq   Int     @default(0) @map("staff_id_seq") // スタッフID連番カウンター（次の番号 = staffIdSeq + 1）
   address      String? @db.Text // 住所
   googleMapUrl String? @map("google_map_url") @db.Text // GoogleMapリンク
   openingTime  String? @map("opening_time") @db.VarChar(10) // 開店時間 (例: "07:00")
@@ -2030,7 +2036,8 @@ model InterviewSlot {
   startTime DateTime @map("start_time")
   endTime   DateTime @map("end_time")
   isBooked  Boolean  @default(false) @map("is_booked")
-  meetUrl   String?  @map("meet_url") @db.VarChar(500)
+  meetUrl           String?  @map("meet_url") @db.VarChar(500)
+  calendarEventId   String?  @map("calendar_event_id") @db.VarChar(500)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -2043,9 +2050,14 @@ model InterviewSlot {
   applicantId Int?       @unique @map("applicant_id")
   applicant   Applicant? @relation(fields: [applicantId], references: [id])
 
+  // 面接担当者
+  interviewerId Int?      @map("interviewer_id")
+  interviewer   Employee? @relation("InterviewerSlots", fields: [interviewerId], references: [id])
+
   @@index([startTime])
   @@index([isBooked])
   @@index([jobCategoryId])
+  @@index([interviewerId])
   @@map("interview_slots")
 }
 
@@ -2068,6 +2080,12 @@ model Applicant {
   // 在留資格
   visaTypeId Int?      @map("visa_type_id")
   visaType   VisaType? @relation(fields: [visaTypeId], references: [id])
+
+  // 生年月日
+  birthday DateTime? @db.Date
+
+  // 性別
+  gender Gender @default(unknown)
 
   // 住所
   postalCode String? @map("postal_code") @db.VarChar(8)
@@ -2168,10 +2186,12 @@ model DefaultInterviewSlot {
   endTime         String   @map("end_time") @db.VarChar(5)   // "17:00" 形式
   intervalMinutes Int      @default(60) @map("interval_minutes")
   isEnabled       Boolean  @default(true) @map("is_enabled")
+  interviewerId   Int?     @map("interviewer_id")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
-  // 多対多: 職種
+  // リレーション
+  interviewer   Employee? @relation("DefaultSlotInterviewer", fields: [interviewerId], references: [id])
   jobCategories DefaultSlotJobCategory[]
 
   @@unique([dayOfWeek])

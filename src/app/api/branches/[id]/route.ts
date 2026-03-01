@@ -14,6 +14,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       data: {
         nameJa: body.nameJa,
         nameEn: body.nameEn,
+        prefix: body.prefix !== undefined ? (body.prefix || null) : undefined,
+        staffIdSeq: body.staffIdSeq !== undefined ? Number(body.staffIdSeq) : undefined,
         address: body.address,
         googleMapUrl: body.googleMapUrl,
         openingTime: body.openingTime,

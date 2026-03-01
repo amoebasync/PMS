@@ -25,6 +25,7 @@ type InterviewSlot = {
   endTime: string;
   isBooked: boolean;
   meetUrl: string | null;
+  interviewer: { id: number; lastNameJa: string; firstNameJa: string; email: string } | null;
   applicant: {
     id: number;
     name: string;
@@ -55,6 +56,7 @@ type Applicant = {
   name: string;
   email: string;
   phone: string | null;
+  birthday: string | null;
   language: string;
   jobCategoryId: number;
   jobCategory: { id: number; nameJa: string; nameEn: string | null } | null;
@@ -73,6 +75,7 @@ type Applicant = {
     endTime: string;
     meetUrl: string | null;
     isBooked: boolean;
+    interviewer: { id: number; lastNameJa: string; firstNameJa: string; email: string } | null;
   } | null;
   trainingSlot: {
     id: number;
@@ -259,10 +262,17 @@ export default function ApplicantsPage() {
   });
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
+  // ── 研修日程変更 ──
+  const [showTrainingReschedulePanel, setShowTrainingReschedulePanel] = useState(false);
+  const [availableTrainingSlots, setAvailableTrainingSlots] = useState<TrainingSlotOption[]>([]);
+  const [selectedNewTrainingSlotId, setSelectedNewTrainingSlotId] = useState<number | null>(null);
+  const [trainingRescheduleLoading, setTrainingRescheduleLoading] = useState(false);
+
   // ── 配布員登録 ──
-  const [branches, setBranches] = useState<{ id: number; nameJa: string }[]>([]);
+  const [branches, setBranches] = useState<{ id: number; nameJa: string; prefix: string | null }[]>([]);
   const [showDistributorForm, setShowDistributorForm] = useState(false);
-  const [distForm, setDistForm] = useState({ birthday: '', branchId: '', staffId: '', gender: '' });
+  const [distForm, setDistForm] = useState({ branchId: '', staffId: '' });
+  const [staffIdLoading, setStaffIdLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
 
@@ -307,6 +317,7 @@ export default function ApplicantsPage() {
   const [countries, setCountries] = useState<Country[]>([]);
   const [visaTypes, setVisaTypes] = useState<VisaType[]>([]);
   const [recruitingMediaList, setRecruitingMediaList] = useState<RecruitingMedia[]>([]);
+  const [interviewerEmployees, setInterviewerEmployees] = useState<{ id: number; lastNameJa: string; firstNameJa: string; email: string }[]>([]);
 
   // ──────────────────────────────────────────
   // データ取得
@@ -368,10 +379,11 @@ export default function ApplicantsPage() {
 
   const fetchMasterData = useCallback(async () => {
     try {
-      const [countriesRes, visaTypesRes, rmRes] = await Promise.all([
+      const [countriesRes, visaTypesRes, rmRes, empRes] = await Promise.all([
         fetch('/api/countries/public'),
         fetch('/api/visa-types/public'),
         fetch('/api/recruiting-media'),
+        fetch('/api/employees?simple=true'),
       ]);
       if (countriesRes.ok) {
         const data = await countriesRes.json();
@@ -384,6 +396,10 @@ export default function ApplicantsPage() {
       if (rmRes.ok) {
         const data = await rmRes.json();
         setRecruitingMediaList(data || []);
+      }
+      if (empRes.ok) {
+        const data = await empRes.json();
+        setInterviewerEmployees(data || []);
       }
     } catch {
       // silently fail
@@ -404,6 +420,24 @@ export default function ApplicantsPage() {
     setLoadingTrainingSlots(false);
   };
 
+  const fetchNextStaffId = async (branchId: string) => {
+    if (!branchId) return;
+    setStaffIdLoading(true);
+    try {
+      const res = await fetch(`/api/branches/${branchId}/next-staff-id`);
+      const data = await res.json();
+      if (res.ok && data.nextStaffId) {
+        setDistForm(f => ({ ...f, staffId: data.nextStaffId }));
+      } else {
+        setDistForm(f => ({ ...f, staffId: '' }));
+      }
+    } catch {
+      setDistForm(f => ({ ...f, staffId: '' }));
+    } finally {
+      setStaffIdLoading(false);
+    }
+  };
+
   const fetchBranches = async () => {
     try {
       const res = await fetch('/api/branches');
@@ -414,17 +448,15 @@ export default function ApplicantsPage() {
   };
 
   const handleRegisterAsDistributor = async () => {
-    if (!selectedApplicant || !distForm.birthday || !distForm.branchId) return;
+    if (!selectedApplicant || !distForm.branchId) return;
     setRegistering(true);
     try {
       const res = await fetch(`/api/applicants/${selectedApplicant.id}/register-as-distributor`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          birthday: distForm.birthday,
           branchId: Number(distForm.branchId),
           staffId: distForm.staffId || undefined,
-          gender: distForm.gender || undefined,
         }),
       });
       const data = await res.json();
@@ -484,6 +516,7 @@ export default function ApplicantsPage() {
   // ──────────────────────────────────────────
   const calendarEvents = slots.map(slot => {
     const isBooked = slot.isBooked && slot.applicant;
+    const interviewerName = slot.interviewer ? `${slot.interviewer.lastNameJa} ${slot.interviewer.firstNameJa}` : '';
     return {
       id: String(slot.id),
       title: isBooked ? slot.applicant!.name : '空きスロット',
@@ -495,6 +528,7 @@ export default function ApplicantsPage() {
       extendedProps: {
         slot,
         isBooked,
+        interviewerName,
       },
     };
   });
@@ -663,6 +697,8 @@ export default function ApplicantsPage() {
     setEvalLoading(true);
     setShowEvalModal(true);
     setShowReschedulePanel(false);
+    setShowTrainingReschedulePanel(false);
+    setSelectedNewTrainingSlotId(null);
     setSelectedTrainingSlotId('');
     setTrainingBookingMode('now');
     setShowDistributorForm(false);
@@ -801,6 +837,50 @@ export default function ApplicantsPage() {
     }
   };
 
+  // 面接担当者変更
+  const handleChangeInterviewer = async (newInterviewerId: number | null) => {
+    if (!selectedApplicant?.interviewSlot) return;
+    const slotId = selectedApplicant.interviewSlot.id;
+    try {
+      const res = await fetch(`/api/interview-slots/${slotId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ interviewerId: newInterviewerId }),
+      });
+      if (!res.ok) throw new Error('update failed');
+      const updatedSlot = await res.json();
+      setSelectedApplicant((prev) =>
+        prev ? { ...prev, interviewSlot: { ...prev.interviewSlot!, interviewer: updatedSlot.interviewer } } : prev
+      );
+    } catch {
+      alert('担当者の変更に失敗しました');
+    }
+  };
+
+  // 応募者削除
+  const handleDeleteApplicant = async () => {
+    if (!selectedApplicant) return;
+    const ok = await showConfirm(
+      `「${selectedApplicant.name}」を削除しますか？\nこの操作は取り消せません。`,
+      { variant: 'danger', confirmLabel: '削除する', title: '応募者削除' }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || '削除に失敗しました');
+      }
+      showToast(`「${selectedApplicant.name}」を削除しました`, 'success');
+      setShowEvalModal(false);
+      setSelectedApplicant(null);
+      fetchSlots();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '削除に失敗しました', 'error');
+    }
+  };
+
   // 日程変更パネル表示
   const openReschedulePanel = async () => {
     if (!selectedApplicant) return;
@@ -845,6 +925,76 @@ export default function ApplicantsPage() {
       showToast(e.message || '面接日程変更に失敗しました', 'error');
     } finally {
       setRescheduleLoading(false);
+    }
+  };
+
+  // ── 研修キャンセル ──
+  const handleCancelTraining = async () => {
+    if (!selectedApplicant) return;
+    const ok = await showConfirm(
+      `「${selectedApplicant.name}」の研修予約をキャンセルしますか？`,
+      { variant: 'danger', confirmLabel: 'キャンセルする', title: '研修キャンセル' }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-training`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'キャンセルに失敗しました');
+      }
+      showToast('研修予約をキャンセルしました', 'success');
+      openEvalModal(selectedApplicant.id);
+      fetchTrainingMgmt();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '研修キャンセルに失敗しました', 'error');
+    }
+  };
+
+  // ── 研修キャンセル（カレンダーモーダルから） ──
+  const handleCancelTrainingFromModal = async (applicantId: number, applicantName: string) => {
+    const ok = await showConfirm(
+      `「${applicantName}」の研修予約をキャンセルしますか？`,
+      { variant: 'danger', confirmLabel: 'キャンセルする', title: '研修キャンセル' }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/applicants/${applicantId}/cancel-training`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'キャンセルに失敗しました');
+      }
+      showToast('研修予約をキャンセルしました', 'success');
+      fetchTrainingMgmt();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '研修キャンセルに失敗しました', 'error');
+    }
+  };
+
+  // ── 研修日程変更 ──
+  const handleTrainingReschedule = async () => {
+    if (!selectedApplicant || !selectedNewTrainingSlotId) return;
+    setTrainingRescheduleLoading(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/reschedule-training`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newTrainingSlotId: selectedNewTrainingSlotId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || '日程変更に失敗しました');
+      }
+      showToast('研修日程を変更しました', 'success');
+      setShowTrainingReschedulePanel(false);
+      openEvalModal(selectedApplicant.id);
+      fetchTrainingMgmt();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '研修日程変更に失敗しました', 'error');
+    } finally {
+      setTrainingRescheduleLoading(false);
     }
   };
 
@@ -1099,6 +1249,17 @@ export default function ApplicantsPage() {
                   dayMaxEvents={4}
                   eventDisplay="block"
                   nowIndicator={true}
+                  eventContent={(arg) => {
+                    const { interviewerName } = arg.event.extendedProps;
+                    return (
+                      <div className="p-0.5 overflow-hidden text-xs leading-tight">
+                        <div className="font-semibold truncate">{arg.event.title}</div>
+                        {interviewerName && (
+                          <div className="text-[10px] opacity-80 truncate">{interviewerName}</div>
+                        )}
+                      </div>
+                    );
+                  }}
                 />
               )}
             </div>
@@ -1478,18 +1639,27 @@ export default function ApplicantsPage() {
                               )}
                             </div>
                             {!isCompleted && (
-                              <button
-                                onClick={() => handleMarkTrainingComplete(app.id)}
-                                disabled={markingComplete === app.id}
-                                className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
-                              >
-                                {markingComplete === app.id ? (
-                                  <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
-                                ) : (
-                                  <i className="bi bi-check2-circle"></i>
-                                )}
-                                研修完了
-                              </button>
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                <button
+                                  onClick={() => handleMarkTrainingComplete(app.id)}
+                                  disabled={markingComplete === app.id}
+                                  className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
+                                >
+                                  {markingComplete === app.id ? (
+                                    <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
+                                  ) : (
+                                    <i className="bi bi-check2-circle"></i>
+                                  )}
+                                  研修完了
+                                </button>
+                                <button
+                                  onClick={() => handleCancelTrainingFromModal(app.id, app.name)}
+                                  className="w-7 h-7 flex items-center justify-center text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                                  title="研修キャンセル"
+                                >
+                                  <i className="bi bi-x-circle text-sm"></i>
+                                </button>
+                              </div>
                             )}
                           </div>
                         );
@@ -1724,14 +1894,38 @@ export default function ApplicantsPage() {
                       <h3 className="text-sm font-black text-slate-800">基本情報</h3>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4">
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {/* 個人情報 */}
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">氏名</p>
                           <p className="text-sm font-bold text-slate-800">{selectedApplicant.name}</p>
                         </div>
                         <div>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">生年月日</p>
+                          <p className="text-sm text-slate-700">
+                            {selectedApplicant.birthday
+                              ? new Date(selectedApplicant.birthday).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+                              : '-'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">性別</p>
+                          <p className="text-sm text-slate-700">
+                            {selectedApplicant.gender === 'male' ? '男性'
+                              : selectedApplicant.gender === 'female' ? '女性'
+                              : selectedApplicant.gender === 'other' ? 'その他'
+                              : '-'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-slate-200 my-3" />
+
+                      {/* 連絡先 */}
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                        <div className="col-span-1">
                           <p className="text-xs font-bold text-slate-400 mb-0.5">メール</p>
-                          <p className="text-sm text-slate-700">{selectedApplicant.email}</p>
+                          <p className="text-sm text-slate-700 break-all">{selectedApplicant.email}</p>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">電話</p>
@@ -1741,14 +1935,39 @@ export default function ApplicantsPage() {
                           <p className="text-xs font-bold text-slate-400 mb-0.5">言語</p>
                           <p className="text-sm text-slate-700">{selectedApplicant.language === 'en' ? 'English' : '日本語'}</p>
                         </div>
+                      </div>
+
+                      <div className="border-t border-slate-200 my-3" />
+
+                      {/* 応募情報 */}
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">職種</p>
                           <p className="text-sm text-slate-700">{selectedApplicant.jobCategory?.nameJa || '-'}</p>
                         </div>
                         <div>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">応募経路</p>
+                          <select
+                            value={evalForm.recruitingMediaId}
+                            onChange={e => setEvalForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
+                            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                          >
+                            <option value="">未設定</option>
+                            {recruitingMediaList.map(m => (
+                              <option key={m.id} value={m.id}>{m.nameJa}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="border-t border-slate-200 my-3" />
+
+                      {/* 面接情報 */}
+                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                        <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">面接日時</p>
                           {selectedApplicant.interviewSlot ? (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm text-slate-700">
                                 {new Date(selectedApplicant.interviewSlot.startTime).toLocaleString('ja-JP', {
                                   year: 'numeric',
@@ -1774,19 +1993,27 @@ export default function ApplicantsPage() {
                             <p className="text-sm text-slate-400">未設定</p>
                           )}
                         </div>
-                        {/* 応募経路 */}
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">応募経路</p>
-                          <select
-                            value={evalForm.recruitingMediaId}
-                            onChange={e => setEvalForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
-                            className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                          >
-                            <option value="">未設定</option>
-                            {recruitingMediaList.map(m => (
-                              <option key={m.id} value={m.id}>{m.nameJa}</option>
-                            ))}
-                          </select>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">面接担当者</p>
+                          {selectedApplicant.interviewSlot ? (
+                            <select
+                              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                              value={selectedApplicant.interviewSlot.interviewer?.id || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                handleChangeInterviewer(val ? Number(val) : null);
+                              }}
+                            >
+                              <option value="">未設定</option>
+                              {interviewerEmployees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.lastNameJa} {emp.firstNameJa}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <p className="text-sm text-slate-400">面接未予約</p>
+                          )}
                         </div>
                       </div>
 
@@ -1981,20 +2208,16 @@ export default function ApplicantsPage() {
 
                       {/* スコア */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {!isJapanese(evalForm.countryId) && (
-                          <>
-                            <ScoreSelector
-                              label="日本語能力"
-                              value={evalForm.japaneseLevel}
-                              onChange={v => setEvalForm(f => ({ ...f, japaneseLevel: v }))}
-                            />
-                            <ScoreSelector
-                              label="英語能力"
-                              value={evalForm.englishLevel}
-                              onChange={v => setEvalForm(f => ({ ...f, englishLevel: v }))}
-                            />
-                          </>
-                        )}
+                        <ScoreSelector
+                          label="日本語能力"
+                          value={evalForm.japaneseLevel}
+                          onChange={v => setEvalForm(f => ({ ...f, japaneseLevel: v }))}
+                        />
+                        <ScoreSelector
+                          label="英語能力"
+                          value={evalForm.englishLevel}
+                          onChange={v => setEvalForm(f => ({ ...f, englishLevel: v }))}
+                        />
                         <ScoreSelector
                           label="コミュニケーション"
                           value={evalForm.communicationScore}
@@ -2079,27 +2302,128 @@ export default function ApplicantsPage() {
                       </div>
 
                       {/* 既に研修スロットが設定済みの場合 */}
-                      {selectedApplicant.trainingSlot && (
-                        <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
-                          <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5"></i>
-                          <div>
-                            <p className="text-xs font-bold text-emerald-700">研修スロット予約済み</p>
-                            <p className="text-xs text-emerald-600 mt-0.5">
-                              {new Date(selectedApplicant.trainingSlot.startTime).toLocaleString('ja-JP', {
-                                year: 'numeric', month: 'numeric', day: 'numeric',
-                                hour: '2-digit', minute: '2-digit',
-                              })}
-                              {' 〜 '}
-                              {new Date(selectedApplicant.trainingSlot.endTime).toLocaleTimeString('ja-JP', {
-                                hour: '2-digit', minute: '2-digit',
-                              })}
-                              {selectedApplicant.trainingSlot.location && ` / ${selectedApplicant.trainingSlot.location}`}
-                            </p>
-                          </div>
-                        </div>
-                      )}
+                      {selectedApplicant.trainingSlot ? (
+                        <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                          <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 bg-emerald-100 rounded-lg flex items-center justify-center shrink-0">
+                                <i className="bi bi-check-circle-fill text-emerald-500"></i>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs font-bold text-emerald-700 mb-1">研修日程確定</p>
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    <i className="bi bi-calendar-event text-slate-400 text-xs"></i>
+                                    <p className="text-sm font-bold text-slate-800">
+                                      {new Date(selectedApplicant.trainingSlot.startTime).toLocaleDateString('ja-JP', {
+                                        year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+                                      })}
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <i className="bi bi-clock text-slate-400 text-xs"></i>
+                                    <p className="text-sm text-slate-700">
+                                      {new Date(selectedApplicant.trainingSlot.startTime).toLocaleTimeString('ja-JP', {
+                                        hour: '2-digit', minute: '2-digit',
+                                      })}
+                                      {' 〜 '}
+                                      {new Date(selectedApplicant.trainingSlot.endTime).toLocaleTimeString('ja-JP', {
+                                        hour: '2-digit', minute: '2-digit',
+                                      })}
+                                    </p>
+                                  </div>
+                                  {selectedApplicant.trainingSlot.location && (
+                                    <div className="flex items-center gap-2">
+                                      <i className="bi bi-geo-alt text-slate-400 text-xs"></i>
+                                      <p className="text-sm text-slate-700">{selectedApplicant.trainingSlot.location}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
 
-                      <div className="bg-slate-50 rounded-xl p-4 space-y-4">
+                            <div className="flex gap-2 pt-2 border-t border-slate-200">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowTrainingReschedulePanel(true);
+                                  setSelectedNewTrainingSlotId(null);
+                                  setTrainingRescheduleLoading(true);
+                                  fetch('/api/training-slots/available')
+                                    .then(r => r.json())
+                                    .then(data => setAvailableTrainingSlots(data.slots || []))
+                                    .catch(() => setAvailableTrainingSlots([]))
+                                    .finally(() => setTrainingRescheduleLoading(false));
+                                }}
+                                className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
+                              >
+                                <i className="bi bi-calendar-plus"></i>日程変更
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelTraining}
+                                className="text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-200 transition-colors inline-flex items-center gap-1"
+                              >
+                                <i className="bi bi-x-circle"></i>研修キャンセル
+                              </button>
+                            </div>
+
+                            {/* 研修日程変更パネル */}
+                            {showTrainingReschedulePanel && (
+                              <div className="pt-3 border-t border-slate-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-xs font-black text-indigo-700">新しい研修日程を選択</h4>
+                                  <button type="button" onClick={() => setShowTrainingReschedulePanel(false)} className="text-slate-400 hover:text-slate-600 text-xs">
+                                    <i className="bi bi-x-lg"></i>
+                                  </button>
+                                </div>
+                                {trainingRescheduleLoading ? (
+                                  <div className="flex items-center justify-center py-4">
+                                    <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                                  </div>
+                                ) : availableTrainingSlots.length === 0 ? (
+                                  <p className="text-xs text-slate-400 py-2">空き研修スロットがありません</p>
+                                ) : (
+                                  <>
+                                    <div className="max-h-48 overflow-y-auto space-y-1">
+                                      {availableTrainingSlots
+                                        .filter(slot => slot.id !== selectedApplicant?.trainingSlot?.id)
+                                        .map(slot => {
+                                          const d = new Date(slot.startTime);
+                                          const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+                                          const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                          return (
+                                            <button
+                                              key={slot.id}
+                                              type="button"
+                                              onClick={() => setSelectedNewTrainingSlotId(slot.id)}
+                                              className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all ${
+                                                selectedNewTrainingSlotId === slot.id
+                                                  ? 'bg-indigo-100 border-indigo-300 border text-indigo-800 font-bold'
+                                                  : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                                              }`}
+                                            >
+                                              <span className="font-bold">{dateStr}</span> {timeStr}
+                                              <span className="ml-2 text-[11px] text-slate-400">残{slot.remainingCapacity}名</span>
+                                              {slot.location && <span className="ml-2 text-[11px] text-slate-400">{slot.location}</span>}
+                                            </button>
+                                          );
+                                        })}
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleTrainingReschedule}
+                                      disabled={!selectedNewTrainingSlotId || trainingRescheduleLoading}
+                                      className="mt-2 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors"
+                                    >
+                                      {trainingRescheduleLoading ? '変更中...' : 'この日程に変更する'}
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50 rounded-xl p-4 space-y-4">
                         {/* 案内方法の選択 */}
                         <div className="flex gap-4">
                           <label className="flex items-center gap-2 cursor-pointer">
@@ -2267,7 +2591,8 @@ export default function ApplicantsPage() {
                             </p>
                           </div>
                         )}
-                      </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -2300,48 +2625,35 @@ export default function ApplicantsPage() {
                       ) : (
                         <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">生年月日 <span className="text-rose-500">*</span></label>
-                            <input
-                              type="date"
-                              value={distForm.birthday}
-                              onChange={e => setDistForm(f => ({ ...f, birthday: e.target.value }))}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
-                            />
-                            <p className="text-[10px] text-slate-400 mt-1">初期パスワードは生年月日（YYYYMMDD）で設定されます</p>
-                          </div>
-                          <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1.5">所属支店 <span className="text-rose-500">*</span></label>
                             <select
                               value={distForm.branchId}
-                              onChange={e => setDistForm(f => ({ ...f, branchId: e.target.value }))}
+                              onChange={e => {
+                                const val = e.target.value;
+                                setDistForm(f => ({ ...f, branchId: val, staffId: '' }));
+                                if (val) fetchNextStaffId(val);
+                              }}
                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
                             >
                               <option value="">選択してください</option>
-                              {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
+                              {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}{b.prefix ? ` (${b.prefix})` : ''}</option>)}
                             </select>
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">スタッフID（任意）</label>
-                            <input
-                              type="text"
-                              value={distForm.staffId}
-                              onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
-                              placeholder="空欄の場合は自動採番"
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">性別（任意）</label>
-                            <select
-                              value={distForm.gender}
-                              onChange={e => setDistForm(f => ({ ...f, gender: e.target.value }))}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
-                            >
-                              <option value="">未設定</option>
-                              <option value="male">男性</option>
-                              <option value="female">女性</option>
-                              <option value="other">その他</option>
-                            </select>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">スタッフID</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={distForm.staffId}
+                                onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
+                                placeholder={distForm.branchId ? '支店のプレフィックスで自動入力' : '支店を選択してください'}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none font-mono"
+                              />
+                              {staffIdLoading && (
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 mt-1">支店選択時に自動入力されます。変更も可能です。</p>
                           </div>
                           <div className="flex gap-2 pt-1">
                             <button
@@ -2352,7 +2664,7 @@ export default function ApplicantsPage() {
                             </button>
                             <button
                               onClick={handleRegisterAsDistributor}
-                              disabled={registering || !distForm.birthday || !distForm.branchId}
+                              disabled={registering || !distForm.branchId}
                               className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                             >
                               {registering && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
@@ -2369,25 +2681,34 @@ export default function ApplicantsPage() {
 
             {/* フッター */}
             {!evalLoading && selectedApplicant && (
-              <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0">
                 <button
-                  onClick={() => {
-                    setShowEvalModal(false);
-                    setSelectedApplicant(null);
-                  }}
-                  className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+                  onClick={handleDeleteApplicant}
+                  className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-sm transition-colors border border-rose-200 flex items-center gap-1.5"
                 >
-                  キャンセル
+                  <i className="bi bi-trash3"></i>
+                  削除
                 </button>
-                <button
-                  onClick={handleSaveEval}
-                  disabled={evalSaving}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {evalSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                  <i className="bi bi-check-lg"></i>
-                  保存
-                </button>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      setShowEvalModal(false);
+                      setSelectedApplicant(null);
+                    }}
+                    className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+                  >
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleSaveEval}
+                    disabled={evalSaving}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {evalSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                    <i className="bi bi-check-lg"></i>
+                    保存
+                  </button>
+                </div>
               </div>
             )}
           </div>

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Image from 'next/image';
+import PrivacyContent from '@/components/portal/PrivacyContent';
 
 // ─── i18n ────────────────────────────────────────────────
 const translations = {
@@ -22,6 +23,11 @@ const translations = {
     emailMismatch: 'メールアドレスが一致しません',
     phone: '電話番号',
     phonePlaceholder: '090-1234-5678',
+    birthday: '生年月日',
+    gender: '性別',
+    genderMale: '男性',
+    genderFemale: '女性',
+    genderOther: 'その他',
     nationalityVisa: '国籍・ビザ',
     country: '国籍',
     countryPlaceholder: '国を選択 / 検索...',
@@ -73,6 +79,11 @@ const translations = {
     emailMismatch: 'Email addresses do not match',
     phone: 'Phone Number',
     phonePlaceholder: '090-1234-5678',
+    birthday: 'Date of Birth',
+    gender: 'Gender',
+    genderMale: 'Male',
+    genderFemale: 'Female',
+    genderOther: 'Other',
     nationalityVisa: 'Nationality & Visa',
     country: 'Nationality',
     countryPlaceholder: 'Select / Search...',
@@ -323,6 +334,8 @@ function ApplyForm() {
     email: '',
     emailConfirm: '',
     phone: '',
+    birthday: '',
+    gender: '',
     jobCategoryId: '',
     countryId: '',
     visaTypeId: '',
@@ -334,6 +347,7 @@ function ApplyForm() {
 
   const [agreePrivacy, setAgreePrivacy] = useState(false);
   const [agreeConfirm, setAgreeConfirm] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState<SuccessData | null>(null);
@@ -490,7 +504,10 @@ function ApplyForm() {
     form.email.trim() !== '' &&
     form.emailConfirm.trim() !== '' &&
     emailsMatch &&
+    form.birthday !== '' &&
+    form.gender !== '' &&
     form.jobCategoryId !== '' &&
+    form.countryId !== '' &&
     form.interviewSlotId !== '' &&
     (!needsVisa || form.visaTypeId !== '') &&
     agreePrivacy &&
@@ -512,6 +529,8 @@ function ApplyForm() {
           name: form.name.trim(),
           email: form.email.trim(),
           phone: form.phone.replace(/\D/g, '') || undefined,
+          birthday: form.birthday || undefined,
+          gender: form.gender || undefined,
           language: form.language,
           jobCategoryId: Number(form.jobCategoryId),
           countryId: form.countryId ? Number(form.countryId) : undefined,
@@ -595,9 +614,15 @@ function ApplyForm() {
                   href={success.meetUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-5 rounded-xl transition-all text-sm"
+                  className="inline-flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 shadow-sm font-semibold py-2.5 px-5 rounded-full transition-all text-sm text-slate-700"
                 >
-                  <i className="bi bi-camera-video" />
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M3.5 6.5A3 3 0 0 1 6.5 3.5h5a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-11Z" fill="#00AC47"/>
+                    <path d="M14.5 8.2l4.8-3.2a.8.8 0 0 1 1.2.7v12.6a.8.8 0 0 1-1.2.7l-4.8-3.2V8.2Z" fill="#00832D"/>
+                    <path d="M6.5 3.5h5a3 3 0 0 1 3 3v2.5h-11V6.5a3 3 0 0 1 3-3Z" fill="#00AC47"/>
+                    <path d="M14.5 9v6l4.8 3.2a.8.8 0 0 0 1.2-.7V5.7a.8.8 0 0 0-1.2-.7L14.5 8.2" fill="#00832D"/>
+                    <rect x="3.5" y="3.5" width="11" height="17" rx="3" fill="#00AC47" fillOpacity=".15"/>
+                  </svg>
                   {t.joinMeet}
                 </a>
               </div>
@@ -781,6 +806,62 @@ function ApplyForm() {
                   className={inputClass}
                 />
               </div>
+
+              {/* Birthday */}
+              <div>
+                <label className={labelClass}>
+                  {t.birthday}
+                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                    {t.required}
+                  </span>
+                </label>
+                <input
+                  type="date"
+                  value={form.birthday}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, birthday: e.target.value }))
+                  }
+                  className={inputClass}
+                  max={new Date().toISOString().split('T')[0]}
+                  required
+                />
+              </div>
+
+              {/* Gender */}
+              <div>
+                <label className={labelClass}>
+                  {t.gender}
+                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                    {t.required}
+                  </span>
+                </label>
+                <div className="flex gap-3 mt-1">
+                  {[
+                    { value: 'male', label: t.genderMale },
+                    { value: 'female', label: t.genderFemale },
+                    { value: 'other', label: t.genderOther },
+                  ].map(({ value, label }) => (
+                    <label
+                      key={value}
+                      className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-lg border-2 transition-all text-xs font-semibold
+                        ${form.gender === value
+                          ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300'
+                        }`}
+                    >
+                      <input
+                        type="radio"
+                        name="gender"
+                        value={value}
+                        checked={form.gender === value}
+                        onChange={() => setForm((prev) => ({ ...prev, gender: value }))}
+                        className="sr-only"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -793,7 +874,12 @@ function ApplyForm() {
             <div className="space-y-4">
               {/* Country - Searchable */}
               <div>
-                <label className={labelClass}>{t.country}</label>
+                <label className={labelClass}>
+                  {t.country}
+                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                    {t.required}
+                  </span>
+                </label>
                 <SearchableSelect
                   options={countries}
                   value={form.countryId}
@@ -1013,7 +1099,14 @@ function ApplyForm() {
                   className="mt-0.5 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                 />
                 <span className="text-sm text-slate-600 group-hover:text-slate-800 transition-colors">
-                  {t.privacyAgree}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setShowPrivacyModal(true); }}
+                    className="text-indigo-600 underline hover:text-indigo-800 font-bold transition-colors"
+                  >
+                    {form.language === 'ja' ? 'プライバシーポリシー' : 'Privacy Policy'}
+                  </button>
+                  {form.language === 'ja' ? 'に同意する' : ' - I agree'}
                 </span>
               </label>
               <label className="flex items-start gap-3 cursor-pointer group">
@@ -1057,6 +1150,36 @@ function ApplyForm() {
 
       {/* Footer spacer */}
       <div className="h-8" />
+
+      {/* ── プライバシーポリシーモーダル ── */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden max-h-[85vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+              <h2 className="text-lg font-black text-slate-800">
+                {form.language === 'ja' ? 'プライバシーポリシー' : 'Privacy Policy'}
+              </h2>
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <i className="bi bi-x-lg text-lg"></i>
+              </button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-5">
+              <PrivacyContent />
+            </div>
+            <div className="px-6 py-3 border-t border-slate-200 shrink-0">
+              <button
+                onClick={() => setShowPrivacyModal(false)}
+                className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-xl text-sm hover:bg-indigo-700 transition-colors"
+              >
+                {form.language === 'ja' ? '閉じる' : 'Close'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

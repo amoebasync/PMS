@@ -21,13 +21,15 @@ export async function POST(request: Request) {
       visaTypeId,
       postalCode,
       address,
+      birthday,
       building,
+      gender,
       interviewSlotId,
       recruitingMediaId,
     } = body;
 
     // バリデーション
-    if (!name || !email || !jobCategoryId || !interviewSlotId) {
+    if (!name || !email || !birthday || !gender || !countryId || !jobCategoryId || !interviewSlotId) {
       return NextResponse.json(
         { error: '必須項目が入力されていません' },
         { status: 400 }
@@ -53,6 +55,7 @@ export async function POST(request: Request) {
       // スロットの空き状況を確認
       const slot = await tx.interviewSlot.findUnique({
         where: { id: Number(interviewSlotId) },
+        include: { interviewer: { select: { email: true } } },
       });
 
       if (!slot || slot.isBooked) {
@@ -65,19 +68,23 @@ export async function POST(request: Request) {
 
       // Google Meet イベントを作成（設定されている場合のみ）
       let meetUrl = slot.meetUrl; // 既存のURLがあればそれを使用
-      
+      let calendarEventId: string | null = null;
+
       if (!meetUrl && isGoogleMeetConfigured()) {
         const jobName = jobCategory?.nameJa || '面接';
         const meetTitle = `【ティラミス】${name}様 ${jobName} 面接`;
         const meetDescription = `応募者: ${name}\nメール: ${email}\n職種: ${jobName}`;
-        
-        meetUrl = await createGoogleMeetEvent(
+
+        const meetResult = await createGoogleMeetEvent(
           meetTitle,
           meetDescription,
           slot.startTime,
           slot.endTime,
-          email // 応募者をゲストとして招待
+          email, // 応募者をゲストとして招待
+          slot.interviewer?.email || undefined // 面接担当者をゲストとして招待
         );
+        meetUrl = meetResult.meetUrl;
+        calendarEventId = meetResult.eventId;
       }
 
       // 面接管理トークン生成
@@ -95,7 +102,9 @@ export async function POST(request: Request) {
           visaTypeId: visaTypeId ? Number(visaTypeId) : null,
           postalCode: postalCode || null,
           address: address || null,
+          birthday: birthday ? new Date(birthday) : null,
           building: building || null,
+          gender: gender || 'unknown',
           managementToken,
           recruitingMediaId: recruitingMediaId ? Number(recruitingMediaId) : null,
         },
@@ -107,7 +116,8 @@ export async function POST(request: Request) {
         data: {
           isBooked: true,
           applicantId: applicant.id,
-          meetUrl: meetUrl || slot.meetUrl, // 新しいURLがあれば更新
+          meetUrl: meetUrl || slot.meetUrl,
+          calendarEventId: calendarEventId || undefined,
         },
       });
 
