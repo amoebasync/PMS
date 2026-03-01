@@ -4,7 +4,6 @@ export PATH=$PATH:/home/ec2-user/.nvm/versions/node/v20.20.0/bin
 npm install --legacy-peer-deps
 npx prisma generate
 npx prisma db push --accept-data-loss
-NODE_OPTIONS='--max-old-space-size=4096' npm run build
 pm2 restart pms
 
 # --- 面接スロット自動生成 CRON 登録（重複時はスキップ） ---
