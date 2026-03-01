@@ -2447,6 +2447,7 @@ model DistributionSession {
   gpsPoints       GpsPoint[]
   progressEvents  ProgressEvent[]
   skipEvents      SkipEvent[]
+  pauseEvents     PauseEvent[]
 
   @@index([distributorId, startedAt])
   @@map("distribution_sessions")
@@ -2506,6 +2507,20 @@ model SkipEvent {
 
   @@index([sessionId])
   @@map("skip_events")
+}
+
+// --- 一時停止イベント ---
+model PauseEvent {
+  id         Int       @id @default(autoincrement())
+  sessionId  Int       @map("session_id")
+  pausedAt   DateTime  @map("paused_at")   // PAUSE した時刻
+  resumedAt  DateTime? @map("resumed_at")  // RESUME した時刻（null = 現在停止中）
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  session    DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("pause_events")
 }
 
 // --- 管理者通知 ---

@@ -39,6 +39,7 @@ export async function GET(
                 },
               },
             },
+            pauseEvents: { orderBy: { pausedAt: 'asc' } },
           },
         },
       },
@@ -107,6 +108,11 @@ export async function GET(
         prohibitedProperty: e.prohibitedProperty,
         reason: e.reason,
         timestamp: e.timestamp,
+      })),
+      pauseEvents: sess.pauseEvents.map((e) => ({
+        id: e.id,
+        pausedAt: e.pausedAt,
+        resumedAt: e.resumedAt,
       })),
       area: schedule.area
         ? {
