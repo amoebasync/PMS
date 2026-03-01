@@ -6,7 +6,7 @@ import { PDFParse } from 'pdf-parse';
 import { uploadToS3, deleteFromS3, listS3Objects, getS3Url, getMimeType } from '@/lib/s3';
 
 
-const S3_PREFIX = 'uploads/avatars/';
+const S3_PREFIX = 'uploads/designs/';
 
 // ========================================================
 // ★ Housekeep (お掃除) 関数

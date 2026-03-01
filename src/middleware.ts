@@ -38,6 +38,7 @@ export function middleware(request: NextRequest) {
     path === '/api/cron/generate-slots' ||
     path === '/api/cron/generate-tasks' ||
     path === '/api/cron/generate-training-slots' ||
+    path === '/api/cron/housekeep' ||
     path === '/api/training-slots/available' ||
     path === '/api/training-booking' ||
     path === '/training-booking';
