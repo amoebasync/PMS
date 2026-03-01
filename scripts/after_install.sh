@@ -35,4 +35,14 @@ if [ -n "$CRON_SECRET" ]; then
   else
     echo "CRON既存: 研修スロット自動生成（スキップ）"
   fi
+
+  # --- ハウスキープ CRON 登録（重複時はスキップ） ---
+  # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
+  HOUSEKEEP_CRON_JOB="0 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "housekeep"; then
+    (crontab -l 2>/dev/null; echo "$HOUSEKEEP_CRON_JOB") | crontab -
+    echo "CRON登録: ハウスキープ（毎日03:00）"
+  else
+    echo "CRON既存: ハウスキープ（スキップ）"
+  fi
 fi
