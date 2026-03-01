@@ -26,6 +26,23 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   // ページ遷移でモバイルメニューを閉じる
   useEffect(() => { setIsMobileOpen(false); }, [pathname]);
 
+  // 新デプロイ後に古いチャンクが読み込めない場合、自動でフルリロード
+  useEffect(() => {
+    const handleChunkError = (event: PromiseRejectionEvent) => {
+      const err = event.reason;
+      if (
+        err?.name === 'ChunkLoadError' ||
+        err?.message?.includes('Loading chunk') ||
+        err?.message?.includes('Failed to fetch dynamically imported module') ||
+        err?.message?.includes('Importing a module script failed')
+      ) {
+        window.location.reload();
+      }
+    };
+    window.addEventListener('unhandledrejection', handleChunkError);
+    return () => window.removeEventListener('unhandledrejection', handleChunkError);
+  }, []);
+
   if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage || isApplyPage) {
     return (
       <NotificationProvider>
