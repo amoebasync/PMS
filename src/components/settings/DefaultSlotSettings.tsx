@@ -28,16 +28,24 @@ const INTERVAL_OPTIONS = [
   { value: 120, label: '120分' },
 ];
 
+function getTomorrowStr() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+}
+
 export default function DefaultSlotSettings() {
   const [slots, setSlots] = useState<DefaultSlot[]>([]);
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveResult, setSaveResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [copyFromDay, setCopyFromDay] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
   const [generateResult, setGenerateResult] = useState<string | null>(null);
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
+  const [effectiveFrom, setEffectiveFrom] = useState<string>(getTomorrowStr());
 
   const fetchSlots = async () => {
     try {
@@ -113,22 +121,37 @@ export default function DefaultSlotSettings() {
 
   const handleSaveAll = async () => {
     setSaving(true);
+    setSaveResult(null);
     try {
       const res = await fetch('/api/settings/default-slots', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slots }),
+        body: JSON.stringify({ slots, effectiveFrom: effectiveFrom || undefined }),
       });
+      const data = await res.json();
       if (res.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
-        // 再取得して最新のIDを反映
         fetchSlots();
+
+        if (data.cleanup) {
+          const { deleted, created } = data.cleanup as { deleted: number; created: number; effectiveFrom: string };
+          setSaveResult({
+            type: 'success',
+            message: `設定を保存しました。${effectiveFrom} 以降のスロットを更新：${deleted}件削除・${created}件追加`,
+          });
+        } else {
+          setSaveResult({ type: 'success', message: '設定を保存しました（スロットの再調整なし）' });
+        }
+      } else {
+        setSaveResult({ type: 'error', message: `エラー: ${data.error || '保存に失敗しました'}` });
       }
     } catch (e) {
+      setSaveResult({ type: 'error', message: 'エラー: 保存に失敗しました' });
       console.error(e);
     }
     setSaving(false);
+    setTimeout(() => setSaveResult(null), 6000);
   };
 
   const handleGenerate = async () => {
@@ -222,6 +245,55 @@ export default function DefaultSlotSettings() {
             </button>
           </div>
         </div>
+
+        {/* 適用開始日 */}
+        <div className="mt-4 flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-200">
+          <i className="bi bi-calendar-event text-amber-600 text-base mt-0.5 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-amber-700 mb-0.5">適用開始日</p>
+            <p className="text-xs text-amber-600">
+              この日以降の<span className="font-bold">未予約スロット</span>を新しい設定に合わせて削除・再生成します。予約済みのスロットには影響しません。
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date"
+              value={effectiveFrom}
+              min={getTomorrowStr()}
+              onChange={(e) => setEffectiveFrom(e.target.value)}
+              className="border border-amber-300 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:ring-2 focus:ring-amber-400 outline-none bg-white"
+            />
+            {effectiveFrom && (
+              <button
+                type="button"
+                onClick={() => setEffectiveFrom('')}
+                className="text-xs text-amber-600 hover:text-amber-800 underline whitespace-nowrap"
+                title="適用開始日をクリアすると、スロットの再調整は行われません"
+              >
+                クリア
+              </button>
+            )}
+          </div>
+        </div>
+        {!effectiveFrom && (
+          <p className="mt-2 text-xs text-slate-400 pl-1">
+            <i className="bi bi-info-circle mr-1" />
+            適用開始日が未設定の場合、マスタの保存のみ行います（既存スロットは変更されません）
+          </p>
+        )}
+
+        {/* 保存結果メッセージ */}
+        {saveResult && (
+          <div className={`mt-3 p-3 rounded-lg text-sm font-medium ${
+            saveResult.type === 'error'
+              ? 'bg-rose-50 text-rose-700 border border-rose-200'
+              : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+          }`}>
+            <i className={`bi ${saveResult.type === 'error' ? 'bi-exclamation-triangle' : 'bi-check-circle'} mr-2`} />
+            {saveResult.message}
+          </div>
+        )}
+
         {generateResult && (
           <div className={`mt-3 p-3 rounded-lg text-sm font-medium ${
             generateResult.startsWith('エラー')
@@ -419,8 +491,9 @@ export default function DefaultSlotSettings() {
       <div className="px-5 py-4 bg-slate-50 border-t border-slate-100">
         <p className="text-xs text-slate-500">
           <i className="bi bi-info-circle mr-1" />
-          「今すぐ生成」で今後2週間分の面接スロットを作成します。既存のスロットと重複する場合はスキップされます。
-          CRON ジョブ（毎日自動実行）でも同じ処理が行われます。
+          「今すぐ生成」で今後2週間分の面接スロットを作成します（不一致スロットの削除は行いません）。
+          設定変更後は「全て保存」で適用開始日以降のスロットを自動的に再調整します。
+          CRON ジョブ（毎日自動実行）でも新規スロットの生成が行われます。
         </p>
       </div>
     </div>

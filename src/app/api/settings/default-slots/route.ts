@@ -130,7 +130,7 @@ export async function PUT(request: Request) {
 }
 
 // POST /api/settings/default-slots
-// 一括更新（全曜日）
+// 一括更新（全曜日）+ オプション: 適用開始日以降のスロット再調整
 export async function POST(request: Request) {
   if (!(await checkAuth())) {
     return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
@@ -138,7 +138,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { slots } = body as {
+    const { slots, effectiveFrom } = body as {
       slots: Array<{
         dayOfWeek: number;
         startTime: string;
@@ -147,12 +147,14 @@ export async function POST(request: Request) {
         isEnabled: boolean;
         jobCategoryIds: number[];
       }>;
+      effectiveFrom?: string; // YYYY-MM-DD
     };
 
     if (!Array.isArray(slots)) {
       return NextResponse.json({ error: '不正なリクエストです' }, { status: 400 });
     }
 
+    // ① マスタ設定を一括 upsert
     const results = await prisma.$transaction(async (tx) => {
       const upserted = [];
       for (const s of slots) {
@@ -192,6 +194,121 @@ export async function POST(request: Request) {
       }
       return upserted;
     });
+
+    // ② 適用開始日が指定されている場合、不一致の未予約スロットを削除して再生成
+    if (effectiveFrom) {
+      const startDate = new Date(effectiveFrom);
+      startDate.setHours(0, 0, 0, 0);
+
+      // 保存後のマスタ設定を取得
+      const masterSlots = await prisma.defaultInterviewSlot.findMany({
+        include: { jobCategories: { select: { jobCategoryId: true } } },
+      });
+
+      let totalDeleted = 0;
+      let totalCreated = 0;
+
+      // 適用開始日から14日間処理
+      for (let i = 0; i < 14; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(currentDate.getDate() + i);
+        const dayOfWeek = currentDate.getDay();
+
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        const master = masterSlots.find((s) => s.dayOfWeek === dayOfWeek && s.isEnabled);
+
+        if (!master) {
+          // 無効な曜日: 未予約スロットを全削除
+          const deleted = await prisma.interviewSlot.deleteMany({
+            where: {
+              isBooked: false,
+              startTime: { gte: dayStart, lte: dayEnd },
+            },
+          });
+          totalDeleted += deleted.count;
+        } else {
+          // 有効な曜日: 新マスタに基づく有効スロットセットを計算
+          const [startH, startM] = master.startTime.split(':').map(Number);
+          const [endH, endM] = master.endTime.split(':').map(Number);
+          const interval = master.intervalMinutes;
+          const jcIds = master.jobCategories.map((jc) => jc.jobCategoryId);
+          const categoryList: (number | null)[] = jcIds.length > 0 ? jcIds : [null];
+
+          type ValidSlot = { startTime: Date; endTime: Date; jobCategoryId: number | null };
+          const validSlots: ValidSlot[] = [];
+          let currentMinutes = startH * 60 + startM;
+          const endMinutes = endH * 60 + endM;
+
+          while (currentMinutes + interval <= endMinutes) {
+            for (const jcId of categoryList) {
+              const slotStart = new Date(currentDate);
+              slotStart.setHours(Math.floor(currentMinutes / 60), currentMinutes % 60, 0, 0);
+              const slotEnd = new Date(currentDate);
+              slotEnd.setHours(
+                Math.floor((currentMinutes + interval) / 60),
+                (currentMinutes + interval) % 60,
+                0,
+                0
+              );
+              validSlots.push({ startTime: slotStart, endTime: slotEnd, jobCategoryId: jcId });
+            }
+            currentMinutes += interval;
+          }
+
+          // この日の既存の未予約スロットを取得
+          const existingUnbooked = await prisma.interviewSlot.findMany({
+            where: {
+              isBooked: false,
+              startTime: { gte: dayStart, lte: dayEnd },
+            },
+          });
+
+          // 新マスタに一致しないスロットを削除
+          for (const existing of existingUnbooked) {
+            const isValid = validSlots.some(
+              (vs) =>
+                vs.startTime.getTime() === new Date(existing.startTime).getTime() &&
+                vs.endTime.getTime() === new Date(existing.endTime).getTime() &&
+                vs.jobCategoryId === existing.jobCategoryId
+            );
+            if (!isValid) {
+              await prisma.interviewSlot.delete({ where: { id: existing.id } });
+              totalDeleted++;
+            }
+          }
+
+          // 新マスタに存在するが未作成のスロットを生成
+          for (const vs of validSlots) {
+            const alreadyExists = existingUnbooked.some(
+              (es) =>
+                new Date(es.startTime).getTime() === vs.startTime.getTime() &&
+                new Date(es.endTime).getTime() === vs.endTime.getTime() &&
+                es.jobCategoryId === vs.jobCategoryId
+            );
+            if (!alreadyExists) {
+              await prisma.interviewSlot.create({
+                data: {
+                  startTime: vs.startTime,
+                  endTime: vs.endTime,
+                  jobCategoryId: vs.jobCategoryId,
+                },
+              });
+              totalCreated++;
+            }
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        slots: results,
+        cleanup: { deleted: totalDeleted, created: totalCreated, effectiveFrom },
+      });
+    }
 
     return NextResponse.json({ success: true, slots: results });
   } catch (error) {
