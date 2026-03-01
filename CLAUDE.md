@@ -555,3 +555,70 @@ earnedAmount = floor(unitPrice × max(actualCounts))
 ### SystemSetting キー
 - `gpsTrackingInterval`: GPS送信間隔（秒）、デフォルト "10"
 - `progressMilestone`: 進捗マイルストーン（枚）、デフォルト "500"
+
+## 研修スロット機能・採用後配布員登録機能（2026-03-01 追加）
+
+設計書: ~/Downloads/PMS_設計書/PMS_応募者管理機能_設計書.docx（Section 14〜17）
+
+### 14. Google Meet 廃止（スロット自動生成時）
+
+スロット生成時（CRON / 手動一括生成）に Google Meet イベントを作成していたが廃止。応募者が `/apply` から予約した時点のみ Meet を作成する。30分ごとのリマインダーメールスパムを解消。
+
+修正ファイル:
+- `src/app/api/cron/generate-slots/route.ts`
+- `src/app/api/interview-slots/generate/route.ts`
+
+### 15. スロットマスタ適用開始日機能
+
+`POST /api/settings/default-slots` に `effectiveFrom (YYYY-MM-DD)` パラメータを追加。指定日以降 14 日間の未予約スロットを新マスタと比較し、不一致スロットを削除・再生成する。
+- UI: `DefaultSlotSettings.tsx` に日付ピッカー追加（デフォルト: 翌日）
+
+### 16. 研修スロット機能
+
+#### 概要
+採用後の研修日程管理。グループ研修（定員制）に対応。
+
+#### DB
+- `TrainingSlot`: `id, startTime, endTime, capacity(10), location?, note?`
+- `DefaultTrainingSlot`: `id, dayOfWeek(@@unique), startTime, endTime, intervalMinutes(120), capacity(10), isEnabled`
+- `Applicant.trainingSlotId`: nullable FK → TrainingSlot
+
+#### 管理者 API（pms_session 必須）
+- `GET/PUT/POST /api/settings/default-training-slots` — 研修スロットマスタ CRUD
+- `GET/POST /api/training-slots` — 研修スロット一覧・作成
+- `DELETE /api/training-slots/[id]` — 削除（応募者紐付き時は 400）
+- `POST /api/training-slots/generate` — 手動一括生成（14日分）
+- `POST /api/applicants/[id]/book-training` — 管理者が研修スロット割り当て
+
+#### 公開 API（認証不要）
+- `GET /api/training-slots/available` — 空き研修スロット（remainingCapacity 付き）
+- `GET/POST /api/training-booking` — managementToken ベースの応募者自己予約
+
+#### CRON API（Bearer CRON_SECRET 認証）
+- `GET /api/cron/generate-training-slots` — 毎日 02:00 に自動生成
+
+#### フロントエンド
+- `/settings` → 「研修スロット」タブ（`DefaultTrainingSlotSettings.tsx`）
+- `/applicants` 評価モーダル → セクション5「研修スロット割り当て」（今すぐ / 後でメール案内）
+- `/training-booking?token=xxx` — 応募者向け研修自己予約ページ（ja/en 対応）
+
+#### メール
+- `sendTrainingConfirmationEmail` — 研修確認メール（管理者割り当て時）
+- `sendTrainingInviteEmail` — 自己予約リンク送信メール
+
+#### CRON 登録（after_install.sh）
+- `0 2 * * *` → `/api/cron/generate-training-slots`（重複チェック付き）
+
+#### 公開パス（middleware.ts）
+`/api/training-slots/available`, `/api/training-booking`, `/training-booking`, `/api/cron/generate-training-slots`
+
+### 17. 採用後配布員登録機能
+
+採用済み・研修日確定後の応募者を FlyerDistributor として登録する機能。
+
+- 表示条件: `hiringStatus === 'HIRED' && applicant.trainingSlot !== null`
+- API: `POST /api/applicants/[id]/register-as-distributor`
+  - 必須: `birthday`（初期パスワード = SHA-256(YYYYMMDD)）、`branchId`
+  - 任意: `staffId`、`gender`
+  - 応募者情報（氏名・メール・電話・国籍・ビザ・住所等）を自動継承
+- UI: 評価モーダルのセクション6で入力フォーム表示、登録後は配布員 ID を表示
