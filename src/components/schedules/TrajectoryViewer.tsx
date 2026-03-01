@@ -34,6 +34,12 @@ interface SkipEvent {
   timestamp: string;
 }
 
+interface PauseEvent {
+  id: number;
+  pausedAt: string;
+  resumedAt: string | null;
+}
+
 interface ProhibitedProperty {
   id: number;
   latitude: number | null;
@@ -56,6 +62,7 @@ interface TrajectoryData {
   gpsPoints: GpsPoint[];
   progressEvents: ProgressEvent[];
   skipEvents: SkipEvent[];
+  pauseEvents: PauseEvent[];
   area: {
     boundaryGeojson: string;
     townName: string;
@@ -282,8 +289,20 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
     ? { lat: points[0].lat, lng: points[0].lng }
     : { lat: 35.68, lng: 139.76 };
 
-  // Stats
-  const duration = endTime.getTime() - startTime.getTime();
+  // PAUSE 中の合計時間を計算（作業時間から除外する）
+  const totalPausedMs = (data.pauseEvents || []).reduce((sum, e) => {
+    const pausedAt = new Date(e.pausedAt).getTime();
+    const resumedAt = e.resumedAt
+      ? new Date(e.resumedAt).getTime()
+      : data.session.finishedAt
+      ? new Date(data.session.finishedAt).getTime()
+      : nowTick;
+    return sum + Math.max(0, resumedAt - pausedAt);
+  }, 0);
+
+  // 実効作業時間（全体時間 - PAUSE 時間）
+  const totalDuration = endTime.getTime() - startTime.getTime();
+  const duration = Math.max(0, totalDuration - totalPausedMs);
   const durationHours = duration / (1000 * 60 * 60);
   const lastProgress = data.progressEvents[data.progressEvents.length - 1];
   const totalMailboxes = lastProgress?.mailboxCount || 0;
@@ -532,7 +551,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               </div>
               <div className="bg-purple-50 rounded-lg p-2 text-center">
                 <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
-                <div className="text-purple-400">作業時間</div>
+                <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
               </div>
             </div>
           </div>
@@ -543,6 +562,11 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               <i className="bi bi-graph-up mr-1"></i>
               時間あたり
             </h3>
+            {totalPausedMs > 0 && (
+              <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
+              </div>
+            )}
             <div className="space-y-2 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">配布ペース</span>
@@ -597,30 +621,66 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               配布進捗
             </h3>
             <div className="space-y-1 text-xs">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
-                <span className="text-slate-500">{fmtTime(data.session.startedAt)}</span>
-                <span className="font-bold text-emerald-600">START</span>
-              </div>
-              {data.progressEvents.map((e) => (
-                <div key={e.id} className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
-                  <span className="text-slate-500">{fmtTime(e.timestamp)}</span>
-                  <span className="font-bold text-blue-600">{e.mailboxCount}枚</span>
-                </div>
-              ))}
-              {data.skipEvents.map((e) => (
-                <div key={`s-${e.id}`} className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
-                  <span className="text-slate-500">{fmtTime(e.timestamp)}</span>
-                  <span className="font-bold text-orange-600">SKIP</span>
-                </div>
-              ))}
-              {data.session.finishedAt && (
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
-                  <span className="text-slate-500">{fmtTime(data.session.finishedAt)}</span>
-                  <span className="font-bold text-red-600">FINISH</span>
+              {/* START + 全イベントを時系列ソートして表示 */}
+              {[
+                { time: data.session.startedAt, type: 'START' as const },
+                ...data.progressEvents.map((e) => ({ time: e.timestamp, type: 'PROGRESS' as const, mailboxCount: e.mailboxCount })),
+                ...data.skipEvents.map((e) => ({ time: e.timestamp, type: 'SKIP' as const })),
+                ...(data.pauseEvents || []).flatMap((e) => [
+                  { time: e.pausedAt, type: 'PAUSE' as const },
+                  ...(e.resumedAt ? [{ time: e.resumedAt, type: 'RESUME' as const }] : []),
+                ]),
+                ...(data.session.finishedAt ? [{ time: data.session.finishedAt, type: 'FINISH' as const }] : []),
+              ]
+                .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+                .map((item, idx) => {
+                  if (item.type === 'START') return (
+                    <div key={`start-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-emerald-600">START</span>
+                    </div>
+                  );
+                  if (item.type === 'PROGRESS') return (
+                    <div key={`p-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-blue-600">{'mailboxCount' in item ? item.mailboxCount : 0}枚</span>
+                    </div>
+                  );
+                  if (item.type === 'SKIP') return (
+                    <div key={`s-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-orange-600">SKIP</span>
+                    </div>
+                  );
+                  if (item.type === 'PAUSE') return (
+                    <div key={`pause-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-yellow-600">PAUSE</span>
+                    </div>
+                  );
+                  if (item.type === 'RESUME') return (
+                    <div key={`resume-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-teal-400 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-teal-600">RESUME</span>
+                    </div>
+                  );
+                  return (
+                    <div key={`finish-${idx}`} className="flex items-center gap-2">
+                      <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
+                      <span className="text-slate-500">{fmtTime(item.time)}</span>
+                      <span className="font-bold text-red-600">FINISH</span>
+                    </div>
+                  );
+                })}
+              {/* 現在 PAUSE 中の場合 */}
+              {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
+                <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
+                  現在一時停止中
                 </div>
               )}
             </div>
