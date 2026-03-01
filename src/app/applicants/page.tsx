@@ -191,6 +191,13 @@ export default function ApplicantsPage() {
   const [selectedTrainingSlotId, setSelectedTrainingSlotId] = useState<number | ''>('');
   const [trainingBookingMode, setTrainingBookingMode] = useState<'now' | 'later'>('now');
 
+  // ── 配布員登録 ──
+  const [branches, setBranches] = useState<{ id: number; nameJa: string }[]>([]);
+  const [showDistributorForm, setShowDistributorForm] = useState(false);
+  const [distForm, setDistForm] = useState({ birthday: '', branchId: '', staffId: '', gender: '' });
+  const [registering, setRegistering] = useState(false);
+  const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
+
   // ── スロット作成フォーム ──
   const [slotForm, setSlotForm] = useState({
     date: '',
@@ -327,6 +334,44 @@ export default function ApplicantsPage() {
       // silently fail
     }
     setLoadingTrainingSlots(false);
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const res = await fetch('/api/branches');
+      if (res.ok) setBranches(await res.json());
+    } catch {
+      // silently fail
+    }
+  };
+
+  const handleRegisterAsDistributor = async () => {
+    if (!selectedApplicant || !distForm.birthday || !distForm.branchId) return;
+    setRegistering(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/register-as-distributor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          birthday: distForm.birthday,
+          branchId: Number(distForm.branchId),
+          staffId: distForm.staffId || undefined,
+          gender: distForm.gender || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setRegisteredDistributorId(data.distributorId);
+        setShowDistributorForm(false);
+        showToast('配布員として登録しました', 'success');
+      } else {
+        showToast(data.error || '登録に失敗しました', 'error');
+      }
+    } catch {
+      showToast('登録に失敗しました', 'error');
+    } finally {
+      setRegistering(false);
+    }
   };
 
   // ── 初回ロード ──
@@ -466,6 +511,9 @@ export default function ApplicantsPage() {
     setShowReschedulePanel(false);
     setSelectedTrainingSlotId('');
     setTrainingBookingMode('now');
+    setShowDistributorForm(false);
+    setDistForm({ birthday: '', branchId: '', staffId: '', gender: '' });
+    setRegisteredDistributorId(null);
     try {
       const res = await fetch(`/api/applicants/${applicantId}`);
       if (!res.ok) throw new Error('fetch failed');
@@ -1677,6 +1725,99 @@ export default function ApplicantsPage() {
                           </div>
                         )}
                       </div>
+                    </div>
+                  )}
+
+                  {/* セクション 6: 配布員登録（採用 + 研修日確定後） */}
+                  {selectedApplicant.hiringStatus === 'HIRED' && selectedApplicant.trainingSlot && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <i className="bi bi-person-badge text-emerald-600"></i>
+                        <h3 className="text-sm font-black text-slate-800">配布員登録</h3>
+                      </div>
+
+                      {registeredDistributorId ? (
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
+                          <i className="bi bi-check-circle-fill text-emerald-500"></i>
+                          <p className="text-xs font-bold text-emerald-700">
+                            配布員として登録済み（スタッフID: {registeredDistributorId}）
+                          </p>
+                        </div>
+                      ) : !showDistributorForm ? (
+                        <button
+                          onClick={() => {
+                            setShowDistributorForm(true);
+                            if (branches.length === 0) fetchBranches();
+                          }}
+                          className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                        >
+                          <i className="bi bi-person-plus"></i>
+                          配布員として登録する
+                        </button>
+                      ) : (
+                        <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">生年月日 <span className="text-rose-500">*</span></label>
+                            <input
+                              type="date"
+                              value={distForm.birthday}
+                              onChange={e => setDistForm(f => ({ ...f, birthday: e.target.value }))}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                            />
+                            <p className="text-[10px] text-slate-400 mt-1">初期パスワードは生年月日（YYYYMMDD）で設定されます</p>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">所属支店 <span className="text-rose-500">*</span></label>
+                            <select
+                              value={distForm.branchId}
+                              onChange={e => setDistForm(f => ({ ...f, branchId: e.target.value }))}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
+                            >
+                              <option value="">選択してください</option>
+                              {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">スタッフID（任意）</label>
+                            <input
+                              type="text"
+                              value={distForm.staffId}
+                              onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
+                              placeholder="空欄の場合は自動採番"
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">性別（任意）</label>
+                            <select
+                              value={distForm.gender}
+                              onChange={e => setDistForm(f => ({ ...f, gender: e.target.value }))}
+                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
+                            >
+                              <option value="">未設定</option>
+                              <option value="male">男性</option>
+                              <option value="female">女性</option>
+                              <option value="other">その他</option>
+                            </select>
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <button
+                              onClick={() => setShowDistributorForm(false)}
+                              className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors"
+                            >
+                              キャンセル
+                            </button>
+                            <button
+                              onClick={handleRegisterAsDistributor}
+                              disabled={registering || !distForm.birthday || !distForm.branchId}
+                              className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+                            >
+                              {registering && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                              登録する
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </>
