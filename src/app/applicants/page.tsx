@@ -190,6 +190,10 @@ export default function ApplicantsPage() {
   const [loadingTrainingSlots, setLoadingTrainingSlots] = useState(false);
   const [selectedTrainingSlotId, setSelectedTrainingSlotId] = useState<number | ''>('');
   const [trainingBookingMode, setTrainingBookingMode] = useState<'now' | 'later'>('now');
+  const [calendarViewDate, setCalendarViewDate] = useState(() => {
+    const now = new Date(); return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
   // ── 配布員登録 ──
   const [branches, setBranches] = useState<{ id: number; nameJa: string }[]>([]);
@@ -1692,10 +1696,10 @@ export default function ApplicantsPage() {
                           </label>
                         </div>
 
-                        {/* 今すぐ指定: ドロップダウン */}
+                        {/* 今すぐ指定: カレンダーピッカー */}
                         {trainingBookingMode === 'now' && (
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">研修日時を選択</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">研修日時を選択</label>
                             {loadingTrainingSlots ? (
                               <div className="flex items-center gap-2 text-slate-400 text-sm">
                                 <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
@@ -1703,26 +1707,119 @@ export default function ApplicantsPage() {
                               </div>
                             ) : trainingSlots.length === 0 ? (
                               <p className="text-sm text-slate-400">利用可能な研修スロットがありません</p>
-                            ) : (
-                              <select
-                                value={selectedTrainingSlotId}
-                                onChange={e => setSelectedTrainingSlotId(e.target.value ? Number(e.target.value) : '')}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                              >
-                                <option value="">選択してください</option>
-                                {trainingSlots.map(slot => {
-                                  const start = new Date(slot.startTime);
-                                  const end = new Date(slot.endTime);
-                                  const dateStr = start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
-                                  const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}-${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
-                                  return (
-                                    <option key={slot.id} value={slot.id}>
-                                      {dateStr} {timeStr}{slot.location ? ` / ${slot.location}` : ''} 残{slot.remainingCapacity}名
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                            )}
+                            ) : (() => {
+                              // スロットを日付ごとにグループ化
+                              const slotsByDate: Record<string, TrainingSlotOption[]> = {};
+                              trainingSlots.forEach(slot => {
+                                const key = new Date(slot.startTime).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                                if (!slotsByDate[key]) slotsByDate[key] = [];
+                                slotsByDate[key].push(slot);
+                              });
+                              const availableDates = new Set(Object.keys(slotsByDate));
+
+                              // カレンダー生成
+                              const { year, month } = calendarViewDate;
+                              const firstDay = new Date(year, month, 1).getDay();
+                              const daysInMonth = new Date(year, month + 1, 0).getDate();
+                              const today = new Date();
+                              today.setHours(0, 0, 0, 0);
+
+                              const slotsForSelected = selectedCalendarDate ? (slotsByDate[selectedCalendarDate] || []) : [];
+
+                              return (
+                                <div className="border border-slate-200 rounded-xl overflow-hidden">
+                                  {/* カレンダーヘッダー */}
+                                  <div className="flex items-center justify-between px-3 py-2 bg-slate-50 border-b border-slate-200">
+                                    <button type="button" onClick={() => setCalendarViewDate(prev => {
+                                      const d = new Date(prev.year, prev.month - 1);
+                                      return { year: d.getFullYear(), month: d.getMonth() };
+                                    })} className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-500">
+                                      <i className="bi bi-chevron-left text-xs"></i>
+                                    </button>
+                                    <span className="text-sm font-bold text-slate-700">
+                                      {year}年{month + 1}月
+                                    </span>
+                                    <button type="button" onClick={() => setCalendarViewDate(prev => {
+                                      const d = new Date(prev.year, prev.month + 1);
+                                      return { year: d.getFullYear(), month: d.getMonth() };
+                                    })} className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-200 text-slate-500">
+                                      <i className="bi bi-chevron-right text-xs"></i>
+                                    </button>
+                                  </div>
+
+                                  {/* 曜日ヘッダー */}
+                                  <div className="grid grid-cols-7 bg-slate-50 border-b border-slate-100">
+                                    {['日','月','火','水','木','金','土'].map((d, i) => (
+                                      <div key={d} className={`text-center text-[10px] font-bold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-slate-400'}`}>{d}</div>
+                                    ))}
+                                  </div>
+
+                                  {/* 日付グリッド */}
+                                  <div className="grid grid-cols-7 p-1 gap-0.5 bg-white">
+                                    {Array.from({ length: firstDay }).map((_, i) => <div key={`e${i}`} />)}
+                                    {Array.from({ length: daysInMonth }).map((_, i) => {
+                                      const day = i + 1;
+                                      const dateKey = `${year}/${String(month + 1).padStart(2,'0')}/${String(day).padStart(2,'0')}`;
+                                      const hasSlot = availableDates.has(dateKey);
+                                      const isSelected = selectedCalendarDate === dateKey;
+                                      const isPast = new Date(year, month, day) < today;
+                                      const dow = new Date(year, month, day).getDay();
+                                      return (
+                                        <button
+                                          key={day}
+                                          type="button"
+                                          disabled={!hasSlot || isPast}
+                                          onClick={() => setSelectedCalendarDate(isSelected ? null : dateKey)}
+                                          className={`relative h-8 w-full rounded-lg text-xs font-bold transition-all
+                                            ${isSelected ? 'bg-indigo-600 text-white' :
+                                              hasSlot && !isPast ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 ring-1 ring-emerald-300' :
+                                              isPast ? 'text-slate-200 cursor-not-allowed' :
+                                              dow === 0 ? 'text-red-300 cursor-not-allowed' :
+                                              dow === 6 ? 'text-blue-300 cursor-not-allowed' :
+                                              'text-slate-300 cursor-not-allowed'}`}
+                                        >
+                                          {day}
+                                          {hasSlot && !isPast && !isSelected && (
+                                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-emerald-500"></span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  {/* 選択日のスロット一覧 */}
+                                  {selectedCalendarDate && (
+                                    <div className="border-t border-slate-200 p-2 bg-slate-50 space-y-1.5">
+                                      <p className="text-[11px] font-bold text-slate-500 px-1">{selectedCalendarDate} のスロット</p>
+                                      {slotsForSelected.map(slot => {
+                                        const start = new Date(slot.startTime);
+                                        const end = new Date(slot.endTime);
+                                        const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                        const isSlotSelected = selectedTrainingSlotId === slot.id;
+                                        return (
+                                          <button
+                                            key={slot.id}
+                                            type="button"
+                                            onClick={() => setSelectedTrainingSlotId(isSlotSelected ? '' : slot.id)}
+                                            className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all
+                                              ${isSlotSelected ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'}`}
+                                          >
+                                            <span className="font-bold">{timeStr}</span>
+                                            <div className="flex items-center gap-2">
+                                              {slot.location && <span className={`text-[11px] ${isSlotSelected ? 'text-indigo-200' : 'text-slate-400'}`}>{slot.location}</span>}
+                                              <span className={`text-[11px] font-bold ${isSlotSelected ? 'text-indigo-200' : slot.remainingCapacity <= 1 ? 'text-rose-500' : 'text-emerald-600'}`}>
+                                                残{slot.remainingCapacity}名
+                                              </span>
+                                              {isSlotSelected && <i className="bi bi-check-circle-fill text-white"></i>}
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
                         )}
 
