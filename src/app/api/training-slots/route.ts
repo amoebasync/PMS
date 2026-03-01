@@ -14,9 +14,13 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // "2026-03" 形式
+    const from = searchParams.get('from');   // ISO文字列
+    const to = searchParams.get('to');       // ISO文字列
 
     const where: any = {};
-    if (month) {
+    if (from && to) {
+      where.startTime = { gte: new Date(from), lt: new Date(to) };
+    } else if (month) {
       const [year, m] = month.split('-').map(Number);
       const start = new Date(year, m - 1, 1);
       const end = new Date(year, m, 1);
