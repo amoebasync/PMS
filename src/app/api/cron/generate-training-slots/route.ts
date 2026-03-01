@@ -26,14 +26,17 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: '有効なデフォルト設定がありません', created: 0, skipped: 0 });
     }
 
-    // 今日から DAYS_AHEAD 日先までの日付を生成
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // JST基準の今日（EC2はUTCで動作するため補正）
+    const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
+    const nowJST = new Date(Date.now() + JST_OFFSET_MS);
+    const todayBase = new Date(Date.UTC(
+      nowJST.getUTCFullYear(), nowJST.getUTCMonth(), nowJST.getUTCDate()
+    ));
 
     const targetDates: Date[] = [];
     for (let i = 1; i <= DAYS_AHEAD; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() + i);
+      const d = new Date(todayBase);
+      d.setUTCDate(d.getUTCDate() + i);
       targetDates.push(d);
     }
 
@@ -42,7 +45,7 @@ export async function GET(request: Request) {
 
     // 各日付に対して処理
     for (const date of targetDates) {
-      const dayOfWeek = date.getDay(); // 0=日, 1=月, ..., 6=土
+      const dayOfWeek = date.getUTCDay(); // JST基準の曜日 (0=日, 1=月, ..., 6=土)
       const defaultSlot = defaultSlots.find((s) => s.dayOfWeek === dayOfWeek);
       if (!defaultSlot) continue;
 
@@ -54,13 +57,14 @@ export async function GET(request: Request) {
       let currentMinutes = startH * 60 + startM;
       const endMinutes = endH * 60 + endM;
 
+      // JST時刻をUTCに変換（-9h）してスロットを作成
       while (currentMinutes + interval <= endMinutes) {
         const slotStart = new Date(date);
-        slotStart.setHours(Math.floor(currentMinutes / 60), currentMinutes % 60, 0, 0);
+        slotStart.setUTCHours(Math.floor(currentMinutes / 60) - 9, currentMinutes % 60, 0, 0);
 
         const slotEnd = new Date(date);
-        slotEnd.setHours(
-          Math.floor((currentMinutes + interval) / 60),
+        slotEnd.setUTCHours(
+          Math.floor((currentMinutes + interval) / 60) - 9,
           (currentMinutes + interval) % 60,
           0,
           0
