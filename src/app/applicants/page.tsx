@@ -149,6 +149,8 @@ const ScoreSelector = ({ value, onChange, label }: { value: number | null; onCha
 export default function ApplicantsPage() {
   const { showToast, showConfirm } = useNotification();
   const calendarRef = useRef<FullCalendar>(null);
+  const trainingCalendarRef = useRef<FullCalendar>(null);
+  const trainingDateRangeRef = useRef<{ from: string; to: string } | null>(null);
 
   // ── タブ ──
   const [activeTab, setActiveTab] = useState<'calendar' | 'list' | 'training'>('calendar');
@@ -167,15 +169,31 @@ export default function ApplicantsPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [markingComplete, setMarkingComplete] = useState<number | null>(null);
+  const [selectedTrainingSlot, setSelectedTrainingSlot] = useState<TrainingSlotManagement | null>(null);
+  const [editCapacity, setEditCapacity] = useState<number>(10);
+  const [savingCapacity, setSavingCapacity] = useState(false);
+  const [deletingSlot, setDeletingSlot] = useState(false);
 
-  const fetchTrainingMgmt = async (month?: string) => {
+  const fetchTrainingMgmt = async (from?: string, to?: string) => {
     setTrainingMgmtLoading(true);
     try {
-      const m = month || trainingMgmtMonth;
-      const res = await fetch(`/api/training-slots?month=${m}`);
+      const f = from ?? trainingDateRangeRef.current?.from;
+      const t = to ?? trainingDateRangeRef.current?.to;
+      let url = '/api/training-slots';
+      if (f && t) {
+        url += `?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+      } else {
+        url += `?month=${trainingMgmtMonth}`;
+      }
+      const res = await fetch(url);
       if (res.ok) {
         const json = await res.json();
-        setTrainingMgmtSlots(json.data || []);
+        const newSlots = json.data || [];
+        setTrainingMgmtSlots(newSlots);
+        setSelectedTrainingSlot(prev => {
+          if (!prev) return null;
+          return newSlots.find((s: TrainingSlotManagement) => s.id === prev.id) ?? null;
+        });
       }
     } catch { /* ignore */ }
     setTrainingMgmtLoading(false);
@@ -443,6 +461,25 @@ export default function ApplicantsPage() {
   }, [searchTerm, filterFlowStatus, filterHiringStatus]);
 
   // ──────────────────────────────────────────
+  // 研修カレンダーイベント変換
+  // ──────────────────────────────────────────
+  const trainingCalendarEvents = trainingMgmtSlots.map(slot => {
+    const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+    const allDone = slot.applicants.length > 0 && slot.applicants.every(a => a.flowStatus === 'TRAINING_COMPLETED');
+    const bg = allDone ? '#10b981' : fillRate >= 100 ? '#ef4444' : fillRate >= 70 ? '#f59e0b' : slot.bookedCount > 0 ? '#6366f1' : '#94a3b8';
+    return {
+      id: String(slot.id),
+      title: `${slot.bookedCount}/${slot.capacity}名`,
+      start: slot.startTime,
+      end: slot.endTime,
+      backgroundColor: bg,
+      borderColor: bg,
+      textColor: '#ffffff',
+      extendedProps: { slot },
+    };
+  });
+
+  // ──────────────────────────────────────────
   // カレンダーイベント変換
   // ──────────────────────────────────────────
   const calendarEvents = slots.map(slot => {
@@ -465,6 +502,68 @@ export default function ApplicantsPage() {
   // ──────────────────────────────────────────
   // イベントハンドラ
   // ──────────────────────────────────────────
+
+  // 研修カレンダー: 週変更
+  const handleTrainingDatesSet = (arg: { start: Date; end: Date }) => {
+    const from = arg.start.toISOString();
+    const to = arg.end.toISOString();
+    trainingDateRangeRef.current = { from, to };
+    fetchTrainingMgmt(from, to);
+  };
+
+  // 研修カレンダー: イベントクリック → スロット詳細表示
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleTrainingEventClick = (arg: any) => {
+    const { slot } = arg.event.extendedProps as { slot: TrainingSlotManagement };
+    setSelectedTrainingSlot(slot);
+    setEditCapacity(slot.capacity);
+  };
+
+  // 研修スロット: 定員保存
+  const handleSaveCapacity = async () => {
+    if (!selectedTrainingSlot) return;
+    setSavingCapacity(true);
+    try {
+      const res = await fetch(`/api/training-slots/${selectedTrainingSlot.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ capacity: editCapacity }),
+      });
+      if (res.ok) {
+        showToast('定員を更新しました', 'success');
+        await fetchTrainingMgmt();
+      } else {
+        const err = await res.json();
+        showToast(err.error || '更新に失敗しました', 'error');
+      }
+    } catch { showToast('エラーが発生しました', 'error'); }
+    setSavingCapacity(false);
+  };
+
+  // 研修スロット: 削除
+  const handleDeleteTrainingSlot = async () => {
+    if (!selectedTrainingSlot) return;
+    const start = new Date(selectedTrainingSlot.startTime);
+    const dateStr = start.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
+    const ok = await showConfirm(
+      `このスロットを削除しますか？\n${dateStr}`,
+      { variant: 'danger', confirmLabel: '削除', title: '研修スロット削除' }
+    );
+    if (!ok) return;
+    setDeletingSlot(true);
+    try {
+      const res = await fetch(`/api/training-slots/${selectedTrainingSlot.id}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('スロットを削除しました', 'success');
+        setSelectedTrainingSlot(null);
+        await fetchTrainingMgmt();
+      } else {
+        const err = await res.json();
+        showToast(err.error || '削除に失敗しました', 'error');
+      }
+    } catch { showToast('エラーが発生しました', 'error'); }
+    setDeletingSlot(false);
+  };
 
   // カレンダー月変更
   const handleDatesSet = (arg: { start: Date; end: Date }) => {
@@ -1158,35 +1257,6 @@ export default function ApplicantsPage() {
               {/* ツールバー */}
               <div className="p-4 border-b border-slate-200 bg-slate-50/50">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => {
-                        const [y, m] = trainingMgmtMonth.split('-').map(Number);
-                        const prev = new Date(y, m - 2, 1);
-                        const nm = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
-                        setTrainingMgmtMonth(nm);
-                        fetchTrainingMgmt(nm);
-                      }}
-                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      <i className="bi bi-chevron-left text-xs"></i>
-                    </button>
-                    <span className="px-3 text-sm font-bold text-slate-700">
-                      {trainingMgmtMonth.replace('-', '年')}月
-                    </span>
-                    <button
-                      onClick={() => {
-                        const [y, m] = trainingMgmtMonth.split('-').map(Number);
-                        const next = new Date(y, m, 1);
-                        const nm = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
-                        setTrainingMgmtMonth(nm);
-                        fetchTrainingMgmt(nm);
-                      }}
-                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
-                    >
-                      <i className="bi bi-chevron-right text-xs"></i>
-                    </button>
-                  </div>
                   <button
                     onClick={async () => {
                       try {
@@ -1205,67 +1275,157 @@ export default function ApplicantsPage() {
                     <i className="bi bi-arrow-clockwise"></i>
                     今すぐ生成
                   </button>
+                  {/* 凡例 */}
+                  <div className="flex items-center gap-3 ml-auto text-xs text-slate-500">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>空き</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>予約あり</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>残りわずか</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>満員</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>全員完了</span>
+                  </div>
                 </div>
               </div>
 
-              {/* スロット一覧 */}
-              {trainingMgmtLoading ? (
-                <div className="flex items-center justify-center py-20">
-                  <div className="flex items-center gap-3 text-slate-400">
-                    <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-medium">読み込み中...</span>
-                  </div>
-                </div>
-              ) : trainingMgmtSlots.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
-                  <i className="bi bi-mortarboard text-4xl"></i>
-                  <p className="text-sm font-medium">研修スロットがありません</p>
-                  <p className="text-xs">「今すぐ生成」で14日分を自動作成できます</p>
-                </div>
-              ) : (
-                <div className="divide-y divide-slate-100">
-                  {trainingMgmtSlots.map(slot => {
-                    const start = new Date(slot.startTime);
-                    const end = new Date(slot.endTime);
-                    const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
-                    const dateStr = start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
-                    const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
-                    return (
-                      <div key={slot.id} className="p-5">
-                        {/* スロットヘッダー */}
-                        <div className="flex items-start justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-bold text-slate-800">{dateStr}</span>
-                              <span className="text-xs text-slate-500">{timeStr}</span>
-                              {slot.location && (
-                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
-                                  <i className="bi bi-geo-alt mr-1"></i>{slot.location}
-                                </span>
-                              )}
-                            </div>
-                            {slot.note && (
-                              <p className="text-xs text-slate-400 mt-0.5">{slot.note}</p>
+              {/* カレンダー + 詳細パネル */}
+              <div className="flex">
+                {/* FullCalendar */}
+                <div className={`p-6 transition-all ${selectedTrainingSlot ? 'w-[60%]' : 'w-full'}`}>
+                  {trainingMgmtLoading && trainingMgmtSlots.length === 0 ? (
+                    <div className="flex items-center justify-center py-20">
+                      <div className="flex items-center gap-3 text-slate-400">
+                        <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span className="text-sm font-medium">読み込み中...</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <FullCalendar
+                      ref={trainingCalendarRef}
+                      plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+                      initialView="timeGridWeek"
+                      locale="ja"
+                      headerToolbar={{
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: 'dayGridMonth,timeGridWeek',
+                      }}
+                      buttonText={{ today: '今日', month: '月', week: '週' }}
+                      events={trainingCalendarEvents}
+                      eventClick={handleTrainingEventClick}
+                      datesSet={handleTrainingDatesSet}
+                      slotMinTime="08:00:00"
+                      slotMaxTime="23:00:00"
+                      allDaySlot={false}
+                      height="auto"
+                      nowIndicator={true}
+                      eventContent={(arg) => {
+                        const slot = arg.event.extendedProps.slot as TrainingSlotManagement;
+                        const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+                        return (
+                          <div className="px-1 py-0.5 overflow-hidden h-full">
+                            <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
+                            <div className="text-[11px] truncate">{slot.bookedCount}/{slot.capacity}名</div>
+                            {slot.location && <div className="text-[10px] truncate opacity-80">{slot.location}</div>}
+                            {slot.capacity > 0 && (
+                              <div className="mt-0.5 h-1 bg-white/30 rounded-full overflow-hidden">
+                                <div className="h-full bg-white/80 rounded-full" style={{ width: `${Math.min(fillRate, 100)}%` }}></div>
+                              </div>
                             )}
                           </div>
-                          {/* 定員バー */}
-                          <div className="text-right min-w-[120px]">
-                            <span className="text-xs font-bold text-slate-600">
-                              {slot.bookedCount} / {slot.capacity}名
-                            </span>
-                            <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden w-24 ml-auto">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  fillRate >= 100 ? 'bg-rose-500' : fillRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min(fillRate, 100)}%` }}
-                              ></div>
-                            </div>
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* スロット詳細パネル */}
+                {selectedTrainingSlot && (() => {
+                  const slot = selectedTrainingSlot;
+                  const start = new Date(slot.startTime);
+                  const end = new Date(slot.endTime);
+                  const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+                  const canDelete = slot.bookedCount === 0;
+                  return (
+                    <div className="w-[40%] border-l border-slate-200 flex flex-col" style={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}>
+                      {/* ヘッダー */}
+                      <div className="sticky top-0 bg-white px-5 py-4 border-b border-slate-200 flex items-start justify-between z-10">
+                        <div>
+                          <div className="text-sm font-black text-slate-800">
+                            {start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })}
                           </div>
+                          <div className="text-xs text-slate-500 mt-0.5">
+                            {start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 {end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          {slot.location && (
+                            <div className="text-xs text-slate-400 mt-1">
+                              <i className="bi bi-geo-alt mr-1"></i>{slot.location}
+                            </div>
+                          )}
                         </div>
-                        {/* 参加者リスト */}
+                        <button
+                          onClick={() => setSelectedTrainingSlot(null)}
+                          className="text-slate-400 hover:text-slate-600 transition-colors mt-0.5"
+                        >
+                          <i className="bi bi-x-lg text-base"></i>
+                        </button>
+                      </div>
+
+                      {/* 定員設定 */}
+                      <div className="px-5 py-4 border-b border-slate-100">
+                        <div className="text-xs font-bold text-slate-500 mb-2">定員</div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEditCapacity(v => Math.max(1, v - 1))}
+                            className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
+                          >
+                            <i className="bi bi-dash text-sm"></i>
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={editCapacity}
+                            onChange={e => setEditCapacity(Math.max(1, Math.min(100, Number(e.target.value))))}
+                            className="w-16 text-center border border-slate-200 rounded-lg py-1.5 text-sm font-bold focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => setEditCapacity(v => Math.min(100, v + 1))}
+                            className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors font-bold"
+                          >
+                            <i className="bi bi-plus text-sm"></i>
+                          </button>
+                          <span className="text-sm text-slate-500">名</span>
+                          <button
+                            onClick={handleSaveCapacity}
+                            disabled={savingCapacity || editCapacity === slot.capacity}
+                            className="ml-auto flex items-center gap-1.5 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-40"
+                          >
+                            {savingCapacity ? (
+                              <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+                            ) : (
+                              <i className="bi bi-check2"></i>
+                            )}
+                            保存
+                          </button>
+                        </div>
+                        {/* 埋まり具合バー */}
+                        <div className="mt-3 flex items-center gap-2">
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all ${fillRate >= 100 ? 'bg-rose-500' : fillRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                              style={{ width: `${Math.min(fillRate, 100)}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-xs font-bold text-slate-600 shrink-0">
+                            {slot.bookedCount}/{slot.capacity}名
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* 参加者リスト */}
+                      <div className="px-5 py-4 flex-1">
+                        <div className="text-xs font-bold text-slate-500 mb-2">参加者</div>
                         {slot.applicants.length === 0 ? (
-                          <p className="text-xs text-slate-400 pl-2 italic">参加者なし</p>
+                          <p className="text-xs text-slate-400 italic">参加者なし</p>
                         ) : (
                           <div className="space-y-2">
                             {slot.applicants.map(app => {
@@ -1274,22 +1434,18 @@ export default function ApplicantsPage() {
                               return (
                                 <div
                                   key={app.id}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${
-                                    isCompleted ? 'bg-emerald-50' : 'bg-slate-50'
-                                  }`}
+                                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
                                 >
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
-                                      isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'
-                                    }`}>
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
                                       <i className={`bi ${isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
                                     </div>
-                                    <span className="text-sm font-bold text-slate-800">{app.name}</span>
-                                    {app.phone && (
-                                      <span className="text-xs text-slate-400">{app.phone}</span>
-                                    )}
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
+                                      {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
+                                    </div>
                                     {flow && (
-                                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${flow.color}`}>
+                                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
                                         {flow.label}
                                       </span>
                                     )}
@@ -1298,14 +1454,14 @@ export default function ApplicantsPage() {
                                     <button
                                       onClick={() => handleMarkTrainingComplete(app.id)}
                                       disabled={markingComplete === app.id}
-                                      className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
+                                      className="flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-2 py-1 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
                                     >
                                       {markingComplete === app.id ? (
                                         <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
                                       ) : (
                                         <i className="bi bi-check2-circle"></i>
                                       )}
-                                      研修完了
+                                      完了
                                     </button>
                                   )}
                                 </div>
@@ -1314,10 +1470,33 @@ export default function ApplicantsPage() {
                           </div>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      {/* 削除ボタン */}
+                      <div className="px-5 py-4 border-t border-slate-100">
+                        {canDelete ? (
+                          <button
+                            onClick={handleDeleteTrainingSlot}
+                            disabled={deletingSlot}
+                            className="w-full flex items-center justify-center gap-2 text-sm font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            {deletingSlot ? (
+                              <span className="w-4 h-4 border border-rose-500 border-t-transparent rounded-full animate-spin inline-block"></span>
+                            ) : (
+                              <i className="bi bi-trash3"></i>
+                            )}
+                            この枠を削除
+                          </button>
+                        ) : (
+                          <p className="text-xs text-slate-400 text-center">
+                            <i className="bi bi-info-circle mr-1"></i>
+                            参加者がいる枠は削除できません
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           )}
         </div>
