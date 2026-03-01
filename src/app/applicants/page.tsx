@@ -328,7 +328,7 @@ export default function ApplicantsPage() {
       const res = await fetch('/api/training-slots/available');
       if (res.ok) {
         const data = await res.json();
-        setTrainingSlots(data);
+        setTrainingSlots(data.slots || []);
       }
     } catch {
       // silently fail
