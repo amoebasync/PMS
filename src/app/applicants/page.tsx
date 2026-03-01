@@ -151,7 +151,53 @@ export default function ApplicantsPage() {
   const calendarRef = useRef<FullCalendar>(null);
 
   // ── タブ ──
-  const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
+  const [activeTab, setActiveTab] = useState<'calendar' | 'list' | 'training'>('calendar');
+
+  // ── 研修管理 ──
+  type TrainingApplicant = { id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null };
+  type TrainingSlotManagement = {
+    id: number; startTime: string; endTime: string; capacity: number;
+    location: string | null; note: string | null; bookedCount: number;
+    remainingCapacity: number; applicants: TrainingApplicant[];
+  };
+  const [trainingMgmtSlots, setTrainingMgmtSlots] = useState<TrainingSlotManagement[]>([]);
+  const [trainingMgmtLoading, setTrainingMgmtLoading] = useState(false);
+  const [trainingMgmtMonth, setTrainingMgmtMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [markingComplete, setMarkingComplete] = useState<number | null>(null);
+
+  const fetchTrainingMgmt = async (month?: string) => {
+    setTrainingMgmtLoading(true);
+    try {
+      const m = month || trainingMgmtMonth;
+      const res = await fetch(`/api/training-slots?month=${m}`);
+      if (res.ok) {
+        const json = await res.json();
+        setTrainingMgmtSlots(json.data || []);
+      }
+    } catch { /* ignore */ }
+    setTrainingMgmtLoading(false);
+  };
+
+  const handleMarkTrainingComplete = async (applicantId: number) => {
+    setMarkingComplete(applicantId);
+    try {
+      const res = await fetch(`/api/applicants/${applicantId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flowStatus: 'TRAINING_COMPLETED' }),
+      });
+      if (res.ok) {
+        showToast('研修完了としてマークしました', 'success');
+        await fetchTrainingMgmt();
+      } else {
+        showToast('更新に失敗しました', 'error');
+      }
+    } catch { showToast('エラーが発生しました', 'error'); }
+    setMarkingComplete(null);
+  };
 
   // ── カレンダー ──
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
@@ -893,6 +939,23 @@ export default function ApplicantsPage() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
             </button>
+            <button
+              onClick={() => {
+                setActiveTab('training');
+                fetchTrainingMgmt();
+              }}
+              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+                activeTab === 'training'
+                  ? 'text-indigo-600'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <i className="bi bi-mortarboard-fill"></i>
+              研修管理
+              {activeTab === 'training' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
+              )}
+            </button>
           </div>
 
           {/* ── TAB 1: カレンダー ── */}
@@ -1086,6 +1149,175 @@ export default function ApplicantsPage() {
                 limit={LIMIT}
                 onPageChange={p => fetchApplicants(p)}
               />
+            </div>
+          )}
+
+          {/* ── TAB 3: 研修管理 ── */}
+          {activeTab === 'training' && (
+            <div>
+              {/* ツールバー */}
+              <div className="p-4 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        const [y, m] = trainingMgmtMonth.split('-').map(Number);
+                        const prev = new Date(y, m - 2, 1);
+                        const nm = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`;
+                        setTrainingMgmtMonth(nm);
+                        fetchTrainingMgmt(nm);
+                      }}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      <i className="bi bi-chevron-left text-xs"></i>
+                    </button>
+                    <span className="px-3 text-sm font-bold text-slate-700">
+                      {trainingMgmtMonth.replace('-', '年')}月
+                    </span>
+                    <button
+                      onClick={() => {
+                        const [y, m] = trainingMgmtMonth.split('-').map(Number);
+                        const next = new Date(y, m, 1);
+                        const nm = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}`;
+                        setTrainingMgmtMonth(nm);
+                        fetchTrainingMgmt(nm);
+                      }}
+                      className="w-8 h-8 rounded-lg border border-slate-200 bg-white flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors"
+                    >
+                      <i className="bi bi-chevron-right text-xs"></i>
+                    </button>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      try {
+                        const res = await fetch('/api/training-slots/generate', { method: 'POST' });
+                        const data = await res.json();
+                        if (res.ok) {
+                          showToast(data.message || 'スロットを生成しました', 'success');
+                          fetchTrainingMgmt();
+                        } else {
+                          showToast(data.error || '生成に失敗しました', 'error');
+                        }
+                      } catch { showToast('エラーが発生しました', 'error'); }
+                    }}
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
+                  >
+                    <i className="bi bi-arrow-clockwise"></i>
+                    今すぐ生成
+                  </button>
+                </div>
+              </div>
+
+              {/* スロット一覧 */}
+              {trainingMgmtLoading ? (
+                <div className="flex items-center justify-center py-20">
+                  <div className="flex items-center gap-3 text-slate-400">
+                    <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span className="text-sm font-medium">読み込み中...</span>
+                  </div>
+                </div>
+              ) : trainingMgmtSlots.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                  <i className="bi bi-mortarboard text-4xl"></i>
+                  <p className="text-sm font-medium">研修スロットがありません</p>
+                  <p className="text-xs">「今すぐ生成」で14日分を自動作成できます</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100">
+                  {trainingMgmtSlots.map(slot => {
+                    const start = new Date(slot.startTime);
+                    const end = new Date(slot.endTime);
+                    const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
+                    const dateStr = start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+                    const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                    return (
+                      <div key={slot.id} className="p-5">
+                        {/* スロットヘッダー */}
+                        <div className="flex items-start justify-between mb-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-sm font-bold text-slate-800">{dateStr}</span>
+                              <span className="text-xs text-slate-500">{timeStr}</span>
+                              {slot.location && (
+                                <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                                  <i className="bi bi-geo-alt mr-1"></i>{slot.location}
+                                </span>
+                              )}
+                            </div>
+                            {slot.note && (
+                              <p className="text-xs text-slate-400 mt-0.5">{slot.note}</p>
+                            )}
+                          </div>
+                          {/* 定員バー */}
+                          <div className="text-right min-w-[120px]">
+                            <span className="text-xs font-bold text-slate-600">
+                              {slot.bookedCount} / {slot.capacity}名
+                            </span>
+                            <div className="mt-1 h-1.5 bg-slate-100 rounded-full overflow-hidden w-24 ml-auto">
+                              <div
+                                className={`h-full rounded-full transition-all ${
+                                  fillRate >= 100 ? 'bg-rose-500' : fillRate >= 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${Math.min(fillRate, 100)}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                        {/* 参加者リスト */}
+                        {slot.applicants.length === 0 ? (
+                          <p className="text-xs text-slate-400 pl-2 italic">参加者なし</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {slot.applicants.map(app => {
+                              const flow = FLOW_STATUS_MAP[app.flowStatus];
+                              const isCompleted = app.flowStatus === 'TRAINING_COMPLETED';
+                              return (
+                                <div
+                                  key={app.id}
+                                  className={`flex items-center justify-between px-3 py-2 rounded-lg ${
+                                    isCompleted ? 'bg-emerald-50' : 'bg-slate-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                                      isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'
+                                    }`}>
+                                      <i className={`bi ${isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
+                                    </div>
+                                    <span className="text-sm font-bold text-slate-800">{app.name}</span>
+                                    {app.phone && (
+                                      <span className="text-xs text-slate-400">{app.phone}</span>
+                                    )}
+                                    {flow && (
+                                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${flow.color}`}>
+                                        {flow.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {!isCompleted && (
+                                    <button
+                                      onClick={() => handleMarkTrainingComplete(app.id)}
+                                      disabled={markingComplete === app.id}
+                                      className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 shrink-0 ml-2"
+                                    >
+                                      {markingComplete === app.id ? (
+                                        <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
+                                      ) : (
+                                        <i className="bi bi-check2-circle"></i>
+                                      )}
+                                      研修完了
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>
