@@ -177,8 +177,9 @@ async function calculateDailyEarnings(distributorId: number, date: Date) {
     details.push({
       scheduleId: schedule.id,
       areaName: schedule.area
-        ? `${schedule.area.town_name || ''}${schedule.area.chome_name || ''}`
+        ? (schedule.area.chome_name || schedule.area.town_name || '')
         : '',
+      areaNameEn: schedule.area?.name_en || '',
       flyerTypeCount,
       unitPrice,
       actualCount,

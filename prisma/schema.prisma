@@ -9,9 +9,10 @@ datasource db {
 
 // 3. モデル定義（今回投入したテーブル構造に合わせます）
 model Prefecture {
-  id        Int    @id
-  name      String @unique
+  id        Int     @id
+  name      String  @unique
   name_kana String
+  name_en   String? @db.VarChar(50)
   areas     Area[] // リレーション
   prohibitedProperties ProhibitedProperty[]
 
@@ -24,6 +25,7 @@ model City {
   code                  String                 @unique
   name                  String
   name_kana             String
+  name_en               String?                @db.VarChar(100)
   areas                 Area[] // リレーション
   distributionSchedules DistributionSchedule[]
   prohibitedProperties  ProhibitedProperty[]
@@ -50,6 +52,7 @@ model Area {
   address_code        String   @unique
   town_name           String
   chome_name          String
+  name_en             String?  @db.VarChar(200)
   boundary_geojson    String?  @db.LongText // ｜で繋いだデータは長くなるのでLongText推奨
   door_to_door_count  Int      @default(0)
   multi_family_count  Int      @default(0)

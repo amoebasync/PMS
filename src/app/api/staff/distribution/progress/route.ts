@@ -24,11 +24,24 @@ export async function POST(request: Request) {
         distributorId: distributor.id,
         finishedAt: null,
       },
-      select: { id: true },
+      select: { id: true, scheduleId: true },
     });
 
     if (!session) {
       return NextResponse.json({ error: 'アクティブなセッションが見つかりません' }, { status: 404 });
+    }
+
+    // 配布予定枚数の最大値を超えていないかチェック
+    const scheduleItems = await prisma.distributionItem.findMany({
+      where: { scheduleId: session.scheduleId },
+      select: { plannedCount: true },
+    });
+    const maxPlanned = Math.max(...scheduleItems.map(i => i.plannedCount ?? 0), 0);
+    if (maxPlanned > 0 && mailboxCount > maxPlanned) {
+      return NextResponse.json({
+        error: `配布枚数が予定枚数（${maxPlanned}枚）を超えています`,
+        maxPlanned,
+      }, { status: 400 });
     }
 
     await prisma.progressEvent.create({

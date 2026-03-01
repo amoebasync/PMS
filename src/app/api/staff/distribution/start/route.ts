@@ -32,12 +32,22 @@ export async function POST(request: Request) {
     }
 
     if (schedule.status === 'DISTRIBUTING') {
-      // 既にセッション開始済み → 既存セッションを返す
+      // 既にセッション開始済み → 既存セッションを返す（現在の進捗も含める）
       const existingSession = await prisma.distributionSession.findUnique({
         where: { scheduleId },
       });
       if (existingSession) {
-        return NextResponse.json({ sessionId: existingSession.id, alreadyStarted: true });
+        // 最新のProgressEventから現在の累積ポスト数を取得
+        const lastProgress = await prisma.progressEvent.findFirst({
+          where: { sessionId: existingSession.id },
+          orderBy: { mailboxCount: 'desc' },
+          select: { mailboxCount: true },
+        });
+        return NextResponse.json({
+          sessionId: existingSession.id,
+          alreadyStarted: true,
+          currentMailboxCount: lastProgress?.mailboxCount ?? 0,
+        });
       }
     }
 

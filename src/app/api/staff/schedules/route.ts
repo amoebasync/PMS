@@ -28,7 +28,9 @@ export async function GET(request: Request) {
         items: {
           orderBy: { slotIndex: 'asc' },
         },
-        area: true,
+        area: {
+          include: { prefecture: true, city: true },
+        },
         city: true,
       },
       orderBy: { date: 'asc' },

@@ -152,6 +152,9 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const [isLive, setIsLive] = useState(false);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Live duration tick (every second)
+  const [nowTick, setNowTick] = useState(Date.now());
+
   // Fetch trajectory data
   const fetchData = useCallback(async () => {
     try {
@@ -185,6 +188,13 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [isLive, fetchData]);
+
+  // Tick every second for live duration display
+  useEffect(() => {
+    if (!isLive) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [isLive]);
 
   // Playback animation
   useEffect(() => {
@@ -221,7 +231,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-slate-600 text-sm">軌跡データを読み込み中...</p>
@@ -232,7 +242,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
   if (error || !data) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center max-w-sm">
           <i className="bi bi-exclamation-triangle text-3xl text-amber-500 mb-3 block"></i>
           <p className="text-slate-700 font-bold mb-2">{error || 'データが見つかりません'}</p>
@@ -252,7 +262,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   // Current timestamp based on slider position
   const currentTimestamp = currentPoint ? new Date(currentPoint.timestamp) : null;
   const startTime = new Date(data.session.startedAt);
-  const endTime = data.session.finishedAt ? new Date(data.session.finishedAt) : new Date();
+  const endTime = data.session.finishedAt ? new Date(data.session.finishedAt) : new Date(nowTick);
 
   // Filter events by current time
   const visibleProgress = currentTimestamp
@@ -279,7 +289,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const totalMailboxes = lastProgress?.mailboxCount || 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[1100] flex flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
@@ -315,7 +325,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               center={center}
               zoom={16}
               options={{
-                mapTypeControl: true,
+                mapTypeControl: false,
                 streetViewControl: false,
                 fullscreenControl: false,
               }}
@@ -340,9 +350,9 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 <Polyline
                   path={visiblePoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
                   options={{
-                    strokeColor: '#3b82f6',
+                    strokeColor: '#ec4899',
                     strokeWeight: 3,
-                    strokeOpacity: 0.9,
+                    strokeOpacity: 0.85,
                   }}
                 />
               )}
@@ -352,9 +362,9 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 <Polyline
                   path={points.slice(visibleCount - 1).map((p) => ({ lat: p.lat, lng: p.lng }))}
                   options={{
-                    strokeColor: '#94a3b8',
+                    strokeColor: '#f9a8d4',
                     strokeWeight: 2,
-                    strokeOpacity: 0.3,
+                    strokeOpacity: 0.35,
                   }}
                 />
               )}
@@ -399,18 +409,21 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 />
               )}
 
-              {/* Current position marker */}
+              {/* Current position marker - map pin with person inside */}
               {currentPoint && (
                 <Marker
                   position={{ lat: currentPoint.lat, lng: currentPoint.lng }}
                   icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 10,
+                    // Map pin outline with person silhouette inside
+                    path: 'M12 0C7.03 0 3 4.03 3 9c0 6.75 9 15 9 15s9-8.25 9-15c0-4.97-4.03-9-9-9zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 10c-2.21 0-4-1.12-4-2.5C8 10.12 9.79 9 12 9s4 1.12 4 2.5c0 1.38-1.79 2.5-4 2.5z',
+                    scale: 1.8,
                     fillColor: '#3b82f6',
                     fillOpacity: 1,
                     strokeColor: '#fff',
-                    strokeWeight: 3,
+                    strokeWeight: 2,
+                    anchor: new google.maps.Point(12, 24),
                   }}
+                  animation={google.maps.Animation.BOUNCE}
                   title={currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : ''}
                 />
               )}

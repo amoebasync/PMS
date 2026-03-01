@@ -27,6 +27,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'シフトが見つかりません' }, { status: 404 });
     }
 
+    // 翌日のシフトは削除不可
+    const now = new Date();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dayAfterTomorrow = new Date(today);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+
+    const shiftDate = new Date(shift.date);
+    shiftDate.setHours(0, 0, 0, 0);
+
+    if (shiftDate >= tomorrow && shiftDate < dayAfterTomorrow) {
+      return NextResponse.json({ error: '翌日のシフトは削除できません' }, { status: 400 });
+    }
+
     await prisma.distributorShift.delete({ where: { id: shiftId } });
 
     return NextResponse.json({ success: true });
