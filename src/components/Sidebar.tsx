@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import NotificationBell from '@/components/NotificationBell';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -144,7 +145,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
         <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`} aria-hidden="true"></i>
       </button>
 
-      <div className="h-[80px] flex items-center justify-center border-b border-white/10 bg-[#0f172a] shrink-0">
+      <div className={`h-[80px] flex items-center border-b border-white/10 bg-[#0f172a] shrink-0 ${isCollapsed ? 'flex-col justify-center gap-1' : 'px-4 justify-between'}`}>
         <Link href="/" className="flex items-center gap-3">
           <div className="relative w-[32px] h-[32px] shrink-0">
             <Image src="/logo/logo_Icon_transparent.png" alt="Icon" fill className="object-contain" priority />
@@ -155,6 +156,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
             </div>
           )}
         </Link>
+        <NotificationBell />
       </div>
 
       <div className="flex-1 py-6 overflow-y-auto sidebar-scrollbar">
