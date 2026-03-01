@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/NotificationBell';
 import { useState, useEffect } from 'react';
 import { NotificationProvider } from '@/components/ui/NotificationProvider';
 
