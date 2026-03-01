@@ -540,6 +540,14 @@ export default function ApplicantsPage() {
     setSavingCapacity(false);
   };
 
+  // 研修スロット詳細パネルを閉じ、カレンダーサイズを再計算
+  const closeTrainingSlotPanel = () => {
+    setSelectedTrainingSlot(null);
+    setTimeout(() => {
+      trainingCalendarRef.current?.getApi().updateSize();
+    }, 50);
+  };
+
   // 研修スロット: 削除
   const handleDeleteTrainingSlot = async () => {
     if (!selectedTrainingSlot) return;
@@ -555,7 +563,7 @@ export default function ApplicantsPage() {
       const res = await fetch(`/api/training-slots/${selectedTrainingSlot.id}`, { method: 'DELETE' });
       if (res.ok) {
         showToast('スロットを削除しました', 'success');
-        setSelectedTrainingSlot(null);
+        closeTrainingSlotPanel();
         await fetchTrainingMgmt();
       } else {
         const err = await res.json();
@@ -1321,13 +1329,27 @@ export default function ApplicantsPage() {
                         const slot = arg.event.extendedProps.slot as TrainingSlotManagement;
                         const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
                         return (
-                          <div className="px-1 py-0.5 overflow-hidden h-full">
-                            <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
-                            <div className="text-[11px] truncate">{slot.bookedCount}/{slot.capacity}名</div>
-                            {slot.location && <div className="text-[10px] truncate opacity-80">{slot.location}</div>}
+                          <div className="px-1 py-0.5 overflow-hidden h-full flex flex-col gap-0.5">
+                            <div className="flex items-center justify-between gap-1">
+                              <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
+                              <div className="text-[11px] shrink-0 opacity-90">{slot.bookedCount}/{slot.capacity}名</div>
+                            </div>
+                            {slot.location && <div className="text-[10px] truncate opacity-80"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</div>}
                             {slot.capacity > 0 && (
-                              <div className="mt-0.5 h-1 bg-white/30 rounded-full overflow-hidden">
+                              <div className="h-1 bg-white/30 rounded-full overflow-hidden">
                                 <div className="h-full bg-white/80 rounded-full" style={{ width: `${Math.min(fillRate, 100)}%` }}></div>
+                              </div>
+                            )}
+                            {slot.applicants.length > 0 && (
+                              <div className="flex flex-col gap-0.5 mt-0.5">
+                                {slot.applicants.map(app => {
+                                  const isDone = app.flowStatus === 'TRAINING_COMPLETED';
+                                  return (
+                                    <div key={app.id} className={`text-[10px] truncate px-1 py-0.5 rounded bg-white/20 leading-tight ${isDone ? 'opacity-60 line-through' : ''}`}>
+                                      {isDone && <span className="mr-0.5">✓</span>}{app.name}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -1362,7 +1384,7 @@ export default function ApplicantsPage() {
                           )}
                         </div>
                         <button
-                          onClick={() => setSelectedTrainingSlot(null)}
+                          onClick={closeTrainingSlotPanel}
                           className="text-slate-400 hover:text-slate-600 transition-colors mt-0.5"
                         >
                           <i className="bi bi-x-lg text-base"></i>
