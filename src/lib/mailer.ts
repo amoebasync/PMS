@@ -1010,3 +1010,203 @@ export const sendAndroidTestInviteEmail = async (
     text: `${distributorName} さん\n\n配布アプリ（Android版）の内部テストにご招待いたします。\n\n【インストール手順】\n1. このメールを受信したGoogleアカウントでログインした状態で、以下のURLにアクセスしてください\n2. 「テスターになる」をタップして参加します\n3. Google Play Storeからアプリをインストールできるようになります\n\nテスト参加URL:\n${ANDROID_OPT_IN_URL}\n\n※ このメールアドレス（${toEmail}）のGoogleアカウントでログインしている必要があります\n※ テスト版のため、予期しない動作が発生する場合があります`,
   });
 };
+
+// ─────────────────────────────────────────────────────────
+// 13. 研修確定通知メール（管理者予約時 or 応募者セルフ予約時）
+// ─────────────────────────────────────────────────────────
+export async function sendTrainingConfirmationEmail(
+  to: string,
+  name: string,
+  lang: string,
+  trainingDate: string,    // "2026年3月10日（月）" or "March 10, 2026 (Monday)"
+  trainingTime: string,    // "09:00 - 12:00"
+  location: string | null,
+  selfBookingLink: string | null  // 後でセルフ予約するリンク（nullならスロット確定済み）
+): Promise<void> {
+  const isEn = lang === 'en';
+
+  const locationRow = location
+    ? `<tr>
+        <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Location' : '研修場所'}</td>
+        <td style="padding:6px 0;font-weight:bold;">${location}</td>
+       </tr>`
+    : '';
+
+  const selfBookingSection = selfBookingLink
+    ? `<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 8px;font-size:13px;font-weight:bold;color:#0369a1;">
+          ${isEn ? '📅 Book your training session' : '📅 研修日程を選択してください'}
+        </p>
+        <p style="margin:0 0 12px;font-size:13px;color:#475569;">
+          ${isEn ? 'Please select your preferred training slot using the link below.' : '以下のリンクから希望の研修日時を選択してください。'}
+        </p>
+        <a href="${selfBookingLink}" style="display:inline-block;background:#0284c7;color:#ffffff;font-weight:bold;font-size:13px;padding:10px 24px;border-radius:8px;text-decoration:none;">
+          ${isEn ? 'Select Training Slot' : '研修日程を選択する'}
+        </a>
+      </div>`
+    : '';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${name},</p>
+    <p style="margin:0 0 16px;">
+      Your training session has been confirmed. Please find the details below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#166534;">Training Details</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Date</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Time</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingTime}</td>
+          </tr>
+          ${locationRow}
+        </table>
+      </td></tr>
+    </table>
+
+    ${selfBookingSection}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      Please be on time. If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${name} 様</p>
+    <p style="margin:0 0 16px;">
+      研修日程が確定しましたのでご連絡いたします。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#166534;">研修情報</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">研修日</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">研修時間</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingTime}</td>
+          </tr>
+          ${locationRow}
+        </table>
+      </td></tr>
+    </table>
+
+    ${selfBookingSection}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      研修当日はお時間に余裕を持ってご参加ください。<br>
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Training Session Confirmed'
+    : '【Tiramis】研修日程のご案内';
+
+  const textContent = isEn
+    ? `Dear ${name},\n\nYour training session has been confirmed.\n\nDate: ${trainingDate}\nTime: ${trainingTime}\n${location ? `Location: ${location}\n` : ''}${selfBookingLink ? `\nBook your slot: ${selfBookingLink}\n` : ''}\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    : `${name} 様\n\n研修日程が確定しましたのでご連絡いたします。\n\n研修日: ${trainingDate}\n研修時間: ${trainingTime}\n${location ? `研修場所: ${location}\n` : ''}${selfBookingLink ? `\n研修日程の選択: ${selfBookingLink}\n` : ''}\n研修当日はお時間に余裕を持ってご参加ください。\nお問い合わせ: info@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// 14. 研修予約案内メール（「後でセルフ予約してください」メール）
+// ─────────────────────────────────────────────────────────
+export async function sendTrainingInviteEmail(
+  to: string,
+  name: string,
+  lang: string,
+  bookingUrl: string  // /training-booking?token=xxx
+): Promise<void> {
+  const isEn = lang === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${name},</p>
+    <p style="margin:0 0 16px;">
+      Congratulations on your acceptance! Please select your preferred training session using the link below.
+    </p>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px 24px;margin:24px 0;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:bold;color:#166534;">
+        Select Your Training Session
+      </p>
+      <p style="margin:0 0 16px;font-size:13px;color:#475569;">
+        Please choose a date and time that works best for you from the available training slots.
+      </p>
+      <a href="${bookingUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;font-weight:bold;font-size:14px;padding:12px 32px;border-radius:8px;text-decoration:none;">
+        Book Training Session
+      </a>
+    </div>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>Please note:</strong> This link is for your use only. Please do not share it with others.
+      </p>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact us at info@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${name} 様</p>
+    <p style="margin:0 0 16px;">
+      この度は採用となりましたことを心よりお祝い申し上げます。<br>
+      以下のリンクから研修日程をご選択ください。
+    </p>
+
+    <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:20px 24px;margin:24px 0;">
+      <p style="margin:0 0 12px;font-size:14px;font-weight:bold;color:#166534;">
+        研修日程のご選択
+      </p>
+      <p style="margin:0 0 16px;font-size:13px;color:#475569;">
+        ご都合のよい研修日時をお選びください。
+      </p>
+      <a href="${bookingUrl}" style="display:inline-block;background:#16a34a;color:#ffffff;font-weight:bold;font-size:14px;padding:12px 32px;border-radius:8px;text-decoration:none;">
+        研修日程を選択する
+      </a>
+    </div>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>ご注意:</strong> このリンクはご本人専用です。第三者への共有はお控えください。
+      </p>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Please Select Your Training Session'
+    : '【Tiramis】研修日程のご選択をお願いします';
+
+  const textContent = isEn
+    ? `Dear ${name},\n\nCongratulations on your acceptance! Please select your preferred training session.\n\nBook your training: ${bookingUrl}\n\nThis link is for your use only. Contact info@tiramis.co.jp for questions.`
+    : `${name} 様\n\nこの度は採用となりましたことをお祝い申し上げます。\n以下のリンクから研修日程をご選択ください。\n\n研修日程の選択: ${bookingUrl}\n\nこのリンクはご本人専用です。\nお問い合わせ: info@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <noreply@tiramis.co.jp>',
+    to,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+}

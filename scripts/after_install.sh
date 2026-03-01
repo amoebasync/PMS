@@ -26,4 +26,13 @@ if [ -n "$CRON_SECRET" ]; then
   else
     echo "CRON既存: 定期タスク自動生成（スキップ）"
   fi
+
+  # --- 研修スロット自動生成 CRON 登録（重複時はスキップ） ---
+  TRAINING_CRON_JOB="0 2 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/generate-training-slots >> /tmp/pms-cron-generate-training-slots.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "generate-training-slots"; then
+    (crontab -l 2>/dev/null; echo "$TRAINING_CRON_JOB") | crontab -
+    echo "CRON登録: 研修スロット自動生成（毎日02:00）"
+  else
+    echo "CRON既存: 研修スロット自動生成（スキップ）"
+  fi
 fi

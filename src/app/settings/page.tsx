@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
 import DefaultSlotSettings from '@/components/settings/DefaultSlotSettings';
+import DefaultTrainingSlotSettings from '@/components/settings/DefaultTrainingSlotSettings';
 
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
 type Industry = { id: number; name: string; _count: { flyers: number } };
@@ -40,7 +41,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -468,13 +469,14 @@ export default function SettingsPage() {
     { key: 'distributionMethod', label: '配布方法',    icon: 'bi-signpost-2' },
     { key: 'company',            label: '自社情報',    icon: 'bi-building' },
     { key: 'interviewSlot',      label: '面接スロット', icon: 'bi-calendar-check' },
+    { key: 'trainingSlot',       label: '研修スロット', icon: 'bi-mortarboard' },
     { key: 'taskCategory',        label: 'タスク種類',  icon: 'bi-list-check' },
     { key: 'recruitingMedia',     label: '求人媒体',    icon: 'bi-megaphone-fill' },
     { key: 'prohibitedReason',   label: '禁止理由',    icon: 'bi-shield-x' },
     { key: 'complaintType',      label: 'クレーム種別', icon: 'bi-exclamation-circle' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType';
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
@@ -946,6 +948,9 @@ export default function SettingsPage() {
 
         {/* 面接スロット設定タブ */}
         {tab === 'interviewSlot' && (<DefaultSlotSettings />)}
+
+        {/* 研修スロット設定タブ */}
+        {tab === 'trainingSlot' && (<DefaultTrainingSlotSettings />)}
 
         {/* タスク種類設定タブ */}
         {tab === 'taskCategory' && (

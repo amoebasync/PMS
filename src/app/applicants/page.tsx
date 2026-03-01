@@ -40,6 +40,16 @@ type Country = { id: number; code: string; name: string; nameEn: string };
 type VisaType = { id: number; name: string };
 type RecruitingMedia = { id: number; nameJa: string; nameEn: string | null; code: string };
 
+type TrainingSlotOption = {
+  id: number;
+  startTime: string;
+  endTime: string;
+  capacity: number;
+  location: string | null;
+  bookedCount: number;
+  remainingCapacity: number;
+};
+
 type Applicant = {
   id: number;
   name: string;
@@ -63,6 +73,13 @@ type Applicant = {
     endTime: string;
     meetUrl: string | null;
     isBooked: boolean;
+  } | null;
+  trainingSlot: {
+    id: number;
+    startTime: string;
+    endTime: string;
+    capacity: number;
+    location: string | null;
   } | null;
   flowStatus: string;
   hiringStatus: string;
@@ -167,6 +184,12 @@ export default function ApplicantsPage() {
   const [availableSlots, setAvailableSlots] = useState<{id: number; startTime: string; endTime: string}[]>([]);
   const [selectedNewSlotId, setSelectedNewSlotId] = useState<number | null>(null);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  // ── 研修スロット ──
+  const [trainingSlots, setTrainingSlots] = useState<TrainingSlotOption[]>([]);
+  const [loadingTrainingSlots, setLoadingTrainingSlots] = useState(false);
+  const [selectedTrainingSlotId, setSelectedTrainingSlotId] = useState<number | ''>('');
+  const [trainingBookingMode, setTrainingBookingMode] = useState<'now' | 'later'>('now');
 
   // ── スロット作成フォーム ──
   const [slotForm, setSlotForm] = useState({
@@ -291,6 +314,20 @@ export default function ApplicantsPage() {
       // silently fail
     }
   }, []);
+
+  const fetchTrainingSlots = async () => {
+    setLoadingTrainingSlots(true);
+    try {
+      const res = await fetch('/api/training-slots/available');
+      if (res.ok) {
+        const data = await res.json();
+        setTrainingSlots(data);
+      }
+    } catch {
+      // silently fail
+    }
+    setLoadingTrainingSlots(false);
+  };
 
   // ── 初回ロード ──
   useEffect(() => {
@@ -426,6 +463,9 @@ export default function ApplicantsPage() {
   const openEvalModal = async (applicantId: number) => {
     setEvalLoading(true);
     setShowEvalModal(true);
+    setShowReschedulePanel(false);
+    setSelectedTrainingSlotId('');
+    setTrainingBookingMode('now');
     try {
       const res = await fetch(`/api/applicants/${applicantId}`);
       if (!res.ok) throw new Error('fetch failed');
@@ -449,6 +489,10 @@ export default function ApplicantsPage() {
         hiringStatus: data.hiringStatus,
         recruitingMediaId: data.recruitingMediaId || '',
       });
+      // 採用済みの場合は研修スロットを取得
+      if (data.hiringStatus === 'HIRED') {
+        fetchTrainingSlots();
+      }
     } catch {
       showToast('応募者情報の取得に失敗しました', 'error');
       setShowEvalModal(false);
@@ -488,7 +532,39 @@ export default function ApplicantsPage() {
         const err = await res.json();
         throw new Error(err.error || '保存に失敗しました');
       }
-      showToast('応募者情報を保存しました', 'success');
+
+      // 研修スロット処理
+      if (evalForm.hiringStatus === 'HIRED') {
+        if (trainingBookingMode === 'now' && selectedTrainingSlotId) {
+          const bookRes = await fetch(`/api/applicants/${selectedApplicant.id}/book-training`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainingSlotId: selectedTrainingSlotId }),
+          });
+          if (!bookRes.ok) {
+            const err = await bookRes.json();
+            showToast(`研修スロットの予約に失敗しました: ${err.error || ''}`, 'error');
+          } else {
+            showToast('応募者情報を保存し、研修スロットを予約しました', 'success');
+          }
+        } else if (trainingBookingMode === 'later') {
+          const inviteRes = await fetch(`/api/applicants/${selectedApplicant.id}/book-training`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ trainingSlotId: null, sendInvite: true }),
+          });
+          if (!inviteRes.ok) {
+            showToast('研修案内メールの送信に失敗しました', 'error');
+          } else {
+            showToast('応募者情報を保存し、研修案内メールを送信しました', 'success');
+          }
+        } else {
+          showToast('応募者情報を保存しました', 'success');
+        }
+      } else {
+        showToast('応募者情報を保存しました', 'success');
+      }
+
       setShowEvalModal(false);
       setSelectedApplicant(null);
       fetchSlots();
@@ -1470,7 +1546,12 @@ export default function ApplicantsPage() {
                         <label className="block text-xs font-bold text-slate-500 mb-1.5">採用ステータス</label>
                         <select
                           value={evalForm.hiringStatus}
-                          onChange={e => setEvalForm(f => ({ ...f, hiringStatus: e.target.value }))}
+                          onChange={e => {
+                            setEvalForm(f => ({ ...f, hiringStatus: e.target.value }));
+                            if (e.target.value === 'HIRED' && trainingSlots.length === 0 && !loadingTrainingSlots) {
+                              fetchTrainingSlots();
+                            }
+                          }}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         >
                           <option value="IN_PROGRESS">選考中</option>
@@ -1490,6 +1571,114 @@ export default function ApplicantsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* セクション 5: 研修スロット設定（採用時のみ） */}
+                  {evalForm.hiringStatus === 'HIRED' && (
+                    <div>
+                      <div className="flex items-center gap-2 mb-3">
+                        <i className="bi bi-mortarboard text-indigo-600"></i>
+                        <h3 className="text-sm font-black text-slate-800">研修スロット設定</h3>
+                      </div>
+
+                      {/* 既に研修スロットが設定済みの場合 */}
+                      {selectedApplicant.trainingSlot && (
+                        <div className="mb-3 bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
+                          <i className="bi bi-check-circle-fill text-emerald-500 mt-0.5"></i>
+                          <div>
+                            <p className="text-xs font-bold text-emerald-700">研修スロット予約済み</p>
+                            <p className="text-xs text-emerald-600 mt-0.5">
+                              {new Date(selectedApplicant.trainingSlot.startTime).toLocaleString('ja-JP', {
+                                year: 'numeric', month: 'numeric', day: 'numeric',
+                                hour: '2-digit', minute: '2-digit',
+                              })}
+                              {' 〜 '}
+                              {new Date(selectedApplicant.trainingSlot.endTime).toLocaleTimeString('ja-JP', {
+                                hour: '2-digit', minute: '2-digit',
+                              })}
+                              {selectedApplicant.trainingSlot.location && ` / ${selectedApplicant.trainingSlot.location}`}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="bg-slate-50 rounded-xl p-4 space-y-4">
+                        {/* 案内方法の選択 */}
+                        <div className="flex gap-4">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="trainingBookingMode"
+                              value="now"
+                              checked={trainingBookingMode === 'now'}
+                              onChange={() => {
+                                setTrainingBookingMode('now');
+                                if (trainingSlots.length === 0 && !loadingTrainingSlots) {
+                                  fetchTrainingSlots();
+                                }
+                              }}
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-bold text-slate-700">今すぐ指定</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="trainingBookingMode"
+                              value="later"
+                              checked={trainingBookingMode === 'later'}
+                              onChange={() => setTrainingBookingMode('later')}
+                              className="text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-bold text-slate-700">後でメールで案内</span>
+                          </label>
+                        </div>
+
+                        {/* 今すぐ指定: ドロップダウン */}
+                        {trainingBookingMode === 'now' && (
+                          <div>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">研修日時を選択</label>
+                            {loadingTrainingSlots ? (
+                              <div className="flex items-center gap-2 text-slate-400 text-sm">
+                                <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                                読み込み中...
+                              </div>
+                            ) : trainingSlots.length === 0 ? (
+                              <p className="text-sm text-slate-400">利用可能な研修スロットがありません</p>
+                            ) : (
+                              <select
+                                value={selectedTrainingSlotId}
+                                onChange={e => setSelectedTrainingSlotId(e.target.value ? Number(e.target.value) : '')}
+                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                              >
+                                <option value="">選択してください</option>
+                                {trainingSlots.map(slot => {
+                                  const start = new Date(slot.startTime);
+                                  const end = new Date(slot.endTime);
+                                  const dateStr = start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+                                  const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}-${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                  return (
+                                    <option key={slot.id} value={slot.id}>
+                                      {dateStr} {timeStr}{slot.location ? ` / ${slot.location}` : ''} 残{slot.remainingCapacity}名
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                            )}
+                          </div>
+                        )}
+
+                        {/* 後でメールで案内 */}
+                        {trainingBookingMode === 'later' && (
+                          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                            <i className="bi bi-envelope-fill text-blue-500 mt-0.5"></i>
+                            <p className="text-xs text-blue-700 font-medium">
+                              保存時に研修予約リンクをメール送信します
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : null}
             </div>

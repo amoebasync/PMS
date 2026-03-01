@@ -2084,6 +2084,10 @@ model Applicant {
   // 面接スロット (1:1 逆参照)
   interviewSlot InterviewSlot?
 
+  // 研修スロット (多対1: 同じ研修枠に複数人参加可)
+  trainingSlotId Int?           @map("training_slot_id")
+  trainingSlot   TrainingSlot?  @relation(fields: [trainingSlotId], references: [id])
+
   // ステータス
   flowStatus   ApplicantFlowStatus   @default(INTERVIEW_WAITING) @map("flow_status")
   hiringStatus ApplicantHiringStatus @default(IN_PROGRESS) @map("hiring_status")
@@ -2106,6 +2110,40 @@ model Applicant {
   @@index([createdAt])
   @@map("applicants")
 }
+// --- 研修スロット ---
+model TrainingSlot {
+  id        Int      @id @default(autoincrement())
+  startTime DateTime @map("start_time")
+  endTime   DateTime @map("end_time")
+  capacity  Int      @default(10) @map("capacity") // 定員（グループ研修）
+  location  String?  @db.VarChar(200)              // 研修場所
+  note      String?  @db.Text                       // 備考
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 多対1 逆参照: 複数応募者が同じ研修枠を予約可
+  applicants Applicant[]
+
+  @@index([startTime])
+  @@map("training_slots")
+}
+
+// --- デフォルト研修スロット設定（曜日ごと） ---
+model DefaultTrainingSlot {
+  id              Int      @id @default(autoincrement())
+  dayOfWeek       Int      @map("day_of_week") // 0=日曜, 1=月曜, ..., 6=土曜
+  startTime       String   @map("start_time") @db.VarChar(5) // "09:00" 形式
+  endTime         String   @map("end_time") @db.VarChar(5)   // "17:00" 形式
+  intervalMinutes Int      @default(120) @map("interval_minutes") // 研修時間（分）
+  capacity        Int      @default(10) @map("capacity")          // デフォルト定員
+  isEnabled       Boolean  @default(true) @map("is_enabled")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([dayOfWeek])
+  @@map("default_training_slots")
+}
+
 // --- 求人媒体マスタ ---
 model RecruitingMedia {
   id        Int      @id @default(autoincrement())

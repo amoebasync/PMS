@@ -36,7 +36,11 @@ export function middleware(request: NextRequest) {
     path === '/api/visa-types/public' ||
     path === '/api/recruiting-media/public' ||
     path === '/api/cron/generate-slots' ||
-    path === '/api/cron/generate-tasks';
+    path === '/api/cron/generate-tasks' ||
+    path === '/api/cron/generate-training-slots' ||
+    path === '/api/training-slots/available' ||
+    path === '/api/training-booking' ||
+    path === '/training-booking';
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;
