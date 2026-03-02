@@ -46,12 +46,15 @@ export async function POST(
 
     const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
     const bookingUrl = `${siteUrl}/interview-booking?token=${token}`;
-    const jobName = applicant.jobCategory?.nameJa || '';
+    const lang = applicant.language || 'ja';
+    const jobName = lang === 'en'
+      ? (applicant.jobCategory?.nameEn || applicant.jobCategory?.nameJa || '')
+      : (applicant.jobCategory?.nameJa || '');
 
     await sendInterviewInvitationEmail(
       applicant.email,
       applicant.name,
-      applicant.language || 'ja',
+      lang,
       bookingUrl,
       jobName,
     );
