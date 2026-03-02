@@ -168,6 +168,46 @@ export async function updateGoogleCalendarAttendees(
 }
 
 /**
+ * Google Calendar イベントを削除する（Meet リンクも同時に無効化される）
+ *
+ * @param calendarEventId - Google Calendar イベントID
+ */
+export async function deleteGoogleCalendarEvent(
+  calendarEventId: string
+): Promise<void> {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
+    console.log('[Google Meet] API credentials not configured, skipping event deletion');
+    return;
+  }
+
+  try {
+    const oauth2Client = new google.auth.OAuth2(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      'https://developers.google.com/oauthplayground'
+    );
+    oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await calendar.events.delete({
+      calendarId: 'primary',
+      eventId: calendarEventId,
+      sendUpdates: 'all',
+    });
+
+    console.log('[Google Meet] Calendar event deleted:', calendarEventId);
+  } catch (error: any) {
+    // 既に削除済み(404)やアクセス不可(410)の場合はログのみ
+    if (error.code === 404 || error.code === 410) {
+      console.log('[Google Meet] Event already deleted or not found:', calendarEventId);
+      return;
+    }
+    console.error('[Google Meet] Error deleting event:', error.message || error);
+  }
+}
+
+/**
  * 環境変数が設定されているかチェック
  */
 export function isGoogleMeetConfigured(): boolean {
