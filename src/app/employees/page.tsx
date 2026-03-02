@@ -23,7 +23,8 @@ type Employee = {
   lastNameEn: string | null;
   firstNameEn: string | null;
   email: string;
-  phone: string | null; 
+  personalEmail: string | null;
+  phone: string | null;
   hireDate: string;
   birthday: string | null;
   gender: 'male' | 'female' | 'other' | 'unknown';
@@ -121,7 +122,8 @@ export default function EmployeePage() {
 
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
-    lastNameEn: '', firstNameEn: '', email: '', phone: '',
+    lastNameEn: '', firstNameEn: '', email: '', personalEmail: '', phone: '',
+    createWorkspaceAccount: false,
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as 'male' | 'female' | 'other' | 'unknown',
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
     rank: 'ASSOCIATE', jobTitle: '', managerId: '',
@@ -264,7 +266,8 @@ export default function EmployeePage() {
         lastNameJa: employee.lastNameJa, firstNameJa: employee.firstNameJa,
         lastNameKana: employee.lastNameKana || '', firstNameKana: employee.firstNameKana || '',
         lastNameEn: employee.lastNameEn || '', firstNameEn: employee.firstNameEn || '',
-        email: employee.email, phone: employee.phone || '',
+        email: employee.email, personalEmail: employee.personalEmail || '', phone: employee.phone || '',
+        createWorkspaceAccount: false,
         hireDate: employee.hireDate && !isNaN(new Date(employee.hireDate).getTime()) ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
         birthday: employee.birthday && !isNaN(new Date(employee.birthday).getTime()) ? new Date(employee.birthday).toISOString().split('T')[0] : '', 
         gender: employee.gender || 'unknown',
@@ -320,6 +323,15 @@ export default function EmployeePage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Workspace アカウント作成時のバリデーション
+    if (formData.createWorkspaceAccount && !currentId) {
+      if (!formData.firstNameEn || !formData.lastNameEn) {
+        showToast('Google Workspaceアカウント作成には英語名（First Name / Last Name）が必須です', 'error');
+        return;
+      }
+    }
+
     const submitData = {
       ...formData,
       isActive: formData.status === 'ACTIVE',
@@ -328,15 +340,24 @@ export default function EmployeePage() {
       lastNameEn: formData.lastNameEn || null,
       firstNameEn: formData.firstNameEn || null,
       phone: formData.phone || null,
+      personalEmail: formData.personalEmail || null,
       employeeCode: formData.employeeCode || null,
-      managerId: formData.managerId || null, // ★ 空欄の場合はnullとして安全に送信
+      managerId: formData.managerId || null,
+      // 新規作成時のみ Workspace フラグを送信
+      createWorkspaceAccount: !currentId ? formData.createWorkspaceAccount : undefined,
+      // Workspace 作成時は email を空にする（API側で自動生成）
+      email: (formData.createWorkspaceAccount && !currentId) ? '' : formData.email,
     };
 
     try {
       const url = currentId ? `/api/employees/${currentId}` : '/api/employees';
       const method = currentId ? 'PUT' : 'POST';
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData) });
-      if (!res.ok) throw new Error('Failed to save');
+      if (!res.ok) {
+        const data = await res.json();
+        showToast(data.error || '保存に失敗しました', 'error');
+        return;
+      }
 
       setIsFormModalOpen(false);
       fetchEmployees(buildEmpQuery());
@@ -851,16 +872,61 @@ export default function EmployeePage() {
                     <label className={labelClass}>社員コード</label>
                     <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder="(空欄で自動採番)" />
                   </div>
-                  <div className="lg:col-span-2">
-                    <label className={labelClass}>ログイン用メールアドレス <span className="text-rose-500">*</span></label>
-                    <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} placeholder="mail@example.com" />
-                  </div>
                   <div>
                     <label className={labelClass}>ステータス</label>
                     <select name="status" value={formData.status} onChange={handleInputChange} className={`${inputClass} font-bold ${formData.status === 'ACTIVE' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-500'}`}>
                       <option value="ACTIVE">在職中 (Active)</option>
                       <option value="INACTIVE">退職済 (Inactive)</option>
                     </select>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <label className={labelClass}>私用メールアドレス</label>
+                    <input type="email" name="personalEmail" value={formData.personalEmail} onChange={handleInputChange} className={inputClass} placeholder="private@example.com" />
+                  </div>
+
+                  {!currentId && (
+                    <div className="lg:col-span-4">
+                      <label className="flex items-center gap-3 cursor-pointer select-none bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl hover:bg-indigo-50 transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formData.createWorkspaceAccount}
+                          onChange={(e) => setFormData(prev => ({ ...prev, createWorkspaceAccount: e.target.checked }))}
+                          className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 accent-indigo-600"
+                        />
+                        <div>
+                          <span className="text-sm font-bold text-indigo-900">Google Workspace アカウントを作成する</span>
+                          <span className="text-[10px] text-indigo-500 ml-2">(@tiramis.co.jp)</span>
+                        </div>
+                      </label>
+                      {formData.createWorkspaceAccount && (
+                        <div className="mt-2 space-y-2">
+                          {(!formData.firstNameEn || !formData.lastNameEn) && (
+                            <p className="text-xs text-amber-600 font-bold flex items-center gap-1">
+                              <i className="bi bi-exclamation-triangle-fill"></i>
+                              英語名（First Name / Last Name）の入力が必要です
+                            </p>
+                          )}
+                          {formData.firstNameEn && formData.lastNameEn && (
+                            <p className="text-xs text-indigo-600 font-bold flex items-center gap-1">
+                              <i className="bi bi-google"></i>
+                              {formData.firstNameEn.toLowerCase()}.{formData.lastNameEn.toLowerCase()}@tiramis.co.jp が作成されます
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className={`${currentId ? 'lg:col-span-4' : 'lg:col-span-4'}`}>
+                    <label className={labelClass}>ログイン用メールアドレス {!(formData.createWorkspaceAccount && !currentId) && <span className="text-rose-500">*</span>}</label>
+                    {formData.createWorkspaceAccount && !currentId ? (
+                      <div className={`${inputClass} bg-slate-100 text-slate-500 cursor-not-allowed`}>
+                        <i className="bi bi-robot text-indigo-500 mr-1"></i>
+                        Workspace アカウント作成時に自動生成されます
+                      </div>
+                    ) : (
+                      <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} placeholder="mail@example.com" />
+                    )}
                   </div>
                 </div>
               </div>

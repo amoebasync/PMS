@@ -108,6 +108,7 @@ model Employee {
   gender         Gender    @default(unknown)
   
   email          String    @unique @db.VarChar(100)
+  personalEmail  String?   @unique @map("personal_email") @db.VarChar(100)
   phone          String?   @db.VarChar(20)
   
   // ============================

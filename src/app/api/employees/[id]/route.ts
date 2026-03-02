@@ -63,7 +63,8 @@ export async function PUT(
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
           email: body.email,
-          phone: body.phone || null, // 電話番号
+          personalEmail: body.personalEmail || null,
+          phone: body.phone || null,
           hireDate: body.hireDate ? new Date(body.hireDate) : null,
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender,
