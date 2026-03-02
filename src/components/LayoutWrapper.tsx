@@ -55,6 +55,8 @@ function getPageInfo(pathname: string): { title: string; icon: string } {
 /*  TopHeader                                                         */
 /* ------------------------------------------------------------------ */
 
+type HeaderLink = { label: string; url: string; icon: string };
+
 function TopHeader({
   isSidebarCollapsed,
   onOpenTaskModal,
@@ -67,7 +69,10 @@ function TopHeader({
   const { showToast } = useNotification();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const [isLinksOpen, setIsLinksOpen] = useState(false);
+  const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
+  const linksRef = useRef<HTMLDivElement>(null);
 
   const { title: pageTitle, icon: pageIcon } = getPageInfo(pathname);
 
@@ -76,12 +81,23 @@ function TopHeader({
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setUserProfile(data); })
       .catch(() => {});
+    fetch('/api/settings/system')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.headerLinks) {
+          try { setHeaderLinks(JSON.parse(data.headerLinks)); } catch { /* ignore */ }
+        }
+      })
+      .catch(() => {});
   }, [pathname]);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setIsUserMenuOpen(false);
+      }
+      if (linksRef.current && !linksRef.current.contains(e.target as Node)) {
+        setIsLinksOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClick);
@@ -126,6 +142,74 @@ function TopHeader({
           <i className="bi bi-plus-lg text-xs"></i>
           <span className="hidden lg:inline">タスク追加</span>
         </button>
+
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+
+        {/* Gmail */}
+        <a
+          href="https://mail.google.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Gmail"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-red-500"
+        >
+          <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor">
+            <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
+          </svg>
+        </a>
+
+        {/* Google Calendar */}
+        <a
+          href="https://calendar.google.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Google Calendar"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-blue-500"
+        >
+          <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor">
+            <path d="M19.5 3h-1V1.5a.5.5 0 0 0-1 0V3h-11V1.5a.5.5 0 0 0-1 0V3h-1A2.5 2.5 0 0 0 2 5.5v14A2.5 2.5 0 0 0 4.5 22h15a2.5 2.5 0 0 0 2.5-2.5v-14A2.5 2.5 0 0 0 19.5 3zM21 19.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5V9h18v10.5zM21 8H3V5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5V8z"/>
+            <rect x="6" y="11" width="3" height="2.5" rx=".4"/>
+            <rect x="10.5" y="11" width="3" height="2.5" rx=".4"/>
+            <rect x="15" y="11" width="3" height="2.5" rx=".4"/>
+            <rect x="6" y="15.5" width="3" height="2.5" rx=".4"/>
+            <rect x="10.5" y="15.5" width="3" height="2.5" rx=".4"/>
+          </svg>
+        </a>
+
+        {/* リンク集ドロップダウン */}
+        {headerLinks.length > 0 && (
+          <div className="relative" ref={linksRef}>
+            <button
+              onClick={() => setIsLinksOpen(!isLinksOpen)}
+              title="リンク集"
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-indigo-600"
+            >
+              <i className="bi bi-grid-3x3-gap-fill text-[16px]"></i>
+            </button>
+            {isLinksOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-[920]">
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
+                  <div className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">リンク集</div>
+                </div>
+                <div className="py-1 max-h-64 overflow-y-auto">
+                  {headerLinks.map((link, idx) => (
+                    <a
+                      key={idx}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setIsLinksOpen(false)}
+                      className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                    >
+                      <i className={`bi ${link.icon || 'bi-link-45deg'} text-gray-400 w-4 text-center`}></i>
+                      {link.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="w-px h-6 bg-gray-200 mx-1" />
 

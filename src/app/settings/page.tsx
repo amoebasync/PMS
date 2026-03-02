@@ -41,7 +41,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'evaluation' | 'rankRates'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'evaluation' | 'rankRates' | 'headerLinks'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -476,9 +476,10 @@ export default function SettingsPage() {
     { key: 'complaintType',      label: 'クレーム種別', icon: 'bi-exclamation-circle' },
     { key: 'evaluation',          label: '評価設定',    icon: 'bi-speedometer2' },
     { key: 'rankRates',            label: 'ランク別単価', icon: 'bi-currency-yen' },
+    { key: 'headerLinks',          label: 'リンク集',     icon: 'bi-link-45deg' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'evaluation' && tab !== 'rankRates';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks';
 
   // 評価設定
   const [evalSettings, setEvalSettings] = useState({
@@ -527,6 +528,76 @@ export default function SettingsPage() {
       ...prev,
       [rank]: prev[rank].map((v, i) => i === index ? (parseFloat(value) || 0) : v),
     }));
+  };
+
+  // リンク集設定
+  type HeaderLink = { label: string; url: string; icon: string };
+  const LINK_ICON_OPTIONS = [
+    { value: 'bi-link-45deg', label: 'リンク' },
+    { value: 'bi-globe', label: 'ウェブ' },
+    { value: 'bi-folder-fill', label: 'フォルダ' },
+    { value: 'bi-file-earmark-text', label: 'ドキュメント' },
+    { value: 'bi-table', label: 'スプレッドシート' },
+    { value: 'bi-bar-chart-fill', label: 'チャート' },
+    { value: 'bi-chat-dots-fill', label: 'チャット' },
+    { value: 'bi-camera-video-fill', label: 'ビデオ' },
+    { value: 'bi-cloud-fill', label: 'クラウド' },
+    { value: 'bi-database-fill', label: 'データベース' },
+    { value: 'bi-shop', label: 'ショップ' },
+    { value: 'bi-tools', label: 'ツール' },
+    { value: 'bi-bookmark-fill', label: 'ブックマーク' },
+    { value: 'bi-star-fill', label: 'お気に入り' },
+  ];
+  const [headerLinks, setHeaderLinks] = useState<HeaderLink[]>([]);
+  const [headerLinksSaving, setHeaderLinksSaving] = useState(false);
+
+  const fetchHeaderLinks = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/system');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.headerLinks) {
+          try { setHeaderLinks(JSON.parse(d.headerLinks)); } catch { /* ignore */ }
+        }
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveHeaderLinks = async () => {
+    setHeaderLinksSaving(true);
+    try {
+      await fetch('/api/settings/system', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: 'headerLinks', value: JSON.stringify(headerLinks) }),
+      });
+      showToast('リンク集を保存しました', 'success');
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    }
+    setHeaderLinksSaving(false);
+  };
+
+  const addHeaderLink = () => {
+    setHeaderLinks(prev => [...prev, { label: '', url: '', icon: 'bi-link-45deg' }]);
+  };
+
+  const removeHeaderLink = (index: number) => {
+    setHeaderLinks(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const updateHeaderLink = (index: number, field: keyof HeaderLink, value: string) => {
+    setHeaderLinks(prev => prev.map((link, i) => i === index ? { ...link, [field]: value } : link));
+  };
+
+  const moveHeaderLink = (index: number, direction: -1 | 1) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= headerLinks.length) return;
+    setHeaderLinks(prev => {
+      const arr = [...prev];
+      [arr[index], arr[newIndex]] = [arr[newIndex], arr[index]];
+      return arr;
+    });
   };
 
   const fetchEvalSettings = useCallback(async () => {
@@ -582,7 +653,7 @@ export default function SettingsPage() {
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); }}
+              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); if (t.key === 'headerLinks') fetchHeaderLinks(); }}
               className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === t.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${t.icon}`}></i> {t.label}
@@ -1639,6 +1710,94 @@ export default function SettingsPage() {
                     <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 保存中...</>
                   ) : (
                     <><i className="bi bi-check2"></i> ランク別単価を保存</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'headerLinks' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-link-45deg mr-2"></i>ヘッダーリンク集</h2>
+              <p className="text-xs text-slate-400 mt-1">ヘッダーのリンク集ドロップダウンに表示するリンクを管理します。Gmail・Google Calendarは常時表示されます。</p>
+            </div>
+            <div className="p-6 space-y-3">
+              {headerLinks.length === 0 && (
+                <div className="text-center py-8 text-slate-400">
+                  <i className="bi bi-link-45deg text-3xl"></i>
+                  <p className="mt-2 text-sm">リンクがまだ登録されていません</p>
+                </div>
+              )}
+              {headerLinks.map((link, idx) => (
+                <div key={idx} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => moveHeaderLink(idx, -1)}
+                      disabled={idx === 0}
+                      className="text-slate-400 hover:text-slate-600 disabled:opacity-30 text-[10px] leading-none"
+                    >
+                      <i className="bi bi-chevron-up"></i>
+                    </button>
+                    <button
+                      onClick={() => moveHeaderLink(idx, 1)}
+                      disabled={idx === headerLinks.length - 1}
+                      className="text-slate-400 hover:text-slate-600 disabled:opacity-30 text-[10px] leading-none"
+                    >
+                      <i className="bi bi-chevron-down"></i>
+                    </button>
+                  </div>
+                  <select
+                    value={link.icon}
+                    onChange={e => updateHeaderLink(idx, 'icon', e.target.value)}
+                    className="w-36 border border-slate-200 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  >
+                    {LINK_ICON_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <div className="w-8 h-8 flex items-center justify-center text-slate-500">
+                    <i className={`bi ${link.icon} text-lg`}></i>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="表示名"
+                    value={link.label}
+                    onChange={e => updateHeaderLink(idx, 'label', e.target.value)}
+                    className="flex-1 min-w-0 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={link.url}
+                    onChange={e => updateHeaderLink(idx, 'url', e.target.value)}
+                    className="flex-[2] min-w-0 border border-slate-200 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <button
+                    onClick={() => removeHeaderLink(idx)}
+                    className="w-8 h-8 flex items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                  >
+                    <i className="bi bi-trash"></i>
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={addHeaderLink}
+                className="w-full py-2.5 border-2 border-dashed border-slate-200 rounded-xl text-sm font-semibold text-slate-400 hover:text-indigo-600 hover:border-indigo-300 transition-colors flex items-center justify-center gap-1.5"
+              >
+                <i className="bi bi-plus-lg"></i> リンクを追加
+              </button>
+              <div className="flex justify-end pt-4 mt-2 border-t border-slate-100">
+                <button
+                  onClick={saveHeaderLinks}
+                  disabled={headerLinksSaving}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {headerLinksSaving ? (
+                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 保存中...</>
+                  ) : (
+                    <><i className="bi bi-check2"></i> リンク集を保存</>
                   )}
                 </button>
               </div>
