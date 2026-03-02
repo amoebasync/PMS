@@ -302,6 +302,8 @@ export default function ApplicantsPage() {
     email: '',
     phone: '',
     language: 'ja',
+    birthday: '',
+    gender: '',
     jobCategoryId: '' as string | number,
     countryId: '' as string | number,
     visaTypeId: '' as string | number,
@@ -804,6 +806,8 @@ export default function ApplicantsPage() {
         email: data.email || '',
         phone: data.phone || '',
         language: data.language || 'ja',
+        birthday: data.birthday ? data.birthday.slice(0, 10) : '',
+        gender: data.gender || '',
         jobCategoryId: data.jobCategoryId || '',
         countryId: data.countryId || '',
         visaTypeId: data.visaTypeId || '',
@@ -847,6 +851,8 @@ export default function ApplicantsPage() {
           email: evalForm.email,
           phone: evalForm.phone || null,
           language: evalForm.language,
+          birthday: evalForm.birthday || null,
+          gender: evalForm.gender || null,
           jobCategoryId: evalForm.jobCategoryId || null,
           countryId: evalForm.countryId || null,
           visaTypeId: evalForm.visaTypeId || null,
@@ -2007,20 +2013,25 @@ export default function ApplicantsPage() {
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">生年月日</p>
-                          <p className="text-sm text-slate-700 py-1.5">
-                            {selectedApplicant.birthday
-                              ? new Date(selectedApplicant.birthday).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
-                              : '-'}
-                          </p>
+                          <input
+                            type="date"
+                            value={evalForm.birthday}
+                            onChange={e => setEvalForm(f => ({ ...f, birthday: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">性別</p>
-                          <p className="text-sm text-slate-700 py-1.5">
-                            {selectedApplicant.gender === 'male' ? '男性'
-                              : selectedApplicant.gender === 'female' ? '女性'
-                              : selectedApplicant.gender === 'other' ? 'その他'
-                              : '-'}
-                          </p>
+                          <select
+                            value={evalForm.gender}
+                            onChange={e => setEvalForm(f => ({ ...f, gender: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          >
+                            <option value="">未設定</option>
+                            <option value="male">男性</option>
+                            <option value="female">女性</option>
+                            <option value="other">その他</option>
+                          </select>
                         </div>
                       </div>
 
