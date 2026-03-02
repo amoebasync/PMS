@@ -133,6 +133,7 @@ export async function PUT(
     if (body.sourcePartnerId !== undefined) updateData.sourcePartnerId = body.sourcePartnerId ? Number(body.sourcePartnerId) : null;
     if (body.needsResponse !== undefined) updateData.needsResponse = !!body.needsResponse;
     if (body.needsCustomerReport !== undefined) updateData.needsCustomerReport = !!body.needsCustomerReport;
+    if (body.penaltyScore !== undefined) updateData.penaltyScore = body.penaltyScore !== null ? Number(body.penaltyScore) : null;
 
     const isStatusChange = body.status !== undefined && body.status !== beforeData.status;
 

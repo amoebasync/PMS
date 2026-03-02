@@ -7,51 +7,61 @@ import { useState, useEffect, useRef } from 'react';
 import { NotificationProvider } from '@/components/ui/NotificationProvider';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import Link from 'next/link';
+import TaskCreateModal from '@/components/TaskCreateModal';
 
-// ページタイトルマップ
-const PAGE_TITLES: Record<string, string> = {
-  '/': 'ダッシュボード',
-  '/attendance': 'マイ勤怠・経費',
-  '/dispatch': 'ディスパッチ',
-  '/schedules': 'スケジュール照会',
-  '/orders': '受注管理',
-  '/billing': '請求管理',
-  '/crm/tasks': 'CRM / タスク',
-  '/crm/leads': '見込み客管理',
-  '/customers': '顧客管理',
-  '/campaigns': 'キャンペーン',
-  '/areas': 'エリア管理',
-  '/flyers': 'チラシ管理',
-  '/transactions': '入出庫・納品管理',
-  '/partners': '外注先マスタ',
-  '/quality/complaints': 'クレーム管理',
-  '/quality/prohibited-properties': '配布禁止物件',
-  '/employees': '社員管理',
-  '/distributors': '配布員管理',
-  '/distributors/payroll': '配布員給与',
-  '/applicants': '応募者管理',
-  '/branches': '支店管理',
-  '/approvals': '人事・経費承認',
-  '/payroll': '給与計算',
-  '/settings': 'システム設定',
-  '/audit-logs': '監査ログ',
-  '/profile': 'プロフィール編集',
+// ページタイトルマップ（アイコン付き）
+const PAGE_TITLES: Record<string, { title: string; icon: string }> = {
+  '/':                              { title: 'ダッシュボード',    icon: 'bi-grid-1x2-fill' },
+  '/attendance':                    { title: 'マイ勤怠・経費',    icon: 'bi-clock-history' },
+  '/dispatch':                      { title: 'ディスパッチ',      icon: 'bi-diagram-3-fill' },
+  '/schedules':                     { title: 'スケジュール照会',  icon: 'bi-calendar-check' },
+  '/orders':                        { title: '受注管理',          icon: 'bi-briefcase-fill' },
+  '/billing':                       { title: '請求管理',          icon: 'bi-receipt-cutoff' },
+  '/crm/tasks':                     { title: 'タスク',            icon: 'bi-list-task' },
+  '/crm/leads':                     { title: '見込み客管理',      icon: 'bi-person-plus-fill' },
+  '/customers':                     { title: '顧客管理',          icon: 'bi-buildings-fill' },
+  '/campaigns':                     { title: 'キャンペーン',      icon: 'bi-megaphone-fill' },
+  '/areas':                         { title: 'エリア管理',        icon: 'bi-geo-alt-fill' },
+  '/flyers':                        { title: 'チラシ管理',        icon: 'bi-file-earmark-richtext' },
+  '/transactions':                  { title: '入出庫・納品管理',  icon: 'bi-box-seam' },
+  '/partners':                      { title: '外注先マスタ',      icon: 'bi-truck' },
+  '/quality/complaints':            { title: 'クレーム管理',      icon: 'bi-exclamation-triangle-fill' },
+  '/quality/prohibited-properties': { title: '配布禁止物件',      icon: 'bi-house-x-fill' },
+  '/employees':                     { title: '社員管理',          icon: 'bi-person-badge-fill' },
+  '/distributors':                  { title: '配布員管理',        icon: 'bi-bicycle' },
+  '/distributors/payroll':          { title: '配布員給与',        icon: 'bi-wallet2' },
+  '/applicants':                    { title: '応募者管理',        icon: 'bi-person-lines-fill' },
+  '/branches':                      { title: '支店管理',          icon: 'bi-shop' },
+  '/approvals':                     { title: '人事・経費承認',    icon: 'bi-check2-square' },
+  '/payroll':                       { title: '給与計算',          icon: 'bi-cash-stack' },
+  '/settings':                      { title: 'システム設定',      icon: 'bi-gear-fill' },
+  '/audit-logs':                    { title: '監査ログ',          icon: 'bi-shield-check' },
+  '/profile':                       { title: 'プロフィール編集',  icon: 'bi-person-gear' },
+  '/announcements':                 { title: '全体お知らせ',      icon: 'bi-megaphone' },
+  '/pricing':                       { title: '価格設定',          icon: 'bi-tags-fill' },
+  '/settings/company':              { title: '自社情報設定',      icon: 'bi-building' },
 };
 
-function getPageTitle(pathname: string): string {
+function getPageInfo(pathname: string): { title: string; icon: string } {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
   const sorted = Object.keys(PAGE_TITLES).sort((a, b) => b.length - a.length);
   for (const key of sorted) {
     if (key !== '/' && pathname.startsWith(key)) return PAGE_TITLES[key];
   }
-  return 'PMS Pro';
+  return { title: 'PMS Pro', icon: 'bi-app' };
 }
 
 /* ------------------------------------------------------------------ */
 /*  TopHeader                                                         */
 /* ------------------------------------------------------------------ */
 
-function TopHeader({ isSidebarCollapsed }: { isSidebarCollapsed: boolean }) {
+function TopHeader({
+  isSidebarCollapsed,
+  onOpenTaskModal,
+}: {
+  isSidebarCollapsed: boolean;
+  onOpenTaskModal: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useNotification();
@@ -59,7 +69,7 @@ function TopHeader({ isSidebarCollapsed }: { isSidebarCollapsed: boolean }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const pageTitle = getPageTitle(pathname);
+  const { title: pageTitle, icon: pageIcon } = getPageInfo(pathname);
 
   useEffect(() => {
     fetch('/api/profile')
@@ -100,11 +110,25 @@ function TopHeader({ isSidebarCollapsed }: { isSidebarCollapsed: boolean }) {
     >
       {/* ページタイトル */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-[17px] font-semibold text-gray-800 truncate">{pageTitle}</h1>
+        <h1 className="text-[17px] font-semibold text-gray-800 truncate flex items-center gap-2">
+          <i className={`bi ${pageIcon} text-indigo-600 text-[15px]`}></i>
+          {pageTitle}
+        </h1>
       </div>
 
-      {/* 右側: 通知 + プロフィール */}
+      {/* 右側: タスク追加 + 通知 + プロフィール */}
       <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onOpenTaskModal}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold
+                     bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+        >
+          <i className="bi bi-plus-lg text-xs"></i>
+          <span className="hidden lg:inline">タスク追加</span>
+        </button>
+
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+
         <div className="flex items-center">
           <NotificationBell />
         </div>
@@ -195,6 +219,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isGlobalTaskModalOpen, setIsGlobalTaskModalOpen] = useState(false);
 
   useEffect(() => { setIsMobileOpen(false); }, [pathname]);
 
@@ -230,7 +255,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
       <div className="flex min-h-screen bg-[#f0f2f5]">
 
         {/* モバイルヘッダー */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-[1100] flex items-center px-4 gap-4">
+        <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-[1100] flex items-center px-4 gap-3">
           <button
             onClick={() => setIsMobileOpen(true)}
             className="text-gray-500 hover:text-gray-900 transition-colors"
@@ -241,6 +266,13 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
           <span className="font-extrabold text-gray-900 tracking-wide flex-1">
             PMS <span className="text-blue-600">Pro</span>
           </span>
+          <button
+            onClick={() => setIsGlobalTaskModalOpen(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold
+                       bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+          >
+            <i className="bi bi-plus-lg text-[10px]"></i>
+          </button>
           <NotificationBell />
         </div>
 
@@ -254,7 +286,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
         {/* トップヘッダー（デスクトップ） */}
         <div className="hidden md:block">
-          <TopHeader isSidebarCollapsed={isSidebarCollapsed} />
+          <TopHeader isSidebarCollapsed={isSidebarCollapsed} onOpenTaskModal={() => setIsGlobalTaskModalOpen(true)} />
         </div>
 
         {/* メインコンテンツ */}
@@ -265,6 +297,13 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         `}>
           {children}
         </main>
+
+        {/* グローバルタスク作成モーダル */}
+        <TaskCreateModal
+          isOpen={isGlobalTaskModalOpen}
+          onClose={() => setIsGlobalTaskModalOpen(false)}
+          onCreated={() => window.dispatchEvent(new Event('task-created'))}
+        />
       </div>
     </NotificationProvider>
   );

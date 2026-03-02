@@ -200,14 +200,6 @@ export default function AttendancePage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-10">
 
-      <div className="flex justify-between items-end border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-clock-history text-indigo-600"></i> マイ勤怠・経費
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">日々の打刻、給与・有給の確認、経費の申請を行います。</p>
-        </div>
-      </div>
 
       {/* HR管理者向け: 対象社員セレクター */}
       {isHrAdmin && (

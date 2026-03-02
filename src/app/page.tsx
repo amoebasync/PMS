@@ -325,6 +325,55 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Distributor Performance */}
+          {data?.evaluation && (
+            <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                  <i className="bi bi-award-fill text-amber-500" /> 配布員パフォーマンス
+                </h3>
+                <Link href="/distributors" className="text-xs text-blue-600 hover:underline font-medium">すべて見る →</Link>
+              </div>
+              {data.evaluation.topDistributors?.length > 0 && (
+                <div className="mb-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Top 5</p>
+                  <div className="space-y-1.5">
+                    {data.evaluation.topDistributors.slice(0, 5).map((d: any, i: number) => {
+                      const rankColors: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-gray-400', D: 'bg-red-400' };
+                      return (
+                        <div key={d.id || i} className="flex items-center gap-2.5">
+                          <span className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${rankColors[d.rank] || 'bg-gray-300'}`}>
+                            {d.rank}
+                          </span>
+                          <span className="text-sm font-medium text-gray-700 flex-1 truncate">{d.name}</span>
+                          <span className="text-sm font-bold text-gray-800">{d.score}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              {data.evaluation.attentionDistributors?.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-2">要注意</p>
+                  <div className="space-y-1.5">
+                    {data.evaluation.attentionDistributors.slice(0, 5).map((d: any, i: number) => (
+                      <div key={d.id || i} className="flex items-center justify-between">
+                        <span className="text-sm text-gray-700 truncate flex-1">{d.name}</span>
+                        <span className="text-xs font-bold text-red-500">
+                          <i className="bi bi-exclamation-triangle-fill mr-0.5" />{d.complaintCount}件
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(!data.evaluation.topDistributors?.length && !data.evaluation.attentionDistributors?.length) && (
+                <p className="text-xs text-gray-400 text-center py-4">評価データなし</p>
+              )}
+            </div>
+          )}
+
           {/* EC Portal status */}
           {data && (
             <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">

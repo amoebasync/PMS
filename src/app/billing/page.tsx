@@ -147,14 +147,7 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* ヘッダー */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-receipt-cutoff text-indigo-600"></i> 請求管理
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">月次まとめ請求の作成・送付・入金管理</p>
-        </div>
+      <div className="flex justify-end mb-6">
         <button
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all"

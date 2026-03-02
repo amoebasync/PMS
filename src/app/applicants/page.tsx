@@ -1218,60 +1218,9 @@ export default function ApplicantsPage() {
       `}</style>
 
       <div className="space-y-6">
-        {/* ── ヘッダー ── */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <i className="bi bi-person-lines-fill text-indigo-600 text-lg"></i>
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-800">応募者管理</h1>
-              <p className="text-xs text-slate-500">面接スロット・応募者評価管理</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <a
-              href="/apply"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors shadow-sm"
-            >
-              <i className="bi bi-box-arrow-up-right"></i>
-              応募ページ
-            </a>
-            <button
-              onClick={() => {
-                fetchJobCategories();
-                setShowManualRegisterModal(true);
-              }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
-            >
-              <i className="bi bi-person-plus-fill"></i>
-              手動登録
-            </button>
-            <button
-              onClick={() => {
-                fetchJobCategories();
-                setShowJobCatModal(true);
-              }}
-              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              <i className="bi bi-tags-fill text-indigo-500"></i>
-              職種マスタ
-            </button>
-            <a
-              href="/settings?tab=interviewSlot"
-              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-slate-50 transition-colors shadow-sm"
-            >
-              <i className="bi bi-gear-fill text-slate-500"></i>
-              スロット設定
-            </a>
-          </div>
-        </div>
-
-        {/* ── タブ ── */}
+        {/* ── タブ + アクションボタン ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="flex border-b border-slate-200">
+          <div className="flex items-center border-b border-slate-200">
             <button
               onClick={() => setActiveTab('calendar')}
               className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
@@ -1320,6 +1269,47 @@ export default function ApplicantsPage() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
             </button>
+
+            {/* スペーサー + アクションボタン */}
+            <div className="flex-1" />
+            <div className="flex items-center gap-2 px-4">
+              <a
+                href="/apply"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                <i className="bi bi-box-arrow-up-right text-indigo-500"></i>
+                応募ページ
+              </a>
+              <button
+                onClick={() => {
+                  fetchJobCategories();
+                  setShowManualRegisterModal(true);
+                }}
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                <i className="bi bi-person-plus-fill text-emerald-500"></i>
+                手動登録
+              </button>
+              <button
+                onClick={() => {
+                  fetchJobCategories();
+                  setShowJobCatModal(true);
+                }}
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                <i className="bi bi-tags-fill text-violet-500"></i>
+                職種マスタ
+              </button>
+              <a
+                href="/settings?tab=interviewSlot"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+              >
+                <i className="bi bi-gear-fill text-slate-400"></i>
+                スロット設定
+              </a>
+            </div>
           </div>
 
           {/* ── TAB 1: カレンダー ── */}

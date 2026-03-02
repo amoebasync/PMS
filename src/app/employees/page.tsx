@@ -436,20 +436,13 @@ export default function EmployeePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-person-vcard-fill text-blue-600"></i> 社員管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">人事マスタ、アカウント情報および契約・給与情報の管理。</p>
-        </div>
-        
-        {canEdit && (
+      {canEdit && (
+        <div className="flex justify-end">
           <button onClick={() => openFormModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
             <i className="bi bi-plus-lg"></i> 新規社員登録
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[250px]">

@@ -45,6 +45,7 @@ export async function POST(request: Request) {
       const type = await tx.complaintType.create({
         data: {
           name: body.name,
+          penaltyScore: body.penaltyScore !== undefined ? Number(body.penaltyScore) : 10,
           sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) : 100,
           isActive: body.isActive !== false,
         },
@@ -100,6 +101,7 @@ export async function PUT(request: Request) {
         where: { id },
         data: {
           name: body.name ?? beforeData.name,
+          penaltyScore: body.penaltyScore !== undefined ? Number(body.penaltyScore) : beforeData.penaltyScore,
           sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) : beforeData.sortOrder,
           isActive: body.isActive !== undefined ? body.isActive : beforeData.isActive,
         },

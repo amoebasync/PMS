@@ -99,16 +99,6 @@ export default function CompanySettingPage() {
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-building text-indigo-600"></i> 自社情報設定
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">帳票（見積書・請求書など）に印刷される自社の情報を設定します。</p>
-        </div>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* 基本情報 */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

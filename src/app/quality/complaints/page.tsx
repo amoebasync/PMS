@@ -39,11 +39,12 @@ interface Complaint {
   sourceContactPhone?: string | null;
   sourcePartnerId?: number | null;
   sourcePartner?: { id: number; name: string } | null;
+  penaltyScore?: number | null;
   needsResponse?: boolean;
   needsCustomerReport?: boolean;
   createdAt: string;
   updatedAt: string;
-  complaintType?: { id: number; name: string } | null;
+  complaintType?: { id: number; name: string; penaltyScore?: number } | null;
   customer?: { id: number; name: string; customerCode: string } | null;
   distributor?: { id: number; name: string; staffId: string } | null;
   schedule?: { id: number; jobNumber: string | null; date: string | null } | null;
@@ -458,15 +459,8 @@ export default function ComplaintsPage() {
   // ================================================================
   return (
     <div className="max-w-[1400px] mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
-            <i className="bi bi-exclamation-triangle-fill text-red-500 mr-2"></i>
-            クレーム管理
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">クレームの受付、対応、解決までの一元管理</p>
-        </div>
+      {/* Action buttons */}
+      <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => setShowCreateModal(true)}
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition-colors"
@@ -1314,6 +1308,17 @@ function DetailModal({
   // Status change
   const [changingStatus, setChangingStatus] = useState(false);
 
+  // Penalty score
+  const [penaltyScoreInput, setPenaltyScoreInput] = useState<string>('');
+  const [savingPenalty, setSavingPenalty] = useState(false);
+
+  // Sync penalty score when complaint changes
+  useEffect(() => {
+    if (complaint) {
+      setPenaltyScoreInput(complaint.penaltyScore != null ? String(complaint.penaltyScore) : '');
+    }
+  }, [complaint?.id, complaint?.penaltyScore]);
+
   // Prohibited property sub-modal
   const [showProhibitedModal, setShowProhibitedModal] = useState(false);
 
@@ -1405,6 +1410,28 @@ function DetailModal({
       showToast('ステータスの変更に失敗しました', 'error');
     } finally {
       setChangingStatus(false);
+    }
+  };
+
+  // ----- Save Penalty Score -----
+  const handleSavePenalty = async () => {
+    if (!complaint) return;
+    setSavingPenalty(true);
+    try {
+      const value = penaltyScoreInput.trim() === '' ? null : parseInt(penaltyScoreInput);
+      const res = await fetch(`/api/complaints/${complaint.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ penaltyScore: value }),
+      });
+      if (!res.ok) throw new Error();
+      await onRefresh();
+      onListRefresh();
+      showToast('減点スコアを保存しました', 'success');
+    } catch {
+      showToast('減点スコアの保存に失敗しました', 'error');
+    } finally {
+      setSavingPenalty(false);
     }
   };
 
@@ -1692,6 +1719,29 @@ function DetailModal({
                       <option value="IN_PROGRESS">対応中</option>
                       <option value="RESOLVED">解決済み</option>
                     </select>
+                  </div>
+                </section>
+
+                {/* Penalty Score */}
+                <section>
+                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">減点スコア</h3>
+                  <div className="space-y-2">
+                    <input
+                      type="number"
+                      min={0}
+                      value={penaltyScoreInput}
+                      onChange={e => setPenaltyScoreInput(e.target.value)}
+                      placeholder={`種別デフォルト: ${complaint.complaintType?.penaltyScore ?? 10}`}
+                      className="w-full border border-slate-300 p-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                    />
+                    <p className="text-[10px] text-slate-400">空欄の場合はクレーム種別のデフォルト値を使用</p>
+                    <button
+                      onClick={handleSavePenalty}
+                      disabled={savingPenalty}
+                      className="w-full text-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
+                    >
+                      {savingPenalty ? '保存中...' : '減点スコアを保存'}
+                    </button>
                   </div>
                 </section>
 

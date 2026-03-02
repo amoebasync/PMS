@@ -105,13 +105,7 @@ export default function BranchPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-shop text-orange-600"></i> 支店管理 (Branches)
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">店舗の基本情報や担当店長を設定します。</p>
-        </div>
+      <div className="flex justify-end">
         <button onClick={() => openForm()} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold shadow-md">
           <i className="bi bi-plus-lg"></i> 新規支店登録
         </button>

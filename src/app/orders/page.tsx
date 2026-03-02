@@ -201,13 +201,7 @@ export default function OrdersListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-briefcase-fill text-indigo-600"></i> 受注 (オーダー) 管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">ポスティング・印刷・折込・デザインの案件を一元管理します。</p>
-        </div>
+      <div className="flex justify-end gap-2 mb-4">
         <Link href="/orders/new" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
           <i className="bi bi-plus-lg"></i> 新規受注の登録
         </Link>

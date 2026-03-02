@@ -313,15 +313,6 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6 pb-10 relative">
-      <div className="flex justify-between items-end border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-person-badge text-indigo-600"></i> マイプロフィール
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">あなたのアカウント情報と、社内・組織情報の確認が行えます。</p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10">
         
         <div className="space-y-6">

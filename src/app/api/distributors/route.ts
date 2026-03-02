@@ -38,12 +38,27 @@ export async function GET(request: Request) {
       return NextResponse.json(distributors);
     }
 
+    // 今月の初日
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
     const distributors = await prisma.flyerDistributor.findMany({
       orderBy: { id: 'desc' },
       include: {
         branch: true,
         country: true,
         visaType: true,
+        _count: {
+          select: {
+            schedules: {
+              where: {
+                status: 'COMPLETED',
+                date: { gte: firstOfMonth, lt: firstOfNextMonth },
+              },
+            },
+          },
+        },
       },
     });
     return NextResponse.json(distributors);

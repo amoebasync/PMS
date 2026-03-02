@@ -85,13 +85,7 @@ export default function PartnerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-truck text-teal-600"></i> 外注先 (パートナー) マスタ
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">印刷会社や折込手配会社などの協力会社を管理します。</p>
-        </div>
+      <div className="flex justify-end">
         <button onClick={() => openForm()} className="bg-teal-600 hover:bg-teal-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
           <i className="bi bi-plus-lg"></i> 新規パートナー登録
         </button>

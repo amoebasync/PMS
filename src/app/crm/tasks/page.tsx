@@ -1,8 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import {
+  AssigneeMultiSelect,
+  AutocompleteInput,
+  type SelectedAssignee,
+  type TaskCategoryInfo,
+} from '@/components/TaskCreateModal';
 
 // ===== 型定義 =====
 type Employee = { id: number; lastNameJa: string; firstNameJa: string };
@@ -16,8 +22,6 @@ type TaskAssigneeData = {
   department: { id: number; name: string } | null;
   branch: { id: number; nameJa: string } | null;
 };
-
-type TaskCategoryInfo = { id: number; name: string; code: string; icon: string | null; colorCls: string | null };
 
 type Task = {
   id: number;
@@ -66,19 +70,6 @@ type TaskTemplate = {
   updatedAt: string;
 };
 
-type SelectedAssignee = {
-  type: 'employee' | 'department' | 'branch';
-  id: number;
-  label: string;
-};
-
-type SearchResult = {
-  type: 'employee' | 'department' | 'branch';
-  id: number;
-  label: string;
-  sub: string;
-};
-
 // ===== 定数 =====
 const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
   HIGH:   { label: '高', cls: 'bg-red-100 text-red-700 border border-red-200' },
@@ -97,16 +88,6 @@ const RECURRENCE_LABELS: Record<string, string> = {
 };
 
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
-
-const ASSIGNEE_TYPE_ICON: Record<string, string> = {
-  employee: 'bi-person-fill', department: 'bi-people-fill', branch: 'bi-building',
-};
-
-const ASSIGNEE_TYPE_COLOR: Record<string, string> = {
-  employee: 'bg-blue-100 text-blue-700 border-blue-200',
-  department: 'bg-purple-100 text-purple-700 border-purple-200',
-  branch: 'bg-amber-100 text-amber-700 border-amber-200',
-};
 
 // ===== ヘルパー =====
 function formatRecurrence(type: string, value: string | null): string {
@@ -144,210 +125,6 @@ function countAssignees(tmpl: TaskTemplate): number {
     + ((tmpl.targetBranchIds as number[]) || []).length;
 }
 
-// ===== 担当者マルチセレクト =====
-function AssigneeMultiSelect({
-  selected,
-  onChange,
-}: {
-  selected: SelectedAssignee[];
-  onChange: (items: SelectedAssignee[]) => void;
-}) {
-  const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleSearch = (q: string) => {
-    setQuery(q);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!q.trim()) { setResults([]); setIsOpen(false); return; }
-    timerRef.current = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch(`/api/search-assignees?q=${encodeURIComponent(q)}`);
-        if (res.ok) {
-          const data: SearchResult[] = await res.json();
-          setResults(data.filter(r => !selected.some(s => s.type === r.type && s.id === r.id)));
-          setIsOpen(true);
-        }
-      } finally { setIsLoading(false); }
-    }, 250);
-  };
-
-  const addItem = (item: SearchResult) => {
-    onChange([...selected, { type: item.type, id: item.id, label: item.label }]);
-    setQuery('');
-    setResults([]);
-    setIsOpen(false);
-  };
-
-  const removeItem = (type: string, id: number) => {
-    onChange(selected.filter(s => !(s.type === type && s.id === id)));
-  };
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <label className="block text-xs font-bold text-slate-600 mb-1">
-        <i className="bi bi-people-fill mr-1"></i>担当者
-      </label>
-      {selected.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-2">
-          {selected.map(s => (
-            <span key={`${s.type}-${s.id}`} className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full border ${ASSIGNEE_TYPE_COLOR[s.type]}`}>
-              <i className={`${ASSIGNEE_TYPE_ICON[s.type]} text-[10px]`}></i>
-              {s.label}
-              <button type="button" onClick={() => removeItem(s.type, s.id)} className="ml-0.5 hover:opacity-70">
-                <i className="bi bi-x text-sm leading-none"></i>
-              </button>
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="relative">
-        <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
-        <input
-          type="text"
-          value={query}
-          onChange={e => handleSearch(e.target.value)}
-          placeholder="社員・部署・支店を検索して追加..."
-          className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        {isLoading && (
-          <div className="absolute right-2 top-1/2 -translate-y-1/2">
-            <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-        )}
-      </div>
-      {isOpen && results.length > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-          {results.map(r => (
-            <button
-              key={`${r.type}-${r.id}`}
-              type="button"
-              onMouseDown={() => addItem(r)}
-              className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0 flex items-center gap-2"
-            >
-              <i className={`${ASSIGNEE_TYPE_ICON[r.type]} text-slate-400`}></i>
-              <div>
-                <span className="font-medium text-slate-800">{r.label}</span>
-                <span className="ml-2 text-xs text-slate-400">{r.sub}</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-      {isOpen && query.trim() && results.length === 0 && !isLoading && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-          <p className="px-3 py-2 text-sm text-slate-400">該当なし</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ===== 顧客オートコンプリート =====
-function AutocompleteInput({
-  value, label, placeholder, fetchUrl, onSelect, onClear, displayText,
-}: {
-  value: string; label: string; placeholder: string;
-  fetchUrl: (q: string) => string;
-  onSelect: (id: string, name: string) => void;
-  onClear: () => void;
-  displayText: string;
-}) {
-  const [query, setQuery] = useState('');
-  const [candidates, setCandidates] = useState<{ id: number; name: string; staffId?: string }[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const q = e.target.value;
-    setQuery(q);
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (!q.trim()) { setCandidates([]); setIsOpen(false); return; }
-    timerRef.current = setTimeout(async () => {
-      setIsLoading(true);
-      try {
-        const res = await fetch(fetchUrl(q));
-        if (res.ok) {
-          const data = await res.json();
-          setCandidates(Array.isArray(data) ? data : []);
-          setIsOpen(true);
-        }
-      } finally { setIsLoading(false); }
-    }, 250);
-  };
-
-  const handleSelect = (item: { id: number; name: string; staffId?: string }) => {
-    onSelect(item.id.toString(), item.name);
-    setQuery(''); setCandidates([]); setIsOpen(false);
-  };
-
-  return (
-    <div ref={wrapRef} className="relative">
-      <label className="block text-xs font-bold text-slate-600 mb-1">{label}</label>
-      {value ? (
-        <div className="flex items-center gap-2 border border-indigo-300 bg-indigo-50 rounded-lg px-3 py-2 text-sm">
-          <i className="bi bi-check-circle-fill text-indigo-500 text-xs"></i>
-          <span className="flex-1 truncate text-indigo-700 font-medium">{displayText}</span>
-          <button type="button" onClick={() => { onClear(); setQuery(''); setCandidates([]); setIsOpen(false); }} className="text-slate-400 hover:text-red-500 transition-colors shrink-0">
-            <i className="bi bi-x-lg text-xs"></i>
-          </button>
-        </div>
-      ) : (
-        <div className="relative">
-          <input
-            type="text" value={query} onChange={handleChange}
-            placeholder={placeholder}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-8"
-          />
-          {isLoading && (
-            <div className="absolute right-2 top-1/2 -translate-y-1/2">
-              <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          )}
-          {isOpen && candidates.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-              {candidates.map(item => (
-                <button key={item.id} type="button" onMouseDown={() => handleSelect(item)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0">
-                  <span className="font-medium text-slate-800">{item.name}</span>
-                  {item.staffId && <span className="ml-2 text-xs text-slate-400">{item.staffId}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-          {isOpen && query.trim() && candidates.length === 0 && !isLoading && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-              <p className="px-3 py-2 text-sm text-slate-400">該当なし</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ===== メインページ =====
 export default function CrmTasksPage() {
   const { showToast, showConfirm } = useNotification();
@@ -371,7 +148,7 @@ export default function CrmTasksPage() {
   const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterMyTasks, setFilterMyTasks] = useState(false);
 
-  // タスクモーダル
+  // タスク編集モーダル（インライン）
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({
@@ -464,6 +241,13 @@ export default function CrmTasksPage() {
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 
+  // グローバルタスク作成モーダルからの作成通知を受信
+  useEffect(() => {
+    const handler = () => fetchTasks();
+    window.addEventListener('task-created', handler);
+    return () => window.removeEventListener('task-created', handler);
+  }, [fetchTasks]);
+
   // テンプレート一覧フェッチ
   const fetchTemplates = useCallback(async () => {
     setIsLoadingTemplates(true);
@@ -482,20 +266,6 @@ export default function CrmTasksPage() {
     if (!catId) return '';
     const cat = taskCategories.find(c => c.id === Number(catId));
     return cat?.code || '';
-  };
-
-  const openTaskCreate = () => {
-    setEditingTask(null);
-    setTaskForm({
-      title: '', description: '', dueDate: new Date().toISOString().slice(0, 10),
-      dueTime: '', isAllDay: true,
-      priority: 'MEDIUM', status: 'PENDING', categoryId: '',
-      customerId: '', distributorId: '', branchId: '',
-    });
-    setTaskAssignees([]);
-    setFormCustomerName('');
-    setFormDistributorName('');
-    setIsTaskModalOpen(true);
   };
 
   const openTaskEdit = (task: Task) => {
@@ -772,49 +542,55 @@ export default function CrmTasksPage() {
   // ===== JSX =====
   return (
     <div className="space-y-5 animate-in fade-in duration-300 pb-10 max-w-7xl mx-auto">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-end border-b border-slate-200 pb-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-check2-all text-indigo-600"></i> タスク管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">CRM タスクの一覧・定期タスク設定</p>
-        </div>
-        <div className="flex gap-2">
-          {activeTab === 'tasks' && (
-            <button onClick={openTaskCreate}
-              className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
-              <i className="bi bi-plus-lg"></i> 新規タスク
-            </button>
-          )}
-          {activeTab === 'templates' && (
-            <button onClick={openTmplCreate}
-              className="bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
-              <i className="bi bi-plus-lg"></i> テンプレート作成
-            </button>
-          )}
-        </div>
-      </div>
 
-      {/* タブ */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-        <button
-          onClick={() => setActiveTab('tasks')}
-          className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'tasks' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <i className="bi bi-list-check mr-1.5"></i>タスク一覧
-        </button>
-        <button
-          onClick={() => setActiveTab('templates')}
-          className={`px-5 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'templates' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-        >
-          <i className="bi bi-arrow-repeat mr-1.5"></i>定期タスク設定
-        </button>
-      </div>
+      {/* ==================== タブバー + コンテンツ ==================== */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* タブ行 */}
+        <div className="flex items-center border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              activeTab === 'tasks' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <i className="bi bi-list-check"></i>
+            タスク一覧
+            {activeTab === 'tasks' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              activeTab === 'templates' ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            <i className="bi bi-arrow-repeat"></i>
+            定期タスク設定
+            {activeTab === 'templates' && (
+              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
+            )}
+          </button>
+
+          {/* スペーサー + アクションボタン */}
+          <div className="flex-1" />
+          <div className="flex items-center gap-2 px-4">
+            {activeTab === 'templates' && (
+              <button onClick={openTmplCreate}
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors">
+                <i className="bi bi-plus-lg text-indigo-500"></i>
+                テンプレート作成
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* タブ内コンテンツ */}
+        <div className="p-5">
 
       {/* ==================== タスク一覧タブ ==================== */}
       {activeTab === 'tasks' && (
-        <>
+        <div className="space-y-5">
           {/* 期限アラートカード */}
           {!isLoadingTasks && (overdueCount > 0 || todayCount > 0) && (
             <div className="flex flex-wrap gap-3">
@@ -848,7 +624,7 @@ export default function CrmTasksPage() {
           )}
 
           {/* 検索・フィルタ */}
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-end">
+          <div className="bg-slate-50 p-4 rounded-xl flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
               <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
               <div className="relative">
@@ -927,7 +703,7 @@ export default function CrmTasksPage() {
           </div>
 
           {/* タスクテーブル */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="rounded-xl border border-slate-200 overflow-hidden">
             {isLoadingTasks ? (
               <div className="flex items-center justify-center h-40">
                 <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
@@ -1056,12 +832,12 @@ export default function CrmTasksPage() {
               </div>
             )}
           </div>
-        </>
+        </div>
       )}
 
       {/* ==================== 定期タスク設定タブ ==================== */}
       {activeTab === 'templates' && (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="rounded-xl border border-slate-200 overflow-hidden">
           {isLoadingTemplates ? (
             <div className="flex items-center justify-center h-40">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
@@ -1151,13 +927,16 @@ export default function CrmTasksPage() {
         </div>
       )}
 
-      {/* ==================== タスク作成/編集モーダル ==================== */}
-      {isTaskModalOpen && (
+        </div>{/* /p-5 */}
+      </div>{/* /bg-white card */}
+
+      {/* ==================== タスク編集モーダル ==================== */}
+      {isTaskModalOpen && editingTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTaskModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-              <h2 className="font-bold text-slate-800 text-lg">{editingTask ? 'タスクを編集' : '新規タスク'}</h2>
+              <h2 className="font-bold text-slate-800 text-lg">タスクを編集</h2>
               <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <i className="bi bi-x-lg text-xl"></i>
               </button>
@@ -1297,7 +1076,7 @@ export default function CrmTasksPage() {
                   className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">キャンセル</button>
                 <button type="submit" disabled={isSubmittingTask}
                   className="bg-indigo-600 text-white text-sm font-bold px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                  {isSubmittingTask ? '保存中...' : editingTask ? '更新' : '作成'}
+                  {isSubmittingTask ? '保存中...' : '更新'}
                 </button>
               </div>
             </form>

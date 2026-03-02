@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const assigneeId = searchParams.get('assigneeId');
   const dueDate = searchParams.get('dueDate');
   const customerId = searchParams.get('customerId');
+  const distributorId = searchParams.get('distributorId');
   const category = searchParams.get('category');
   const myTasks = searchParams.get('myTasks');
 
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status;
   if (assigneeId) where.assigneeId = parseInt(assigneeId);
   if (customerId) where.customerId = parseInt(customerId);
+  if (distributorId) where.distributorId = parseInt(distributorId);
   if (category) where.categoryId = parseInt(category);
 
   if (dueDate === 'today') {

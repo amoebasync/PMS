@@ -99,11 +99,6 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       <div className="max-w-5xl mx-auto px-4 py-10">
-        <div className="mb-8">
-          <h1 className="text-2xl font-black text-slate-800">価格設定</h1>
-          <p className="text-sm text-slate-500 mt-1">折り加工・エリアランク・配布期間乗数・チラシサイズの単価を管理します。</p>
-        </div>
-
         {/* タブ */}
         <div className="flex gap-1 mb-6 bg-slate-200 p-1 rounded-xl w-fit">
           {tabs.map(t => (
