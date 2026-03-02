@@ -118,25 +118,16 @@ export default function ApprovalsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 relative">
-      <div className="flex justify-between items-end border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-check2-square text-indigo-600"></i> 人事・経費の承認
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">
-            {isHrAdmin ? '全社員から申請された勤怠、休暇、経費の確認と承認を行います。' : 'あなたの部下から申請された勤怠、休暇、経費の確認と承認を行います。'}
-          </p>
-        </div>
-
+      <div className="flex justify-end gap-2 mb-4">
         {/* 承認待ち / 履歴 の切り替えトグル */}
         <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
-          <button 
+          <button
             onClick={() => setViewMode('PENDING')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === 'PENDING' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >
             <i className="bi bi-inbox mr-1"></i> 承認待ち
           </button>
-          <button 
+          <button
             onClick={() => setViewMode('HISTORY')}
             className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === 'HISTORY' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
           >

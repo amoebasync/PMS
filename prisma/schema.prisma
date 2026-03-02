@@ -636,6 +636,7 @@ model FlyerDistributor {
   minSheets       Int?    @map("min_sheets") // 最低枚数1
   maxSheets       Int?    @map("max_sheets") // 最高枚数1
   targetAmount    String? @map("target_amount") @db.VarChar(50) // 目標金額 (¥8,000–¥9,999など)
+  rateMode        String  @default("manual") @map("rate_mode") @db.VarChar(10) // 'auto' | 'manual'
 
   // プロフィール写真
   avatarUrl String? @map("avatar_url") @db.Text
@@ -644,6 +645,9 @@ model FlyerDistributor {
   note      String?  @db.Text // 備考
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 評価スコア
+  currentScore   Int      @default(100) @map("current_score") // 最新の総合スコア
 
   schedules      DistributionSchedule[]
   shifts         DistributorShift[]
@@ -655,6 +659,7 @@ model FlyerDistributor {
   appDistributionLogs   AppDistributionLog[]
   distributionSessions  DistributionSession[]
   adminNotifications    AdminNotification[]
+  evaluations           DistributorEvaluation[]
 
   @@map("flyer_distributors")
 }
@@ -2250,12 +2255,13 @@ model ProhibitedReason {
 
 // --- クレーム種別マスタ ---
 model ComplaintType {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(100)
-  sortOrder Int      @default(100) @map("sort_order")
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  penaltyScore Int      @default(10) @map("penalty_score") // デフォルト減点（正の整数）
+  sortOrder    Int      @default(100) @map("sort_order")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   complaints Complaint[]
 
@@ -2374,6 +2380,9 @@ model Complaint {
   // 画像
   imageUrls       String?          @map("image_urls") @db.Text
 
+  // 個別減点スコア（null = ComplaintType のデフォルトを使用）
+  penaltyScore    Int?             @map("penalty_score")
+
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -2405,6 +2414,38 @@ model ComplaintResponse {
   responder Employee? @relation("ComplaintResponder", fields: [responderId], references: [id])
 
   @@map("complaint_responses")
+}
+
+// --- 評価期間 ---
+enum EvaluationPeriod {
+  WEEKLY
+}
+
+// --- 配布員評価 ---
+model DistributorEvaluation {
+  id               Int              @id @default(autoincrement())
+  distributorId    Int              @map("distributor_id")
+  distributor      FlyerDistributor @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  periodStart      DateTime         @map("period_start") @db.Date
+  periodEnd        DateTime         @map("period_end") @db.Date
+
+  performanceScore Int              @map("performance_score") // 稼働実績スコア（加点分）
+  qualityScore     Int              @map("quality_score")     // 品質スコア（減点分、負の値）
+  totalScore       Int              @map("total_score")       // baseScore + performance + quality
+  determinedRank   String           @map("determined_rank") @db.VarChar(10)
+
+  // 内訳詳細（JSON）
+  scoreBreakdown   String?          @map("score_breakdown") @db.Text
+
+  note             String?          @db.Text
+  isManualOverride Boolean          @default(false) @map("is_manual_override")
+
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  @@unique([distributorId, periodStart])
+  @@map("distributor_evaluations")
 }
 
 // ==========================================

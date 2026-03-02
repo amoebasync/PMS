@@ -20,9 +20,22 @@ function buildInitialPassword(birthday: string | null | undefined): string | nul
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
     const distributor = await prisma.flyerDistributor.findUnique({
       where: { id: parseInt(id) },
-      include: { branch: true, country: true, visaType: true },
+      include: {
+        branch: true, country: true, visaType: true,
+        _count: {
+          select: {
+            schedules: { where: { status: 'COMPLETED', date: { gte: firstOfMonth, lt: firstOfNextMonth } } },
+            complaints: { where: { status: 'UNRESOLVED' } },
+            tasks: { where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } },
+          },
+        },
+      },
     });
     if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { passwordHash, ...safe } = distributor;
@@ -95,6 +108,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         minSheets: parseIntSafe(body.minSheets),
         maxSheets: parseIntSafe(body.maxSheets),
         targetAmount: body.targetAmount,
+        rateMode: body.rateMode || 'manual',
         note: body.note,
         language: body.language || 'ja',
       },

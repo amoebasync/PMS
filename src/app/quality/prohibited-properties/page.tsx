@@ -1019,32 +1019,23 @@ export default function ProhibitedPropertiesPage() {
   // ===== Render =====
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-slate-800">
-            <i className="bi bi-shield-exclamation text-rose-500 mr-2"></i>
-            配布禁止物件管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">配布禁止対象物件の登録・管理・地図表示</p>
+      {/* Action buttons */}
+      {activeTab === 'list' && (
+        <div className="flex justify-end gap-2 mb-4">
+          <button
+            onClick={openDrawCreate}
+            className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+          >
+            <i className="bi bi-pentagon"></i> 地図で範囲指定
+          </button>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
+          >
+            <i className="bi bi-plus-lg"></i> 新規登録
+          </button>
         </div>
-        {activeTab === 'list' && (
-          <div className="flex items-center gap-2">
-            <button
-              onClick={openDrawCreate}
-              className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-            >
-              <i className="bi bi-pentagon"></i> 地図で範囲指定
-            </button>
-            <button
-              onClick={openCreate}
-              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
-            >
-              <i className="bi bi-plus-lg"></i> 新規登録
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-1 bg-slate-100 p-1 rounded-xl">

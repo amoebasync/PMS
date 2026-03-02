@@ -270,14 +270,7 @@ export default function DistributorPage() {
 
   return (
     <div className="space-y-6">
-      {/* ページヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-bicycle text-emerald-600"></i> 配布員管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">ポスティングスタッフの情報と契約を管理します。</p>
-        </div>
+      <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => openForm()}
           className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold shadow-md flex items-center gap-2 transition-colors"
@@ -326,52 +319,74 @@ export default function DistributorPage() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">ID / 氏名</th>
-              <th className="px-6 py-4">支店 / ランク</th>
-              <th className="px-6 py-4">国籍 / 在留資格</th>
-              <th className="px-6 py-4">在籍状態</th>
-              <th className="px-6 py-4 text-right">操作</th>
+              <th className="px-5 py-3">ID / 氏名</th>
+              <th className="px-5 py-3">支店</th>
+              <th className="px-5 py-3 text-center">ランク</th>
+              <th className="px-5 py-3 text-center">スコア</th>
+              <th className="px-5 py-3 text-center">今月出勤</th>
+              <th className="px-5 py-3">国籍</th>
+              <th className="px-5 py-3 text-center">状態</th>
+              <th className="px-5 py-3 text-right">操作</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400">読み込み中...</td></tr>
+              <tr><td colSpan={8} className="p-8 text-center text-slate-400">読み込み中...</td></tr>
             ) : filteredDistributors.length === 0 ? (
-              <tr><td colSpan={5} className="p-8 text-center text-slate-400">該当するスタッフがいません</td></tr>
-            ) : filteredDistributors.map(d => (
+              <tr><td colSpan={8} className="p-8 text-center text-slate-400">該当するスタッフがいません</td></tr>
+            ) : filteredDistributors.map(d => {
+              const rankColorMap: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-gray-400', D: 'bg-red-400' };
+              const monthlyAttendance = d._count?.schedules ?? 0;
+              return (
               <tr
                 key={d.id}
                 onClick={() => router.push(`/distributors/${d.id}`)}
                 className="hover:bg-slate-50 cursor-pointer"
               >
-                <td className="px-6 py-4">
-                  <div className="font-mono text-xs text-slate-400">{d.staffId}</div>
-                  <div className="font-bold text-slate-800">{d.name}</div>
-                  {d.email && <div className="text-xs text-slate-400">{d.email}</div>}
+                <td className="px-5 py-3">
+                  <div className="font-mono text-[10px] text-slate-400">{d.staffId}</div>
+                  <div className="font-bold text-sm text-slate-800">{d.name}</div>
+                  {d.email && <div className="text-[11px] text-slate-400 truncate max-w-[180px]">{d.email}</div>}
                 </td>
-                <td className="px-6 py-4 text-sm">
-                  <div>{d.branch ? d.branch.nameJa : '—'}</div>
-                  <div className="text-xs font-bold text-emerald-600">Rank: {d.rank || '—'}</div>
+                <td className="px-5 py-3 text-sm text-slate-700">
+                  {d.branch ? d.branch.nameJa : '—'}
                 </td>
-                <td className="px-6 py-4 text-sm">
-                  <div className="font-bold text-slate-700">{d.country ? d.country.name : '—'}</div>
-                  <div className="text-xs text-slate-500">{d.visaType ? d.visaType.name : 'ビザ未確認'}</div>
+                <td className="px-5 py-3 text-center">
+                  {d.rank ? (
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black text-white ${rankColorMap[d.rank] || 'bg-gray-300'}`}>
+                      {d.rank}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-slate-300">—</span>
+                  )}
                 </td>
-                <td className="px-6 py-4">
+                <td className="px-5 py-3 text-center">
+                  <span className="text-sm font-bold text-slate-800">{d.currentScore ?? '—'}</span>
+                  {d.currentScore != null && <span className="text-[10px] text-slate-400 ml-0.5">pt</span>}
+                </td>
+                <td className="px-5 py-3 text-center">
+                  <span className="text-sm font-bold text-slate-700">{monthlyAttendance}</span>
+                  <span className="text-[10px] text-slate-400 ml-0.5">日</span>
+                </td>
+                <td className="px-5 py-3 text-sm text-slate-700">
+                  {d.country ? d.country.name : '—'}
+                </td>
+                <td className="px-5 py-3 text-center">
                   {d.leaveDate
-                    ? <span className="px-2 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">退社済</span>
-                    : <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">在籍中</span>}
+                    ? <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">退社済</span>
+                    : <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">在籍中</span>}
                 </td>
-                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
-                  <button onClick={() => openForm(d)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors">
+                <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
+                  <button onClick={() => openForm(d)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors">
                     <i className="bi bi-pencil-square"></i>
                   </button>
-                  <button onClick={() => { setCurrentId(d.id); setIsDeleteModalOpen(true); }} className="p-2 text-slate-400 hover:text-rose-600 transition-colors">
+                  <button onClick={() => { setCurrentId(d.id); setIsDeleteModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors">
                     <i className="bi bi-trash"></i>
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         </div>

@@ -368,24 +368,18 @@ export default function CustomerPage() {
   return (
     <div className="space-y-6">
 
-      {/* ページヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-buildings-fill text-blue-600"></i> 顧客管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">取引先企業の情報を一元管理します。</p>
-        </div>
+      {/* アクションボタン */}
+      <div className="flex justify-end gap-2">
         <button
           onClick={() => openFormModal()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-bold text-sm shadow-md flex items-center gap-2 transition-colors"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all"
         >
           <i className="bi bi-plus-lg"></i> 新規顧客登録
         </button>
       </div>
 
-      {/* 検索・フィルタパネル */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-3 items-end">
+      {/* フィルタパネル */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[220px]">
           <label className={labelCls}>キーワード検索</label>
           <div className="relative">
@@ -395,20 +389,20 @@ export default function CustomerPage() {
               placeholder="会社名・カナ・顧客コード..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none"
+              className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
             />
           </div>
         </div>
         <div>
           <label className={labelCls}>担当営業</label>
-          <select value={filterSalesRepId} onChange={e => setFilterSalesRepId(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white min-w-[120px]">
+          <select value={filterSalesRepId} onChange={e => setFilterSalesRepId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[120px]">
             <option value="">すべて</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
           </select>
         </div>
         <div>
           <label className={labelCls}>流入経路</label>
-          <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white min-w-[110px]">
+          <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
             <option value="">すべて</option>
             <option value="EC">EC</option>
             <option value="SALES">営業</option>
@@ -418,14 +412,14 @@ export default function CustomerPage() {
         </div>
         <div>
           <label className={labelCls}>キャンペーン</label>
-          <select value={filterCampaignId} onChange={e => setFilterCampaignId(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white min-w-[130px]">
+          <select value={filterCampaignId} onChange={e => setFilterCampaignId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[130px]">
             <option value="">すべて</option>
             {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
           <label className={labelCls}>ステータス</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white min-w-[110px]">
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
             <option value="">すべて</option>
             <option value="VALID">有効</option>
             <option value="INVALID">無効</option>
@@ -441,18 +435,11 @@ export default function CustomerPage() {
         )}
       </div>
 
-      <div>
-        <span className="text-xs text-slate-400">
-          {isLoading ? '読み込み中...' : `${filteredCustomers.length} 件`}
-          {!isLoading && filteredCustomers.length !== customers.length && ` / 全 ${customers.length} 件`}
-        </span>
-      </div>
-
-      {/* 顧客一覧テーブル */}
+      {/* テーブル */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-        <table className="w-full text-left">
-          <thead className="bg-slate-50 border-b border-slate-200">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
               <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">顧客コード / 会社名</th>
               <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">電話 / 住所</th>

@@ -121,17 +121,6 @@ export default function AuditLogsPage() {
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6">
-      {/* ページヘッダー */}
-      <div className="mb-6 flex items-center gap-3">
-        <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-          <i className="bi bi-shield-check text-indigo-600 text-xl" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">監査ログ</h1>
-          <p className="text-sm text-slate-500">システム操作の履歴を確認できます</p>
-        </div>
-      </div>
-
       {/* フィルターパネル */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4 shadow-sm">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

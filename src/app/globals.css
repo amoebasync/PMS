@@ -24,20 +24,24 @@ body {
   border-radius: 10px;
 }
 
-/* サイドバー専用スクロールバー（ライトテーマ） */
+/* サイドバー専用：スクロール中のみスクロールバー表示 */
+.sidebar-scrollbar {
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+}
+.sidebar-scrollbar.is-scrolling {
+  scrollbar-color: #cbd5e1 transparent !important;
+}
 .sidebar-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 4px !important;
 }
 .sidebar-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: transparent !important;
 }
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background-color: transparent;
-  border-radius: 10px;
+  background-color: transparent !important;
+  border-radius: 10px !important;
 }
-.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: #e2e8f0;
-}
-.sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #cbd5e1;
+.sidebar-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1 !important;
 }

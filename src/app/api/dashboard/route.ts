@@ -114,6 +114,49 @@ export async function GET() {
       include: { customer: { select: { id: true, name: true } } },
     });
 
+    // 7. 評価セクション: トップ配布員 & 要注意配布員
+    const topDistributors = await prisma.flyerDistributor.findMany({
+      where: { leaveDate: null },
+      orderBy: { currentScore: 'desc' },
+      take: 5,
+      select: { id: true, name: true, staffId: true, rank: true, currentScore: true },
+    });
+
+    // 今週のクレーム2件以上の配布員
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Go back to Sunday
+    const attentionDistributorsRaw = await prisma.complaint.groupBy({
+      by: ['distributorId'],
+      where: {
+        distributorId: { not: null },
+        occurredAt: { gte: weekStart, lt: tomorrow },
+      },
+      _count: { id: true },
+      having: {
+        id: { _count: { gte: 2 } },
+      },
+    });
+
+    let attentionDistributors: { id: number; name: string; staffId: string; complaintCount: number }[] = [];
+    if (attentionDistributorsRaw.length > 0) {
+      const distIds = attentionDistributorsRaw
+        .map((r) => r.distributorId)
+        .filter((id): id is number => id !== null);
+      const distMap = await prisma.flyerDistributor.findMany({
+        where: { id: { in: distIds } },
+        select: { id: true, name: true, staffId: true },
+      });
+      const nameMap = new Map(distMap.map((d) => [d.id, d]));
+      attentionDistributors = attentionDistributorsRaw
+        .filter((r) => r.distributorId !== null)
+        .map((r) => ({
+          id: r.distributorId!,
+          name: nameMap.get(r.distributorId!)?.name || '',
+          staffId: nameMap.get(r.distributorId!)?.staffId || '',
+          complaintCount: r._count.id,
+        }));
+    }
+
     return NextResponse.json({
       alerts: {
         orders: pendingOrders,
@@ -138,6 +181,10 @@ export async function GET() {
       },
       quality: {
         unresolvedComplaintCount,
+      },
+      evaluation: {
+        topDistributors,
+        attentionDistributors,
       },
     });
   } catch (error) {

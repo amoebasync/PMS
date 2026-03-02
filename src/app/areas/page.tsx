@@ -333,14 +333,7 @@ export default function AreasPage() {
 
   return (
     <div className="space-y-6">
-      {/* ページヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-map-fill text-indigo-600"></i> エリア管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">配布エリアのマスタ情報と世帯数統計を管理します。</p>
-        </div>
+      <div className="flex justify-end gap-2 mb-4">
         <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
           <i className="bi bi-plus-lg"></i> 新規登録
         </button>

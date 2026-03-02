@@ -8,7 +8,11 @@ export async function GET(request: Request) {
   const to = searchParams.get('to');
 
   try {
+    const distributorId = searchParams.get('distributorId');
     const whereClause: any = {};
+    if (distributorId) {
+      whereClause.distributorId = parseInt(distributorId);
+    }
     if (from || to) {
       whereClause.date = {};
       if (from) whereClause.date.gte = new Date(from);

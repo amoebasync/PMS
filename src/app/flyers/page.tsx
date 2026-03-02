@@ -203,13 +203,7 @@ export default function FlyerPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-file-earmark-richtext text-fuchsia-600"></i> チラシ案件管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">配布するチラシ情報の登録と、現在庫の確認を行います。</p>
-        </div>
+      <div className="flex justify-end gap-2 mb-4">
         <button onClick={() => openForm()} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2 rounded-lg font-bold shadow-md">
           <i className="bi bi-plus-lg"></i> 新規チラシ登録
         </button>

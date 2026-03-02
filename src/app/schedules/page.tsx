@@ -116,8 +116,6 @@ export default function ScheduleListPage() {
   return (
     <div className="space-y-6 h-[calc(100vh-6rem)] flex flex-col">
       <div className="flex-none space-y-4">
-        <h1 className="text-2xl font-bold text-slate-800"><i className="bi bi-calendar-check text-indigo-600"></i> スケジュール照会</h1>
-        
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">対象日</label>

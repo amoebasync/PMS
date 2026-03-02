@@ -36,6 +36,15 @@ if [ -n "$CRON_SECRET" ]; then
     echo "CRON既存: 研修スロット自動生成（スキップ）"
   fi
 
+  # --- 配布員評価 CRON 登録（重複時はスキップ） ---
+  EVAL_CRON_JOB="0 4 * * 1 curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/evaluate-distributors >> /tmp/pms-cron-evaluate-distributors.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "evaluate-distributors"; then
+    (crontab -l 2>/dev/null; echo "$EVAL_CRON_JOB") | crontab -
+    echo "CRON登録: 配布員評価（毎週月曜04:00）"
+  else
+    echo "CRON既存: 配布員評価（スキップ）"
+  fi
+
   # --- ハウスキープ CRON 登録（重複時はスキップ） ---
   # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
   HOUSEKEEP_CRON_JOB="0 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"

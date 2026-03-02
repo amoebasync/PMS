@@ -217,16 +217,6 @@ export default function PayrollPage() {
 
   return (
     <div className="space-y-6">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-cash-stack text-indigo-600"></i> 給与計算
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">月次（正社員）・週次（アルバイト・業務委託）の給与を一括計算・確定します。</p>
-        </div>
-      </div>
-
       {/* 操作バー */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div>

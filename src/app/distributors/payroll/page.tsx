@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
 
 type Distributor = {
@@ -188,18 +187,9 @@ export default function DistributorPayrollPage() {
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500 mb-1">
-            <Link href="/distributors" className="hover:text-indigo-600">配布員管理</Link>
-            <i className="bi bi-chevron-right text-xs"></i>
-            <span>給与管理</span>
-          </div>
-          <h1 className="text-2xl font-black text-slate-800">配布員 給与管理</h1>
-        </div>
-        {/* 全員一斉計算ボタン */}
-        {distributors.length > 0 && (
+      {/* Action buttons */}
+      {distributors.length > 0 && (
+        <div className="flex justify-end mb-4">
           <button
             onClick={handleGenerateAll}
             disabled={generatingAll || loading}
@@ -211,8 +201,8 @@ export default function DistributorPayrollPage() {
               <><i className="bi bi-calculator-fill"></i>全員一斉計算</>
             )}
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Week navigation */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center justify-between">

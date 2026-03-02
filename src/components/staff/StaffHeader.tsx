@@ -11,11 +11,12 @@ export function StaffHeader({ name }: { name?: string }) {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const navItems = [
-    { name: 'ホーム',     href: '/staff',          icon: 'bi-house-door-fill' },
-    { name: 'シフト',     href: '/staff/shifts',    icon: 'bi-calendar3' },
-    { name: '交通費',     href: '/staff/expenses',  icon: 'bi-train-front-fill' },
-    { name: '配布報告',   href: '/staff/report',    icon: 'bi-clipboard-check-fill' },
-    { name: 'プロフィール', href: '/staff/profile', icon: 'bi-person-fill' },
+    { name: 'ホーム',     href: '/staff',            icon: 'bi-house-door-fill' },
+    { name: 'シフト',     href: '/staff/shifts',      icon: 'bi-calendar3' },
+    { name: '交通費',     href: '/staff/expenses',    icon: 'bi-train-front-fill' },
+    { name: '配布報告',   href: '/staff/report',      icon: 'bi-clipboard-check-fill' },
+    { name: '評価',       href: '/staff/evaluation',  icon: 'bi-award-fill' },
+    { name: 'プロフィール', href: '/staff/profile',   icon: 'bi-person-fill' },
   ];
 
   const handleLogout = async () => {
@@ -51,7 +52,7 @@ export function StaffHeader({ name }: { name?: string }) {
 
       {/* Bottom navigation bar (mobile-first) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up">
-        <div className="max-w-lg mx-auto grid grid-cols-5">
+        <div className="max-w-lg mx-auto grid grid-cols-6">
           {navItems.map((item) => {
             const isActive = item.href === '/staff'
               ? pathname === '/staff'

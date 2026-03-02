@@ -5,13 +5,40 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
+const RANK_COLORS: Record<string, { bg: string; text: string }> = {
+  S: { bg: 'bg-yellow-500', text: 'text-white' },
+  A: { bg: 'bg-blue-500', text: 'text-white' },
+  B: { bg: 'bg-green-500', text: 'text-white' },
+  C: { bg: 'bg-gray-400', text: 'text-white' },
+  D: { bg: 'bg-red-400', text: 'text-white' },
+};
+
+function EvalRankBadge({ rank, size = 'md' }: { rank: string; size?: 'sm' | 'md' | 'lg' }) {
+  const c = RANK_COLORS[rank] || RANK_COLORS.C;
+  const sizeClass = size === 'sm' ? 'w-6 h-6 text-xs' : size === 'lg' ? 'w-12 h-12 text-xl' : 'w-10 h-10 text-lg';
+  return <span className={`inline-flex items-center justify-center rounded-lg font-black ${c.bg} ${c.text} ${sizeClass}`}>{rank}</span>;
+}
+
+/* ─── 編集モーダル用（evaluationタブ削除：4タブ構成） ─── */
 type FormTab = 'basic' | 'contract' | 'bank' | 'rate';
 const FORM_TABS: { key: FormTab; label: string; icon: string }[] = [
-  { key: 'basic',    label: '基本情報',    icon: 'bi-person-fill' },
-  { key: 'contract', label: '在留・契約',  icon: 'bi-file-earmark-text-fill' },
-  { key: 'bank',     label: '口座情報',    icon: 'bi-bank2' },
+  { key: 'basic',    label: '基本情報',     icon: 'bi-person-fill' },
+  { key: 'contract', label: '在留・契約',   icon: 'bi-file-earmark-text-fill' },
+  { key: 'bank',     label: '口座情報',     icon: 'bi-bank2' },
   { key: 'rate',     label: 'レート・評価', icon: 'bi-graph-up' },
+];
+
+/* ─── 詳細画面タブ ─── */
+type DetailTab = 'overview' | 'finance' | 'evaluation' | 'schedules' | 'tasks' | 'complaints';
+const DETAIL_TABS: { key: DetailTab; label: string; icon: string }[] = [
+  { key: 'overview',   label: '概要',     icon: 'bi-person-fill' },
+  { key: 'finance',    label: '口座・レート', icon: 'bi-bank2' },
+  { key: 'evaluation', label: '評価',     icon: 'bi-award' },
+  { key: 'schedules',  label: '配布履歴', icon: 'bi-calendar-check' },
+  { key: 'tasks',      label: 'タスク',   icon: 'bi-list-task' },
+  { key: 'complaints', label: 'クレーム', icon: 'bi-exclamation-triangle' },
 ];
 
 const inputCls = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white';
@@ -64,6 +91,38 @@ function handlePostalInput(raw: string, setPostal: (v: string) => void, setAddre
 }
 const todayStr = () => new Date().toISOString().split('T')[0];
 
+/* ─── ステータスバッジヘルパー ─── */
+function ScheduleStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { cls: string; label: string }> = {
+    UNSTARTED:    { cls: 'bg-slate-100 text-slate-500', label: '未開始' },
+    IN_PROGRESS:  { cls: 'bg-amber-100 text-amber-700', label: '進行中' },
+    DISTRIBUTING: { cls: 'bg-blue-100 text-blue-700 animate-pulse', label: '配布中' },
+    COMPLETED:    { cls: 'bg-emerald-100 text-emerald-700', label: '完了' },
+  };
+  const m = map[status] || map.UNSTARTED;
+  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span>;
+}
+
+function TaskStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { cls: string; label: string }> = {
+    PENDING:     { cls: 'bg-slate-100 text-slate-500', label: '未着手' },
+    IN_PROGRESS: { cls: 'bg-blue-100 text-blue-700', label: '進行中' },
+    DONE:        { cls: 'bg-emerald-100 text-emerald-700', label: '完了' },
+  };
+  const m = map[status] || map.PENDING;
+  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span>;
+}
+
+function ComplaintStatusBadge({ status }: { status: string }) {
+  const map: Record<string, { cls: string; label: string }> = {
+    UNRESOLVED:  { cls: 'bg-rose-100 text-rose-700', label: '未対応' },
+    IN_PROGRESS: { cls: 'bg-amber-100 text-amber-700', label: '対応中' },
+    RESOLVED:    { cls: 'bg-emerald-100 text-emerald-700', label: '解決済' },
+  };
+  const m = map[status] || map.UNRESOLVED;
+  return <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${m.cls}`}>{m.label}</span>;
+}
+
 export default function DistributorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -72,6 +131,20 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [distributor, setDistributor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+
+  // 詳細タブ
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+
+  // 遅延ロード用
+  const [schedules, setSchedules] = useState<any[]>([]);
+  const [schedulesLoading, setSchedulesLoading] = useState(false);
+  const [schedulesLoaded, setSchedulesLoaded] = useState(false);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [tasksLoading, setTasksLoading] = useState(false);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [complaints, setComplaints] = useState<any[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
+  const [complaintsLoaded, setComplaintsLoaded] = useState(false);
 
   // Master data for edit modal
   const [branches, setBranches] = useState<any[]>([]);
@@ -90,6 +163,9 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [bankInputText, setBankInputText] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+  // ランク別単価マスタ（自動モード用）
+  const [rankRatesMap, setRankRatesMap] = useState<Record<string, number[]>>({});
+
   // アプリ配信モーダル
   const [isAppDistOpen, setIsAppDistOpen] = useState(false);
   const [appDistEmail, setAppDistEmail] = useState('');
@@ -98,6 +174,12 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [appDistHistory, setAppDistHistory] = useState<any[]>([]);
   const [appDistHistoryLoading, setAppDistHistoryLoading] = useState(false);
   const [hasAppDistributed, setHasAppDistributed] = useState(false);
+
+  // 評価データ
+  const [evalData, setEvalData] = useState<any>(null);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalRankForm, setEvalRankForm] = useState({ determinedRank: '', note: '' });
+  const [evalSaving, setEvalSaving] = useState(false);
 
   const initialForm = {
     staffId: '', name: '', branchId: '', phone: '', email: '',
@@ -112,7 +194,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     bankAccountNameKana: '', transferNumber: '',
     equipmentBattery: '', equipmentBag: '', equipmentMobile: '',
     flyerDeliveryMethod: '', transportationMethod: '',
-    ratePlan: '', rate1Type: '', rate2Type: '', rate3Type: '',
+    ratePlan: '', rateMode: 'manual',
+    rate1Type: '', rate2Type: '', rate3Type: '',
     rate4Type: '', rate5Type: '', rate6Type: '',
     transportationFee: '', trainingAllowance: '',
     rank: '', attendanceCount: '0',
@@ -129,7 +212,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setLoading(false);
   };
 
-  // アプリ配信履歴読み込み
   const loadDistHistory = async () => {
     setAppDistHistoryLoading(true);
     try {
@@ -141,6 +223,71 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       }
     } catch { /* ignore */ }
     setAppDistHistoryLoading(false);
+  };
+
+  const loadEvaluation = async () => {
+    setEvalLoading(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/evaluations`);
+      if (res.ok) {
+        const data = await res.json();
+        setEvalData(data);
+        if (data.evaluations?.length > 0) {
+          const latest = data.evaluations[0];
+          setEvalRankForm({ determinedRank: latest.determinedRank || '', note: '' });
+        }
+      }
+    } catch { /* ignore */ }
+    setEvalLoading(false);
+  };
+
+  const loadSchedules = async () => {
+    setSchedulesLoading(true);
+    try {
+      const res = await fetch(`/api/schedules?distributorId=${id}`);
+      if (res.ok) setSchedules(await res.json());
+    } catch { /* ignore */ }
+    setSchedulesLoading(false);
+    setSchedulesLoaded(true);
+  };
+
+  const loadTasks = async () => {
+    setTasksLoading(true);
+    try {
+      const res = await fetch(`/api/tasks?distributorId=${id}`);
+      if (res.ok) setTasks(await res.json());
+    } catch { /* ignore */ }
+    setTasksLoading(false);
+    setTasksLoaded(true);
+  };
+
+  const loadComplaints = async () => {
+    setComplaintsLoading(true);
+    try {
+      const res = await fetch(`/api/complaints?distributorId=${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setComplaints(data.complaints || data);
+      }
+    } catch { /* ignore */ }
+    setComplaintsLoading(false);
+    setComplaintsLoaded(true);
+  };
+
+  const saveEvalRank = async () => {
+    if (!evalRankForm.determinedRank) return;
+    setEvalSaving(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/evaluations`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(evalRankForm),
+      });
+      if (!res.ok) throw new Error();
+      showToast('ランクを更新しました', 'success');
+      loadEvaluation();
+    } catch { showToast('更新に失敗しました', 'error'); }
+    setEvalSaving(false);
   };
 
   const openAppDist = () => {
@@ -186,7 +333,21 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     });
     loadDistributor();
     loadDistHistory();
+    loadEvaluation();
+    // ランク別単価マスタ読み込み
+    fetch('/api/settings/system').then(r => r.json()).then(d => {
+      if (d.rankRates) {
+        try { setRankRatesMap(JSON.parse(d.rankRates)); } catch { /* ignore */ }
+      }
+    }).catch(() => {});
   }, [id]);
+
+  // 遅延ロード
+  useEffect(() => {
+    if (activeTab === 'schedules' && !schedulesLoaded) loadSchedules();
+    if (activeTab === 'tasks' && !tasksLoaded) loadTasks();
+    if (activeTab === 'complaints' && !complaintsLoaded) loadComplaints();
+  }, [activeTab]);
 
   const japanId = useMemo(() => countries.find((c: any) => c.code === 'JP')?.id?.toString() || '', [countries]);
   const isNonJapanese = !!formData.countryId && formData.countryId !== japanId;
@@ -241,6 +402,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       gender: distributor.gender || '',
       rank: distributor.rank || '',
       ratePlan: distributor.ratePlan || '',
+      rateMode: distributor.rateMode || 'manual',
       targetAmount: distributor.targetAmount || '',
       note: distributor.note || '',
       leaveReason: distributor.leaveReason || '',
@@ -264,6 +426,34 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setShowCountryDropdown(false);
     setShowBankDropdown(false);
     setIsEditOpen(true);
+  };
+
+  const applyRankRates = (rank: string) => {
+    const rates = rankRatesMap[rank];
+    if (!rates) return;
+    setFormData(prev => ({
+      ...prev,
+      rate1Type: rates[0]?.toString() || '',
+      rate2Type: rates[1]?.toString() || '',
+      rate3Type: rates[2]?.toString() || '',
+      rate4Type: rates[3]?.toString() || '',
+      rate5Type: rates[4]?.toString() || '',
+      rate6Type: rates[5]?.toString() || '',
+    }));
+  };
+
+  const handleRankChange = (newRank: string) => {
+    setFormData(prev => ({ ...prev, rank: newRank }));
+    if (formData.rateMode === 'auto' && newRank) {
+      applyRankRates(newRank);
+    }
+  };
+
+  const handleRateModeChange = (mode: string) => {
+    setFormData(prev => ({ ...prev, rateMode: mode }));
+    if (mode === 'auto' && formData.rank) {
+      applyRankRates(formData.rank);
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
@@ -354,14 +544,11 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const isActive = !d.leaveDate;
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      {/* ページヘッダー */}
-      <div className="flex items-center justify-between">
+    <div className="space-y-0 max-w-5xl">
+      {/* ═══════ ページヘッダー ═══════ */}
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
-          <Link
-            href="/distributors"
-            className="text-slate-400 hover:text-slate-700 transition-colors"
-          >
+          <Link href="/distributors" className="text-slate-400 hover:text-slate-700 transition-colors">
             <i className="bi bi-arrow-left text-xl"></i>
           </Link>
           <div>
@@ -385,28 +572,20 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={openAppDist}
-            className="flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
-          >
+          <button onClick={openAppDist}
+            className="flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
             <i className="bi bi-phone-fill"></i> 配布アプリ配信
           </button>
-          <button
-            onClick={() => { setResetPwMsg(null); setIsResetPasswordOpen(true); }}
-            className="flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-amber-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
-          >
+          <button onClick={() => { setResetPwMsg(null); setIsResetPasswordOpen(true); }}
+            className="flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-amber-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
             <i className="bi bi-key-fill"></i> PW リセット
           </button>
-          <button
-            onClick={openEdit}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors"
-          >
+          <button onClick={openEdit}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors">
             <i className="bi bi-pencil-square"></i> 編集
           </button>
-          <button
-            onClick={() => setIsDeleteOpen(true)}
-            className="flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-500 hover:text-rose-600 border border-rose-200 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
-          >
+          <button onClick={() => setIsDeleteOpen(true)}
+            className="flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-500 hover:text-rose-600 border border-rose-200 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
             <i className="bi bi-trash"></i>
           </button>
         </div>
@@ -414,7 +593,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* パスワードリセット結果メッセージ */}
       {resetPwMsg && (
-        <div className={`p-3 rounded-xl text-sm font-bold flex items-center gap-2 ${
+        <div className={`mb-4 p-3 rounded-xl text-sm font-bold flex items-center gap-2 ${
           resetPwMsg.type === 'success'
             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
             : 'bg-rose-50 text-rose-700 border border-rose-200'
@@ -427,95 +606,448 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* ─── 基本情報 ─── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-person-fill text-emerald-500"></i> 基本情報
-          </h2>
-          <InfoRow label="氏名" value={d.name} />
-          <InfoRow label="スタッフID" value={d.staffId} />
-          <InfoRow label="支店" value={d.branch?.nameJa} />
-          <InfoRow label="メール" value={d.email} />
-          <InfoRow label="電話番号" value={d.phone} />
-          <InfoRow label="生年月日" value={d.birthday ? d.birthday.slice(0, 10) : null} />
-          <InfoRow label="性別" value={d.gender} />
-          <InfoRow label="国籍" value={d.country?.name} />
-          <InfoRow label="ポータル言語" value={d.language === 'en' ? '🇬🇧 English' : '🇯🇵 日本語'} />
+      {/* ═══════ KPIカード行 ═══════ */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+          {d.rank ? <EvalRankBadge rank={d.rank} size="lg" /> : <div className="w-12 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-slate-300"><i className="bi bi-dash text-xl"></i></div>}
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">ランク</p>
+            <p className="text-lg font-black text-slate-800">{d.rank || '—'}</p>
+          </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-geo-alt-fill text-emerald-500"></i> 住所
-          </h2>
-          <InfoRow label="郵便番号" value={d.postalCode} />
-          <InfoRow label="住所" value={d.address} />
-          <InfoRow label="建物名" value={d.buildingName} />
-
-          <h2 className="text-sm font-bold text-slate-500 mt-5 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-file-earmark-text-fill text-emerald-500"></i> 在留・契約
-          </h2>
-          <InfoRow label="在留資格" value={d.visaType?.name} />
-          <InfoRow label="ビザ有効期限" value={d.visaExpiryDate ? d.visaExpiryDate.slice(0, 10) : null} />
-          <InfoRow label="入社日" value={d.joinDate ? d.joinDate.slice(0, 10) : null} />
-          <InfoRow label="退社日" value={d.leaveDate ? d.leaveDate.slice(0, 10) : null} />
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+          <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+            <i className="bi bi-speedometer2 text-blue-500 text-xl"></i>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">スコア</p>
+            <p className="text-lg font-black text-slate-800">{evalData?.evaluations?.[0]?.totalScore ?? '—'}</p>
+          </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-shield-check-fill text-emerald-500"></i> 確認事項
-          </h2>
-          <InfoRow label="個人情報同意" value={d.hasAgreedPersonalInfo} />
-          <InfoRow label="業務委託契約" value={d.hasSignedContract} />
-          <InfoRow label="在留カード確認" value={d.hasResidenceCard} />
-
-          <h2 className="text-sm font-bold text-slate-500 mt-5 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-bank2 text-emerald-500"></i> 口座情報
-          </h2>
-          <InfoRow label="支払方法" value={d.paymentMethod} />
-          <InfoRow label="銀行名" value={d.bankName} />
-          <InfoRow label="支店番号" value={d.bankBranchCode} />
-          <InfoRow label="口座種類" value={d.bankAccountType} />
-          <InfoRow label="口座番号" value={d.bankAccountNumber} />
-          <InfoRow label="口座名義" value={d.bankAccountName} />
-          <InfoRow label="口座名義(カナ)" value={d.bankAccountNameKana} />
-          <InfoRow label="振込番号" value={d.transferNumber} />
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+          <div className="w-12 h-12 bg-emerald-50 rounded-lg flex items-center justify-center">
+            <i className="bi bi-calendar-check text-emerald-500 text-xl"></i>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">今月出勤</p>
+            <p className="text-lg font-black text-slate-800">{d._count?.schedules ?? 0}<span className="text-xs text-slate-400 ml-0.5">回</span></p>
+          </div>
         </div>
-
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-graph-up text-emerald-500"></i> レート・評価
-          </h2>
-          <InfoRow label="ランク" value={d.rank} />
-          <InfoRow label="レートプラン" value={d.ratePlan} />
-          <InfoRow label="出勤回数" value={d.attendanceCount} />
-          <InfoRow label="1 Type Rate" value={d.rate1Type} />
-          <InfoRow label="2 Type Rate" value={d.rate2Type} />
-          <InfoRow label="3 Type Rate" value={d.rate3Type} />
-          <InfoRow label="交通費" value={d.transportationFee} />
-          <InfoRow label="研修手当" value={d.trainingAllowance} />
-
-          <h2 className="text-sm font-bold text-slate-500 mt-5 mb-3 flex items-center gap-1.5">
-            <i className="bi bi-tools text-emerald-500"></i> 稼働・貸与品
-          </h2>
-          <InfoRow label="移動方法" value={d.transportationMethod} />
-          <InfoRow label="チラシ受取" value={d.flyerDeliveryMethod} />
-          <InfoRow label="バッテリー" value={d.equipmentBattery} />
-          <InfoRow label="カバン" value={d.equipmentBag} />
-          <InfoRow label="携帯" value={d.equipmentMobile} />
+        <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
+          <div className="w-12 h-12 bg-rose-50 rounded-lg flex items-center justify-center">
+            <i className="bi bi-exclamation-triangle text-rose-500 text-xl"></i>
+          </div>
+          <div>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">未対応クレーム</p>
+            <p className="text-lg font-black text-slate-800">{d._count?.complaints ?? 0}<span className="text-xs text-slate-400 ml-0.5">件</span></p>
+          </div>
         </div>
       </div>
 
-      {d.note && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-          <p className="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1">
-            <i className="bi bi-sticky-fill"></i> 備考
-          </p>
-          <p className="text-sm text-amber-900 whitespace-pre-wrap">{d.note}</p>
+      {/* ═══════ タブバー ═══════ */}
+      <div className="border-b border-slate-200 mb-5">
+        <div className="flex gap-0 overflow-x-auto">
+          {DETAIL_TABS.map(t => (
+            <button key={t.key} onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
+                activeTab === t.key ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}>
+              <i className={`bi ${t.icon}`}></i>{t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══════ タブコンテンツ ═══════ */}
+
+      {/* ─── 概要タブ ─── */}
+      {activeTab === 'overview' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+              <i className="bi bi-person-fill text-emerald-500"></i> 基本情報
+            </h2>
+            <InfoRow label="氏名" value={d.name} />
+            <InfoRow label="スタッフID" value={d.staffId} />
+            <InfoRow label="支店" value={d.branch?.nameJa} />
+            <InfoRow label="メール" value={d.email} />
+            <InfoRow label="電話番号" value={d.phone} />
+            <InfoRow label="生年月日" value={d.birthday ? d.birthday.slice(0, 10) : null} />
+            <InfoRow label="性別" value={d.gender} />
+            <InfoRow label="国籍" value={d.country?.name} />
+            <InfoRow label="ポータル言語" value={d.language === 'en' ? 'English' : '日本語'} />
+          </div>
+
+          <div className="space-y-5">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+                <i className="bi bi-geo-alt-fill text-emerald-500"></i> 住所
+              </h2>
+              <InfoRow label="郵便番号" value={d.postalCode} />
+              <InfoRow label="住所" value={d.address} />
+              <InfoRow label="建物名" value={d.buildingName} />
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+                <i className="bi bi-file-earmark-text-fill text-emerald-500"></i> 在留・契約
+              </h2>
+              <InfoRow label="在留資格" value={d.visaType?.name} />
+              <InfoRow label="ビザ有効期限" value={d.visaExpiryDate ? d.visaExpiryDate.slice(0, 10) : null} />
+              <InfoRow label="入社日" value={d.joinDate ? d.joinDate.slice(0, 10) : null} />
+              <InfoRow label="退社日" value={d.leaveDate ? d.leaveDate.slice(0, 10) : null} />
+              <InfoRow label="個人情報同意" value={d.hasAgreedPersonalInfo} />
+              <InfoRow label="業務委託契約" value={d.hasSignedContract} />
+              <InfoRow label="在留カード確認" value={d.hasResidenceCard} />
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ====== 編集モーダル ====== */}
+      {/* ─── 口座・レートタブ ─── */}
+      {activeTab === 'finance' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+              <i className="bi bi-bank2 text-emerald-500"></i> 口座情報
+            </h2>
+            <InfoRow label="支払方法" value={d.paymentMethod} />
+            <InfoRow label="銀行名" value={d.bankName} />
+            <InfoRow label="支店番号" value={d.bankBranchCode} />
+            <InfoRow label="口座種類" value={d.bankAccountType} />
+            <InfoRow label="口座番号" value={d.bankAccountNumber} />
+            <InfoRow label="口座名義" value={d.bankAccountName} />
+            <InfoRow label="口座名義(カナ)" value={d.bankAccountNameKana} />
+            <InfoRow label="振込番号" value={d.transferNumber} />
+          </div>
+
+          <div className="space-y-5">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+                <i className="bi bi-graph-up text-emerald-500"></i> レート・評価
+              </h2>
+              <InfoRow label="ランク" value={d.rank} />
+              <InfoRow label="レートプラン" value={d.ratePlan} />
+              <InfoRow label="出勤回数" value={d.attendanceCount} />
+              <InfoRow label="単価モード" value={d.rateMode === 'auto' ? '自動（ランク連動）' : '手動'} />
+              <InfoRow label="1 Type Rate" value={d.rate1Type} />
+              <InfoRow label="2 Type Rate" value={d.rate2Type} />
+              <InfoRow label="3 Type Rate" value={d.rate3Type} />
+              <InfoRow label="4 Type Rate" value={d.rate4Type} />
+              <InfoRow label="5 Type Rate" value={d.rate5Type} />
+              <InfoRow label="6 Type Rate" value={d.rate6Type} />
+              <InfoRow label="交通費" value={d.transportationFee} />
+              <InfoRow label="研修手当" value={d.trainingAllowance} />
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+                <i className="bi bi-tools text-emerald-500"></i> 稼働・貸与品
+              </h2>
+              <InfoRow label="移動方法" value={d.transportationMethod} />
+              <InfoRow label="チラシ受取" value={d.flyerDeliveryMethod} />
+              <InfoRow label="バッテリー" value={d.equipmentBattery} />
+              <InfoRow label="カバン" value={d.equipmentBag} />
+              <InfoRow label="携帯" value={d.equipmentMobile} />
+            </div>
+          </div>
+
+          {d.note && (
+            <div className="md:col-span-2 bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-xs font-bold text-amber-700 mb-1 flex items-center gap-1">
+                <i className="bi bi-sticky-fill"></i> 備考
+              </p>
+              <p className="text-sm text-amber-900 whitespace-pre-wrap">{d.note}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── 評価タブ ─── */}
+      {activeTab === 'evaluation' && (
+        <div className="space-y-5">
+          {evalLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : !evalData ? (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+              <i className="bi bi-award text-4xl text-slate-200 block mb-2"></i>
+              <p className="text-sm text-slate-400">評価データがありません</p>
+            </div>
+          ) : (
+            <>
+              {/* Score Summary */}
+              {evalData.evaluations?.length > 0 && (() => {
+                const latest = evalData.evaluations[0];
+                const prev = evalData.evaluations[1];
+                const change = prev ? latest.totalScore - prev.totalScore : 0;
+                return (
+                  <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                    <EvalRankBadge rank={latest.determinedRank} size="lg" />
+                    <div>
+                      <p className="text-2xl font-black text-slate-800">{latest.totalScore} <span className="text-sm text-slate-400">点</span></p>
+                      {change !== 0 && (
+                        <p className={`text-xs font-bold ${change > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {change > 0 ? '+' : ''}{change} (先週比)
+                        </p>
+                      )}
+                    </div>
+                    <div className="ml-auto text-right">
+                      <p className="text-xs text-slate-400">パフォーマンス</p>
+                      <p className="text-sm font-bold text-emerald-600">{latest.performanceScore}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-slate-400">品質</p>
+                      <p className="text-sm font-bold text-rose-600">{latest.qualityScore}</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Chart */}
+              {evalData.evaluations?.length > 1 && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                  <p className="text-xs font-bold text-slate-500 mb-3">スコア推移</p>
+                  <ResponsiveContainer width="100%" height={220}>
+                    <LineChart data={[...evalData.evaluations].reverse().map((e: any) => ({
+                      week: `${new Date(e.periodStart).getMonth() + 1}/${new Date(e.periodStart).getDate()}`,
+                      totalScore: e.totalScore,
+                      performanceScore: e.performanceScore,
+                      qualityScore: e.qualityScore,
+                    }))}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                      <XAxis dataKey="week" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 10 }} />
+                      <Tooltip contentStyle={{ fontSize: 11 }} />
+                      <Line type="monotone" dataKey="totalScore" stroke="#3b82f6" name="総合" strokeWidth={2} dot={{ r: 2 }} />
+                      <Line type="monotone" dataKey="performanceScore" stroke="#22c55e" name="パフォーマンス" strokeWidth={1.5} dot={false} />
+                      <Line type="monotone" dataKey="qualityScore" stroke="#ef4444" name="品質" strokeWidth={1.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {/* Complaints in eval */}
+              {evalData.complaints?.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                  <p className="text-xs font-bold text-slate-500 mb-3">クレーム履歴</p>
+                  <div className="border border-slate-200 rounded-xl overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-slate-500">日付</th>
+                          <th className="px-3 py-2 text-left text-slate-500">種別</th>
+                          <th className="px-3 py-2 text-left text-slate-500">内容</th>
+                          <th className="px-3 py-2 text-right text-slate-500">減点</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {evalData.complaints.map((c: any) => (
+                          <tr key={c.id} className="hover:bg-slate-50">
+                            <td className="px-3 py-2 text-slate-600">{new Date(c.occurredAt).toLocaleDateString('ja-JP')}</td>
+                            <td className="px-3 py-2 text-slate-700 font-bold">{c.complaintType?.name || '-'}</td>
+                            <td className="px-3 py-2 text-slate-600 truncate max-w-[160px]">{c.title}</td>
+                            <td className="px-3 py-2 text-right text-rose-600 font-bold">-{c.penaltyScore ?? c.complaintType?.penaltyScore ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Rank Adjustment */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
+                <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
+                  <i className="bi bi-pencil-square"></i> ランク手動調整
+                </p>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-slate-600 mb-1">ランク</label>
+                    <select
+                      value={evalRankForm.determinedRank}
+                      onChange={e => setEvalRankForm(p => ({ ...p, determinedRank: e.target.value }))}
+                      className={selectCls}
+                    >
+                      <option value="">-- 選択 --</option>
+                      <option value="S">S</option>
+                      <option value="A">A</option>
+                      <option value="B">B</option>
+                      <option value="C">C</option>
+                      <option value="D">D</option>
+                    </select>
+                  </div>
+                  <div className="flex-[2]">
+                    <label className="block text-xs font-bold text-slate-600 mb-1">コメント</label>
+                    <input
+                      value={evalRankForm.note}
+                      onChange={e => setEvalRankForm(p => ({ ...p, note: e.target.value }))}
+                      className={inputCls}
+                      placeholder="調整理由を入力..."
+                    />
+                  </div>
+                  <button
+                    onClick={saveEvalRank}
+                    disabled={evalSaving || !evalRankForm.determinedRank}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
+                  >
+                    {evalSaving ? '保存中...' : <><i className="bi bi-check2"></i> 更新</>}
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ─── 配布履歴タブ ─── */}
+      {activeTab === 'schedules' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          {schedulesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : schedules.length === 0 ? (
+            <div className="p-8 text-center">
+              <i className="bi bi-calendar-x text-4xl text-slate-200 block mb-2"></i>
+              <p className="text-sm text-slate-400">配布履歴がありません</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">日付</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">エリア</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">チラシ</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">予定枚数</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">実績枚数</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {schedules.map((s: any) => (
+                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3 text-slate-700 font-medium">{s.date ? new Date(s.date).toLocaleDateString('ja-JP') : '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{s.area?.name || s.city?.name || '—'}</td>
+                      <td className="px-4 py-3"><ScheduleStatusBadge status={s.status} /></td>
+                      <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">
+                        {s.items?.map((it: any) => it.flyerName).filter(Boolean).join(', ') || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right text-slate-600">
+                        {s.items?.reduce((sum: number, it: any) => sum + (it.plannedCount || 0), 0).toLocaleString() || '—'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-slate-800">
+                        {s.items?.some((it: any) => it.actualCount != null)
+                          ? s.items.reduce((sum: number, it: any) => sum + (it.actualCount || 0), 0).toLocaleString()
+                          : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── タスクタブ ─── */}
+      {activeTab === 'tasks' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          {tasksLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : tasks.length === 0 ? (
+            <div className="p-8 text-center">
+              <i className="bi bi-list-task text-4xl text-slate-200 block mb-2"></i>
+              <p className="text-sm text-slate-400">タスクがありません</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">カテゴリ</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">期日</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">担当者</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {tasks.map((t: any) => (
+                    <tr key={t.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3"><TaskStatusBadge status={t.status} /></td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">{t.title}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {t.taskCategory ? (
+                          <span className="inline-flex items-center gap-1 text-xs">
+                            {t.taskCategory.icon && <i className={`bi ${t.taskCategory.icon}`}></i>}
+                            {t.taskCategory.name}
+                          </span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString('ja-JP') : '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">
+                        {t.assignee ? `${t.assignee.lastNameJa}${t.assignee.firstNameJa}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── クレームタブ ─── */}
+      {activeTab === 'complaints' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          {complaintsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-3 border-rose-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : complaints.length === 0 ? (
+            <div className="p-8 text-center">
+              <i className="bi bi-exclamation-triangle text-4xl text-slate-200 block mb-2"></i>
+              <p className="text-sm text-slate-400">クレームがありません</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">日付</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">種別</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">タイトル</th>
+                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">住所</th>
+                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">減点</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {complaints.map((c: any) => (
+                    <tr key={c.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-4 py-3"><ComplaintStatusBadge status={c.status} /></td>
+                      <td className="px-4 py-3 text-slate-600">{c.occurredAt ? new Date(c.occurredAt).toLocaleDateString('ja-JP') : '—'}</td>
+                      <td className="px-4 py-3 text-slate-700 font-medium">{c.complaintType?.name || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">{c.title}</td>
+                      <td className="px-4 py-3 text-slate-600 truncate max-w-[180px]">{c.address || '—'}</td>
+                      <td className="px-4 py-3 text-right text-rose-600 font-bold">
+                        -{c.penaltyScore ?? c.complaintType?.penaltyScore ?? 0}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ====== 編集モーダル（4タブ: 基本情報 / 在留・契約 / 口座情報 / レート・評価） ====== */}
       {isEditOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
@@ -598,8 +1130,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                     <div>
                       <Label>ポータル言語</Label>
                       <select name="language" value={formData.language} onChange={handleInputChange} className={selectCls}>
-                        <option value="ja">🇯🇵 日本語</option>
-                        <option value="en">🇬🇧 English</option>
+                        <option value="ja">日本語</option>
+                        <option value="en">English</option>
                       </select>
                       <p className="text-[11px] text-slate-400 mt-1 ml-1">ログイン後に誘導されるポータルの言語</p>
                     </div>
@@ -766,21 +1298,60 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 {formTab === 'rate' && (
                   <>
                     <div className="grid grid-cols-3 gap-4">
-                      <div><Label>ランク</Label><input name="rank" value={formData.rank} onChange={handleInputChange} className={inputCls} placeholder="例: A, B, C" /></div>
+                      <div>
+                        <Label>ランク</Label>
+                        <select value={formData.rank} onChange={e => handleRankChange(e.target.value)} className={selectCls}>
+                          <option value="">— 未選択 —</option>
+                          <option value="S">S</option>
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                          <option value="D">D</option>
+                        </select>
+                      </div>
                       <div><Label>レートプラン</Label><input name="ratePlan" value={formData.ratePlan} onChange={handleInputChange} className={inputCls} placeholder="例: Basic" /></div>
                       <div><Label>出勤回数</Label><input type="number" name="attendanceCount" value={formData.attendanceCount} onChange={handleInputChange} className={inputCls} min={0} /></div>
                     </div>
+
+                    {/* 配布単価セクション */}
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-                      <p className="text-xs font-bold text-slate-500">単価レート（円/枚）</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold text-slate-500">配布単価（円/枚）</p>
+                        <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
+                          <button type="button"
+                            onClick={() => handleRateModeChange('auto')}
+                            className={`px-3 py-1 text-xs font-bold transition-colors ${formData.rateMode === 'auto' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                          >
+                            <i className="bi bi-lightning-fill mr-1"></i>自動
+                          </button>
+                          <button type="button"
+                            onClick={() => handleRateModeChange('manual')}
+                            className={`px-3 py-1 text-xs font-bold transition-colors ${formData.rateMode === 'manual' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
+                          >
+                            <i className="bi bi-pencil-fill mr-1"></i>手動
+                          </button>
+                        </div>
+                      </div>
+                      {formData.rateMode === 'auto' && (
+                        <p className="text-[10px] text-indigo-600 flex items-center gap-1">
+                          <i className="bi bi-info-circle-fill"></i>
+                          ランクを変更すると、システム設定のランク別単価が自動反映されます
+                        </p>
+                      )}
                       <div className="grid grid-cols-3 gap-3">
-                        {(['rate1Type', 'rate2Type', 'rate3Type'] as const).map((f, i) => (
+                        {(['rate1Type', 'rate2Type', 'rate3Type', 'rate4Type', 'rate5Type', 'rate6Type'] as const).map((f, i) => (
                           <div key={f}>
                             <Label>{i + 1} Type Rate</Label>
-                            <input type="number" step="0.01" name={f} value={(formData as any)[f]} onChange={handleInputChange} className={inputCls} placeholder="0.00" />
+                            <input type="number" step="0.01" name={f} value={(formData as any)[f]} onChange={handleInputChange}
+                              className={inputCls + (formData.rateMode === 'auto' ? ' bg-indigo-50 border-indigo-200' : '')}
+                              placeholder="0.00"
+                              readOnly={formData.rateMode === 'auto'}
+                            />
                           </div>
                         ))}
                       </div>
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                       <div><Label>交通費</Label><input name="transportationFee" value={formData.transportationFee} onChange={handleInputChange} className={inputCls} placeholder="例: FULL, 1000" /></div>
                       <div><Label>研修手当</Label><input name="trainingAllowance" value={formData.trainingAllowance} onChange={handleInputChange} className={inputCls} /></div>
@@ -912,7 +1483,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       {isAppDistOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50" onClick={() => setIsAppDistOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            {/* ヘッダー */}
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                 <i className="bi bi-phone-fill text-indigo-500"></i> 配布アプリ配信
@@ -923,7 +1493,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
             </div>
 
             <div className="px-6 py-5 overflow-y-auto flex-1 space-y-5">
-              {/* プラットフォーム選択 */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-2">プラットフォーム</label>
                 <div className="flex gap-2">
@@ -950,7 +1519,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 </div>
               </div>
 
-              {/* メールアドレス入力 */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">メールアドレス</label>
                 <input
@@ -967,7 +1535,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 </p>
               </div>
 
-              {/* 送信ボタン */}
               <button
                 onClick={sendAppDistribution}
                 disabled={appDistSending || !appDistEmail}
@@ -980,7 +1547,6 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 )}
               </button>
 
-              {/* 配信履歴 */}
               <div>
                 <h4 className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
                   <i className="bi bi-clock-history"></i> 配信履歴

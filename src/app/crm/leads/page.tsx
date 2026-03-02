@@ -223,15 +223,7 @@ export default function LeadsPage() {
 
   return (
     <div className="space-y-6">
-      {/* ヘッダー */}
-      <div className="flex justify-between items-center border-b border-slate-200 pb-5">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-funnel-fill text-sky-600"></i>
-            見込み客管理
-          </h1>
-          <p className="text-slate-500 text-sm mt-1">見込み客（リード）のステージと進捗を管理します。</p>
-        </div>
+      <div className="flex justify-end gap-2 mb-4">
         <button
           onClick={() => openFormModal()}
           className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md flex items-center gap-2"
