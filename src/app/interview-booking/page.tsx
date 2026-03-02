@@ -84,13 +84,13 @@ function formatDate(dateStr: string, lang: Lang) {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
-    weekday: 'long',
+    weekday: 'short',
   });
 }
 
 function formatTime(startStr: string, endStr: string) {
-  const start = new Date(startStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-  const end = new Date(endStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  const start = new Date(startStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const end = new Date(endStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
   return `${start} - ${end}`;
 }
 
@@ -101,11 +101,13 @@ function InterviewBookingContent() {
 
   const [lang, setLang] = useState<Lang>('ja');
   const t = translations[lang];
+  const isEn = lang === 'en';
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [bookingData, setBookingData] = useState<BookingData | null>(null);
   const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState<SuccessData | null>(null);
 
@@ -136,6 +138,27 @@ function InterviewBookingContent() {
     };
     fetchData();
   }, [token]);
+
+  // Group slots by date
+  const slotsByDate: Record<string, InterviewSlot[]> = {};
+  if (bookingData?.slots) {
+    bookingData.slots.forEach((slot) => {
+      const dateStr = new Date(slot.startTime).toLocaleDateString(
+        isEn ? 'en-US' : 'ja-JP',
+        { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }
+      );
+      if (!slotsByDate[dateStr]) slotsByDate[dateStr] = [];
+      slotsByDate[dateStr].push(slot);
+    });
+  }
+  const dateKeys = Object.keys(slotsByDate);
+
+  // Auto-select first date
+  useEffect(() => {
+    if (dateKeys.length > 0 && !selectedDate) {
+      setSelectedDate(dateKeys[0]);
+    }
+  }, [dateKeys, selectedDate]);
 
   const handleSubmit = async () => {
     if (!selectedSlotId) return;
@@ -201,7 +224,7 @@ function InterviewBookingContent() {
               <i className="bi bi-exclamation-triangle-fill text-rose-500 text-2xl"></i>
             </div>
             <h2 className="text-lg font-black text-slate-800 mb-2">
-              {lang === 'ja' ? 'エラーが発生しました' : 'An Error Occurred'}
+              {isEn ? 'An Error Occurred' : 'エラーが発生しました'}
             </h2>
             <p className="text-sm text-slate-600">{error}</p>
           </div>
@@ -253,75 +276,81 @@ function InterviewBookingContent() {
               {bookingData.applicant && (
                 <p className="text-sm font-bold text-indigo-600 mt-1">
                   {bookingData.applicant.name}
-                  {lang === 'ja' ? ' 様' : ''}
+                  {!isEn ? ' 様' : ''}
                 </p>
               )}
             </div>
 
-            {/* スロット一覧 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100">
-                <h2 className="font-bold text-slate-700 flex items-center gap-2">
-                  <i className="bi bi-calendar3 text-indigo-500"></i>
-                  {t.selectSlot}
-                </h2>
+            {/* スロット選択 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <i className="bi bi-calendar-check text-indigo-500"></i>
+                <h2 className="font-bold text-slate-700">{t.selectSlot}</h2>
               </div>
+              <p className="text-xs text-slate-400 mb-4">{t.subtitle}</p>
 
-              {bookingData.slots.length === 0 ? (
-                <div className="px-6 py-10 text-center">
-                  <i className="bi bi-calendar-x text-3xl text-slate-300 block mb-3"></i>
+              {dateKeys.length === 0 ? (
+                <div className="py-10 text-center">
+                  <i className="bi bi-calendar-x text-3xl text-slate-300 mb-2 block"></i>
                   <p className="text-sm text-slate-400">{t.noSlotsAvailable}</p>
                 </div>
               ) : (
-                <div className="p-4 space-y-3">
-                  {bookingData.slots.map(slot => {
-                    const isSelected = selectedSlotId === slot.id;
-                    return (
+                <>
+                  {/* 日付タブ */}
+                  <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
+                    {dateKeys.map((dateStr) => (
                       <button
-                        key={slot.id}
+                        key={dateStr}
                         type="button"
-                        onClick={() => setSelectedSlotId(slot.id)}
-                        className={`w-full text-left rounded-xl border-2 px-4 py-4 transition-all cursor-pointer ${
-                          isSelected
-                            ? 'bg-indigo-50 border-indigo-400 shadow-sm'
-                            : 'bg-white border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40'
+                        onClick={() => { setSelectedDate(dateStr); setSelectedSlotId(null); }}
+                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+                          selectedDate === dateStr
+                            ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                         }`}
                       >
-                        <div className="flex items-center gap-3">
-                          {/* 選択インジケーター */}
-                          <div className={`w-4 h-4 rounded-full border-2 shrink-0 flex items-center justify-center transition-all ${
-                            isSelected ? 'border-indigo-500 bg-indigo-500' : 'border-slate-300'
-                          }`}>
-                            {isSelected && <div className="w-2 h-2 rounded-full bg-white"></div>}
-                          </div>
-                          <div className="flex-1">
-                            {/* 日付 */}
-                            <p className="text-sm font-black text-slate-800">
-                              {formatDate(slot.startTime, lang)}
-                            </p>
-                            {/* 時間 */}
-                            <p className="text-sm text-slate-600 mt-0.5">
-                              <i className="bi bi-clock mr-1.5 text-indigo-400"></i>
-                              {formatTime(slot.startTime, slot.endTime)}
-                            </p>
-                            {/* 面接担当 */}
-                            {slot.interviewer && (
-                              <p className="text-xs text-slate-500 mt-1">
-                                <i className="bi bi-person mr-1 text-slate-400"></i>
-                                {t.interviewer}: {slot.interviewer.lastNameJa} {slot.interviewer.firstNameJa}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                        {dateStr}
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
+                  </div>
+
+                  {/* 時間スロット */}
+                  {selectedDate && slotsByDate[selectedDate] && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {slotsByDate[selectedDate].map((slot) => {
+                        const start = new Date(slot.startTime).toLocaleTimeString(
+                          isEn ? 'en-US' : 'ja-JP',
+                          { hour: '2-digit', minute: '2-digit', hour12: false }
+                        );
+                        const end = new Date(slot.endTime).toLocaleTimeString(
+                          isEn ? 'en-US' : 'ja-JP',
+                          { hour: '2-digit', minute: '2-digit', hour12: false }
+                        );
+                        const isSelected = selectedSlotId === slot.id;
+                        return (
+                          <button
+                            key={slot.id}
+                            type="button"
+                            onClick={() => setSelectedSlotId(slot.id)}
+                            className={`p-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                              isSelected
+                                ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md shadow-indigo-100'
+                                : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
+                            }`}
+                          >
+                            <i className={`bi bi-clock mr-1.5 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} />
+                            {start} - {end}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
             {/* 送信ボタン */}
-            {bookingData.slots.length > 0 && (
+            {dateKeys.length > 0 && (
               <div className="space-y-3">
                 {!selectedSlotId && (
                   <p className="text-center text-sm text-slate-400">{t.selectPrompt}</p>
