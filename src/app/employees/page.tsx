@@ -24,6 +24,7 @@ type Employee = {
   firstNameEn: string | null;
   email: string;
   personalEmail: string | null;
+  workspaceNotifiedAt: string | null;
   phone: string | null;
   hireDate: string;
   birthday: string | null;
@@ -116,6 +117,7 @@ export default function EmployeePage() {
   const [welcomeToast, setWelcomeToast] = useState<{ id: number; name: string } | null>(null);
   const [isToastExiting, setIsToastExiting] = useState(false);
   const [pendingWelcomeEmp, setPendingWelcomeEmp] = useState<Employee | null>(null);
+  const [sendingWorkspaceNotify, setSendingWorkspaceNotify] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     date: new Date().toISOString().split('T')[0], type: 'GRANTED', days: '', validUntil: '', note: ''
   });
@@ -438,6 +440,30 @@ export default function EmployeePage() {
     }
     setSendingWelcomeId(null);
   };
+
+  const handleWorkspaceNotify = async () => {
+    if (!selectedEmployee) return;
+    const isAlreadyNotified = !!selectedEmployee.workspaceNotifiedAt;
+    if (isAlreadyNotified) {
+      const confirmed = await showConfirm('既に通知済みですが、再度通知しますか？', { variant: 'warning', confirmLabel: '再送信する' });
+      if (!confirmed) return;
+    }
+    setSendingWorkspaceNotify(true);
+    try {
+      const res = await fetch(`/api/employees/${selectedEmployee.id}/notify-workspace`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('Workspace通知メールを送信しました', 'success');
+        setSelectedEmployee(prev => prev ? { ...prev, workspaceNotifiedAt: data.notifiedAt } : prev);
+      } else {
+        showToast(data.error || '通知に失敗しました', 'error');
+      }
+    } catch {
+      showToast('通信エラーが発生しました', 'error');
+    }
+    setSendingWorkspaceNotify(false);
+  };
+
   const executeDelete = async () => {
     if (!currentId) return;
     try {
@@ -675,6 +701,28 @@ export default function EmployeePage() {
                   <i className="bi bi-envelope text-blue-200"></i>
                   <span className="font-semibold truncate">{selectedEmployee.email}</span>
                 </div>
+                {selectedEmployee.personalEmail && (
+                  <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
+                    <i className="bi bi-envelope-heart text-blue-200"></i>
+                    <span className="font-semibold truncate">{selectedEmployee.personalEmail}</span>
+                  </div>
+                )}
+
+                {canEdit && selectedEmployee.email.endsWith('@tiramis.co.jp') && (
+                  <button
+                    onClick={handleWorkspaceNotify}
+                    disabled={sendingWorkspaceNotify}
+                    className="w-full mt-2 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                  >
+                    {sendingWorkspaceNotify ? (
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 送信中...</>
+                    ) : selectedEmployee.workspaceNotifiedAt ? (
+                      <><i className="bi bi-check-circle-fill text-emerald-300"></i> Workspace 通知済み<span className="text-[10px] opacity-70 ml-1">（再送信可）</span></>
+                    ) : (
+                      <><i className="bi bi-google"></i> Workspace ログイン情報を通知</>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
 
