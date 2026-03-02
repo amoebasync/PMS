@@ -5,8 +5,20 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   const cookieStore = await cookies();
-  if (!cookieStore.get('pms_session')?.value) {
+  const sessionId = cookieStore.get('pms_session')?.value;
+  if (!sessionId) {
     return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  // SUPER_ADMIN のみアクセス可
+  const empId = parseInt(sessionId);
+  const employee = await prisma.employee.findUnique({
+    where: { id: empId },
+    include: { roles: { include: { role: true } } },
+  });
+  const isSuperAdmin = employee?.roles?.some(r => r.role.code === 'SUPER_ADMIN');
+  if (!isSuperAdmin) {
+    return NextResponse.json({ error: 'アクセス権限がありません。スーパー管理者のみ閲覧できます' }, { status: 403 });
   }
 
   try {

@@ -14,6 +14,7 @@ interface MenuItem {
   href: string;
   icon: string;
   badge?: 'orders' | 'approvals';
+  superAdminOnly?: boolean;
 }
 
 interface MenuGroup {
@@ -88,7 +89,7 @@ const MENU_GROUPS: MenuGroup[] = [
     title: 'SYSTEM',
     items: [
       { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
-      { name: '監査ログ', href: '/audit-logs', icon: 'bi-shield-check' },
+      { name: '監査ログ', href: '/audit-logs', icon: 'bi-shield-check', superAdminOnly: true },
     ],
   },
 ];
@@ -115,6 +116,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   // Badge counts
   const [orderPendingCount, setOrderPendingCount] = useState(0);
   const [approvalPendingCount, setApprovalPendingCount] = useState(0);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Flyout (collapsed mode)
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
@@ -124,10 +126,16 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   const scrollRef = useRef<HTMLDivElement>(null);
   const scrollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  /* ---- Badge fetch ---- */
+  /* ---- Badge fetch + role check ---- */
   useEffect(() => {
     fetch('/api/orders/pending-count').then(r => r.json()).then(d => setOrderPendingCount(d.count || 0)).catch(() => {});
     fetch('/api/approvals/pending-count').then(r => r.json()).then(d => setApprovalPendingCount(d.total || 0)).catch(() => {});
+    fetch('/api/profile').then(r => r.ok ? r.json() : null).then(data => {
+      if (data) {
+        const roles = data.roles?.map((r: any) => r.role?.code) || [];
+        setIsSuperAdmin(roles.includes('SUPER_ADMIN'));
+      }
+    }).catch(() => {});
   }, [pathname]);
 
   /* ---- Scroll-only scrollbar visibility ---- */
@@ -272,7 +280,10 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
 
           {/* ── Menu groups ── */}
           {MENU_GROUPS.map((group) => {
-            const groupHasBadge = group.items.some(item => item.badge && getBadge(item.badge) > 0);
+            const visibleItems = group.items.filter(item => !item.superAdminOnly || isSuperAdmin);
+            if (visibleItems.length === 0) return null;
+            const filteredGroup = { ...group, items: visibleItems };
+            const groupHasBadge = filteredGroup.items.some(item => item.badge && getBadge(item.badge) > 0);
 
             return (
               <div key={group.title} className={isCollapsed ? 'px-2 mb-1' : 'px-3 mb-1'}>
@@ -286,10 +297,10 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                       title={group.title}
                       className={`
                         w-full flex items-center justify-center py-2.5 rounded-xl transition-all duration-150 group relative
-                        ${group.items.some(item => isHrefActive(item.href, pathname)) ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'}
+                        ${filteredGroup.items.some(item => isHrefActive(item.href, pathname)) ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'}
                       `}
                     >
-                      <i className={`${group.items[0].icon} text-[17px]`} />
+                      <i className={`${filteredGroup.items[0].icon} text-[17px]`} />
                       {groupHasBadge && (
                         <div className="absolute top-1 right-1.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" />
                       )}
@@ -305,7 +316,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                       {group.title}
                     </div>
                     <div className="space-y-0.5">
-                      {group.items.map(item => {
+                      {filteredGroup.items.map(item => {
                         const active = isHrefActive(item.href, pathname);
                         const badgeCount = getBadge(item.badge);
                         return (
@@ -342,6 +353,8 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
       {isCollapsed && flyoutGroup && (() => {
         const group = MENU_GROUPS.find(g => g.title === flyoutGroup);
         if (!group) return null;
+        const flyoutItems = group.items.filter(item => !item.superAdminOnly || isSuperAdmin);
+        if (flyoutItems.length === 0) return null;
         return (
           <div
             ref={flyoutRef}
@@ -351,7 +364,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
             <div className="px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 select-none">
               {group.title}
             </div>
-            {group.items.map(item => {
+            {flyoutItems.map(item => {
               const active = isHrefActive(item.href, pathname);
               const badgeCount = getBadge(item.badge);
               return (
