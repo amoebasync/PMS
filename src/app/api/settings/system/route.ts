@@ -16,6 +16,7 @@ const DEFAULTS: Record<string, string> = {
   evalRankC: '60',            // Cランク閾値（以上）、これ未満はDランク
   evalCycleDay: '0',          // 評価サイクル開始曜日（0=日,1=月...）
   rankRates: JSON.stringify({ S: [0,0,0,0,0,0], A: [0,0,0,0,0,0], B: [0,0,0,0,0,0], C: [0,0,0,0,0,0], D: [0,0,0,0,0,0] }),
+  headerLinks: JSON.stringify([]),  // ヘッダーリンク集
 };
 
 async function checkAdminAuth() {

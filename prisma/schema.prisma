@@ -353,7 +353,7 @@ model Department {
 // --- システム設定（キー・バリュー形式） ---
 model SystemSetting {
   key       String   @id @db.VarChar(50)
-  value     String   @db.VarChar(255)
+  value     String   @db.Text
   updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("system_settings")
