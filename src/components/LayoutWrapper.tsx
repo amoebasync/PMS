@@ -114,6 +114,11 @@ function TopHeader({
     }
   };
 
+  // tiramis.co.jp ドメインの場合のみ authuser パラメータを付与
+  const authParam = userProfile?.email?.endsWith('@tiramis.co.jp')
+    ? `?authuser=${encodeURIComponent(userProfile.email)}`
+    : '';
+
   return (
     <header
       className={`
@@ -147,7 +152,7 @@ function TopHeader({
 
         {/* Gmail */}
         <a
-          href="https://mail.google.com"
+          href={`https://mail.google.com/mail/u/${authParam}`}
           target="_blank"
           rel="noopener noreferrer"
           title="Gmail"
@@ -160,7 +165,7 @@ function TopHeader({
 
         {/* Google Calendar */}
         <a
-          href="https://calendar.google.com"
+          href={`https://calendar.google.com/calendar/u/${authParam}`}
           target="_blank"
           rel="noopener noreferrer"
           title="Google Calendar"
