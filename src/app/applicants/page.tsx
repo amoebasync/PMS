@@ -277,6 +277,12 @@ export default function ApplicantsPage() {
   const [registering, setRegistering] = useState(false);
   const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
 
+  // ── 手動登録 ──
+  const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja' });
+  const [manualRegSaving, setManualRegSaving] = useState(false);
+  const [sendingInvitation, setSendingInvitation] = useState(false);
+
   // ── スロット作成フォーム ──
   const [slotForm, setSlotForm] = useState({
     date: '',
@@ -472,6 +478,57 @@ export default function ApplicantsPage() {
       showToast('登録に失敗しました', 'error');
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // 手動登録
+  const handleManualRegister = async () => {
+    if (!manualRegForm.name.trim() || !manualRegForm.email.trim() || !manualRegForm.jobCategoryId) {
+      showToast('氏名・メール・職種は必須です', 'warning');
+      return;
+    }
+    setManualRegSaving(true);
+    try {
+      const res = await fetch('/api/applicants', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: manualRegForm.name.trim(),
+          email: manualRegForm.email.trim(),
+          phone: manualRegForm.phone.trim() || undefined,
+          jobCategoryId: Number(manualRegForm.jobCategoryId),
+          language: manualRegForm.language,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '登録に失敗しました');
+      showToast('応募者を登録しました', 'success');
+      setShowManualRegisterModal(false);
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja' });
+      fetchApplicants(1);
+      fetchSlots();
+    } catch (e: any) {
+      showToast(e.message || '登録に失敗しました', 'error');
+    } finally {
+      setManualRegSaving(false);
+    }
+  };
+
+  // 面接案内メール送信
+  const handleSendInterviewInvitation = async () => {
+    if (!selectedApplicant) return;
+    setSendingInvitation(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/send-interview-invitation`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || '送信に失敗しました');
+      showToast('面接案内メールを送信しました', 'success');
+    } catch (e: any) {
+      showToast(e.message || '面接案内メールの送信に失敗しました', 'error');
+    } finally {
+      setSendingInvitation(false);
     }
   };
 
@@ -1140,6 +1197,16 @@ export default function ApplicantsPage() {
               <i className="bi bi-box-arrow-up-right"></i>
               応募ページ
             </a>
+            <button
+              onClick={() => {
+                fetchJobCategories();
+                setShowManualRegisterModal(true);
+              }}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+            >
+              <i className="bi bi-person-plus-fill"></i>
+              手動登録
+            </button>
             <button
               onClick={() => {
                 fetchJobCategories();
@@ -2038,6 +2105,25 @@ export default function ApplicantsPage() {
                         </div>
                       )}
 
+                      {/* 面接案内メール送信（未予約時） */}
+                      {!selectedApplicant.interviewSlot && (
+                        <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={handleSendInterviewInvitation}
+                            disabled={sendingInvitation}
+                            className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {sendingInvitation ? (
+                              <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin inline-block"></span>
+                            ) : (
+                              <i className="bi bi-envelope-fill"></i>
+                            )}
+                            面接案内メールを送信
+                          </button>
+                        </div>
+                      )}
+
                       {/* 日程変更パネル */}
                       {showReschedulePanel && (
                         <div className="mt-3 pt-3 border-t border-slate-200">
@@ -2712,6 +2798,136 @@ export default function ApplicantsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          モーダル: 応募者手動登録
+         ════════════════════════════════════════════ */}
+      {showManualRegisterModal && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <i className="bi bi-person-plus-fill text-emerald-600"></i>
+                </div>
+                <h2 className="text-lg font-black text-slate-800">応募者を手動登録</h2>
+              </div>
+              <button
+                onClick={() => setShowManualRegisterModal(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <i className="bi bi-x-lg text-lg"></i>
+              </button>
+            </div>
+
+            {/* ボディ */}
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  氏名 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={manualRegForm.name}
+                  onChange={e => setManualRegForm(f => ({ ...f, name: e.target.value }))}
+                  placeholder="山田 太郎"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  メールアドレス <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={manualRegForm.email}
+                  onChange={e => setManualRegForm(f => ({ ...f, email: e.target.value }))}
+                  placeholder="example@email.com"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  電話番号 <span className="text-slate-400 font-normal">（任意）</span>
+                </label>
+                <input
+                  type="tel"
+                  value={manualRegForm.phone}
+                  onChange={e => setManualRegForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="090-1234-5678"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  職種 <span className="text-rose-500">*</span>
+                </label>
+                <select
+                  value={manualRegForm.jobCategoryId}
+                  onChange={e => setManualRegForm(f => ({ ...f, jobCategoryId: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                >
+                  <option value="">選択してください</option>
+                  {jobCategories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.nameJa}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">メール言語</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualRegLang"
+                      value="ja"
+                      checked={manualRegForm.language === 'ja'}
+                      onChange={() => setManualRegForm(f => ({ ...f, language: 'ja' }))}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-medium text-slate-700">日本語</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="manualRegLang"
+                      value="en"
+                      checked={manualRegForm.language === 'en'}
+                      onChange={() => setManualRegForm(f => ({ ...f, language: 'en' }))}
+                      className="text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="text-sm font-medium text-slate-700">English</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* フッター */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button
+                onClick={() => setShowManualRegisterModal(false)}
+                className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleManualRegister}
+                disabled={manualRegSaving || !manualRegForm.name.trim() || !manualRegForm.email.trim() || !manualRegForm.jobCategoryId}
+                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {manualRegSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                <i className="bi bi-person-plus-fill"></i>
+                登録する
+              </button>
+            </div>
           </div>
         </div>
       )}

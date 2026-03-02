@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
+import crypto from 'crypto';
 
 // GET /api/applicants
 // 管理者: 応募者一覧（ページング+フィルタ）
@@ -82,5 +83,52 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Applicants Fetch Error:', error);
     return NextResponse.json({ error: '応募者の取得に失敗しました' }, { status: 500 });
+  }
+}
+
+// POST /api/applicants
+// 管理者: 応募者の手動登録（他サイト経由の応募者を手入力で登録）
+export async function POST(request: Request) {
+  const cookieStore = await cookies();
+  if (!cookieStore.get('pms_session')?.value) {
+    return NextResponse.json({ error: '認証エラー: ログインが必要です' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { name, email, phone, language, jobCategoryId } = body;
+
+    if (!name || !email || !language || !jobCategoryId) {
+      return NextResponse.json({ error: '氏名・メールアドレス・言語・職種は必須です' }, { status: 400 });
+    }
+
+    // メール重複チェック
+    const existing = await prisma.applicant.findUnique({ where: { email } });
+    if (existing) {
+      return NextResponse.json({ error: 'このメールアドレスはすでに登録されています' }, { status: 409 });
+    }
+
+    const managementToken = crypto.randomBytes(32).toString('hex');
+
+    const applicant = await prisma.applicant.create({
+      data: {
+        name,
+        email,
+        phone: phone || null,
+        language: language || 'ja',
+        jobCategoryId: Number(jobCategoryId),
+        managementToken,
+        flowStatus: 'INTERVIEW_WAITING',
+        hiringStatus: 'IN_PROGRESS',
+      },
+      include: {
+        jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
+      },
+    });
+
+    return NextResponse.json(applicant, { status: 201 });
+  } catch (error) {
+    console.error('Applicant Create Error:', error);
+    return NextResponse.json({ error: '応募者の登録に失敗しました' }, { status: 500 });
   }
 }

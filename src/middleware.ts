@@ -41,7 +41,9 @@ export function middleware(request: NextRequest) {
     path === '/api/cron/housekeep' ||
     path === '/api/training-slots/available' ||
     path === '/api/training-booking' ||
-    path === '/training-booking';
+    path === '/training-booking' ||
+    path === '/api/interview-booking' ||
+    path === '/interview-booking';
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;
