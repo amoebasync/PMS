@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
-import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
+import { createGoogleMeetEvent, isGoogleMeetConfigured, deleteGoogleCalendarEvent } from '@/lib/google-meet';
 
 // POST /api/applicants/[id]/reschedule
 // 管理者: 面接日程を変更（旧スロット解放 → 新スロット予約）
@@ -39,6 +39,7 @@ export async function POST(
     }
 
     const oldSlotId = applicant.interviewSlot?.id;
+    const oldCalendarEventId = applicant.interviewSlot?.calendarEventId;
 
     // 新スロットの確認
     const newSlot = await prisma.interviewSlot.findUnique({
@@ -126,6 +127,11 @@ export async function POST(
         },
       });
     });
+
+    // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行）
+    if (oldCalendarEventId) {
+      deleteGoogleCalendarEvent(oldCalendarEventId).catch(() => {});
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

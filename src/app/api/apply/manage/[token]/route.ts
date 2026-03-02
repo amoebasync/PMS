@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 import { sendInterviewChangeEmail, sendInterviewCancelEmail } from '@/lib/mailer';
-import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
+import { createGoogleMeetEvent, isGoogleMeetConfigured, deleteGoogleCalendarEvent } from '@/lib/google-meet';
 
 // 応募者をトークンで検索し、面接スロットと職種情報を含めて返す
 async function findApplicantByToken(token: string) {
@@ -227,6 +227,11 @@ export async function PUT(
       return updatedSlot;
     });
 
+    // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行）
+    if (currentSlot.calendarEventId) {
+      deleteGoogleCalendarEvent(currentSlot.calendarEventId).catch(() => {});
+    }
+
     // 変更後の面接日時フォーマット
     const isEn = applicant.language === 'en';
     const newDate = new Date(result.startTime).toLocaleDateString(
@@ -358,6 +363,11 @@ export async function DELETE(
         tx,
       });
     });
+
+    // Google Calendar イベントを削除（トランザクション外で非同期実行）
+    if (currentSlot.calendarEventId) {
+      deleteGoogleCalendarEvent(currentSlot.calendarEventId).catch(() => {});
+    }
 
     const isEn = applicant.language === 'en';
     const jobCategoryName = isEn

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { deleteGoogleCalendarEvent } from '@/lib/google-meet';
 
 // POST /api/applicants/[id]/cancel-interview
 // 管理者: 面接をキャンセル（スロット解放）
@@ -35,6 +36,7 @@ export async function POST(
     }
 
     const slotId = applicant.interviewSlot.id;
+    const oldCalendarEventId = applicant.interviewSlot.calendarEventId;
 
     const updated = await prisma.$transaction(async (tx) => {
       // スロット解放
@@ -71,6 +73,11 @@ export async function POST(
         },
       });
     });
+
+    // Google Calendar イベントを削除（トランザクション外で非同期実行）
+    if (oldCalendarEventId) {
+      deleteGoogleCalendarEvent(oldCalendarEventId).catch(() => {});
+    }
 
     return NextResponse.json(updated);
   } catch (error) {
