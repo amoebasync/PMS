@@ -24,17 +24,20 @@ body {
   border-radius: 10px;
 }
 
-/* ★ 追加: サイドバー専用のダークテーマスクロールバー */
+/* サイドバー専用スクロールバー（ライトテーマ） */
 .sidebar-scrollbar::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 .sidebar-scrollbar::-webkit-scrollbar-track {
-  background: #0f172a; /* サイドバーの背景色と完全に同化させる */
+  background: transparent;
 }
 .sidebar-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #334155; 
+  background-color: transparent;
   border-radius: 10px;
 }
+.sidebar-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: #e2e8f0;
+}
 .sidebar-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: #475569; 
+  background-color: #cbd5e1;
 }
