@@ -51,12 +51,14 @@ export async function GET(request: Request) {
     }
 
     const now = new Date();
+    // 4時間後以降のスロットのみ表示
+    const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
     // 空きスロット取得（職種フィルタ or 全職種対応）
     const slots = await prisma.interviewSlot.findMany({
       where: {
         isBooked: false,
-        startTime: { gt: now },
+        startTime: { gt: fourHoursLater },
         OR: [
           { jobCategoryId: applicant.jobCategoryId },
           { jobCategoryId: null },
@@ -131,8 +133,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'このスロットはすでに予約されています' }, { status: 409 });
     }
 
-    if (new Date(slot.startTime) <= new Date()) {
-      return NextResponse.json({ error: 'このスロットはすでに過去の日程です' }, { status: 400 });
+    const minStartTime = new Date(Date.now() + 4 * 60 * 60 * 1000);
+    if (new Date(slot.startTime) <= minStartTime) {
+      return NextResponse.json({ error: '開始まで4時間を切っているスロットは予約できません' }, { status: 400 });
     }
 
     // Google Meet 作成

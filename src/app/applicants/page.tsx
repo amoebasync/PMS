@@ -40,7 +40,7 @@ type InterviewSlot = {
 
 type Country = { id: number; code: string; name: string; nameEn: string };
 type VisaType = { id: number; name: string };
-type RecruitingMedia = { id: number; nameJa: string; nameEn: string | null; code: string };
+type RecruitingMedia = { id: number; nameJa: string; nameEn: string | null; code: string; isActive: boolean; sortOrder: number };
 
 type TrainingSlotOption = {
   id: number;
@@ -240,6 +240,7 @@ export default function ApplicantsPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pageRef = useRef(1); // ポーリング用: 現在のページ番号を追跡
 
   // ── モーダル状態 ──
   const [showSlotModal, setShowSlotModal] = useState(false);
@@ -280,7 +281,7 @@ export default function ApplicantsPage() {
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
-  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja' });
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '' });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
@@ -504,13 +505,14 @@ export default function ApplicantsPage() {
           phone: manualRegForm.phone.trim() || undefined,
           jobCategoryId: Number(manualRegForm.jobCategoryId),
           language: manualRegForm.language,
+          recruitingMediaId: manualRegForm.recruitingMediaId ? Number(manualRegForm.recruitingMediaId) : undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
       showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
       setShowManualRegisterModal(false);
-      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja' });
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '' });
       fetchApplicants(1);
       fetchSlots();
       // 面接案内メール自動送信
@@ -551,6 +553,19 @@ export default function ApplicantsPage() {
     fetchApplicants(1);
     fetchMasterData();
   }, []);
+
+  // ── ページ番号をrefに同期（ポーリング用） ──
+  useEffect(() => { pageRef.current = page; }, [page]);
+
+  // ── 30秒ポーリング: 面接予約が入ったら自動更新 ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchApplicants(pageRef.current);
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchApplicants]);
 
   // ── 検索デバウンス ──
   useEffect(() => {
@@ -2933,6 +2948,22 @@ export default function ApplicantsPage() {
                   <option value="">選択してください</option>
                   {jobCategories.map(cat => (
                     <option key={cat.id} value={cat.id}>{cat.nameJa}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  求人媒体 <span className="text-slate-400 font-normal">（任意）</span>
+                </label>
+                <select
+                  value={manualRegForm.recruitingMediaId}
+                  onChange={e => setManualRegForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                >
+                  <option value="">選択なし</option>
+                  {recruitingMediaList.filter(m => m.isActive).map(m => (
+                    <option key={m.id} value={m.id}>{m.nameJa}</option>
                   ))}
                 </select>
               </div>
