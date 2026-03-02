@@ -336,8 +336,8 @@ export default function ApplicantsPage() {
   // ──────────────────────────────────────────
   // データ取得
   // ──────────────────────────────────────────
-  const fetchSlots = useCallback(async (month?: string) => {
-    setCalendarLoading(true);
+  const fetchSlots = useCallback(async (month?: string, silent = false) => {
+    if (!silent) setCalendarLoading(true);
     try {
       const m = month || currentMonth;
       const res = await fetch(`/api/interview-slots?month=${m}`);
@@ -345,15 +345,17 @@ export default function ApplicantsPage() {
       const data = await res.json();
       setSlots(data.data || []);
     } catch {
-      setSlots([]);
-      showToast('スロットの取得に失敗しました', 'error');
+      if (!silent) {
+        setSlots([]);
+        showToast('スロットの取得に失敗しました', 'error');
+      }
     } finally {
-      setCalendarLoading(false);
+      if (!silent) setCalendarLoading(false);
     }
   }, [currentMonth, showToast]);
 
-  const fetchApplicants = useCallback(async (p = 1) => {
-    setListLoading(true);
+  const fetchApplicants = useCallback(async (p = 1, silent = false) => {
+    if (!silent) setListLoading(true);
     try {
       const params = new URLSearchParams({
         page: p.toString(),
@@ -371,9 +373,9 @@ export default function ApplicantsPage() {
       setTotalPages(data.totalPages || 1);
       setPage(p);
     } catch {
-      setApplicants([]);
+      if (!silent) setApplicants([]);
     } finally {
-      setListLoading(false);
+      if (!silent) setListLoading(false);
     }
   }, [searchTerm, filterFlowStatus, filterHiringStatus]);
 
@@ -557,15 +559,16 @@ export default function ApplicantsPage() {
   // ── ページ番号をrefに同期（ポーリング用） ──
   useEffect(() => { pageRef.current = page; }, [page]);
 
-  // ── 30秒ポーリング: 面接予約が入ったら自動更新 ──
+  // ── 30秒ポーリング: 面接予約・変更・キャンセルを自動反映（ローディング表示なし）──
   useEffect(() => {
     const interval = setInterval(() => {
       if (!document.hidden) {
-        fetchApplicants(pageRef.current);
+        fetchApplicants(pageRef.current, true); // silent
+        fetchSlots(undefined, true);            // silent
       }
     }, 30_000);
     return () => clearInterval(interval);
-  }, [fetchApplicants]);
+  }, [fetchApplicants, fetchSlots]);
 
   // ── 検索デバウンス ──
   useEffect(() => {
