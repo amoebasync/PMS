@@ -140,6 +140,11 @@ export async function PUT(
     const updateData: any = {};
 
     // 基本情報の修正（面接時に修正可能）
+    if (body.name !== undefined) updateData.name = body.name;
+    if (body.email !== undefined) updateData.email = body.email;
+    if (body.phone !== undefined) updateData.phone = body.phone || null;
+    if (body.language !== undefined) updateData.language = body.language;
+    if (body.jobCategoryId !== undefined) updateData.jobCategoryId = body.jobCategoryId ? Number(body.jobCategoryId) : null;
     if (body.countryId !== undefined) updateData.countryId = body.countryId ? Number(body.countryId) : null;
     if (body.visaTypeId !== undefined) updateData.visaTypeId = body.visaTypeId ? Number(body.visaTypeId) : null;
     if (body.postalCode !== undefined) updateData.postalCode = body.postalCode || null;

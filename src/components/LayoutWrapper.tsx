@@ -19,6 +19,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isDistributorPage = pathname.startsWith('/staff');
   const isAppPrivacyPage = pathname.startsWith('/app-privacy');
   const isApplyPage = pathname === '/apply' || pathname.startsWith('/apply/manage');
+  const isPublicBookingPage = pathname === '/interview-booking' || pathname === '/training-booking';
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -43,7 +44,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     return () => window.removeEventListener('unhandledrejection', handleChunkError);
   }, []);
 
-  if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage || isApplyPage) {
+  if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage || isApplyPage || isPublicBookingPage) {
     return (
       <NotificationProvider>
         <main className={`w-full min-h-screen m-0 p-0 ${isAuthPage ? 'bg-[#0f172a]' : ''}`}>

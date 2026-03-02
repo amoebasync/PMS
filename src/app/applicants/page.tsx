@@ -297,6 +297,11 @@ export default function ApplicantsPage() {
   // ── 応募者評価フォーム ──
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [evalForm, setEvalForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    language: 'ja',
+    jobCategoryId: '' as string | number,
     countryId: '' as string | number,
     visaTypeId: '' as string | number,
     postalCode: '',
@@ -503,11 +508,18 @@ export default function ApplicantsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
-      showToast('応募者を登録しました', 'success');
+      showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
       setShowManualRegisterModal(false);
       setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja' });
       fetchApplicants(1);
       fetchSlots();
+      // 面接案内メール自動送信
+      try {
+        await fetch(`/api/applicants/${data.id}/send-interview-invitation`, { method: 'POST' });
+        showToast('面接案内メールを送信しました', 'success');
+      } catch {
+        showToast('面接案内メールの送信に失敗しました', 'error');
+      }
     } catch (e: any) {
       showToast(e.message || '登録に失敗しました', 'error');
     } finally {
@@ -755,6 +767,7 @@ export default function ApplicantsPage() {
   const openEvalModal = async (applicantId: number) => {
     setEvalLoading(true);
     setShowEvalModal(true);
+    if (jobCategories.length === 0) fetchJobCategories();
     setShowReschedulePanel(false);
     setShowTrainingReschedulePanel(false);
     setSelectedNewTrainingSlotId(null);
@@ -769,6 +782,11 @@ export default function ApplicantsPage() {
       const data: Applicant = await res.json();
       setSelectedApplicant(data);
       setEvalForm({
+        name: data.name || '',
+        email: data.email || '',
+        phone: data.phone || '',
+        language: data.language || 'ja',
+        jobCategoryId: data.jobCategoryId || '',
         countryId: data.countryId || '',
         visaTypeId: data.visaTypeId || '',
         postalCode: data.postalCode || '',
@@ -807,6 +825,11 @@ export default function ApplicantsPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          name: evalForm.name,
+          email: evalForm.email,
+          phone: evalForm.phone || null,
+          language: evalForm.language,
+          jobCategoryId: evalForm.jobCategoryId || null,
           countryId: evalForm.countryId || null,
           visaTypeId: evalForm.visaTypeId || null,
           postalCode: evalForm.postalCode || null,
@@ -1967,11 +1990,16 @@ export default function ApplicantsPage() {
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">氏名</p>
-                          <p className="text-sm font-bold text-slate-800">{selectedApplicant.name}</p>
+                          <input
+                            type="text"
+                            value={evalForm.name}
+                            onChange={e => setEvalForm(f => ({ ...f, name: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">生年月日</p>
-                          <p className="text-sm text-slate-700">
+                          <p className="text-sm text-slate-700 py-1.5">
                             {selectedApplicant.birthday
                               ? new Date(selectedApplicant.birthday).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
                               : '-'}
@@ -1979,7 +2007,7 @@ export default function ApplicantsPage() {
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">性別</p>
-                          <p className="text-sm text-slate-700">
+                          <p className="text-sm text-slate-700 py-1.5">
                             {selectedApplicant.gender === 'male' ? '男性'
                               : selectedApplicant.gender === 'female' ? '女性'
                               : selectedApplicant.gender === 'other' ? 'その他'
@@ -1994,15 +2022,33 @@ export default function ApplicantsPage() {
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div className="col-span-1">
                           <p className="text-xs font-bold text-slate-400 mb-0.5">メール</p>
-                          <p className="text-sm text-slate-700 break-all">{selectedApplicant.email}</p>
+                          <input
+                            type="email"
+                            value={evalForm.email}
+                            onChange={e => setEvalForm(f => ({ ...f, email: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">電話</p>
-                          <p className="text-sm text-slate-700">{selectedApplicant.phone || '-'}</p>
+                          <input
+                            type="tel"
+                            value={evalForm.phone}
+                            onChange={e => handlePhoneChange(e.target.value, v => setEvalForm(f => ({ ...f, phone: v })))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                            placeholder="090-0000-0000"
+                          />
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">言語</p>
-                          <p className="text-sm text-slate-700">{selectedApplicant.language === 'en' ? 'English' : '日本語'}</p>
+                          <select
+                            value={evalForm.language}
+                            onChange={e => setEvalForm(f => ({ ...f, language: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          >
+                            <option value="ja">日本語</option>
+                            <option value="en">English</option>
+                          </select>
                         </div>
                       </div>
 
@@ -2012,7 +2058,16 @@ export default function ApplicantsPage() {
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">職種</p>
-                          <p className="text-sm text-slate-700">{selectedApplicant.jobCategory?.nameJa || '-'}</p>
+                          <select
+                            value={evalForm.jobCategoryId}
+                            onChange={e => setEvalForm(f => ({ ...f, jobCategoryId: e.target.value }))}
+                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                          >
+                            <option value="">選択してください</option>
+                            {jobCategories.filter(jc => jc.isActive).map(jc => (
+                              <option key={jc.id} value={jc.id}>{jc.nameJa}</option>
+                            ))}
+                          </select>
                         </div>
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">応募経路</p>
