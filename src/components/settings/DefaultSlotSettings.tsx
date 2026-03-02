@@ -8,6 +8,13 @@ type JobCategory = {
   nameEn: string | null;
 };
 
+type EmployeeOption = {
+  id: number;
+  lastNameJa: string;
+  firstNameJa: string;
+  email: string;
+};
+
 type DefaultSlot = {
   id: number | null;
   dayOfWeek: number;
@@ -15,6 +22,7 @@ type DefaultSlot = {
   endTime: string;
   intervalMinutes: number;
   isEnabled: boolean;
+  interviewerId: number | null;
   jobCategoryIds: number[];
 };
 
@@ -37,6 +45,7 @@ function getTomorrowStr() {
 export default function DefaultSlotSettings() {
   const [slots, setSlots] = useState<DefaultSlot[]>([]);
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -72,9 +81,22 @@ export default function DefaultSlotSettings() {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch('/api/employees?simple=true');
+      if (res.ok) {
+        const data = await res.json();
+        setEmployees(data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchSlots();
     fetchJobCategories();
+    fetchEmployees();
   }, []);
 
   const handleSlotChange = (dayOfWeek: number, field: keyof DefaultSlot, value: string | boolean | number | number[]) => {
@@ -111,6 +133,7 @@ export default function DefaultSlotSettings() {
               endTime: source.endTime,
               intervalMinutes: source.intervalMinutes,
               isEnabled: source.isEnabled,
+              interviewerId: source.interviewerId,
               jobCategoryIds: [...source.jobCategoryIds],
             }
       )
@@ -403,6 +426,26 @@ export default function DefaultSlotSettings() {
                     {slotCount}枠/日
                   </span>
                 )}
+
+                {/* 面接担当者 */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-slate-500 whitespace-nowrap">担当者</label>
+                  <select
+                    value={slot.interviewerId || ''}
+                    onChange={(e) =>
+                      handleSlotChange(slot.dayOfWeek, 'interviewerId', e.target.value ? Number(e.target.value) : null)
+                    }
+                    disabled={!slot.isEnabled}
+                    className="border border-slate-300 rounded-lg px-2 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none disabled:bg-slate-100 disabled:text-slate-400 max-w-[160px]"
+                  >
+                    <option value="">未設定</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.lastNameJa} {emp.firstNameJa}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
                 {/* 展開/折りたたみ（職種選択） */}
                 <button

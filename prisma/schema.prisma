@@ -691,11 +691,16 @@ model DistributorExpense {
 
 // --- 在留資格マスタ ---
 model VisaType {
-  id        Int                @id @default(autoincrement())
-  name      String             @unique @db.VarChar(100)
-  sortOrder Int                @default(100) @map("sort_order")
-  createdAt DateTime           @default(now()) @map("created_at")
-  updatedAt DateTime           @updatedAt @map("updated_at")
+  id                  Int      @id @default(autoincrement())
+  name                String   @unique @db.VarChar(100)
+  nameEn              String   @default("") @map("name_en") @db.VarChar(100)
+  sortOrder           Int      @default(100) @map("sort_order")
+  canContract         Boolean  @default(false) @map("can_contract")         // 業務委託可否
+  canPartTime         Boolean  @default(false) @map("can_part_time")         // アルバイト・パート可否
+  workHourLimit       Int?     @map("work_hour_limit")                       // 就労制限時間(null=なし, 28=週28h)
+  requiresDesignation Boolean  @default(false) @map("requires_designation") // 指定書要確認
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
 
   distributors FlyerDistributor[]
   applicants   Applicant[]

@@ -43,6 +43,7 @@ export async function POST(
     // 新スロットの確認
     const newSlot = await prisma.interviewSlot.findUnique({
       where: { id: Number(newSlotId) },
+      include: { interviewer: { select: { email: true } } },
     });
 
     if (!newSlot) {
@@ -59,18 +60,22 @@ export async function POST(
 
     // Google Meet生成
     let meetUrl = newSlot.meetUrl;
+    let calendarEventId: string | null = null;
     if (!meetUrl && isGoogleMeetConfigured()) {
       const jobName = applicant.jobCategory?.nameJa || '面接';
       const meetTitle = `【ティラミス】${applicant.name}様 ${jobName} 面接`;
       const meetDescription = `応募者: ${applicant.name}\nメール: ${applicant.email}\n職種: ${jobName}`;
 
-      meetUrl = await createGoogleMeetEvent(
+      const meetResult = await createGoogleMeetEvent(
         meetTitle,
         meetDescription,
         newSlot.startTime,
         newSlot.endTime,
-        applicant.email
+        applicant.email,
+        newSlot.interviewer?.email || undefined
       );
+      meetUrl = meetResult.meetUrl;
+      calendarEventId = meetResult.eventId;
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -92,6 +97,7 @@ export async function POST(
           isBooked: true,
           applicantId: applicantId,
           meetUrl: meetUrl || newSlot.meetUrl,
+          calendarEventId: calendarEventId || undefined,
         },
       });
 

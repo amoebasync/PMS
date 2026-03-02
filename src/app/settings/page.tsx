@@ -9,7 +9,7 @@ import DefaultTrainingSlotSettings from '@/components/settings/DefaultTrainingSl
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
 type Industry = { id: number; name: string; _count: { flyers: number } };
 type Country = { id: number; code: string; name: string; nameEn: string | null; sortOrder: number; _count: { employees: number; distributors: number } };
-type VisaType = { id: number; name: string; sortOrder: number; _count: { distributors: number } };
+type VisaType = { id: number; name: string; nameEn: string; sortOrder: number; canContract: boolean; canPartTime: boolean; workHourLimit: number | null; requiresDesignation: boolean; _count: { distributors: number } };
 type Bank = { id: number; code: string; name: string; nameKana: string | null; sortOrder: number };
 type DistributionMethod = { id: number; name: string; capacityType: string; priceAddon: number; sortOrder: number; isActive: boolean };
 type TaskCategory = { id: number; name: string; code: string; icon: string | null; colorCls: string | null; sortOrder: number; isActive: boolean };
@@ -396,7 +396,7 @@ export default function SettingsPage() {
     if (tab === 'department') return { code: '', name: '' };
     if (tab === 'industry') return { name: '' };
     if (tab === 'country') return { code: '', name: '', nameEn: '', aliases: '', sortOrder: 100 };
-    if (tab === 'visaType') return { name: '', sortOrder: 100 };
+    if (tab === 'visaType') return { name: '', nameEn: '', sortOrder: 100, canContract: false, canPartTime: false, workHourLimit: '', requiresDesignation: false };
     if (tab === 'bank') return { code: '', name: '', nameKana: '', sortOrder: 100 };
     if (tab === 'distributionMethod') return { name: '', capacityType: 'all', priceAddon: 0, sortOrder: 100, isActive: true };
     return {};
@@ -413,7 +413,7 @@ export default function SettingsPage() {
     if (tab === 'department') setForm({ code: item.code || '', name: item.name });
     else if (tab === 'industry') setForm({ name: item.name });
     else if (tab === 'country') setForm({ code: item.code, name: item.name, nameEn: item.nameEn || '', aliases: item.aliases || '', sortOrder: item.sortOrder });
-    else if (tab === 'visaType') setForm({ name: item.name, sortOrder: item.sortOrder });
+    else if (tab === 'visaType') setForm({ name: item.name, nameEn: item.nameEn || '', sortOrder: item.sortOrder, canContract: item.canContract, canPartTime: item.canPartTime, workHourLimit: item.workHourLimit ?? '', requiresDesignation: item.requiresDesignation });
     else if (tab === 'bank') setForm({ code: item.code || '', name: item.name, nameKana: item.nameKana || '', sortOrder: item.sortOrder });
     else if (tab === 'distributionMethod') setForm({ name: item.name, capacityType: item.capacityType, priceAddon: item.priceAddon, sortOrder: item.sortOrder, isActive: item.isActive });
     setShowModal('edit');
@@ -859,7 +859,7 @@ export default function SettingsPage() {
                     {tab === 'department' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">コード</th><th className="px-5 py-3 text-left font-bold text-slate-600">部署名</th><th className="px-5 py-3 text-center font-bold text-slate-600">社員数</th><th className="px-5 py-3"></th></>)}
                     {tab === 'industry' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">業種名</th><th className="px-5 py-3 text-center font-bold text-slate-600">チラシ数</th><th className="px-5 py-3"></th></>)}
                     {tab === 'country' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">コード</th><th className="px-5 py-3 text-left font-bold text-slate-600">国名（日本語）</th><th className="px-5 py-3 text-left font-bold text-slate-600">英語名</th><th className="px-5 py-3 text-center font-bold text-slate-600">順</th><th className="px-5 py-3 text-center font-bold text-slate-600">利用</th><th className="px-5 py-3"></th></>)}
-                    {tab === 'visaType' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">在留資格名</th><th className="px-5 py-3 text-center font-bold text-slate-600">順</th><th className="px-5 py-3 text-center font-bold text-slate-600">配布員数</th><th className="px-5 py-3"></th></>)}
+                    {tab === 'visaType' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">在留資格名</th><th className="px-5 py-3 text-left font-bold text-slate-600">英語名</th><th className="px-5 py-3 text-center font-bold text-slate-600">委託</th><th className="px-5 py-3 text-center font-bold text-slate-600">バイト</th><th className="px-5 py-3 text-center font-bold text-slate-600">就労制限</th><th className="px-5 py-3 text-center font-bold text-slate-600">指定書</th><th className="px-5 py-3 text-center font-bold text-slate-600">順</th><th className="px-5 py-3 text-center font-bold text-slate-600">配布員数</th><th className="px-5 py-3"></th></>)}
                     {tab === 'bank' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">コード</th><th className="px-5 py-3 text-left font-bold text-slate-600">銀行名</th><th className="px-5 py-3 text-left font-bold text-slate-600">カナ</th><th className="px-5 py-3 text-center font-bold text-slate-600">順</th><th className="px-5 py-3"></th></>)}
                     {tab === 'distributionMethod' && (<><th className="px-5 py-3 text-left font-bold text-slate-600">配布方法名</th><th className="px-5 py-3 text-left font-bold text-slate-600">集計対象</th><th className="px-5 py-3 text-center font-bold text-slate-600">単価加算</th><th className="px-5 py-3 text-center font-bold text-slate-600">順</th><th className="px-5 py-3 text-center font-bold text-slate-600">有効</th><th className="px-5 py-3"></th></>)}
                   </tr>
@@ -899,12 +899,17 @@ export default function SettingsPage() {
                   {tab === 'visaType' && visaTypes.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50">
                       <td className="px-5 py-3 font-bold text-slate-800">{item.name}</td>
+                      <td className="px-5 py-3 text-xs text-slate-500">{item.nameEn || '—'}</td>
+                      <td className="px-5 py-3 text-center">{item.canContract ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">可</span> : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">不可</span>}</td>
+                      <td className="px-5 py-3 text-center">{item.canPartTime ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700">可</span> : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">不可</span>}</td>
+                      <td className="px-5 py-3 text-center text-xs text-slate-600">{item.workHourLimit ? `週${item.workHourLimit}h` : <span className="text-slate-400">なし</span>}</td>
+                      <td className="px-5 py-3 text-center">{item.requiresDesignation ? <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">要確認</span> : <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">不要</span>}</td>
                       <td className="px-5 py-3 text-center text-sm text-slate-600">{item.sortOrder}</td>
                       <td className="px-5 py-3 text-center"><span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{item._count.distributors}名</span></td>
                       <td className="px-5 py-3 text-right"><button onClick={() => openEdit(item)} className="text-indigo-500 hover:text-indigo-700 mr-3 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button><button onClick={() => handleDelete(item)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button></td>
                     </tr>
                   ))}
-                  {tab === 'visaType' && visaTypes.length === 0 && <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">在留資格がありません</td></tr>}
+                  {tab === 'visaType' && visaTypes.length === 0 && <tr><td colSpan={9} className="px-5 py-8 text-center text-slate-400">在留資格がありません</td></tr>}
 
                   {tab === 'bank' && banks.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50">
@@ -947,7 +952,9 @@ export default function SettingsPage() {
         )}
 
         {/* 面接スロット設定タブ */}
-        {tab === 'interviewSlot' && (<DefaultSlotSettings />)}
+        {tab === 'interviewSlot' && (
+          <DefaultSlotSettings />
+        )}
 
         {/* 研修スロット設定タブ */}
         {tab === 'trainingSlot' && (<DefaultTrainingSlotSettings />)}
@@ -1380,9 +1387,40 @@ export default function SettingsPage() {
               {/* 在留資格 */}
               {tab === 'visaType' && (
                 <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">在留資格名 <span className="text-rose-500">*</span></label>
+                      <input type="text" required value={form.name || ''} onChange={e => setForm((p: any) => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 特定技能1号" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-1">英語名</label>
+                      <input type="text" value={form.nameEn || ''} onChange={e => setForm((p: any) => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="例: Specified Skilled Worker Type 1" />
+                    </div>
+                  </div>
                   <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-1">在留資格名 <span className="text-rose-500">*</span></label>
-                    <input type="text" required value={form.name || ''} onChange={e => setForm((p: any) => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 特定技能1号" />
+                    <label className="block text-sm font-bold text-slate-700 mb-2">就労条件</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={!!form.canContract} onChange={e => setForm((p: any) => ({ ...p, canContract: e.target.checked }))} className="w-4 h-4 rounded accent-indigo-600" />
+                        <span className="text-sm text-slate-700">業務委託 可</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={!!form.canPartTime} onChange={e => setForm((p: any) => ({ ...p, canPartTime: e.target.checked }))} className="w-4 h-4 rounded accent-indigo-600" />
+                        <span className="text-sm text-slate-700">アルバイト・パート 可</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" checked={!!form.requiresDesignation} onChange={e => setForm((p: any) => ({ ...p, requiresDesignation: e.target.checked }))} className="w-4 h-4 rounded accent-indigo-600" />
+                        <span className="text-sm text-slate-700">指定書 要確認</span>
+                      </label>
+                      <div>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">就労制限時間（空欄=なし）</label>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs text-slate-500">週</span>
+                          <input type="number" value={form.workHourLimit ?? ''} onChange={e => setForm((p: any) => ({ ...p, workHourLimit: e.target.value }))} className={inp + ' w-20'} min={1} max={168} placeholder="28" />
+                          <span className="text-xs text-slate-500">時間まで</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-slate-700 mb-1">表示順</label>

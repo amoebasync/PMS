@@ -21,7 +21,8 @@ const REFRESH_TOKEN = process.env.GOOGLE_REFRESH_TOKEN;
  * @param description - 予定の説明
  * @param startTime - 開始時刻（Date または ISO文字列）
  * @param endTime - 終了時刻（Date または ISO文字列）
- * @param attendeeEmail - 参加者のメールアドレス（オプション）
+ * @param attendeeEmail - 応募者のメールアドレス（オプション）
+ * @param interviewerEmail - 面接担当者のメールアドレス（オプション）
  * @returns Google Meet の URL、または null（設定がない場合やエラー時）
  */
 export async function createGoogleMeetEvent(
@@ -29,12 +30,13 @@ export async function createGoogleMeetEvent(
   description: string,
   startTime: Date | string,
   endTime: Date | string,
-  attendeeEmail?: string
-): Promise<string | null> {
+  attendeeEmail?: string,
+  interviewerEmail?: string
+): Promise<{ meetUrl: string | null; eventId: string | null }> {
   // 環境変数が設定されていない場合は null を返す
   if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
     console.log('[Google Meet] API credentials not configured, skipping Meet creation');
-    return null;
+    return { meetUrl: null, eventId: null };
   }
 
   try {
@@ -73,7 +75,12 @@ export async function createGoogleMeetEvent(
           },
         },
       },
-      attendees: attendeeEmail ? [{ email: attendeeEmail }] : undefined,
+      attendees: (() => {
+        const list: { email: string }[] = [];
+        if (attendeeEmail) list.push({ email: attendeeEmail });
+        if (interviewerEmail && interviewerEmail !== attendeeEmail) list.push({ email: interviewerEmail });
+        return list.length > 0 ? list : undefined;
+      })(),
       reminders: {
         useDefault: false,
         overrides: [
@@ -87,31 +94,76 @@ export async function createGoogleMeetEvent(
       calendarId: 'primary',
       requestBody: event,
       conferenceDataVersion: 1,
-      sendUpdates: attendeeEmail ? 'all' : 'none',
+      sendUpdates: (attendeeEmail || interviewerEmail) ? 'all' : 'none',
     });
 
     // Meet リンクを取得
     const meetUrl = response.data.conferenceData?.entryPoints?.find(
       (ep) => ep.entryPointType === 'video'
     )?.uri;
+    const eventId = response.data.id || null;
 
     if (meetUrl) {
-      console.log('[Google Meet] Event created with Meet URL:', meetUrl);
-      return meetUrl;
+      console.log('[Google Meet] Event created with Meet URL:', meetUrl, 'eventId:', eventId);
+      return { meetUrl, eventId };
     }
 
     console.log('[Google Meet] Event created but no Meet URL found');
-    return null;
+    return { meetUrl: null, eventId };
   } catch (error: any) {
     console.error('[Google Meet] Error creating event:', error.message || error);
-    
+
     // 認証エラーの場合は詳細をログ出力
     if (error.code === 401 || error.code === 403) {
       console.error('[Google Meet] Authentication error. Please check your credentials.');
       console.error('[Google Meet] Make sure GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REFRESH_TOKEN are set correctly.');
     }
-    
-    return null;
+
+    return { meetUrl: null, eventId: null };
+  }
+}
+
+/**
+ * 既存の Google Calendar イベントの参加者を更新する
+ *
+ * @param calendarEventId - Google Calendar イベントID
+ * @param attendeeEmail - 応募者のメールアドレス（オプション）
+ * @param interviewerEmail - 面接担当者のメールアドレス（オプション）
+ */
+export async function updateGoogleCalendarAttendees(
+  calendarEventId: string,
+  attendeeEmail?: string | null,
+  interviewerEmail?: string | null
+): Promise<void> {
+  if (!CLIENT_ID || !CLIENT_SECRET || !REFRESH_TOKEN) {
+    console.log('[Google Meet] API credentials not configured, skipping attendee update');
+    return;
+  }
+
+  try {
+    const oauth2Client = new google.auth.OAuth2(
+      CLIENT_ID,
+      CLIENT_SECRET,
+      'https://developers.google.com/oauthplayground'
+    );
+    oauth2Client.setCredentials({ refresh_token: REFRESH_TOKEN });
+
+    const calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const attendees: { email: string }[] = [];
+    if (attendeeEmail) attendees.push({ email: attendeeEmail });
+    if (interviewerEmail && interviewerEmail !== attendeeEmail) attendees.push({ email: interviewerEmail });
+
+    await calendar.events.patch({
+      calendarId: 'primary',
+      eventId: calendarEventId,
+      requestBody: { attendees },
+      sendUpdates: 'all',
+    });
+
+    console.log('[Google Meet] Attendees updated for event:', calendarEventId);
+  } catch (error: any) {
+    console.error('[Google Meet] Error updating attendees:', error.message || error);
   }
 }
 
