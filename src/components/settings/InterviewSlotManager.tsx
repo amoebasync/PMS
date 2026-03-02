@@ -9,6 +9,13 @@ type JobCategory = {
   nameEn: string | null;
 };
 
+type EmployeeOption = {
+  id: number;
+  lastNameJa: string;
+  firstNameJa: string;
+  email: string;
+};
+
 type InterviewSlot = {
   id: number;
   startTime: string;
@@ -16,6 +23,7 @@ type InterviewSlot = {
   isBooked: boolean;
   jobCategoryId: number | null;
   jobCategory: JobCategory | null;
+  interviewer: EmployeeOption | null;
   applicant: {
     id: number;
     name: string;
@@ -27,6 +35,7 @@ export default function InterviewSlotManager() {
   const { showToast, showConfirm } = useNotification();
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -36,6 +45,7 @@ export default function InterviewSlotManager() {
   const [formStartTime, setFormStartTime] = useState('10:00');
   const [formEndTime, setFormEndTime] = useState('11:00');
   const [formJobCategoryId, setFormJobCategoryId] = useState<string>('');
+  const [formInterviewerId, setFormInterviewerId] = useState<string>('');
 
   // フィルター
   const [filterMonth, setFilterMonth] = useState(() => {
@@ -68,8 +78,21 @@ export default function InterviewSlotManager() {
     }
   };
 
+  const fetchEmployees = async () => {
+    try {
+      const res = await fetch('/api/employees?simple=true');
+      if (res.ok) {
+        const data = await res.json();
+        setEmployees(data || []);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchJobCategories();
+    fetchEmployees();
   }, []);
 
   useEffect(() => {
@@ -96,6 +119,7 @@ export default function InterviewSlotManager() {
           startTime: startTime.toISOString(),
           endTime: endTime.toISOString(),
           jobCategoryId: formJobCategoryId ? Number(formJobCategoryId) : null,
+          interviewerId: formInterviewerId ? Number(formInterviewerId) : null,
         }),
       });
 
@@ -106,6 +130,7 @@ export default function InterviewSlotManager() {
         setFormStartTime('10:00');
         setFormEndTime('11:00');
         setFormJobCategoryId('');
+        setFormInterviewerId('');
         fetchSlots();
       } else {
         const err = await res.json();
@@ -217,6 +242,16 @@ export default function InterviewSlotManager() {
                       </span>
                     )}
                   </div>
+                  <div className="w-28">
+                    {slot.interviewer ? (
+                      <span className="text-xs text-slate-600 font-medium">
+                        <i className="bi bi-person-badge mr-1" />
+                        {slot.interviewer.lastNameJa} {slot.interviewer.firstNameJa}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">担当者未設定</span>
+                    )}
+                  </div>
                   <div className="w-32 text-right">
                     {slot.isBooked && slot.applicant ? (
                       <span className="text-xs text-amber-700 font-medium">
@@ -319,6 +354,27 @@ export default function InterviewSlotManager() {
                 </select>
                 <p className="text-xs text-slate-500 mt-1">
                   「全職種」を選択すると、どの職種の応募者も選択可能なスロットになります
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  面接担当者
+                </label>
+                <select
+                  value={formInterviewerId}
+                  onChange={(e) => setFormInterviewerId(e.target.value)}
+                  className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">未設定</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.lastNameJa} {emp.firstNameJa}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  担当者を設定すると、Google Meet作成時にカレンダー招待が送信されます
                 </p>
               </div>
 

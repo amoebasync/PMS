@@ -54,9 +54,21 @@ export async function GET(request: Request) {
               endTime: true,
               meetUrl: true,
               isBooked: true,
+              interviewer: {
+                select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
+              },
             },
           },
           recruitingMedia: { select: { id: true, nameJa: true, nameEn: true, code: true } },
+          trainingSlot: {
+            select: {
+              id: true,
+              startTime: true,
+              endTime: true,
+              capacity: true,
+              location: true,
+            },
+          },
         },
       }),
     ]);

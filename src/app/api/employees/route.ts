@@ -86,6 +86,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ data: employees, total, page, totalPages: Math.ceil(total / limit) });
     }
 
+    // ?simple=true: ドロップダウン用の軽量レスポンス（名前・メールのみ）
+    const simple = searchParams.get('simple');
+    if (simple === 'true') {
+      const employees = await prisma.employee.findMany({
+        where: { isActive: true },
+        orderBy: { lastNameJa: 'asc' },
+        select: {
+          id: true,
+          lastNameJa: true,
+          firstNameJa: true,
+          email: true,
+        },
+      });
+      return NextResponse.json(employees);
+    }
+
     // パラメーターなし: 全件返す (後方互換・ドロップダウン用)
     const employees = await prisma.employee.findMany({
       orderBy: { id: 'desc' },

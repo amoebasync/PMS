@@ -97,6 +97,7 @@ export async function POST(request: Request) {
     // トークンで応募者を検索
     const applicant = await prisma.applicant.findFirst({
       where: { managementToken: token },
+      include: { jobCategory: true },
     });
 
     if (!applicant) {
@@ -151,6 +152,8 @@ export async function POST(request: Request) {
 
     const trainingTime = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')} - ${String(slotEnd.getHours()).padStart(2, '0')}:${String(slotEnd.getMinutes()).padStart(2, '0')}`;
 
+    const jobName = applicant.jobCategory?.nameJa || applicant.jobCategory?.nameEn || '';
+
     sendTrainingConfirmationEmail(
       updated.email,
       updated.name,
@@ -158,7 +161,10 @@ export async function POST(request: Request) {
       trainingDate,
       trainingTime,
       trainingSlot.location,
-      null
+      null,
+      jobName,
+      trainingSlot.startTime,
+      trainingSlot.endTime,
     ).catch((err) => console.error('Training confirmation email failed:', err));
 
     return NextResponse.json({

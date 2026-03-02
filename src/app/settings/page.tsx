@@ -947,7 +947,9 @@ export default function SettingsPage() {
         )}
 
         {/* 面接スロット設定タブ */}
-        {tab === 'interviewSlot' && (<DefaultSlotSettings />)}
+        {tab === 'interviewSlot' && (
+          <DefaultSlotSettings />
+        )}
 
         {/* 研修スロット設定タブ */}
         {tab === 'trainingSlot' && (<DefaultTrainingSlotSettings />)}

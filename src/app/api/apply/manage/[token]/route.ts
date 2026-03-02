@@ -157,6 +157,7 @@ export async function PUT(
       // 新スロットの空き確認
       const newSlot = await tx.interviewSlot.findUnique({
         where: { id: Number(newSlotId) },
+        include: { interviewer: { select: { email: true } } },
       });
 
       if (!newSlot || newSlot.isBooked) {
@@ -169,6 +170,7 @@ export async function PUT(
 
       // Google Meet イベントを作成（設定されている場合のみ）
       let meetUrl = newSlot.meetUrl;
+      let calendarEventId: string | null = null;
       if (!meetUrl && isGoogleMeetConfigured()) {
         const isEn = applicant.language === 'en';
         const jobName = isEn
@@ -177,13 +179,16 @@ export async function PUT(
         const meetTitle = `【ティラミス】${applicant.name}様 ${jobName} 面接`;
         const meetDescription = `応募者: ${applicant.name}\nメール: ${applicant.email}\n職種: ${jobName}`;
 
-        meetUrl = await createGoogleMeetEvent(
+        const meetResult = await createGoogleMeetEvent(
           meetTitle,
           meetDescription,
           newSlot.startTime,
           newSlot.endTime,
-          applicant.email
+          applicant.email,
+          newSlot.interviewer?.email || undefined
         );
+        meetUrl = meetResult.meetUrl;
+        calendarEventId = meetResult.eventId;
       }
 
       // 旧スロット解放
@@ -202,6 +207,7 @@ export async function PUT(
           isBooked: true,
           applicantId: applicant.id,
           meetUrl: meetUrl || newSlot.meetUrl,
+          calendarEventId: calendarEventId || undefined,
         },
       });
 

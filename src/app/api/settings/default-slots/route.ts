@@ -26,6 +26,9 @@ export async function GET() {
     const slots = await prisma.defaultInterviewSlot.findMany({
       orderBy: { dayOfWeek: 'asc' },
       include: {
+        interviewer: {
+          select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
+        },
         jobCategories: {
           include: {
             jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
@@ -46,6 +49,8 @@ export async function GET() {
           endTime: existing.endTime,
           intervalMinutes: existing.intervalMinutes,
           isEnabled: existing.isEnabled,
+          interviewerId: existing.interviewerId,
+          interviewer: existing.interviewer,
           jobCategoryIds: existing.jobCategories.map((jc) => jc.jobCategoryId),
           jobCategories: existing.jobCategories.map((jc) => jc.jobCategory),
         });
@@ -57,6 +62,8 @@ export async function GET() {
           endTime: '17:00',
           intervalMinutes: 60,
           isEnabled: false,
+          interviewerId: null,
+          interviewer: null,
           jobCategoryIds: [],
           jobCategories: [],
         });
@@ -79,7 +86,7 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { dayOfWeek, startTime, endTime, intervalMinutes, isEnabled, jobCategoryIds } = body;
+    const { dayOfWeek, startTime, endTime, intervalMinutes, isEnabled, jobCategoryIds, interviewerId } = body;
 
     if (dayOfWeek === undefined || dayOfWeek < 0 || dayOfWeek > 6) {
       return NextResponse.json({ error: '曜日が不正です' }, { status: 400 });
@@ -94,6 +101,7 @@ export async function PUT(request: Request) {
           endTime: endTime || '17:00',
           intervalMinutes: intervalMinutes || 60,
           isEnabled: isEnabled ?? false,
+          interviewerId: interviewerId ? Number(interviewerId) : null,
         },
         create: {
           dayOfWeek,
@@ -101,6 +109,7 @@ export async function PUT(request: Request) {
           endTime: endTime || '17:00',
           intervalMinutes: intervalMinutes || 60,
           isEnabled: isEnabled ?? false,
+          interviewerId: interviewerId ? Number(interviewerId) : null,
         },
       });
 
@@ -146,6 +155,7 @@ export async function POST(request: Request) {
         intervalMinutes: number;
         isEnabled: boolean;
         jobCategoryIds: number[];
+        interviewerId: number | null;
       }>;
       effectiveFrom?: string; // YYYY-MM-DD
     };
@@ -165,6 +175,7 @@ export async function POST(request: Request) {
             endTime: s.endTime || '17:00',
             intervalMinutes: s.intervalMinutes || 60,
             isEnabled: s.isEnabled ?? false,
+            interviewerId: s.interviewerId ? Number(s.interviewerId) : null,
           },
           create: {
             dayOfWeek: s.dayOfWeek,
@@ -172,6 +183,7 @@ export async function POST(request: Request) {
             endTime: s.endTime || '17:00',
             intervalMinutes: s.intervalMinutes || 60,
             isEnabled: s.isEnabled ?? false,
+            interviewerId: s.interviewerId ? Number(s.interviewerId) : null,
           },
         });
 
@@ -297,6 +309,7 @@ export async function POST(request: Request) {
                   startTime: vs.startTime,
                   endTime: vs.endTime,
                   jobCategoryId: vs.jobCategoryId,
+                  interviewerId: master.interviewerId,
                 },
               });
               totalCreated++;

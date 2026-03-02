@@ -94,6 +94,7 @@ export async function POST(request: Request) {
               startTime: slotStart,
               endTime: slotEnd,
               jobCategoryId: jcId,
+              interviewerId: defaultSlot.interviewerId,
             },
           });
           totalCreated++;

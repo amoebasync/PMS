@@ -34,6 +34,9 @@ export async function GET(request: Request) {
         jobCategory: {
           select: { id: true, nameJa: true, nameEn: true },
         },
+        interviewer: {
+          select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
+        },
         applicant: {
           select: {
             id: true,
@@ -76,10 +79,12 @@ export async function POST(request: Request) {
             startTime: new Date(body.startTime),
             endTime: new Date(body.endTime),
             jobCategoryId: body.jobCategoryId ? Number(body.jobCategoryId) : null,
+            interviewerId: body.interviewerId ? Number(body.interviewerId) : null,
             meetUrl: body.meetUrl || null,
           },
           include: {
             jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
+            interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
           },
         });
 
@@ -112,6 +117,7 @@ export async function POST(request: Request) {
               startTime: new Date(s.startTime),
               endTime: new Date(s.endTime),
               jobCategoryId: s.jobCategoryId ? Number(s.jobCategoryId) : (body.jobCategoryId ? Number(body.jobCategoryId) : null),
+              interviewerId: s.interviewerId ? Number(s.interviewerId) : (body.interviewerId ? Number(body.interviewerId) : null),
               meetUrl: s.meetUrl || body.meetUrl || null,
             },
           });
@@ -136,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     // 時間帯指定で自動生成
-    const { date, startHour, endHour, intervalMinutes, meetUrl, jobCategoryId } = body;
+    const { date, startHour, endHour, intervalMinutes, meetUrl, jobCategoryId, interviewerId } = body;
     if (!date || startHour == null || endHour == null || !intervalMinutes) {
       return NextResponse.json({ error: '必須項目が不足しています' }, { status: 400 });
     }
@@ -169,6 +175,7 @@ export async function POST(request: Request) {
             startTime: s.startTime,
             endTime: s.endTime,
             jobCategoryId: jobCategoryId ? Number(jobCategoryId) : null,
+            interviewerId: interviewerId ? Number(interviewerId) : null,
             meetUrl: meetUrl || null,
           },
         });
