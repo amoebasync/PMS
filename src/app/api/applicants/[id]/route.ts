@@ -150,6 +150,8 @@ export async function PUT(
     if (body.postalCode !== undefined) updateData.postalCode = body.postalCode || null;
     if (body.address !== undefined) updateData.address = body.address || null;
     if (body.building !== undefined) updateData.building = body.building || null;
+    if (body.birthday !== undefined) updateData.birthday = body.birthday ? new Date(body.birthday) : null;
+    if (body.gender !== undefined) updateData.gender = body.gender || null;
 
     // ステータス
     if (body.flowStatus !== undefined) updateData.flowStatus = body.flowStatus;
