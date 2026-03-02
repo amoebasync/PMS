@@ -281,6 +281,23 @@ function InterviewBookingContent() {
               )}
             </div>
 
+            {/* Google Meet バナー */}
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-start gap-3">
+              <i className="bi bi-camera-video-fill text-blue-500 text-lg mt-0.5 shrink-0"></i>
+              <div>
+                <p className="text-sm font-bold text-blue-800">
+                  {isEn
+                    ? 'This interview will be conducted online via Google Meet.'
+                    : '面接は Google Meet を使用したオンライン面接で実施いたします。'}
+                </p>
+                <p className="text-xs text-blue-600 mt-0.5">
+                  {isEn
+                    ? 'A Google Meet link will be sent to you after your interview is confirmed.'
+                    : '面接日程確定後に Google Meet のリンクをメールでお送りします。'}
+                </p>
+              </div>
+            </div>
+
             {/* スロット選択 */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
               <div className="flex items-center gap-2 mb-1">

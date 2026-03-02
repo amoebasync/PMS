@@ -479,6 +479,11 @@ export const sendApplicantConfirmationEmail = async (
     <p style="margin:0 0 16px;">
       Thank you for your application. Your interview has been scheduled as follows.
     </p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
+      <p style="margin:0;font-size:14px;color:#1d4ed8;">
+        📹 <strong>This interview will be conducted online via Google Meet.</strong>
+      </p>
+    </div>
 
     <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
       <tr><td style="padding:20px 24px;">
@@ -517,6 +522,11 @@ export const sendApplicantConfirmationEmail = async (
       この度はご応募いただき、誠にありがとうございます。<br>
       以下の内容で面接のご予約を承りました。
     </p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
+      <p style="margin:0;font-size:14px;color:#1d4ed8;">
+        📹 <strong>面接は Google Meet を使用したオンライン面接で実施いたします。</strong>
+      </p>
+    </div>
 
     <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
       <tr><td style="padding:20px 24px;">
@@ -1325,6 +1335,12 @@ export async function sendInterviewInvitationEmail(
       Thank you for your interest in joining our team${jobCategoryName ? ` as <strong>${jobCategoryName}</strong>` : ''}.
       We would like to invite you to schedule an interview at your convenience.
     </p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
+      <p style="margin:0;font-size:14px;color:#1d4ed8;">
+        📹 <strong>This interview will be conducted online via Google Meet.</strong><br>
+        <span style="font-size:13px;color:#3b82f6;">A Google Meet link will be provided once your interview is confirmed.</span>
+      </p>
+    </div>
     <p style="margin:0 0 24px;">Please use the link below to choose your preferred interview date and time.</p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${bookingUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
@@ -1341,6 +1357,12 @@ export async function sendInterviewInvitationEmail(
       この度は${jobCategoryName ? `<strong>${jobCategoryName}</strong>への` : ''}ご応募いただきありがとうございます。<br>
       面接の日程調整をお願いしたく、ご連絡いたしました。
     </p>
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
+      <p style="margin:0;font-size:14px;color:#1d4ed8;">
+        📹 <strong>面接は Google Meet を使用したオンライン面接で実施いたします。</strong><br>
+        <span style="font-size:13px;color:#3b82f6;">面接日程確定後に Google Meet のリンクをお送りします。</span>
+      </p>
+    </div>
     <p style="margin:0 0 24px;">以下のリンクから、ご都合のよい面接日程をお選びください。</p>
     <div style="text-align:center;margin:32px 0;">
       <a href="${bookingUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
