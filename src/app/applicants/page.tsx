@@ -2610,7 +2610,10 @@ export default function ApplicantsPage() {
                               name="trainingBookingMode"
                               value="later"
                               checked={trainingBookingMode === 'later'}
-                              onChange={() => setTrainingBookingMode('later')}
+                              onChange={() => {
+                                setTrainingBookingMode('later');
+                                setEvalForm(f => ({ ...f, flowStatus: 'TRAINING_WAITING' }));
+                              }}
                               className="text-indigo-600 focus:ring-indigo-500"
                             />
                             <span className="text-sm font-bold text-slate-700">後でメールで案内</span>
@@ -2721,7 +2724,12 @@ export default function ApplicantsPage() {
                                           <button
                                             key={slot.id}
                                             type="button"
-                                            onClick={() => setSelectedTrainingSlotId(isSlotSelected ? '' : slot.id)}
+                                            onClick={() => {
+                                              setSelectedTrainingSlotId(isSlotSelected ? '' : slot.id);
+                                              if (!isSlotSelected) {
+                                                setEvalForm(f => ({ ...f, flowStatus: 'TRAINING_WAITING' }));
+                                              }
+                                            }}
                                             className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all
                                               ${isSlotSelected ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'}`}
                                           >
