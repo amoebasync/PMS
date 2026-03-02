@@ -2863,7 +2863,7 @@ export default function ApplicantsPage() {
                             </button>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </>
