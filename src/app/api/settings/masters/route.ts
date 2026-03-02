@@ -75,7 +75,12 @@ export async function POST(request: Request) {
       result = await prisma.visaType.create({
         data: {
           name: data.name,
+          nameEn: data.nameEn || '',
           sortOrder: parseInt(data.sortOrder) || 100,
+          canContract: !!data.canContract,
+          canPartTime: !!data.canPartTime,
+          workHourLimit: data.workHourLimit ? parseInt(data.workHourLimit) : null,
+          requiresDesignation: !!data.requiresDesignation,
         },
       });
     } else if (type === 'bank') {
@@ -137,7 +142,12 @@ export async function PUT(request: Request) {
         where: { id: parseInt(id) },
         data: {
           name: data.name,
+          nameEn: data.nameEn || '',
           sortOrder: parseInt(data.sortOrder) || 100,
+          canContract: !!data.canContract,
+          canPartTime: !!data.canPartTime,
+          workHourLimit: data.workHourLimit ? parseInt(data.workHourLimit) : null,
+          requiresDesignation: !!data.requiresDesignation,
         },
       });
     } else if (type === 'bank') {

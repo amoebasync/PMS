@@ -139,6 +139,7 @@ interface Country {
 interface VisaType {
   id: number;
   name: string;
+  nameEn: string;
 }
 
 interface InterviewSlot {
@@ -927,7 +928,12 @@ function ApplyForm() {
                       }))
                     }
                     getOptionValue={(v) => String(v.id)}
-                    getOptionLabel={(v) => v.name}
+                    getOptionLabel={(v) => isEn && v.nameEn ? v.nameEn : v.name}
+                    filterFn={(v, s) => {
+                      const q = s.toLowerCase();
+                      return v.name.toLowerCase().includes(q) ||
+                        (v.nameEn || '').toLowerCase().includes(q);
+                    }}
                     placeholder={loadingVisaTypes ? t.loadingCategories : t.visaTypePlaceholder}
                     searchPlaceholder={t.searchPlaceholder}
                     noResultsText={t.noResults}

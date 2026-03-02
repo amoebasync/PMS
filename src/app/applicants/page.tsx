@@ -94,6 +94,7 @@ type Applicant = {
   communicationScore: number | null;
   impressionScore: number | null;
   interviewNotes: string | null;
+  gender: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -702,7 +703,7 @@ export default function ApplicantsPage() {
     setSelectedTrainingSlotId('');
     setTrainingBookingMode('now');
     setShowDistributorForm(false);
-    setDistForm({ birthday: '', branchId: '', staffId: '', gender: '' });
+    setDistForm({ branchId: '', staffId: '' });
     setRegisteredDistributorId(null);
     try {
       const res = await fetch(`/api/applicants/${applicantId}`);
