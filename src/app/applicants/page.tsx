@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { handlePhoneChange } from '@/lib/formatters';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -2859,7 +2860,7 @@ export default function ApplicantsPage() {
                 <input
                   type="tel"
                   value={manualRegForm.phone}
-                  onChange={e => setManualRegForm(f => ({ ...f, phone: e.target.value }))}
+                  onChange={e => handlePhoneChange(e.target.value, v => setManualRegForm(f => ({ ...f, phone: v })))}
                   placeholder="090-1234-5678"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                 />
