@@ -1307,6 +1307,109 @@ export async function sendTrainingInviteEmail(
 }
 
 // ─────────────────────────────────────────────────────────
+// 16. 面接日程調整招待メール（応募者向け）
+// ─────────────────────────────────────────────────────────
+export async function sendInterviewInvitationEmail(
+  to: string,
+  name: string,
+  lang: string,
+  bookingUrl: string,
+  jobCategoryName?: string,
+): Promise<void> {
+  const isEn = lang === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${name},</p>
+    <p style="margin:0 0 16px;">
+      Thank you for your interest in joining our team${jobCategoryName ? ` as <strong>${jobCategoryName}</strong>` : ''}.
+      We would like to invite you to schedule an interview at your convenience.
+    </p>
+    <p style="margin:0 0 24px;">Please use the link below to choose your preferred interview date and time.</p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${bookingUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+        📅 Schedule Interview
+      </a>
+    </div>
+    <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:24px 0;">
+      <p style="margin:0;font-size:13px;color:#92400e;">⚠️ This link is for your personal use only. Please do not share it with others.</p>
+    </div>
+    `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${name} 様</p>
+    <p style="margin:0 0 16px;">
+      この度は${jobCategoryName ? `<strong>${jobCategoryName}</strong>への` : ''}ご応募いただきありがとうございます。<br>
+      面接の日程調整をお願いしたく、ご連絡いたしました。
+    </p>
+    <p style="margin:0 0 24px;">以下のリンクから、ご都合のよい面接日程をお選びください。</p>
+    <div style="text-align:center;margin:32px 0;">
+      <a href="${bookingUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;">
+        📅 面接日程を選択する
+      </a>
+    </div>
+    <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:24px 0;">
+      <p style="margin:0;font-size:13px;color:#92400e;">⚠️ このリンクはご本人専用です。他の方への共有はお控えください。</p>
+    </div>
+    `;
+
+  const subject = isEn ? '[Tiramis] Please Schedule Your Interview' : '【Tiramis】面接日程のご選択をお願いします';
+  const textContent = isEn
+    ? `Dear ${name},\n\nPlease schedule your interview using the link below.\n\n${bookingUrl}\n\nThis link is for your personal use only.\nContact recruit@tiramis.co.jp for questions.`
+    : `${name} 様\n\n以下のリンクから面接日程をお選びください。\n\n${bookingUrl}\n\nこのリンクはご本人専用です。\nお問い合わせ: recruit@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// 17. 面接予約完了 管理者通知メール
+// ─────────────────────────────────────────────────────────
+export async function sendInterviewBookingAdminNotification(
+  to: string,
+  applicantName: string,
+  applicantEmail: string,
+  interviewDate: string,
+  interviewTime: string,
+  meetUrl: string | null,
+  jobCategoryName?: string,
+): Promise<void> {
+  const meetSection = meetUrl
+    ? `<tr><td style="padding:6px 0;color:#64748b;width:140px;">Google Meet</td><td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${meetUrl}</a></td></tr>`
+    : '';
+
+  const contentHtml = `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 16px;">【面接予約通知】</p>
+    <p style="margin:0 0 16px;font-size:14px;color:#475569;">応募者が面接日程の予約を完了しました。</p>
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">予約内容</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr><td style="padding:6px 0;color:#64748b;width:140px;">応募者氏名</td><td style="padding:6px 0;font-weight:bold;">${applicantName}</td></tr>
+          <tr><td style="padding:6px 0;color:#64748b;">メールアドレス</td><td style="padding:6px 0;">${applicantEmail}</td></tr>
+          ${jobCategoryName ? `<tr><td style="padding:6px 0;color:#64748b;">応募職種</td><td style="padding:6px 0;">${jobCategoryName}</td></tr>` : ''}
+          <tr><td style="padding:6px 0;color:#64748b;">面接日</td><td style="padding:6px 0;font-weight:bold;">${interviewDate}</td></tr>
+          <tr><td style="padding:6px 0;color:#64748b;">時間</td><td style="padding:6px 0;">${interviewTime}</td></tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis PMS" <recruit@tiramis.co.jp>',
+    to,
+    subject: `【面接予約】${applicantName} 様より面接日程が確定しました`,
+    html: htmlWrapper(contentHtml),
+    text: `【面接予約通知】\n\n応募者: ${applicantName}（${applicantEmail}）\n${jobCategoryName ? `職種: ${jobCategoryName}\n` : ''}面接日: ${interviewDate}\n時間: ${interviewTime}${meetUrl ? `\nMeet: ${meetUrl}` : ''}`,
+  });
+}
+
+// ─────────────────────────────────────────────────────────
 // 15. 研修キャンセル通知メール
 // ─────────────────────────────────────────────────────────
 export async function sendTrainingCancellationEmail(
