@@ -100,6 +100,36 @@ export default function ProfilePageEn() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxW = 1920;
+        const maxH = 1920;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+          'image/jpeg',
+          0.85,
+        );
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleCardUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -107,23 +137,28 @@ export default function ProfilePageEn() {
     setUploadingCard(side);
     setMessage(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      const compressed = await compressImage(file);
+      const formData = new FormData();
+      formData.append('file', compressed, file.name.replace(/\.[^.]+$/, '.jpg'));
 
-    const res = await fetch(`/api/staff/residence-card?side=${side}`, {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await res.json();
+      const res = await fetch(`/api/staff/residence-card?side=${side}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
 
-    if (res.ok) {
-      setProfile((p) => p ? {
-        ...p,
-        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-      } : p);
-      setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
-    } else {
-      setMessage({ type: 'error', text: data.error || 'Upload failed.' });
+      if (res.ok) {
+        setProfile((p) => p ? {
+          ...p,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+        } : p);
+        setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'Upload failed.' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'Upload failed. Please try again.' });
     }
     setUploadingCard(null);
     if (side === 'front' && cardFrontInputRef.current) cardFrontInputRef.current.value = '';

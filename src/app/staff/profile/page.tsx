@@ -101,6 +101,36 @@ export default function ProfilePage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new window.Image();
+      img.onload = () => {
+        const maxW = 1920;
+        const maxH = 1920;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('Canvas not supported')); return; }
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+          'image/jpeg',
+          0.85,
+        );
+      };
+      img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
   const handleCardUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -108,23 +138,28 @@ export default function ProfilePage() {
     setUploadingCard(side);
     setMessage(null);
 
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      const compressed = await compressImage(file);
+      const formData = new FormData();
+      formData.append('file', compressed, file.name.replace(/\.[^.]+$/, '.jpg'));
 
-    const res = await fetch(`/api/staff/residence-card?side=${side}`, {
-      method: 'POST',
-      body: formData,
-    });
-    const data = await res.json();
+      const res = await fetch(`/api/staff/residence-card?side=${side}`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
 
-    if (res.ok) {
-      setProfile((p) => p ? {
-        ...p,
-        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-      } : p);
-      setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
-    } else {
-      setMessage({ type: 'error', text: data.error || 'アップロードに失敗しました' });
+      if (res.ok) {
+        setProfile((p) => p ? {
+          ...p,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+        } : p);
+        setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
+      } else {
+        setMessage({ type: 'error', text: data.error || 'アップロードに失敗しました' });
+      }
+    } catch {
+      setMessage({ type: 'error', text: 'アップロードに失敗しました。もう一度お試しください。' });
     }
     setUploadingCard(null);
     if (side === 'front' && cardFrontInputRef.current) cardFrontInputRef.current.value = '';

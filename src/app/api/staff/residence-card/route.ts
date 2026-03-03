@@ -68,9 +68,9 @@ export async function POST(request: Request) {
     }
 
     const ext = file.originalName.split('.').pop()?.toLowerCase() || 'jpg';
-    const allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'];
     if (!allowed.includes(ext)) {
-      return NextResponse.json({ error: '画像ファイル（JPG/PNG/GIF/WebP）のみアップロードできます' }, { status: 400 });
+      return NextResponse.json({ error: '画像ファイル（JPG/PNG/GIF/WebP/HEIC）のみアップロードできます' }, { status: 400 });
     }
 
     const filename = `distributor-${distributor.id}-residence-card-${side}-${Date.now()}.${ext}`;
