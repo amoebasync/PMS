@@ -722,7 +722,7 @@ export default function SettingsPage() {
         </div>
 
         {/* 全般設定タブ */}
-        {tab === 'general' && (
+        {tab === 'general' && (<>
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-slate-100">
               <h2 className="font-bold text-slate-700">全般設定</h2>
@@ -882,7 +882,44 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
-        )}
+
+          {/* 応募者メール設定 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-envelope-fill text-emerald-500 mr-2"></i>応募者メール設定</h2>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center justify-between gap-6">
+                <div>
+                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i className="bi bi-send-check text-emerald-500"></i>
+                    採用通知メールを自動送信する
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">OFFにすると、採用ステータスを「採用」に変更しても採用通知メールが送信されません。</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => {
+                      const newVal = systemSettings.sendHiringEmail !== 'false' ? 'false' : 'true';
+                      setSystemSettings(prev => ({ ...prev, sendHiringEmail: newVal }));
+                      handleSaveSystemSetting('sendHiringEmail', newVal);
+                    }}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                      systemSettings.sendHiringEmail !== 'false' ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      systemSettings.sendHiringEmail !== 'false' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <span className="text-sm font-bold text-slate-600 w-8">
+                    {systemSettings.sendHiringEmail !== 'false' ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>)}
 
         {/* 自社情報タブ */}
         {tab === 'company' && (

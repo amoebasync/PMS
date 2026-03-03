@@ -217,22 +217,29 @@ export async function PUT(
       return result;
     });
 
-    // 採用に変更された場合、採用通知メールを送信
+    // 採用に変更された場合、採用通知メールを送信（システム設定で無効化可能）
     if (
       body.hiringStatus === 'HIRED' &&
       previousHiringStatus !== 'HIRED'
     ) {
-      const lang = updated.language || 'ja';
-      const jobName = lang === 'en'
-        ? (updated.jobCategory?.nameEn || updated.jobCategory?.nameJa || '')
-        : (updated.jobCategory?.nameJa || '');
+      const sendHiringSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'sendHiringEmail' },
+      });
+      const shouldSend = sendHiringSetting?.value !== 'false';
 
-      sendHiringNotificationEmail(
-        updated.email,
-        updated.name,
-        lang,
-        jobName,
-      ).catch((err) => console.error('Hiring notification email failed:', err));
+      if (shouldSend) {
+        const lang = updated.language || 'ja';
+        const jobName = lang === 'en'
+          ? (updated.jobCategory?.nameEn || updated.jobCategory?.nameJa || '')
+          : (updated.jobCategory?.nameJa || '');
+
+        sendHiringNotificationEmail(
+          updated.email,
+          updated.name,
+          lang,
+          jobName,
+        ).catch((err) => console.error('Hiring notification email failed:', err));
+      }
     }
 
     return NextResponse.json(updated);
