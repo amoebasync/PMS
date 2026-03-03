@@ -349,7 +349,7 @@ export default function ApplicantsPage() {
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
-  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '' });
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', sendInterviewEmail: true });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
@@ -605,17 +605,21 @@ export default function ApplicantsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
-      showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
       setShowManualRegisterModal(false);
-      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '' });
+      const shouldSendEmail = manualRegForm.sendInterviewEmail;
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', sendInterviewEmail: true });
       fetchApplicants(1);
       fetchSlots();
-      // 面接案内メール自動送信
-      try {
-        await fetch(`/api/applicants/${data.id}/send-interview-invitation`, { method: 'POST' });
-        showToast('面接案内メールを送信しました', 'success');
-      } catch {
-        showToast('面接案内メールの送信に失敗しました', 'error');
+      if (shouldSendEmail) {
+        showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
+        try {
+          await fetch(`/api/applicants/${data.id}/send-interview-invitation`, { method: 'POST' });
+          showToast('面接案内メールを送信しました', 'success');
+        } catch {
+          showToast('面接案内メールの送信に失敗しました', 'error');
+        }
+      } else {
+        showToast('応募者を登録しました', 'success');
       }
     } catch (e: any) {
       showToast(e.message || '登録に失敗しました', 'error');
@@ -3499,6 +3503,16 @@ export default function ApplicantsPage() {
                   </label>
                 </div>
               </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer pt-2 border-t border-slate-100">
+                <input
+                  type="checkbox"
+                  checked={manualRegForm.sendInterviewEmail}
+                  onChange={e => setManualRegForm(f => ({ ...f, sendInterviewEmail: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm font-medium text-slate-700">面接日程調整メールを送信する</span>
+              </label>
             </div>
 
             {/* フッター */}
