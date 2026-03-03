@@ -30,6 +30,10 @@ export async function PUT(
       targetIds,
       notifyEnabled,
       description,
+      scheduleHour,
+      scheduleDayOfWeek,
+      scheduleDayOfMonth,
+      scheduleWeekOrdinal,
     } = body;
 
     const data: any = {};
@@ -41,6 +45,10 @@ export async function PUT(
     if (targetIds !== undefined) data.targetIds = targetIds === null ? null : String(targetIds);
     if (typeof notifyEnabled === 'boolean') data.notifyEnabled = notifyEnabled;
     if (description !== undefined) data.description = description;
+    if (scheduleHour !== undefined) data.scheduleHour = parseInt(scheduleHour);
+    if (scheduleDayOfWeek !== undefined) data.scheduleDayOfWeek = scheduleDayOfWeek === null ? null : parseInt(scheduleDayOfWeek);
+    if (scheduleDayOfMonth !== undefined) data.scheduleDayOfMonth = scheduleDayOfMonth === null ? null : parseInt(scheduleDayOfMonth);
+    if (scheduleWeekOrdinal !== undefined) data.scheduleWeekOrdinal = scheduleWeekOrdinal === null ? null : parseInt(scheduleWeekOrdinal);
 
     const updated = await prisma.alertDefinition.update({
       where: { id: defId },

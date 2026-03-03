@@ -1792,7 +1792,14 @@ export default function SettingsPage() {
           </div>
         )}
         {/* アラート定義タブ */}
-        {tab === 'alertDefinition' && (
+        {tab === 'alertDefinition' && (() => {
+          const DOW_KEYS = ['dow_sun','dow_mon','dow_tue','dow_wed','dow_thu','dow_fri','dow_sat'] as const;
+          const SEVERITY_COLORS: Record<string, string> = {
+            INFO: 'bg-sky-100 text-sky-700',
+            WARNING: 'bg-amber-100 text-amber-700',
+            CRITICAL: 'bg-rose-100 text-rose-700',
+          };
+          return (
           <div className="space-y-4">
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100">
@@ -1810,104 +1817,201 @@ export default function SettingsPage() {
                 if (!def.targetIds) return [];
                 try { const p = JSON.parse(def.targetIds); return Array.isArray(p) ? p : []; } catch { return []; }
               })();
+              const monthlyMode = def.scheduleWeekOrdinal != null ? 'weekday' : 'date';
+              const selSm = 'border border-slate-200 rounded-lg text-sm px-2.5 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500 bg-white';
               return (
-                <div key={def.id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <label className="relative inline-flex items-center cursor-pointer">
+                <div key={def.id} className={`bg-white rounded-2xl shadow-sm border overflow-hidden transition-opacity ${def.isEnabled ? 'border-slate-200' : 'border-slate-100 opacity-60'}`}>
+                  {/* ── ヘッダー: 名前 + トグル + 保存中 ── */}
+                  <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
                         <input type="checkbox" checked={def.isEnabled} onChange={e => handleSaveAlertDefinition(def.id, { isEnabled: e.target.checked })} className="sr-only peer" />
                         <div className="w-9 h-5 bg-slate-200 peer-focus:ring-2 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
                       </label>
-                      <div>
-                        <h3 className="font-bold text-slate-800">{def.name}</h3>
-                        <span className="text-xs text-slate-400 font-mono">{def.code}</span>
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-slate-800 text-[15px] truncate">{def.name}</h3>
+                        {def.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{def.description}</p>}
                       </div>
                     </div>
-                    {adSaving === def.id && <span className="text-xs text-indigo-500 animate-pulse">{t('saving_ellipsis')}</span>}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[11px] text-slate-400 font-mono bg-slate-50 px-2 py-0.5 rounded">{def.code}</span>
+                      {adSaving === def.id && <span className="text-xs text-indigo-500 animate-pulse">{t('saving_ellipsis')}</span>}
+                    </div>
                   </div>
-                  <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_category')}</label>
-                      <select value={def.categoryId} onChange={e => handleSaveAlertDefinition(def.id, { categoryId: parseInt(e.target.value) })} className={inp}>
-                        {alertCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_severity')}</label>
-                      <select value={def.severity} onChange={e => handleSaveAlertDefinition(def.id, { severity: e.target.value })} className={inp}>
-                        <option value="INFO">INFO</option>
-                        <option value="WARNING">WARNING</option>
-                        <option value="CRITICAL">CRITICAL</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_frequency')}</label>
-                      <select value={def.frequency} onChange={e => handleSaveAlertDefinition(def.id, { frequency: e.target.value })} className={inp}>
-                        <option value="DAILY">{t('freq_daily')}</option>
-                        <option value="WEEKLY">{t('freq_weekly')}</option>
-                        <option value="MONTHLY">{t('freq_monthly')}</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_notification')}</label>
-                      <label className="flex items-center gap-2 mt-1.5 cursor-pointer">
-                        <input type="checkbox" checked={def.notifyEnabled} onChange={e => handleSaveAlertDefinition(def.id, { notifyEnabled: e.target.checked })} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                        <span className="text-sm text-slate-700">{t('browser_notification')}</span>
+
+                  {/* ── ボディ: 2段構成 ── */}
+                  <div className="px-5 py-4 space-y-4">
+                    {/* 上段: カテゴリ・重要度・通知 — インライン */}
+                    <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                      {/* カテゴリ */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">{t('label_category')}</span>
+                        <select value={def.categoryId} onChange={e => handleSaveAlertDefinition(def.id, { categoryId: parseInt(e.target.value) })} className={selSm}>
+                          {alertCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      {/* 重要度 */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-slate-500">{t('label_severity')}</span>
+                        <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                          {(['INFO','WARNING','CRITICAL'] as const).map(sev => (
+                            <button key={sev} type="button"
+                              onClick={() => handleSaveAlertDefinition(def.id, { severity: sev })}
+                              className={`px-2.5 py-1 text-xs font-bold transition-colors ${def.severity === sev ? SEVERITY_COLORS[sev] : 'bg-white text-slate-400 hover:bg-slate-50'}`}
+                            >{sev}</button>
+                          ))}
+                        </div>
+                      </div>
+                      {/* 通知 */}
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input type="checkbox" checked={def.notifyEnabled} onChange={e => handleSaveAlertDefinition(def.id, { notifyEnabled: e.target.checked })} className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                        <span className="text-xs text-slate-600">{t('browser_notification')}</span>
                       </label>
                     </div>
-                    <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_target_type')}</label>
-                      <select value={def.targetType} onChange={e => handleSaveAlertDefinition(def.id, { targetType: e.target.value, targetIds: null })} className={inp}>
-                        <option value="ALL">{t('target_all')}</option>
-                        <option value="ROLE">{t('target_role')}</option>
-                        <option value="DEPARTMENT">{t('target_department')}</option>
-                        <option value="EMPLOYEE">{t('target_employee')}</option>
-                      </select>
+
+                    {/* 下段: スケジュール + 対象 — 2カラム */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* スケジュールセクション */}
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="text-xs font-bold text-slate-500 mb-2.5"><i className="bi bi-clock mr-1"></i>{t('label_schedule')}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          {/* 周期 */}
+                          <select value={def.frequency} onChange={e => {
+                            const freq = e.target.value;
+                            const updates: any = { frequency: freq };
+                            if (freq === 'DAILY') {
+                              updates.scheduleDayOfWeek = null;
+                              updates.scheduleDayOfMonth = null;
+                              updates.scheduleWeekOrdinal = null;
+                            } else if (freq === 'WEEKLY') {
+                              updates.scheduleDayOfWeek = def.scheduleDayOfWeek ?? 1;
+                              updates.scheduleDayOfMonth = null;
+                              updates.scheduleWeekOrdinal = null;
+                            } else if (freq === 'MONTHLY') {
+                              updates.scheduleDayOfWeek = null;
+                              updates.scheduleDayOfMonth = 1;
+                              updates.scheduleWeekOrdinal = null;
+                            }
+                            handleSaveAlertDefinition(def.id, updates);
+                          }} className={`${selSm} font-semibold`}>
+                            <option value="DAILY">{t('freq_daily')}</option>
+                            <option value="WEEKLY">{t('freq_weekly')}</option>
+                            <option value="MONTHLY">{t('freq_monthly')}</option>
+                          </select>
+
+                          {/* WEEKLY: 曜日ボタン */}
+                          {def.frequency === 'WEEKLY' && (
+                            <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                              {DOW_KEYS.map((key, i) => (
+                                <button key={i} type="button"
+                                  onClick={() => handleSaveAlertDefinition(def.id, { scheduleDayOfWeek: i })}
+                                  className={`w-8 py-1 text-xs font-bold transition-colors ${(def.scheduleDayOfWeek ?? 1) === i ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                >{t(key)}</button>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* MONTHLY: 日付 or 第n X曜日 切替 */}
+                          {def.frequency === 'MONTHLY' && (
+                            <>
+                              <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                                <button type="button"
+                                  onClick={() => {
+                                    handleSaveAlertDefinition(def.id, { scheduleDayOfMonth: 1, scheduleWeekOrdinal: null, scheduleDayOfWeek: null });
+                                  }}
+                                  className={`px-2.5 py-1 text-xs font-bold transition-colors ${monthlyMode === 'date' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                >{t('monthly_by_date')}</button>
+                                <button type="button"
+                                  onClick={() => {
+                                    handleSaveAlertDefinition(def.id, { scheduleDayOfMonth: null, scheduleWeekOrdinal: 1, scheduleDayOfWeek: def.scheduleDayOfWeek ?? 1 });
+                                  }}
+                                  className={`px-2.5 py-1 text-xs font-bold transition-colors ${monthlyMode === 'weekday' ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                >{t('monthly_by_weekday')}</button>
+                              </div>
+                              {monthlyMode === 'date' ? (
+                                <select value={def.scheduleDayOfMonth ?? 1} onChange={e => handleSaveAlertDefinition(def.id, { scheduleDayOfMonth: parseInt(e.target.value) })} className={selSm}>
+                                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                                    <option key={d} value={d}>{d}{t('label_day_of_month')}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <>
+                                  <select value={def.scheduleWeekOrdinal ?? 1} onChange={e => handleSaveAlertDefinition(def.id, { scheduleWeekOrdinal: parseInt(e.target.value) })} className={selSm}>
+                                    <option value={1}>{t('week_1st')}</option>
+                                    <option value={2}>{t('week_2nd')}</option>
+                                    <option value={3}>{t('week_3rd')}</option>
+                                    <option value={4}>{t('week_4th')}</option>
+                                    <option value={-1}>{t('week_last')}</option>
+                                  </select>
+                                  <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                                    {DOW_KEYS.map((key, i) => (
+                                      <button key={i} type="button"
+                                        onClick={() => handleSaveAlertDefinition(def.id, { scheduleDayOfWeek: i })}
+                                        className={`w-8 py-1 text-xs font-bold transition-colors ${(def.scheduleDayOfWeek ?? 1) === i ? 'bg-indigo-600 text-white' : 'bg-white text-slate-500 hover:bg-slate-50'}`}
+                                      >{t(key)}</button>
+                                    ))}
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          )}
+
+                          {/* 時刻 (共通) */}
+                          <div className="flex items-center gap-1.5">
+                            <i className="bi bi-clock text-slate-400 text-xs"></i>
+                            <select value={def.scheduleHour ?? 9} onChange={e => handleSaveAlertDefinition(def.id, { scheduleHour: parseInt(e.target.value) })} className={selSm}>
+                              {Array.from({ length: 24 }, (_, i) => (
+                                <option key={i} value={i}>{String(i).padStart(2, '0')}:00</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* 対象セクション */}
+                      <div className="bg-slate-50 rounded-xl px-4 py-3">
+                        <div className="text-xs font-bold text-slate-500 mb-2.5"><i className="bi bi-people mr-1"></i>{t('label_target_type')}</div>
+                        <div className="space-y-2">
+                          <select value={def.targetType} onChange={e => handleSaveAlertDefinition(def.id, { targetType: e.target.value, targetIds: null })} className={selSm}>
+                            <option value="ALL">{t('target_all')}</option>
+                            <option value="ROLE">{t('target_role')}</option>
+                            <option value="DEPARTMENT">{t('target_department')}</option>
+                            <option value="EMPLOYEE">{t('target_employee')}</option>
+                          </select>
+                          {def.targetType === 'ROLE' && (
+                            <select multiple value={localTargetIds.map(String)} onChange={e => {
+                              const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
+                              handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
+                            }} className={`${selSm} w-full min-h-[60px]`}>
+                              {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                            </select>
+                          )}
+                          {def.targetType === 'DEPARTMENT' && (
+                            <select multiple value={localTargetIds.map(String)} onChange={e => {
+                              const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
+                              handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
+                            }} className={`${selSm} w-full min-h-[60px]`}>
+                              {deptList.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+                            </select>
+                          )}
+                          {def.targetType === 'EMPLOYEE' && (
+                            <select multiple value={localTargetIds.map(String)} onChange={e => {
+                              const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
+                              handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
+                            }} className={`${selSm} w-full min-h-[60px]`}>
+                              {empList.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+                            </select>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    {def.targetType === 'ROLE' && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_target_role')}</label>
-                        <select multiple value={localTargetIds.map(String)} onChange={e => {
-                          const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
-                          handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
-                        }} className={`${inp} min-h-[80px]`}>
-                          {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {def.targetType === 'DEPARTMENT' && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_target_dept')}</label>
-                        <select multiple value={localTargetIds.map(String)} onChange={e => {
-                          const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
-                          handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
-                        }} className={`${inp} min-h-[80px]`}>
-                          {deptList.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
-                        </select>
-                      </div>
-                    )}
-                    {def.targetType === 'EMPLOYEE' && (
-                      <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1">{t('label_target_emp')}</label>
-                        <select multiple value={localTargetIds.map(String)} onChange={e => {
-                          const selected = Array.from(e.target.selectedOptions, o => parseInt(o.value));
-                          handleSaveAlertDefinition(def.id, { targetIds: JSON.stringify(selected) });
-                        }} className={`${inp} min-h-[80px]`}>
-                          {empList.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-                        </select>
-                      </div>
-                    )}
                   </div>
-                  {def.description && (
-                    <div className="px-6 pb-4">
-                      <p className="text-xs text-slate-400"><i className="bi bi-info-circle mr-1"></i>{def.description}</p>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
-        )}
+          );
+        })()}
         {/* 評価設定タブ */}
         {tab === 'evaluation' && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">

@@ -128,6 +128,7 @@ export async function runAlertDefinitionChecks(): Promise<{
   });
 
   const jstNow = getJSTDate();
+  const currentHour = jstNow.getHours();
   const dayOfWeek = jstNow.getDay();
   const dayOfMonth = jstNow.getDate();
 
@@ -136,9 +137,35 @@ export async function runAlertDefinitionChecks(): Promise<{
   const errors: string[] = [];
 
   for (const def of definitions) {
+    // 時刻チェック（CRONが毎時実行の場合に有効、1日1回CRONの場合はスキップ）
+    // scheduleHour が設定されている場合、その時刻のみ実行
     // 周期チェック
-    if (def.frequency === 'WEEKLY' && dayOfWeek !== 1) continue;  // 月曜のみ
-    if (def.frequency === 'MONTHLY' && dayOfMonth !== 1) continue; // 1日のみ
+    if (def.frequency === 'WEEKLY') {
+      const targetDay = def.scheduleDayOfWeek ?? 1; // デフォルト月曜
+      if (dayOfWeek !== targetDay) continue;
+    }
+    if (def.frequency === 'MONTHLY') {
+      if (def.scheduleDayOfMonth != null) {
+        // 毎月n日
+        if (dayOfMonth !== def.scheduleDayOfMonth) continue;
+      } else if (def.scheduleWeekOrdinal != null && def.scheduleDayOfWeek != null) {
+        // 毎月第n X曜日
+        if (dayOfWeek !== def.scheduleDayOfWeek) continue;
+        if (def.scheduleWeekOrdinal === -1) {
+          // 最後のX曜日: 次週の同曜日が翌月なら今週が最後
+          const nextWeek = new Date(jstNow);
+          nextWeek.setDate(jstNow.getDate() + 7);
+          if (nextWeek.getMonth() === jstNow.getMonth()) continue;
+        } else {
+          // 第n週: (dayOfMonth - 1) / 7 + 1 = 第何週か
+          const weekOrdinal = Math.ceil(dayOfMonth / 7);
+          if (weekOrdinal !== def.scheduleWeekOrdinal) continue;
+        }
+      } else {
+        // フォールバック: 1日
+        if (dayOfMonth !== 1) continue;
+      }
+    }
     // DAILY は毎日実行
 
     const checkFn = getAlertCheck(def.code);

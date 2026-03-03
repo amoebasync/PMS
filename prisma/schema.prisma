@@ -622,6 +622,7 @@ model FlyerDistributor {
   bankAccountNumber   String? @map("bank_account_number") @db.VarChar(20) // 口座番号
   bankAccountName     String? @map("bank_account_name") @db.VarChar(100) // 名義
   bankAccountNameKana String? @map("bank_account_name_kana") @db.VarChar(100) // 名義（半角カナ）
+  bankCardImageUrl    String? @map("bank_card_image_url") @db.Text // キャッシュカード画像URL
   transferNumber      String? @map("transfer_number") @db.VarChar(50) // 振込番号
 
   // 貸与品・稼働形態
@@ -2733,6 +2734,13 @@ model AlertDefinition {
   category        AlertCategory    @relation(fields: [categoryId], references: [id])
   severity        AlertSeverity    @default(WARNING)
   frequency       AlertFrequency   @default(DAILY)
+
+  // スケジュール詳細
+  scheduleHour       Int            @default(9) @map("schedule_hour")          // 実行時刻（0-23、JST）
+  scheduleDayOfWeek  Int?           @map("schedule_day_of_week")               // 曜日（0=日〜6=土）WEEKLY時
+  scheduleDayOfMonth Int?           @map("schedule_day_of_month")              // 日付（1-31）MONTHLY時
+  scheduleWeekOrdinal Int?          @map("schedule_week_ordinal")              // 第n週（1-5, -1=最後）MONTHLY時
+  // MONTHLY: scheduleDayOfMonth指定 → 毎月n日、scheduleWeekOrdinal+scheduleDayOfWeek指定 → 毎月第n X曜日
 
   targetType      AlertTargetType  @default(ALL) @map("target_type")
   targetIds       String?          @map("target_ids") @db.Text
