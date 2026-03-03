@@ -75,6 +75,8 @@ export default function DistributorPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
   const [filterBranchId, setFilterBranchId] = useState('');
+  const [sortKey, setSortKey] = useState<'id' | 'branch' | 'rank' | ''>('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -167,7 +169,8 @@ export default function DistributorPage() {
   );
 
   const filteredDistributors = useMemo(() => {
-    return distributors.filter(d => {
+    const RANK_ORDER: Record<string, number> = { S: 0, A: 1, B: 2, C: 3, D: 4 };
+    const list = distributors.filter(d => {
       if (filterStatus === 'ACTIVE' && d.leaveDate) return false;
       if (filterStatus === 'INACTIVE' && !d.leaveDate) return false;
       if (filterBranchId && d.branchId?.toString() !== filterBranchId) return false;
@@ -177,7 +180,41 @@ export default function DistributorPage() {
       }
       return true;
     });
-  }, [distributors, searchTerm, filterStatus, filterBranchId]);
+    if (sortKey) {
+      list.sort((a, b) => {
+        let cmp = 0;
+        if (sortKey === 'id') {
+          cmp = (a.id ?? 0) - (b.id ?? 0);
+        } else if (sortKey === 'branch') {
+          const aName = a.branch?.nameJa || '';
+          const bName = b.branch?.nameJa || '';
+          cmp = aName.localeCompare(bName, 'ja');
+        } else if (sortKey === 'rank') {
+          const aR = RANK_ORDER[a.rank] ?? 99;
+          const bR = RANK_ORDER[b.rank] ?? 99;
+          cmp = aR - bR;
+        }
+        return sortDir === 'desc' ? -cmp : cmp;
+      });
+    }
+    return list;
+  }, [distributors, searchTerm, filterStatus, filterBranchId, sortKey, sortDir]);
+
+  const handleSort = (key: 'id' | 'branch' | 'rank') => {
+    if (sortKey === key) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  const SortIcon = ({ col }: { col: string }) => {
+    if (sortKey !== col) return <i className="bi bi-chevron-expand text-slate-300 ml-1 text-[10px]"></i>;
+    return sortDir === 'asc'
+      ? <i className="bi bi-caret-up-fill text-emerald-500 ml-1 text-[10px]"></i>
+      : <i className="bi bi-caret-down-fill text-emerald-500 ml-1 text-[10px]"></i>;
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const target = e.target as HTMLInputElement;
@@ -319,9 +356,9 @@ export default function DistributorPage() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-5 py-3">ID / 氏名</th>
-              <th className="px-5 py-3">支店</th>
-              <th className="px-5 py-3 text-center">ランク</th>
+              <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('id')}>ID / 氏名<SortIcon col="id" /></th>
+              <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('branch')}>支店<SortIcon col="branch" /></th>
+              <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('rank')}>ランク<SortIcon col="rank" /></th>
               <th className="px-5 py-3 text-center">スコア</th>
               <th className="px-5 py-3 text-center">今月出勤</th>
               <th className="px-5 py-3">国籍</th>
