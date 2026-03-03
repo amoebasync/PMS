@@ -1,0 +1,102 @@
+{
+  "btn_new_order": "新規受注の登録",
+
+  "alert_action_required": "要確認アクション",
+  "alert_pending_payment": "件の <span class=\"underline decoration-orange-300 decoration-2\">入金待ち</span> があります",
+  "alert_pending_review": "件の <span class=\"underline decoration-yellow-300 decoration-2\">審査待ち</span> があります",
+
+  "filter_keyword": "キーワード検索",
+  "filter_keyword_placeholder": "受注番号、案件名、顧客名など...",
+  "filter_source": "受注経路",
+  "filter_status": "ステータス",
+  "filter_sales_rep": "担当営業",
+  "filter_all": "すべて",
+  "filter_source_web": "EC経由 (WEB)",
+  "filter_source_sales": "営業経由 (社内)",
+
+  "status_draft": "下書き",
+  "status_planning": "提案中",
+  "status_pending_payment": "入金確認待ち",
+  "status_pending_review": "審査待ち",
+  "status_adjusting": "要調整・修正",
+  "status_confirmed": "手配中(確定)",
+  "status_in_progress": "作業・配布中",
+  "status_completed": "完了",
+  "status_canceled": "キャンセル",
+
+  "th_order_no": "受注番号 / 受注日",
+  "th_customer": "顧客名 / 案件名",
+  "th_sales_rep": "担当営業",
+  "th_breakdown": "依頼内訳",
+  "th_total_amount": "受注総額",
+  "th_status": "ステータス",
+  "th_actions": "操作",
+
+  "badge_ec": "EC経由",
+  "badge_ec_tooltip": "ECサイト経由の発注",
+  "badge_sales": "営業経由",
+  "badge_sales_tooltip": "社内システムでの発注",
+
+  "badge_posting": "ポス",
+  "badge_posting_tooltip": "ポスティング",
+  "badge_print": "印刷",
+  "badge_print_tooltip": "印刷手配",
+  "badge_insert": "折込",
+  "badge_insert_tooltip": "新聞折込",
+  "badge_design": "デザ",
+  "badge_design_tooltip": "デザイン",
+
+  "sales_rep_unassigned": "未定",
+  "click_to_process": "クリックして処理を進める",
+
+  "empty_title": "該当する受注データがありません",
+  "empty_description": "検索条件を変更するか、新規受注を登録してください",
+
+  "delete_confirm": "この受注データを削除しますか？",
+  "delete_confirm_title": "受注データの削除",
+  "delete_failed": "削除に失敗しました",
+
+  "status_update_failed": "ステータス更新に失敗しました",
+  "communication_error": "通信エラーが発生しました",
+
+  "payment_confirm": "受注番号 {{orderNo}} ({{customerName}}) の入金を確認し、審査待ちへ進めますか？",
+  "payment_confirm_label": "確認・進める",
+
+  "review_modal_title": "発注の審査・承認",
+  "review_loading": "データを読み込んでいます...",
+  "review_detail_failed": "詳細データの取得に失敗しました",
+
+  "review_title_unset": "案件名未設定",
+  "review_tax_included": "税込",
+
+  "review_content_title": "依頼内容",
+  "review_plan_label": "プラン:",
+  "review_plan_print_posting": "印刷＋ポスティング",
+  "review_plan_posting_only": "ポスティングのみ",
+  "review_planned_count": "予定枚数:",
+  "review_count_unit": "枚",
+  "review_area_count": "配布エリア:",
+  "review_area_unit": "ヶ所",
+  "review_period": "配布期間:",
+  "review_unset": "未定",
+
+  "review_payment_method": "支払方法:",
+  "review_payment_credit": "クレジットカード",
+  "review_payment_bank": "銀行振込・請求書",
+  "review_payment_status": "入金状況:",
+  "review_payment_completed": "入金済 (決済完了)",
+  "review_payment_pending": "未入金",
+
+  "approve_confirm": "この発注を承認し、受注確定(手配中)としますか？",
+  "approve_confirm_label": "承認する",
+  "reject_reason_required": "不承認の理由を入力してください",
+  "reject_confirm": "この発注を不承認として差し戻しますか？",
+  "reject_confirm_label": "不承認にする",
+  "reject_reason_label": "不承認・差し戻しの理由（必須）",
+  "reject_reason_placeholder": "例: 配布エリアの容量が不足しているため、部数の調整をお願いいたします。",
+  "reject_reason_note": "※この理由はクライアントにも通知・表示されます。",
+
+  "btn_reject": "不承認にする",
+  "btn_approve": "承認して手配へ進む",
+  "btn_close": "閉じる"
+}

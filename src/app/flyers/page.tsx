@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link'; // ★ 追加: これがないとエラーになります
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 const FOLD_STATUS_MAP: Record<string, { label: string, color: string }> = {
   NEEDS_FOLDING: { label: '要折', color: 'bg-rose-100 text-rose-700 border-rose-200' },
@@ -11,6 +12,7 @@ const FOLD_STATUS_MAP: Record<string, { label: string, color: string }> = {
 };
 
 export default function FlyerPage() {
+  const { t } = useTranslation('flyers');
   const { showToast, showConfirm } = useNotification();
   const [flyers, setFlyers] = useState<any[]>([]);
   const [masters, setMasters] = useState({ industries: [], sizes: [], customers: [] });
@@ -95,7 +97,7 @@ export default function FlyerPage() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        throw new Error(errData?.error || '保存に失敗しました。チラシコードが重複している可能性があります。');
+        throw new Error(errData?.error || t('error_save'));
       }
       setIsFormOpen(false);
       fetchData();
@@ -103,12 +105,12 @@ export default function FlyerPage() {
   };
 
   const del = async (id: number) => {
-    if (!await showConfirm('このチラシを削除しますか？', { variant: 'danger', title: 'チラシの削除', detail: 'すでにスケジュールに登録されている場合は削除できません', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_delete'), { variant: 'danger', title: t('confirm_delete_title'), detail: t('confirm_delete_detail'), confirmLabel: t('confirm_delete_btn') })) return;
     try {
       const res = await fetch(`/api/flyers/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       fetchData();
-    } catch (e) { showToast('削除に失敗しました。関連データが存在する可能性があります', 'error'); }
+    } catch (e) { showToast(t('error_delete'), 'error'); }
   };
 
   const openQrModal = async (flyer: any) => {
@@ -136,7 +138,7 @@ export default function FlyerPage() {
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => null);
-        throw new Error(errData?.error || 'QRコードの発行に失敗しました。');
+        throw new Error(errData?.error || t('qr_error_issue'));
       }
       
       const listRes = await fetch(`/api/flyers/${qrFlyer.id}/qrcodes`);
@@ -164,16 +166,16 @@ export default function FlyerPage() {
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.map(q => q.id === qrId ? { ...q, ...editQrForm } : q));
       setEditingQrId(null);
-    } catch (e) { showToast('更新に失敗しました', 'error'); }
+    } catch (e) { showToast(t('qr_error_update'), 'error'); }
   };
 
   const toggleQrActive = async (qr: any) => {
     const newStatus = !qr.isActive;
     const confirmMsg = newStatus
-      ? 'このQRコードを「有効」にしますか？'
-      : 'このQRコードを「無効（アーカイブ）」にしますか？\n無効にすると、スキャンしたユーザーはデフォルトページへ転送されます。';
+      ? t('qr_confirm_activate')
+      : t('qr_confirm_deactivate');
 
-    if (!await showConfirm(confirmMsg, { variant: 'warning', confirmLabel: '変更する' })) return;
+    if (!await showConfirm(confirmMsg, { variant: 'warning', confirmLabel: t('qr_confirm_change') })) return;
 
     try {
       const res = await fetch(`/api/qrcodes/${qr.id}`, {
@@ -183,16 +185,16 @@ export default function FlyerPage() {
       });
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.map(q => q.id === qr.id ? { ...q, isActive: newStatus } : q));
-    } catch (e) { showToast('ステータスの更新に失敗しました', 'error'); }
+    } catch (e) { showToast(t('qr_error_status'), 'error'); }
   };
 
   const deleteQrCode = async (qrId: number) => {
-    if (!await showConfirm('このQRコードを物理削除しますか？', { variant: 'danger', title: '【警告】QRコードの物理削除', detail: 'すでに印刷・配布されている場合、スキャンしても404エラーになります。通常は「無効化」を使用してください。', confirmLabel: '物理削除する' })) return;
+    if (!await showConfirm(t('qr_confirm_physical_delete'), { variant: 'danger', title: t('qr_physical_delete_title'), detail: t('qr_physical_delete_detail'), confirmLabel: t('qr_physical_delete_btn') })) return;
     try {
       const res = await fetch(`/api/qrcodes/${qrId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       setQrCodes(prev => prev.filter(q => q.id !== qrId));
-    } catch (e) { showToast('削除に失敗しました', 'error'); }
+    } catch (e) { showToast(t('qr_error_delete'), 'error'); }
   };
 
   const filteredFlyers = flyers.filter(f => 
@@ -205,14 +207,14 @@ export default function FlyerPage() {
     <div className="space-y-6">
       <div className="flex justify-end gap-2 mb-4">
         <button onClick={() => openForm()} className="bg-fuchsia-600 hover:bg-fuchsia-700 text-white px-4 py-2 rounded-lg font-bold shadow-md">
-          <i className="bi bi-plus-lg"></i> 新規チラシ登録
+          <i className="bi bi-plus-lg"></i> {t('btn_new')}
         </button>
       </div>
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="relative max-w-md">
           <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-          <input type="text" placeholder="チラシ名、コード、顧客名で検索..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-fuchsia-500" />
+          <input type="text" placeholder={t('search_placeholder')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border rounded-lg outline-none focus:ring-2 focus:ring-fuchsia-500" />
         </div>
       </div>
 
@@ -221,22 +223,22 @@ export default function FlyerPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">チラシ名 / コード</th>
-              <th className="px-6 py-4">顧客 / 業種</th>
-              <th className="px-6 py-4">サイズ / 折ステータス</th>
-              <th className="px-6 py-4">1束の枚数</th>
-              <th className="px-6 py-4">有効期間</th>
-              <th className="px-6 py-4 text-right bg-slate-100">現在庫</th>
-              <th className="px-6 py-4 text-center">操作</th>
+              <th className="px-6 py-4">{t('table_name_code')}</th>
+              <th className="px-6 py-4">{t('table_customer_industry')}</th>
+              <th className="px-6 py-4">{t('table_size_fold')}</th>
+              <th className="px-6 py-4">{t('table_bundle_count')}</th>
+              <th className="px-6 py-4">{t('table_valid_period')}</th>
+              <th className="px-6 py-4 text-right bg-slate-100">{t('table_current_stock')}</th>
+              <th className="px-6 py-4 text-center">{t('actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td colSpan={7} className="p-8 text-center">読み込み中...</td></tr> : 
+            {isLoading ? <tr><td colSpan={7} className="p-8 text-center">{t('loading')}</td></tr> :
              filteredFlyers.map(f => (
               <tr key={f.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4">
                   <div className="font-bold text-slate-800 text-base">{f.name}</div>
-                  <div className="font-mono text-xs text-slate-400 mt-1"><i className="bi bi-upc-scan text-slate-300"></i> {f.flyerCode || 'コードなし'}</div>
+                  <div className="font-mono text-xs text-slate-400 mt-1"><i className="bi bi-upc-scan text-slate-300"></i> {f.flyerCode || t('no_code')}</div>
                 </td>
                 <td className="px-6 py-4">
                   <div className="font-bold text-slate-700">{f.customer?.name}</div>
@@ -250,19 +252,19 @@ export default function FlyerPage() {
                 </td>
                 <td className="px-6 py-4">
                   {f.bundleCount ? (
-                    <span className="font-bold text-slate-700">{f.bundleCount.toLocaleString()} <span className="text-xs font-normal">枚</span></span>
+                    <span className="font-bold text-slate-700">{f.bundleCount.toLocaleString()} <span className="text-xs font-normal">{t('sheets')}</span></span>
                   ) : <span className="text-slate-400">-</span>}
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-600 font-mono">
-                  {f.startDate ? new Date(f.startDate).toLocaleDateString() : '未定'} <br/>
-                  〜 {f.endDate ? new Date(f.endDate).toLocaleDateString() : '未定'}
+                  {f.startDate ? new Date(f.startDate).toLocaleDateString() : t('undecided')} <br/>
+                  〜 {f.endDate ? new Date(f.endDate).toLocaleDateString() : t('undecided')}
                 </td>
                 <td className="px-6 py-4 text-right bg-slate-50">
-                  <div className="font-bold text-lg text-fuchsia-600">{f.stockCount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">枚</span></div>
-                  <Link href="/transactions" className="text-[10px] font-bold text-blue-600 hover:underline mt-1 block">入出庫の管理 &gt;</Link>
+                  <div className="font-bold text-lg text-fuchsia-600">{f.stockCount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">{t('sheets')}</span></div>
+                  <Link href="/transactions" className="text-[10px] font-bold text-blue-600 hover:underline mt-1 block">{t('stock_management_link')}</Link>
                 </td>
                 <td className="px-6 py-4 text-center space-x-1">
-                  <button onClick={() => openQrModal(f)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="QRコード発行・管理"><i className="bi bi-qr-code text-lg"></i></button>
+                  <button onClick={() => openQrModal(f)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title={t('qr_title')}><i className="bi bi-qr-code text-lg"></i></button>
                   <button onClick={() => openForm(f)} className="p-2 text-slate-400 hover:text-fuchsia-600 transition-colors"><i className="bi bi-pencil-square text-lg"></i></button>
                   <button onClick={() => del(f.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors"><i className="bi bi-trash text-lg"></i></button>
                 </td>
@@ -281,43 +283,43 @@ export default function FlyerPage() {
             {/* 左側：新規発行フォーム */}
             <div className="w-full md:w-[360px] bg-slate-50 p-6 border-r border-slate-200 flex flex-col shrink-0 overflow-y-auto custom-scrollbar">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="font-bold text-slate-800"><i className="bi bi-qr-code text-indigo-600 mr-2"></i>QRコード発行</h3>
+                <h3 className="font-bold text-slate-800"><i className="bi bi-qr-code text-indigo-600 mr-2"></i>{t('qr_issue_title')}</h3>
                 <button onClick={() => setIsQrModalOpen(false)} className="md:hidden text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
               </div>
 
               <form onSubmit={saveQrCode} className="space-y-5 flex-1">
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">転送先URL (LPなど) <span className="text-rose-500">*</span></label>
-                  <input type="url" required value={qrForm.redirectUrl} onChange={e => setQrForm({...qrForm, redirectUrl: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="https://example.com/campaign" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('qr_redirect_url')} <span className="text-rose-500">*</span></label>
+                  <input type="url" required value={qrForm.redirectUrl} onChange={e => setQrForm({...qrForm, redirectUrl: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder={t('qr_redirect_placeholder')} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">エイリアス (URLの一部) <span className="text-rose-500">*</span></label>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('qr_alias')} <span className="text-rose-500">*</span></label>
                   <div className="flex items-center text-sm border border-slate-300 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-indigo-500">
                     <span className="bg-slate-100 text-slate-500 px-3 py-2.5 text-xs font-mono border-r border-slate-300 shrink-0">/q/</span>
-                    <input type="text" required value={qrForm.alias} onChange={e => setQrForm({...qrForm, alias: e.target.value})} className="w-full p-2.5 outline-none font-mono text-sm" placeholder="azabu-sp" pattern="[a-zA-Z0-9-_]+" title="半角英数字、ハイフン、アンダースコアのみ" />
+                    <input type="text" required value={qrForm.alias} onChange={e => setQrForm({...qrForm, alias: e.target.value})} className="w-full p-2.5 outline-none font-mono text-sm" placeholder={t('qr_alias_placeholder')} pattern="[a-zA-Z0-9-_]+" title={t('qr_alias_pattern_title')} />
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">※チラシに印字されるURLです。<br/>例: pms.tiramis.co.jp/q/azabu-sp</p>
+                  <p className="text-[10px] text-slate-500 mt-1">{t('qr_alias_note')}<br/>{t('qr_alias_example')}</p>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">識別用メモ</label>
-                  <input type="text" value={qrForm.memo} onChange={e => setQrForm({...qrForm, memo: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="表面 右下用 など" />
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('qr_memo')}</label>
+                  <input type="text" value={qrForm.memo} onChange={e => setQrForm({...qrForm, memo: e.target.value})} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500 outline-none" placeholder={t('qr_memo_placeholder')} />
                 </div>
 
                 <div className="p-3 bg-indigo-50/50 border border-indigo-100 rounded-lg mt-3">
                   <label className="flex items-center gap-2 cursor-pointer mb-2">
                     <input type="checkbox" checked={qrForm.notifyOnScan} onChange={e => setQrForm({...qrForm, notifyOnScan: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                    <span className="text-xs font-bold text-indigo-900">スキャン時にメール通知する</span>
+                    <span className="text-xs font-bold text-indigo-900">{t('qr_notify_on_scan')}</span>
                   </label>
                   {qrForm.notifyOnScan && (
                     <div>
-                      <label className="text-[10px] text-slate-500 block mb-1">送信先メールアドレス (複数可)</label>
-                      <textarea value={qrForm.notificationEmails} onChange={e => setQrForm({...qrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-xs border border-indigo-200 rounded p-2 outline-none focus:ring-1 focus:ring-indigo-500" placeholder="client@example.com, boss@example.com" />
+                      <label className="text-[10px] text-slate-500 block mb-1">{t('qr_notify_emails_label')}</label>
+                      <textarea value={qrForm.notificationEmails} onChange={e => setQrForm({...qrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-xs border border-indigo-200 rounded p-2 outline-none focus:ring-1 focus:ring-indigo-500" placeholder={t('qr_notify_emails_placeholder')} />
                     </div>
                   )}
                 </div>
 
                 <button type="submit" disabled={isQrSaving} className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-all mt-4 disabled:opacity-50">
-                  {isQrSaving ? '発行中...' : 'QRコードを発行する'}
+                  {isQrSaving ? t('qr_issuing') : t('qr_issue_btn')}
                 </button>
               </form>
             </div>
@@ -327,7 +329,7 @@ export default function FlyerPage() {
               <div className="flex justify-between items-center mb-6 hidden md:flex pb-3 border-b border-slate-100 sticky top-0 bg-white z-10">
                 <div>
                   <h3 className="font-bold text-slate-800 text-xl">{qrFlyer.name}</h3>
-                  <p className="text-xs text-slate-500 mt-1">発行済みQRコード一覧とダウンロード</p>
+                  <p className="text-xs text-slate-500 mt-1">{t('qr_list_title')}</p>
                 </div>
                 <button onClick={() => setIsQrModalOpen(false)} className="text-slate-400 hover:text-slate-800 transition-colors p-2"><i className="bi bi-x-lg text-xl"></i></button>
               </div>
@@ -335,7 +337,7 @@ export default function FlyerPage() {
               {qrCodes.length === 0 ? (
                 <div className="text-center py-20 text-slate-400 flex flex-col items-center">
                   <i className="bi bi-qr-code text-6xl mb-4 text-slate-200"></i>
-                  <p>QRコードはまだ発行されていません。<br/>左のフォームから作成してください。</p>
+                  <p>{t('qr_empty')}<br/>{t('qr_empty_hint')}</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 2xl:grid-cols-2 gap-5">
@@ -364,7 +366,7 @@ export default function FlyerPage() {
                                 onChange={e => setQrOptions({...qrOptions, [qr.id]: { transparent: e.target.checked }})} 
                                 className="accent-indigo-600"
                               />
-                              背景を透過する
+                              {t('qr_transparent_bg')}
                             </label>
                             
                             <div className="flex gap-1.5 w-full">
@@ -383,33 +385,33 @@ export default function FlyerPage() {
                           {editingQrId === qr.id ? (
                             <div className="flex flex-col gap-3 h-full bg-indigo-50/30 p-4 rounded-xl border border-indigo-100">
                               <div className="font-bold text-xs text-indigo-700 border-b border-indigo-200 pb-2 mb-1">
-                                <i className="bi bi-pencil-square mr-1"></i>QRコード情報の編集
+                                <i className="bi bi-pencil-square mr-1"></i>{t('qr_edit_title')}
                               </div>
                               <div>
-                                <label className="text-[10px] text-slate-500 font-bold block mb-1">転送先URL</label>
+                                <label className="text-[10px] text-slate-500 font-bold block mb-1">{t('qr_edit_redirect')}</label>
                                 <input type="url" value={editQrForm.redirectUrl} onChange={e => setEditQrForm({...editQrForm, redirectUrl: e.target.value})} className="w-full text-xs border border-indigo-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner bg-white" />
                               </div>
                               <div>
-                                <label className="text-[10px] text-slate-500 font-bold block mb-1">メモ</label>
+                                <label className="text-[10px] text-slate-500 font-bold block mb-1">{t('qr_edit_memo')}</label>
                                 <input type="text" value={editQrForm.memo} onChange={e => setEditQrForm({...editQrForm, memo: e.target.value})} className="w-full text-xs border border-indigo-300 rounded-lg p-2 outline-none focus:ring-2 focus:ring-indigo-500 shadow-inner bg-white" />
                               </div>
                               
                               <div className="p-3 bg-white border border-indigo-100 rounded-lg shadow-sm">
                                 <label className="flex items-center gap-2 cursor-pointer mb-1.5">
                                   <input type="checkbox" checked={editQrForm.notifyOnScan} onChange={e => setEditQrForm({...editQrForm, notifyOnScan: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500" />
-                                  <span className="text-[10px] font-bold text-indigo-900">スキャン時にメール通知する</span>
+                                  <span className="text-[10px] font-bold text-indigo-900">{t('qr_notify_on_scan')}</span>
                                 </label>
                                 {editQrForm.notifyOnScan && (
                                   <div className="mt-2">
-                                    <label className="text-[9px] text-slate-500 block mb-0.5">送信先メールアドレス</label>
+                                    <label className="text-[9px] text-slate-500 block mb-0.5">{t('qr_edit_notify_emails')}</label>
                                     <textarea value={editQrForm.notificationEmails} onChange={e => setEditQrForm({...editQrForm, notificationEmails: e.target.value})} rows={2} className="w-full text-[10px] border border-indigo-200 rounded p-1.5 outline-none focus:ring-1 focus:ring-indigo-500 bg-slate-50" placeholder="client@example.com" />
                                   </div>
                                 )}
                               </div>
 
                               <div className="flex justify-end gap-2 mt-auto pt-3 border-t border-indigo-100">
-                                <button onClick={() => setEditingQrId(null)} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] rounded-lg font-bold hover:bg-slate-50 transition-colors">キャンセル</button>
-                                <button onClick={() => saveEditQr(qr.id)} className="px-4 py-2 bg-indigo-600 text-white text-[10px] rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors">保存する</button>
+                                <button onClick={() => setEditingQrId(null)} className="px-4 py-2 bg-white border border-slate-200 text-slate-600 text-[10px] rounded-lg font-bold hover:bg-slate-50 transition-colors">{t('cancel')}</button>
+                                <button onClick={() => saveEditQr(qr.id)} className="px-4 py-2 bg-indigo-600 text-white text-[10px] rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors">{t('qr_save_btn')}</button>
                               </div>
                             </div>
                           ) : (
@@ -420,15 +422,15 @@ export default function FlyerPage() {
                                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-colors shadow-sm border ${qr.isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'}`}
                                 >
                                   <span className={`w-2 h-2 rounded-full ${qr.isActive ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
-                                  {qr.isActive ? '有効 (Active)' : '無効 (Archived)'}
+                                  {qr.isActive ? t('qr_active') : t('qr_archived')}
                                 </button>
                                 
                                 <div className="flex gap-2">
                                   <button onClick={() => startEditQr(qr)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-indigo-600 bg-white border border-slate-200 hover:border-indigo-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title="編集">
-                                    <i className="bi bi-pencil-square"></i> 編集
+                                    <i className="bi bi-pencil-square"></i> {t('edit')}
                                   </button>
-                                  <button onClick={() => deleteQrCode(qr.id)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title="削除">
-                                    <i className="bi bi-trash"></i> 削除
+                                  <button onClick={() => deleteQrCode(qr.id)} className="flex items-center gap-1.5 text-[10px] font-bold text-slate-600 hover:text-rose-600 bg-white border border-slate-200 hover:border-rose-300 px-3 py-1.5 rounded-lg transition-colors shadow-sm" title={t('delete')}>
+                                    <i className="bi bi-trash"></i> {t('delete')}
                                   </button>
                                 </div>
                               </div>
@@ -436,14 +438,14 @@ export default function FlyerPage() {
                               {qr.memo && <div className="text-xs font-bold text-slate-700 mb-3 truncate bg-slate-100 inline-block px-2 py-1 rounded-md border border-slate-200" title={qr.memo}><i className="bi bi-tag-fill text-slate-400 mr-1"></i>{qr.memo}</div>}
                               
                               <div className="mb-3">
-                                <div className="text-[10px] text-slate-500 font-bold mb-1">印刷用URL (エイリアス):</div>
+                                <div className="text-[10px] text-slate-500 font-bold mb-1">{t('qr_print_url')}</div>
                                 <div className="font-mono text-xs text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-3 py-2 rounded-lg truncate" title={qrUrl}>
                                   {qrUrl}
                                 </div>
                               </div>
                               
                               <div className="mb-4">
-                                <div className="text-[10px] text-slate-500 font-bold mb-1">転送先URL:</div>
+                                <div className="text-[10px] text-slate-500 font-bold mb-1">{t('qr_redirect_url_label')}</div>
                                 <a href={qr.redirectUrl} target="_blank" className="text-xs text-blue-600 hover:underline truncate block w-full" title={qr.redirectUrl}>
                                   <i className="bi bi-link-45deg"></i> {qr.redirectUrl}
                                 </a>
@@ -451,12 +453,12 @@ export default function FlyerPage() {
 
                               {qr.notifyOnScan && (
                                 <div className="text-[10px] text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-1.5 rounded-md flex items-center gap-1.5 mb-3 self-start truncate max-w-full font-medium">
-                                  <i className="bi bi-envelope-check-fill text-indigo-500"></i> 通知ON ({qr.notificationEmails?.split(',').length || 0}件)
+                                  <i className="bi bi-envelope-check-fill text-indigo-500"></i> {t('qr_notify_on', { count: qr.notificationEmails?.split(',').length || 0 })}
                                 </div>
                               )}
                               
                               <div className="mt-auto flex flex-wrap items-center justify-between pt-4 border-t border-slate-100 gap-4">
-                                <div className="text-[10px] text-slate-400 font-medium">作成: {new Date(qr.createdAt).toLocaleDateString()}</div>
+                                <div className="text-[10px] text-slate-400 font-medium">{t('qr_created', { date: new Date(qr.createdAt).toLocaleDateString() })}</div>
                                 
                                 <div className="flex gap-5">
                                   <div className="flex flex-col items-end" title="総スキャン回数 (延べアクセス数)">
@@ -497,92 +499,92 @@ export default function FlyerPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-              <h3 className="font-bold text-slate-800">{currentId ? 'チラシ情報の編集' : '新規チラシ登録'}</h3>
+              <h3 className="font-bold text-slate-800">{currentId ? t('modal_title_edit') : t('modal_title_new')}</h3>
               <button onClick={() => setIsFormOpen(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             
             <form onSubmit={save} className="p-6 overflow-y-auto space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 md:col-span-1">
-                  <label className="text-xs font-bold text-slate-600">チラシ名 *</label>
-                  <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 春の入会キャンペーン" />
+                  <label className="text-xs font-bold text-slate-600">{t('form_name')}</label>
+                  <input required name="name" value={formData.name} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder={t('form_name_placeholder')} />
                 </div>
-                
+
                 <div className="col-span-2 md:col-span-1">
-                  <label className="text-xs font-bold text-slate-600">チラシコード (UNIQUE)</label>
-                  <input name="flyerCode" value={formData.flyerCode} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-blue-50 focus:bg-white" placeholder="クライアント独自のIDなど" />
+                  <label className="text-xs font-bold text-slate-600">{t('form_code')}</label>
+                  <input name="flyerCode" value={formData.flyerCode} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-blue-50 focus:bg-white" placeholder={t('form_code_placeholder')} />
                 </div>
                 
                 <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-600">顧客 (クライアント) *</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_customer')}</label>
                   <select required name="customerId" value={formData.customerId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
-                    <option value="">選択してください</option>
+                    <option value="">{t('form_select_placeholder')}</option>
                     {(masters.customers || []).map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-600">業種 (併配NGチェック用) *</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_industry')}</label>
                   <select required name="industryId" value={formData.industryId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
-                    <option value="">選択してください</option>
+                    <option value="">{t('form_select_placeholder')}</option>
                     {(masters.industries || []).map((i: any) => <option key={i.id} value={i.id}>{i.name}</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-600">サイズ *</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_size')}</label>
                   <select required name="sizeId" value={formData.sizeId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
-                    <option value="">選択してください</option>
-                    {(masters.sizes || []).map((s: any) => <option key={s.id} value={s.id}>{s.name} {s.isFoldRequired ? '(折必須)' : ''}</option>)}
+                    <option value="">{t('form_select_placeholder')}</option>
+                    {(masters.sizes || []).map((s: any) => <option key={s.id} value={s.id}>{s.name} {s.isFoldRequired ? t('form_size_fold_required') : ''}</option>)}
                   </select>
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-600">配布開始可能日</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_start_date')}</label>
                   <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600">配布完了期限</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_end_date')}</label>
                   <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" />
                 </div>
 
                 <div className="col-span-2 p-4 bg-fuchsia-50/50 border border-fuchsia-100 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600">1束の枚数 (結束用)</label>
+                  <label className="text-xs font-bold text-slate-600">{t('form_bundle_count')}</label>
                   <div className="relative mt-1 max-w-xs">
-                    <input type="number" min="1" name="bundleCount" value={formData.bundleCount} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white pr-8 text-right font-bold text-slate-700" placeholder="例: 500" />
-                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">枚</span>
+                    <input type="number" min="1" name="bundleCount" value={formData.bundleCount} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white pr-8 text-right font-bold text-slate-700" placeholder={t('form_bundle_placeholder')} />
+                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">{t('sheets')}</span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-1">※この枚数単位で在庫の持ち出し計算が行われます</p>
+                  <p className="text-[10px] text-slate-500 mt-1">{t('form_bundle_note')}</p>
                 </div>
 
                 <div className="col-span-2 p-4 bg-slate-50 border border-slate-200 rounded-lg">
-                  <label className="text-xs font-bold text-slate-600 block mb-2">折りステータス (現在の状態)</label>
+                  <label className="text-xs font-bold text-slate-600 block mb-2">{t('form_fold_status')}</label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" name="foldStatus" value="NO_FOLDING_REQUIRED" checked={formData.foldStatus === 'NO_FOLDING_REQUIRED'} onChange={handleInputChange} />
-                      <span className="text-sm">折無し (そのまま配布可)</span>
+                      <span className="text-sm">{t('form_fold_none')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" name="foldStatus" value="NEEDS_FOLDING" checked={formData.foldStatus === 'NEEDS_FOLDING'} onChange={handleInputChange} />
-                      <span className="text-sm font-bold text-rose-600">要折 (自社作業が必要/配布不可)</span>
+                      <span className="text-sm font-bold text-rose-600">{t('form_fold_needs')}</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input type="radio" name="foldStatus" value="FOLDED" checked={formData.foldStatus === 'FOLDED'} onChange={handleInputChange} />
-                      <span className="text-sm font-bold text-blue-600">折済 (作業完了/配布可)</span>
+                      <span className="text-sm font-bold text-blue-600">{t('form_fold_done')}</span>
                     </label>
                   </div>
                 </div>
 
                 <div className="col-span-2">
-                  <label className="text-xs font-bold text-slate-600">備考</label>
-                  <textarea name="remarks" value={formData.remarks} onChange={handleInputChange} rows={2} className="w-full border p-2 rounded-lg text-sm" placeholder="注意事項など" />
+                  <label className="text-xs font-bold text-slate-600">{t('form_remarks')}</label>
+                  <textarea name="remarks" value={formData.remarks} onChange={handleInputChange} rows={2} className="w-full border p-2 rounded-lg text-sm" placeholder={t('form_remarks_placeholder')} />
                 </div>
               </div>
 
               <div className="pt-4 border-t flex justify-end gap-3">
-                <button type="button" onClick={() => setIsFormOpen(false)} className="px-5 py-2.5 text-slate-600 text-sm font-bold">キャンセル</button>
+                <button type="button" onClick={() => setIsFormOpen(false)} className="px-5 py-2.5 text-slate-600 text-sm font-bold">{t('cancel')}</button>
                 <button type="submit" className="px-5 py-2.5 bg-fuchsia-600 hover:bg-fuchsia-700 text-white rounded-lg text-sm font-bold shadow-md">
-                  {currentId ? '更新する' : '登録する'}
+                  {currentId ? t('btn_update') : t('btn_register')}
                 </button>
               </div>
             </form>

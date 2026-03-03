@@ -11,12 +11,19 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '認証エラー' }, { status: 401 });
     }
 
+    const currentEmployeeId = parseInt(session.value);
+
     const { searchParams } = new URL(request.url);
     const unreadOnly = searchParams.get('unreadOnly') === 'true';
     const limit = parseInt(searchParams.get('limit') || '20');
     const sinceId = searchParams.get('sinceId') ? parseInt(searchParams.get('sinceId')!) : undefined;
 
-    const where: any = {};
+    // recipientId が null（全員向け）または自分宛の通知のみ表示
+    const recipientFilter = isNaN(currentEmployeeId)
+      ? { recipientId: null }
+      : { OR: [{ recipientId: null }, { recipientId: currentEmployeeId }] };
+
+    const where: any = { ...recipientFilter };
     if (unreadOnly) {
       where.isRead = false;
     }
@@ -34,7 +41,10 @@ export async function GET(request: Request) {
         },
       }),
       prisma.adminNotification.count({
-        where: { isRead: false },
+        where: {
+          isRead: false,
+          ...recipientFilter,
+        },
       }),
     ]);
 
@@ -47,6 +57,8 @@ export async function GET(request: Request) {
         scheduleId: n.scheduleId,
         distributorId: n.distributorId,
         distributorName: n.distributor?.name,
+        alertDefinitionId: n.alertDefinitionId,
+        alertId: n.alertId,
         isRead: n.isRead,
         createdAt: n.createdAt,
       })),

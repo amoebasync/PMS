@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 import { GoogleMap, useJsApiLoader, Marker, Polygon, InfoWindow, DrawingManager } from '@react-google-maps/api';
 import { MarkerClusterer, SuperClusterAlgorithm } from '@googlemaps/markerclusterer';
 import * as XLSX from 'xlsx';
@@ -87,10 +88,10 @@ interface ValidationResult {
 // ===== Constants =====
 type TabKey = 'list' | 'map' | 'import';
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'list', label: '一覧', icon: 'bi-list-ul' },
-  { key: 'map', label: '地図', icon: 'bi-geo-alt-fill' },
-  { key: 'import', label: 'CSVインポート', icon: 'bi-upload' },
+const TABS: { key: TabKey; labelKey: string; icon: string }[] = [
+  { key: 'list', labelKey: 'tab_list', icon: 'bi-list-ul' },
+  { key: 'map', labelKey: 'tab_map', icon: 'bi-geo-alt-fill' },
+  { key: 'import', labelKey: 'tab_csv_import', icon: 'bi-upload' },
 ];
 
 const INPUT_CLS = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500';
@@ -158,19 +159,29 @@ const fmtDate = (d: string | null) => {
 };
 
 // ===== Severity helpers =====
-const SEVERITY_CONFIG: Record<number, { label: string; color: string; bg: string; border: string; icon: string }> = {
-  1: { label: '低', color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200', icon: 'bi-dash-circle' },
-  2: { label: 'やや低', color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bi-info-circle' },
-  3: { label: '中', color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bi-exclamation-circle' },
-  4: { label: '高', color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: 'bi-exclamation-triangle-fill' },
-  5: { label: '最高', color: 'text-rose-700', bg: 'bg-rose-100', border: 'border-rose-300', icon: 'bi-fire' },
+const SEVERITY_STYLE: Record<number, { color: string; bg: string; border: string; icon: string }> = {
+  1: { color: 'text-slate-600', bg: 'bg-slate-100', border: 'border-slate-200', icon: 'bi-dash-circle' },
+  2: { color: 'text-blue-700', bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bi-info-circle' },
+  3: { color: 'text-amber-700', bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bi-exclamation-circle' },
+  4: { color: 'text-orange-700', bg: 'bg-orange-50', border: 'border-orange-200', icon: 'bi-exclamation-triangle-fill' },
+  5: { color: 'text-rose-700', bg: 'bg-rose-100', border: 'border-rose-300', icon: 'bi-fire' },
 };
 
-const SeverityBadge = ({ value }: { value: number | null }) => {
-  const cfg = SEVERITY_CONFIG[value ?? 3] || SEVERITY_CONFIG[3];
+const SEVERITY_LABEL_KEYS: Record<number, string> = {
+  1: 'severity_low',
+  2: 'severity_slightly_low',
+  3: 'severity_medium',
+  4: 'severity_high',
+  5: 'severity_highest',
+};
+
+const SeverityBadge = ({ value, t }: { value: number | null; t?: (key: string) => string }) => {
+  const cfg = SEVERITY_STYLE[value ?? 3] || SEVERITY_STYLE[3];
+  const labelKey = SEVERITY_LABEL_KEYS[value ?? 3] || SEVERITY_LABEL_KEYS[3];
+  const label = t ? t(labelKey) : labelKey;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${cfg.bg} ${cfg.color} border ${cfg.border}`}>
-      <i className={`bi ${cfg.icon}`}></i>{cfg.label}
+      <i className={`bi ${cfg.icon}`}></i>{label}
     </span>
   );
 };
@@ -178,6 +189,7 @@ const SeverityBadge = ({ value }: { value: number | null }) => {
 // ===== Component =====
 export default function ProhibitedPropertiesPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('prohibited-properties');
 
   // -- Tab
   const [activeTab, setActiveTab] = useState<TabKey>('list');
@@ -316,14 +328,14 @@ export default function ProhibitedPropertiesPage() {
         setItems(json.data);
         setTotal(json.total);
       } else {
-        showToast('データの取得に失敗しました', 'error');
+        showToast(t('fetch_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [page, limit, filterPrefecture, filterCity, filterSearch, filterIsActive, filterCustomer, showToast]);
+  }, [page, limit, filterPrefecture, filterCity, filterSearch, filterIsActive, filterCustomer, showToast, t]);
 
   useEffect(() => { fetchMaster(); }, [fetchMaster]);
   useEffect(() => { if (activeTab === 'list') fetchList(); }, [activeTab, fetchList]);
@@ -343,10 +355,10 @@ export default function ProhibitedPropertiesPage() {
         const data = await res.json();
         setSelectedProperty(data);
       } else {
-        showToast('詳細の取得に失敗しました', 'error');
+        showToast(t('detail_fetch_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setDetailLoading(false);
     }
@@ -407,16 +419,16 @@ export default function ProhibitedPropertiesPage() {
         }),
       });
       if (res.ok) {
-        showToast('更新しました', 'success');
+        showToast(t('updated_success'), 'success');
         setIsEditing(false);
         await openDetail(selectedProperty.id);
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || '更新に失敗しました', 'error');
+        showToast(err.error || t('update_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
   };
 
@@ -424,8 +436,8 @@ export default function ProhibitedPropertiesPage() {
   const handleDeactivate = async () => {
     if (!selectedProperty) return;
     const ok = await showConfirm(
-      'この物件を無効化しますか？',
-      { title: '配布禁止物件の無効化', variant: 'danger', confirmLabel: '無効化する' }
+      t('deactivate_confirm'),
+      { title: t('deactivate_title'), variant: 'danger', confirmLabel: t('deactivate_btn') }
     );
     if (!ok) return;
 
@@ -438,24 +450,24 @@ export default function ProhibitedPropertiesPage() {
         body: JSON.stringify({ deactivateReason: reason || null }),
       });
       if (res.ok) {
-        showToast('無効化しました', 'success');
+        showToast(t('deactivated_success'), 'success');
         setDeactivateReason('');
         await openDetail(selectedProperty.id);
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || '無効化に失敗しました', 'error');
+        showToast(err.error || t('deactivate_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
   };
 
   const handleActivate = async () => {
     if (!selectedProperty) return;
     const ok = await showConfirm(
-      'この物件を有効化しますか？',
-      { title: '配布禁止物件の有効化', variant: 'success', confirmLabel: '有効化する' }
+      t('activate_confirm'),
+      { title: t('activate_title'), variant: 'success', confirmLabel: t('activate_btn') }
     );
     if (!ok) return;
 
@@ -466,15 +478,15 @@ export default function ProhibitedPropertiesPage() {
         body: JSON.stringify({ isActive: true, deactivatedAt: null, deactivateReason: null }),
       });
       if (res.ok) {
-        showToast('有効化しました', 'success');
+        showToast(t('activated_success'), 'success');
         await openDetail(selectedProperty.id);
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || '有効化に失敗しました', 'error');
+        showToast(err.error || t('activate_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
   };
 
@@ -490,14 +502,14 @@ export default function ProhibitedPropertiesPage() {
         body: formData,
       });
       if (res.ok) {
-        showToast('画像をアップロードしました', 'success');
+        showToast(t('image_uploaded'), 'success');
         await openDetail(selectedProperty.id);
       } else {
         const err = await res.json();
-        showToast(err.error || 'アップロードに失敗しました', 'error');
+        showToast(err.error || t('image_upload_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setImageUploading(false);
       if (imageInputRef.current) imageInputRef.current.value = '';
@@ -507,8 +519,8 @@ export default function ProhibitedPropertiesPage() {
   const handleImageDelete = async (imageUrl: string) => {
     if (!selectedProperty) return;
     const ok = await showConfirm(
-      'この画像を削除しますか？',
-      { title: '画像の削除', variant: 'danger', confirmLabel: '削除する' }
+      t('image_delete_confirm'),
+      { title: t('image_delete_title'), variant: 'danger', confirmLabel: t('image_delete_btn') }
     );
     if (!ok) return;
 
@@ -519,14 +531,14 @@ export default function ProhibitedPropertiesPage() {
         body: JSON.stringify({ imageUrl }),
       });
       if (res.ok) {
-        showToast('画像を削除しました', 'success');
+        showToast(t('image_deleted'), 'success');
         await openDetail(selectedProperty.id);
       } else {
         const err = await res.json();
-        showToast(err.error || '削除に失敗しました', 'error');
+        showToast(err.error || t('image_delete_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
   };
 
@@ -572,7 +584,7 @@ export default function ProhibitedPropertiesPage() {
 
   const submitCreate = async () => {
     if (!createForm.address) {
-      showToast('住所は必須です', 'warning');
+      showToast(t('address_required'), 'warning');
       return;
     }
     setCreating(true);
@@ -596,15 +608,15 @@ export default function ProhibitedPropertiesPage() {
         }),
       });
       if (res.ok) {
-        showToast('配布禁止物件を登録しました', 'success');
+        showToast(t('registered_success'), 'success');
         setShowCreate(false);
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || '登録に失敗しました', 'error');
+        showToast(err.error || t('register_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setCreating(false);
     }
@@ -701,11 +713,11 @@ export default function ProhibitedPropertiesPage() {
 
   const submitDrawCreate = async () => {
     if (drawnPolygonPaths.length < 3) {
-      showToast('地図上でポリゴンを描画してください', 'warning');
+      showToast(t('draw_polygon_required'), 'warning');
       return;
     }
     if (!drawCreateForm.address) {
-      showToast('住所は必須です', 'warning');
+      showToast(t('address_required'), 'warning');
       return;
     }
 
@@ -732,15 +744,15 @@ export default function ProhibitedPropertiesPage() {
       });
 
       if (res.ok) {
-        showToast('配布禁止エリアを登録しました', 'success');
+        showToast(t('area_registered_success'), 'success');
         closeDrawCreate();
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || '登録に失敗しました', 'error');
+        showToast(err.error || t('register_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setDrawCreating(false);
     }
@@ -870,7 +882,7 @@ export default function ProhibitedPropertiesPage() {
       const rows = XLSX.utils.sheet_to_json<any[]>(worksheet, { header: 1 });
 
       if (rows.length < 2) {
-        showToast('ファイルの中身が空か、データが見つかりません', 'error');
+        showToast(t('csv_empty_file'), 'error');
         return;
       }
 
@@ -912,15 +924,15 @@ export default function ProhibitedPropertiesPage() {
 
         // Required: ADDRESS
         if (!parsed.ADDRESS) {
-          errors.push('ADDRESS (住所) は必須です');
+          errors.push(t('csv_address_required'));
         }
 
         // LATITUDE / LONGITUDE must be numbers if present
         if (parsed.LATITUDE && isNaN(Number(parsed.LATITUDE))) {
-          errors.push('LATITUDE は数値である必要があります');
+          errors.push(t('csv_latitude_number'));
         }
         if (parsed.LONGITUDE && isNaN(Number(parsed.LONGITUDE))) {
-          errors.push('LONGITUDE は数値である必要があります');
+          errors.push(t('csv_longitude_number'));
         }
 
         return { row: idx + 2, data: parsed, errors, isValid: errors.length === 0 };
@@ -929,14 +941,14 @@ export default function ProhibitedPropertiesPage() {
       setCsvParsed(validations);
     } catch (err) {
       console.error('CSV parse error:', err);
-      showToast('ファイルの読み込みに失敗しました', 'error');
+      showToast(t('csv_parse_error'), 'error');
     }
   };
 
   const executeCsvImport = async () => {
     const validRows = csvParsed.filter(v => v.isValid);
     if (validRows.length === 0) {
-      showToast('インポート可能なデータがありません', 'warning');
+      showToast(t('csv_no_valid_data'), 'warning');
       return;
     }
 
@@ -966,14 +978,14 @@ export default function ProhibitedPropertiesPage() {
       if (res.ok) {
         const result = await res.json();
         setCsvResult(result);
-        showToast(`${result.success}件のインポートが完了しました`, 'success');
+        showToast(t('csv_import_success', { count: String(result.success) }), 'success');
         fetchList();
       } else {
         const err = await res.json();
-        showToast(err.error || 'インポートに失敗しました', 'error');
+        showToast(err.error || t('csv_import_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     } finally {
       setCsvImporting(false);
     }
@@ -1026,13 +1038,13 @@ export default function ProhibitedPropertiesPage() {
             onClick={openDrawCreate}
             className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
           >
-            <i className="bi bi-pentagon"></i> 地図で範囲指定
+            <i className="bi bi-pentagon"></i> {t('btn_draw_area')}
           </button>
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
           >
-            <i className="bi bi-plus-lg"></i> 新規登録
+            <i className="bi bi-plus-lg"></i> {t('btn_new_register')}
           </button>
         </div>
       )}
@@ -1050,7 +1062,7 @@ export default function ProhibitedPropertiesPage() {
             }`}
           >
             <i className={`bi ${tab.icon}`}></i>
-            {tab.label}
+            {t(tab.labelKey)}
           </button>
         ))}
       </div>
@@ -1062,61 +1074,61 @@ export default function ProhibitedPropertiesPage() {
           <div className={CARD_CLS}>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">都道府県</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_prefecture')}</label>
                 <select
                   value={filterPrefecture}
                   onChange={e => setFilterPrefecture(e.target.value)}
                   className={SELECT_CLS}
                 >
-                  <option value="">全て</option>
+                  <option value="">{t('filter_all')}</option>
                   {prefectures.map(p => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">市区町村</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_city')}</label>
                 <select
                   value={filterCity}
                   onChange={e => setFilterCity(e.target.value)}
                   className={SELECT_CLS}
                   disabled={!filterPrefecture}
                 >
-                  <option value="">全て</option>
+                  <option value="">{t('filter_all')}</option>
                   {filteredCities.map(c => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">キーワード</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_keyword')}</label>
                 <input
                   type="text"
                   value={filterSearch}
                   onChange={e => setFilterSearch(e.target.value)}
-                  placeholder="住所・建物名で検索"
+                  placeholder={t('filter_keyword_placeholder')}
                   className={INPUT_CLS}
                 />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">状態</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_state')}</label>
                 <select
                   value={filterIsActive}
                   onChange={e => setFilterIsActive(e.target.value)}
                   className={SELECT_CLS}
                 >
-                  <option value="">全て</option>
-                  <option value="true">有効</option>
-                  <option value="false">無効</option>
+                  <option value="">{t('filter_all')}</option>
+                  <option value="true">{t('filter_state_active')}</option>
+                  <option value="false">{t('filter_state_inactive')}</option>
                 </select>
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-500 mb-1 block">顧客ID</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_customer_id')}</label>
                 <input
                   type="text"
                   value={filterCustomer}
                   onChange={e => setFilterCustomer(e.target.value)}
-                  placeholder="顧客IDで絞り込み"
+                  placeholder={t('filter_customer_id_placeholder')}
                   className={INPUT_CLS}
                 />
               </div>
@@ -1128,12 +1140,12 @@ export default function ProhibitedPropertiesPage() {
             {loading ? (
               <div className="p-12 text-center text-slate-400">
                 <i className="bi bi-arrow-repeat animate-spin text-2xl"></i>
-                <p className="mt-2 text-sm font-bold">読み込み中...</p>
+                <p className="mt-2 text-sm font-bold">{t('loading')}</p>
               </div>
             ) : items.length === 0 ? (
               <div className="p-12 text-center text-slate-400">
                 <i className="bi bi-inbox text-4xl"></i>
-                <p className="mt-2 text-sm font-bold">データがありません</p>
+                <p className="mt-2 text-sm font-bold">{t('no_data')}</p>
               </div>
             ) : (
               <>
@@ -1141,15 +1153,15 @@ export default function ProhibitedPropertiesPage() {
                   <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 border-b border-slate-200">
                       <tr>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">住所</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">建物名</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">枚数</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">重要度</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">禁止理由</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">対象顧客</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">登録日</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">状態</th>
-                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">操作</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_address')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_building_name')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-right">{t('table_unit_count')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">{t('table_severity')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_reason')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_customer')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_created_date')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_state')}</th>
+                        <th className="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">{t('table_actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1165,20 +1177,20 @@ export default function ProhibitedPropertiesPage() {
                           </td>
                           <td className="px-4 py-3 text-slate-600">{item.buildingName || '-'}</td>
                           <td className="px-4 py-3 text-slate-600 text-right">{item.unitCount ? item.unitCount.toLocaleString() : '-'}</td>
-                          <td className="px-4 py-3 text-center"><SeverityBadge value={item.severity} /></td>
+                          <td className="px-4 py-3 text-center"><SeverityBadge value={item.severity} t={t} /></td>
                           <td className="px-4 py-3 text-slate-600">{item.prohibitedReason?.name || '-'}</td>
                           <td className="px-4 py-3 text-slate-600">
-                            {item.customer ? item.customer.name : <span className="text-amber-600 font-bold text-xs">全顧客</span>}
+                            {item.customer ? item.customer.name : <span className="text-amber-600 font-bold text-xs">{t('table_customer_all')}</span>}
                           </td>
                           <td className="px-4 py-3 text-slate-500 text-xs">{fmtDate(item.createdAt)}</td>
                           <td className="px-4 py-3">
                             {item.isActive ? (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 border border-emerald-200">
-                                <i className="bi bi-check-circle-fill"></i> 有効
+                                <i className="bi bi-check-circle-fill"></i> {t('table_state_active')}
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-700 border border-rose-200">
-                                <i className="bi bi-x-circle-fill"></i> 無効
+                                <i className="bi bi-x-circle-fill"></i> {t('table_state_inactive')}
                               </span>
                             )}
                           </td>
@@ -1187,7 +1199,7 @@ export default function ProhibitedPropertiesPage() {
                               onClick={(e) => { e.stopPropagation(); openDetail(item.id); }}
                               className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
                             >
-                              <i className="bi bi-eye mr-1"></i>詳細
+                              <i className="bi bi-eye mr-1"></i>{t('detail_btn')}
                             </button>
                           </td>
                         </tr>
@@ -1199,7 +1211,7 @@ export default function ProhibitedPropertiesPage() {
                 {/* Pagination */}
                 <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-slate-200 gap-3">
                   <p className="text-xs text-slate-500">
-                    {total}件中 {startIdx}-{endIdx}件表示
+                    {t('pagination_showing', { total: String(total), start: String(startIdx), end: String(endIdx) })}
                   </p>
                   <div className="flex items-center gap-1">
                     <button
@@ -1250,7 +1262,7 @@ export default function ProhibitedPropertiesPage() {
               {mapLoading && (
                 <div className="absolute top-3 left-3 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-md">
                   <span className="text-xs font-bold text-slate-600">
-                    <i className="bi bi-arrow-repeat animate-spin mr-1"></i>読み込み中...
+                    <i className="bi bi-arrow-repeat animate-spin mr-1"></i>{t('map_loading')}
                   </span>
                 </div>
               )}
@@ -1261,7 +1273,7 @@ export default function ProhibitedPropertiesPage() {
                   <div className="flex items-center gap-2">
                     <i className="bi bi-zoom-in text-amber-600 text-lg"></i>
                     <span className="text-xs font-bold text-amber-800">
-                      地図をもう少しズームインしてください。ズームレベル{MIN_MAP_ZOOM}以上で物件が表示されます。
+                      {t('map_zoom_hint', { level: String(MIN_MAP_ZOOM) })}
                     </span>
                   </div>
                 </div>
@@ -1273,8 +1285,7 @@ export default function ProhibitedPropertiesPage() {
                   <div className="flex items-center gap-2">
                     <i className="bi bi-info-circle-fill text-blue-600"></i>
                     <span className="text-xs font-bold text-blue-800">
-                      表示範囲内に{mapTotal.toLocaleString()}件の物件があります（{mapProperties.length.toLocaleString()}件表示中）。
-                      ズームインすると全件表示できます。
+                      {t('map_limited_hint', { total: mapTotal.toLocaleString(), shown: mapProperties.length.toLocaleString() })}
                     </span>
                   </div>
                 </div>
@@ -1285,7 +1296,7 @@ export default function ProhibitedPropertiesPage() {
                 <div className="absolute top-3 right-3 z-10 bg-white/90 backdrop-blur-sm rounded-lg px-3 py-1.5 shadow-md">
                   <span className="text-xs font-bold text-slate-600">
                     <i className="bi bi-geo-alt-fill text-rose-500 mr-1"></i>
-                    {mapProperties.length.toLocaleString()}件
+                    {t('map_count', { count: mapProperties.length.toLocaleString() })}
                   </span>
                 </div>
               )}
@@ -1338,13 +1349,13 @@ export default function ProhibitedPropertiesPage() {
                         <p className="text-xs text-slate-600 mb-1">{selectedMapItem.buildingName}</p>
                       )}
                       <p className="text-xs text-slate-500">
-                        顧客: {selectedMapItem.customer?.name || '全顧客'}
+                        {t('map_customer_label')}{selectedMapItem.customer?.name || t('map_customer_all')}
                       </p>
                       <button
                         onClick={() => { setSelectedMapItem(null); openDetail(selectedMapItem.id); }}
                         className="mt-2 text-xs font-bold text-indigo-600 hover:text-indigo-800"
                       >
-                        詳細を見る
+                        {t('map_view_detail')}
                       </button>
                     </div>
                   </InfoWindow>
@@ -1355,7 +1366,7 @@ export default function ProhibitedPropertiesPage() {
             <div className="flex items-center justify-center" style={{ height: MAP_CONTAINER.height }}>
               <div className="text-center text-slate-400">
                 <i className="bi bi-geo-alt text-4xl"></i>
-                <p className="mt-2 text-sm font-bold">地図を読み込み中...</p>
+                <p className="mt-2 text-sm font-bold">{t('map_loading_map')}</p>
               </div>
             </div>
           )}
@@ -1369,14 +1380,14 @@ export default function ProhibitedPropertiesPage() {
           <div className={CARD_CLS}>
             <h2 className="text-lg font-black text-slate-800 mb-2">
               <i className="bi bi-file-earmark-spreadsheet text-emerald-600 mr-2"></i>
-              CSVインポート
+              {t('csv_title')}
             </h2>
             <p className="text-sm text-slate-500 mb-4">
-              CSV / Excel ファイルをアップロードして配布禁止物件を一括登録します。
+              {t('csv_description')}
             </p>
 
             <div className="mb-4 p-4 bg-slate-50 rounded-xl border border-slate-200">
-              <p className="text-xs font-bold text-slate-600 mb-2">必要なカラム:</p>
+              <p className="text-xs font-bold text-slate-600 mb-2">{t('csv_required_columns')}</p>
               <div className="flex flex-wrap gap-1.5">
                 {CSV_HEADERS.map(h => (
                   <span key={h} className={`px-2 py-0.5 rounded text-xs font-mono ${h === 'ADDRESS' ? 'bg-rose-100 text-rose-700 font-bold' : 'bg-slate-200 text-slate-600'}`}>
@@ -1404,7 +1415,7 @@ export default function ProhibitedPropertiesPage() {
                   onClick={resetCsv}
                   className="text-xs font-bold text-rose-600 hover:text-rose-800 transition-colors"
                 >
-                  <i className="bi bi-x-lg mr-1"></i>クリア
+                  <i className="bi bi-x-lg mr-1"></i>{t('csv_clear')}
                 </button>
               </div>
             )}
@@ -1415,17 +1426,17 @@ export default function ProhibitedPropertiesPage() {
             <div className={CARD_CLS}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
                 <div>
-                  <h3 className="text-base font-black text-slate-800">プレビュー</h3>
+                  <h3 className="text-base font-black text-slate-800">{t('csv_preview')}</h3>
                   <div className="flex items-center gap-4 mt-1">
                     <span className="text-sm text-slate-600">
-                      合計: <strong>{csvParsed.length}行</strong>
+                      {t('csv_total_rows')}<strong>{csvParsed.length}{t('csv_rows_unit')}</strong>
                     </span>
                     <span className="text-sm text-emerald-600">
-                      有効: <strong>{csvParsed.filter(v => v.isValid).length}行</strong>
+                      {t('csv_valid_rows')}<strong>{csvParsed.filter(v => v.isValid).length}{t('csv_rows_unit')}</strong>
                     </span>
                     {csvParsed.some(v => !v.isValid) && (
                       <span className="text-sm text-rose-600">
-                        エラー: <strong>{csvParsed.filter(v => !v.isValid).length}行</strong>
+                        {t('csv_error_rows')}<strong>{csvParsed.filter(v => !v.isValid).length}{t('csv_rows_unit')}</strong>
                       </span>
                     )}
                   </div>
@@ -1436,9 +1447,9 @@ export default function ProhibitedPropertiesPage() {
                   className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {csvImporting ? (
-                    <><i className="bi bi-arrow-repeat animate-spin"></i>インポート中...</>
+                    <><i className="bi bi-arrow-repeat animate-spin"></i>{t('csv_importing')}</>
                   ) : (
-                    <><i className="bi bi-cloud-upload"></i>インポート実行</>
+                    <><i className="bi bi-cloud-upload"></i>{t('csv_execute')}</>
                   )}
                 </button>
               </div>
@@ -1447,8 +1458,8 @@ export default function ProhibitedPropertiesPage() {
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-slate-50 sticky top-0 z-10">
                     <tr>
-                      <th className="px-3 py-2 text-slate-500 font-bold">行</th>
-                      <th className="px-3 py-2 text-slate-500 font-bold">状態</th>
+                      <th className="px-3 py-2 text-slate-500 font-bold">{t('csv_row')}</th>
+                      <th className="px-3 py-2 text-slate-500 font-bold">{t('csv_status')}</th>
                       <th className="px-3 py-2 text-slate-500 font-bold">PROHIBITED_CD</th>
                       <th className="px-3 py-2 text-slate-500 font-bold">CLIENT_CD</th>
                       <th className="px-3 py-2 text-slate-500 font-bold">ADDRESS</th>
@@ -1456,7 +1467,7 @@ export default function ProhibitedPropertiesPage() {
                       <th className="px-3 py-2 text-slate-500 font-bold">LATITUDE</th>
                       <th className="px-3 py-2 text-slate-500 font-bold">LONGITUDE</th>
                       <th className="px-3 py-2 text-slate-500 font-bold">REMARK</th>
-                      <th className="px-3 py-2 text-slate-500 font-bold">エラー</th>
+                      <th className="px-3 py-2 text-slate-500 font-bold">{t('csv_error')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1494,20 +1505,20 @@ export default function ProhibitedPropertiesPage() {
             <div className={CARD_CLS}>
               <h3 className="text-base font-black text-slate-800 mb-3">
                 <i className="bi bi-clipboard-check text-emerald-600 mr-2"></i>
-                インポート結果
+                {t('csv_result_title')}
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                 <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200 text-center">
                   <p className="text-2xl font-black text-emerald-700">{csvResult.success}</p>
-                  <p className="text-xs font-bold text-emerald-600 mt-1">成功</p>
+                  <p className="text-xs font-bold text-emerald-600 mt-1">{t('csv_result_success')}</p>
                 </div>
                 <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 text-center">
                   <p className="text-2xl font-black text-amber-700">{csvResult.skipped}</p>
-                  <p className="text-xs font-bold text-amber-600 mt-1">スキップ</p>
+                  <p className="text-xs font-bold text-amber-600 mt-1">{t('csv_result_skipped')}</p>
                 </div>
                 <div className="bg-rose-50 rounded-xl p-4 border border-rose-200 text-center">
                   <p className="text-2xl font-black text-rose-700">{csvResult.errors.length}</p>
-                  <p className="text-xs font-bold text-rose-600 mt-1">エラー</p>
+                  <p className="text-xs font-bold text-rose-600 mt-1">{t('csv_result_errors')}</p>
                 </div>
               </div>
               {csvResult.errors.length > 0 && (
@@ -1515,8 +1526,8 @@ export default function ProhibitedPropertiesPage() {
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-slate-500 font-bold">行</th>
-                        <th className="px-3 py-2 text-slate-500 font-bold">エラー内容</th>
+                        <th className="px-3 py-2 text-slate-500 font-bold">{t('csv_error_row')}</th>
+                        <th className="px-3 py-2 text-slate-500 font-bold">{t('csv_error_content')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1542,7 +1553,7 @@ export default function ProhibitedPropertiesPage() {
             {detailLoading && !selectedProperty ? (
               <div className="p-12 text-center text-slate-400">
                 <i className="bi bi-arrow-repeat animate-spin text-2xl"></i>
-                <p className="mt-2 text-sm font-bold">読み込み中...</p>
+                <p className="mt-2 text-sm font-bold">{t('loading')}</p>
               </div>
             ) : selectedProperty && (
               <>
@@ -1558,11 +1569,11 @@ export default function ProhibitedPropertiesPage() {
                     <div className="flex items-center gap-3 mt-1">
                       {selectedProperty.isActive ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
-                          <i className="bi bi-check-circle-fill"></i> 有効
+                          <i className="bi bi-check-circle-fill"></i> {t('table_state_active')}
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-700">
-                          <i className="bi bi-x-circle-fill"></i> 無効
+                          <i className="bi bi-x-circle-fill"></i> {t('table_state_inactive')}
                         </span>
                       )}
                       <span className="text-xs text-slate-400">ID: {selectedProperty.id}</span>
@@ -1577,39 +1588,39 @@ export default function ProhibitedPropertiesPage() {
                   {/* Section 1: Property info */}
                   <div>
                     <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                      <i className="bi bi-building text-indigo-500"></i> 物件情報
+                      <i className="bi bi-building text-indigo-500"></i> {t('detail_property_info')}
                     </h3>
                     {isEditing ? (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">都道府県</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_prefecture')}</label>
                           <select
                             value={editForm.prefectureId}
                             onChange={e => handleEditPrefChange(e.target.value)}
                             className={SELECT_CLS}
                           >
-                            <option value="">未選択</option>
+                            <option value="">{t('form_not_selected')}</option>
                             {prefectures.map(p => (
                               <option key={p.id} value={p.id}>{p.name}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">市区町村</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_city')}</label>
                           <select
                             value={editForm.cityId}
                             onChange={e => setEditForm((f: Record<string, any>) => ({ ...f, cityId: e.target.value }))}
                             className={SELECT_CLS}
                             disabled={!editForm.prefectureId}
                           >
-                            <option value="">未選択</option>
+                            <option value="">{t('form_not_selected')}</option>
                             {editCities.map(c => (
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                           </select>
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">住所 <span className="text-rose-500">*</span></label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_address')} <span className="text-rose-500">*</span></label>
                           <input
                             type="text"
                             value={editForm.address}
@@ -1618,7 +1629,7 @@ export default function ProhibitedPropertiesPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">建物名</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_building_name')}</label>
                           <input
                             type="text"
                             value={editForm.buildingName}
@@ -1627,7 +1638,7 @@ export default function ProhibitedPropertiesPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">部屋番号</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_room_number')}</label>
                           <input
                             type="text"
                             value={editForm.roomNumber}
@@ -1636,7 +1647,7 @@ export default function ProhibitedPropertiesPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">配布可能枚数</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_unit_count_label')}</label>
                           <input
                             type="number"
                             value={editForm.unitCount}
@@ -1647,10 +1658,10 @@ export default function ProhibitedPropertiesPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">重要度（誤配リスク）</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_severity_label')}</label>
                           <div className="flex items-center gap-1">
                             {[1, 2, 3, 4, 5].map(v => {
-                              const cfg = SEVERITY_CONFIG[v];
+                              const cfg = SEVERITY_STYLE[v];
                               const selected = Number(editForm.severity) === v;
                               return (
                                 <button
@@ -1664,14 +1675,14 @@ export default function ProhibitedPropertiesPage() {
                                   }`}
                                 >
                                   <i className={`bi ${cfg.icon} block text-sm mb-0.5`}></i>
-                                  {cfg.label}
+                                  {t(SEVERITY_LABEL_KEYS[v])}
                                 </button>
                               );
                             })}
                           </div>
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">郵便番号</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_postal_code')}</label>
                           <input
                             type="text"
                             value={editForm.postalCode}
@@ -1681,13 +1692,13 @@ export default function ProhibitedPropertiesPage() {
                           />
                         </div>
                         <div>
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">禁止理由</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason')}</label>
                           <select
                             value={editForm.prohibitedReasonId}
                             onChange={e => setEditForm((f: Record<string, any>) => ({ ...f, prohibitedReasonId: e.target.value }))}
                             className={SELECT_CLS}
                           >
-                            <option value="">未選択</option>
+                            <option value="">{t('form_not_selected')}</option>
                             {reasons.filter(r => r.isActive).map(r => (
                               <option key={r.id} value={r.id}>{r.name}</option>
                             ))}
@@ -1695,11 +1706,11 @@ export default function ProhibitedPropertiesPage() {
                         </div>
                         <div className="sm:col-span-2">
                           <label className="text-xs font-bold text-slate-500 mb-2 block">
-                            <i className="bi bi-geo-alt text-rose-500 mr-1"></i>位置情報（地図をクリックまたはピンをドラッグ）
+                            <i className="bi bi-geo-alt text-rose-500 mr-1"></i>{t('form_location_hint')}
                           </label>
                           <div className="grid grid-cols-2 gap-3 mb-2">
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">緯度</label>
+                              <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">{t('form_latitude')}</label>
                               <input
                                 type="number"
                                 step="any"
@@ -1709,7 +1720,7 @@ export default function ProhibitedPropertiesPage() {
                               />
                             </div>
                             <div>
-                              <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">経度</label>
+                              <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">{t('form_longitude')}</label>
                               <input
                                 type="number"
                                 step="any"
@@ -1773,7 +1784,7 @@ export default function ProhibitedPropertiesPage() {
                           )}
                         </div>
                         <div className="sm:col-span-2">
-                          <label className="text-xs font-bold text-slate-500 mb-1 block">理由詳細</label>
+                          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason_detail')}</label>
                           <textarea
                             value={editForm.reasonDetail}
                             onChange={e => setEditForm((f: Record<string, any>) => ({ ...f, reasonDetail: e.target.value }))}
@@ -1784,29 +1795,29 @@ export default function ProhibitedPropertiesPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
-                        <InfoRow label="住所" value={`${selectedProperty.prefecture?.name || ''} ${selectedProperty.city?.name || ''} ${selectedProperty.address}`} />
-                        <InfoRow label="建物名" value={selectedProperty.buildingName} />
-                        <InfoRow label="部屋番号" value={selectedProperty.roomNumber} />
-                        <InfoRow label="配布可能枚数" value={selectedProperty.unitCount?.toLocaleString()} />
+                        <InfoRow label={t('form_address')} value={`${selectedProperty.prefecture?.name || ''} ${selectedProperty.city?.name || ''} ${selectedProperty.address}`} />
+                        <InfoRow label={t('form_building_name')} value={selectedProperty.buildingName} />
+                        <InfoRow label={t('form_room_number')} value={selectedProperty.roomNumber} />
+                        <InfoRow label={t('form_unit_count_label')} value={selectedProperty.unitCount?.toLocaleString()} />
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">重要度</p>
-                          <SeverityBadge value={selectedProperty.severity} />
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('table_severity')}</p>
+                          <SeverityBadge value={selectedProperty.severity} t={t} />
                         </div>
-                        <InfoRow label="郵便番号" value={selectedProperty.postalCode} />
-                        <InfoRow label="緯度" value={selectedProperty.latitude?.toString()} />
-                        <InfoRow label="経度" value={selectedProperty.longitude?.toString()} />
-                        <InfoRow label="禁止理由" value={selectedProperty.prohibitedReason?.name} />
-                        <InfoRow label="理由詳細" value={selectedProperty.reasonDetail} />
-                        <InfoRow label="対象顧客" value={selectedProperty.customer ? selectedProperty.customer.name : '全顧客'} />
-                        <InfoRow label="登録日" value={fmtDate(selectedProperty.createdAt)} />
+                        <InfoRow label={t('form_postal_code')} value={selectedProperty.postalCode} />
+                        <InfoRow label={t('form_latitude')} value={selectedProperty.latitude?.toString()} />
+                        <InfoRow label={t('form_longitude')} value={selectedProperty.longitude?.toString()} />
+                        <InfoRow label={t('form_reason')} value={selectedProperty.prohibitedReason?.name} />
+                        <InfoRow label={t('form_reason_detail')} value={selectedProperty.reasonDetail} />
+                        <InfoRow label={t('detail_target_customer')} value={selectedProperty.customer ? selectedProperty.customer.name : t('detail_target_customer_all')} />
+                        <InfoRow label={t('detail_created_date')} value={fmtDate(selectedProperty.createdAt)} />
                         {!selectedProperty.isActive && (
                           <>
-                            <InfoRow label="無効化日" value={fmtDate(selectedProperty.deactivatedAt)} />
-                            <InfoRow label="無効化理由" value={selectedProperty.deactivateReason} />
+                            <InfoRow label={t('detail_deactivated_date')} value={fmtDate(selectedProperty.deactivatedAt)} />
+                            <InfoRow label={t('detail_deactivate_reason')} value={selectedProperty.deactivateReason} />
                           </>
                         )}
                         {selectedProperty.originalCode && (
-                          <InfoRow label="元コード" value={selectedProperty.originalCode} />
+                          <InfoRow label={t('detail_original_code')} value={selectedProperty.originalCode} />
                         )}
                       </div>
                     )}
@@ -1815,8 +1826,8 @@ export default function ProhibitedPropertiesPage() {
                   {/* Section 2: Images */}
                   <div>
                     <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                      <i className="bi bi-images text-indigo-500"></i> 画像
-                      <span className="text-xs font-normal text-slate-400 ml-1">({detailImages.length}件)</span>
+                      <i className="bi bi-images text-indigo-500"></i> {t('detail_images')}
+                      <span className="text-xs font-normal text-slate-400 ml-1">({t('detail_images_count', { count: String(detailImages.length) })})</span>
                     </h3>
                     {detailImages.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -1824,14 +1835,14 @@ export default function ProhibitedPropertiesPage() {
                           <div key={idx} className="relative group rounded-xl overflow-hidden border border-slate-200 aspect-square bg-slate-100">
                             <img
                               src={url}
-                              alt={`画像 ${idx + 1}`}
+                              alt={t('detail_image_alt', { num: String(idx + 1) })}
                               className="w-full h-full object-cover"
                               onError={(e) => { (e.target as HTMLImageElement).src = '/logo/logo_Icon_transparent.png'; }}
                             />
                             <button
                               onClick={() => handleImageDelete(url)}
                               className="absolute top-2 right-2 bg-rose-600 hover:bg-rose-700 text-white w-7 h-7 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                              title="削除"
+                              title={t('detail_delete_tooltip')}
                             >
                               <i className="bi bi-trash text-xs"></i>
                             </button>
@@ -1839,7 +1850,7 @@ export default function ProhibitedPropertiesPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-sm text-slate-400">画像はありません</p>
+                      <p className="text-sm text-slate-400">{t('detail_no_images')}</p>
                     )}
                     <div className="mt-3">
                       <input
@@ -1855,9 +1866,9 @@ export default function ProhibitedPropertiesPage() {
                         className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
                       >
                         {imageUploading ? (
-                          <><i className="bi bi-arrow-repeat animate-spin"></i>アップロード中...</>
+                          <><i className="bi bi-arrow-repeat animate-spin"></i>{t('detail_uploading')}</>
                         ) : (
-                          <><i className="bi bi-cloud-upload"></i>画像をアップロード</>
+                          <><i className="bi bi-cloud-upload"></i>{t('detail_upload_image')}</>
                         )}
                       </button>
                     </div>
@@ -1867,7 +1878,7 @@ export default function ProhibitedPropertiesPage() {
                   {selectedProperty.complaint && (
                     <div>
                       <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                        <i className="bi bi-exclamation-triangle text-amber-500"></i> 紐付きクレーム
+                        <i className="bi bi-exclamation-triangle text-amber-500"></i> {t('detail_related_complaint')}
                       </h3>
                       <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
                         <p className="font-bold text-sm text-slate-800">
@@ -1875,7 +1886,7 @@ export default function ProhibitedPropertiesPage() {
                         </p>
                         {selectedProperty.complaint.status && (
                           <p className="text-xs text-slate-500 mt-1">
-                            ステータス: {selectedProperty.complaint.status}
+                            {t('detail_complaint_status', { status: selectedProperty.complaint.status || '' })}
                           </p>
                         )}
                       </div>
@@ -1886,7 +1897,7 @@ export default function ProhibitedPropertiesPage() {
                   {(selectedProperty.latitude && selectedProperty.longitude) && (
                     <div>
                       <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                        <i className="bi bi-geo-alt text-indigo-500"></i> 地図プレビュー
+                        <i className="bi bi-geo-alt text-indigo-500"></i> {t('detail_map_preview')}
                       </h3>
                       {isLoaded ? (
                         <div className="rounded-xl overflow-hidden border border-slate-200" style={{ height: '300px' }}>
@@ -1929,7 +1940,7 @@ export default function ProhibitedPropertiesPage() {
                         </div>
                       ) : (
                         <div className="h-[300px] bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-sm">
-                          地図を読み込み中...
+                          {t('detail_map_loading')}
                         </div>
                       )}
                     </div>
@@ -1944,13 +1955,13 @@ export default function ProhibitedPropertiesPage() {
                         onClick={saveEdit}
                         className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                       >
-                        <i className="bi bi-check-lg"></i> 保存
+                        <i className="bi bi-check-lg"></i> {t('btn_save')}
                       </button>
                       <button
                         onClick={() => setIsEditing(false)}
                         className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                       >
-                        キャンセル
+                        {t('btn_cancel')}
                       </button>
                     </>
                   ) : (
@@ -1959,7 +1970,7 @@ export default function ProhibitedPropertiesPage() {
                         onClick={startEdit}
                         className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                       >
-                        <i className="bi bi-pencil"></i> 編集
+                        <i className="bi bi-pencil"></i> {t('btn_edit')}
                       </button>
                       {selectedProperty.isActive ? (
                         <div className="flex items-center gap-2">
@@ -1967,14 +1978,14 @@ export default function ProhibitedPropertiesPage() {
                             type="text"
                             value={deactivateReason}
                             onChange={e => setDeactivateReason(e.target.value)}
-                            placeholder="無効化の理由（任意）"
+                            placeholder={t('deactivate_reason_placeholder')}
                             className="border border-slate-300 p-2 rounded-xl text-sm outline-none focus:ring-2 focus:ring-rose-500 w-48"
                           />
                           <button
                             onClick={handleDeactivate}
                             className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                           >
-                            <i className="bi bi-slash-circle"></i> 無効化
+                            <i className="bi bi-slash-circle"></i> {t('btn_deactivate')}
                           </button>
                         </div>
                       ) : (
@@ -1982,14 +1993,14 @@ export default function ProhibitedPropertiesPage() {
                           onClick={handleActivate}
                           className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors"
                         >
-                          <i className="bi bi-check-circle"></i> 有効化
+                          <i className="bi bi-check-circle"></i> {t('btn_activate')}
                         </button>
                       )}
                       <button
                         onClick={closeDetail}
                         className="ml-auto px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                       >
-                        閉じる
+                        {t('btn_close')}
                       </button>
                     </>
                   )}
@@ -2008,7 +2019,7 @@ export default function ProhibitedPropertiesPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h2 className="text-lg font-black text-slate-800">
                 <i className="bi bi-plus-circle text-indigo-500 mr-2"></i>
-                配布禁止物件の新規登録
+                {t('create_modal_title')}
               </h2>
               <button onClick={() => setShowCreate(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <i className="bi bi-x-lg text-slate-500 text-lg"></i>
@@ -2019,34 +2030,34 @@ export default function ProhibitedPropertiesPage() {
             <div className="px-6 py-5 space-y-4 max-h-[65vh] overflow-y-auto">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">都道府県</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_prefecture')}</label>
                   <select
                     value={createForm.prefectureId}
                     onChange={e => handleCreatePrefChange(e.target.value)}
                     className={SELECT_CLS}
                   >
-                    <option value="">未選択</option>
+                    <option value="">{t('form_not_selected')}</option>
                     {prefectures.map(p => (
                       <option key={p.id} value={p.id}>{p.name}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">市区町村</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_city')}</label>
                   <select
                     value={createForm.cityId}
                     onChange={e => setCreateForm((f: Record<string, any>) => ({ ...f, cityId: e.target.value }))}
                     className={SELECT_CLS}
                     disabled={!createForm.prefectureId}
                   >
-                    <option value="">未選択</option>
+                    <option value="">{t('form_not_selected')}</option>
                     {createCities.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">住所 <span className="text-rose-500">*</span></label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_address')} <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     value={createForm.address}
@@ -2056,7 +2067,7 @@ export default function ProhibitedPropertiesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">建物名</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_building_name')}</label>
                   <input
                     type="text"
                     value={createForm.buildingName}
@@ -2066,7 +2077,7 @@ export default function ProhibitedPropertiesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">部屋番号</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_room_number')}</label>
                   <input
                     type="text"
                     value={createForm.roomNumber}
@@ -2076,7 +2087,7 @@ export default function ProhibitedPropertiesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">配布可能枚数</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_unit_count_label')}</label>
                   <input
                     type="number"
                     value={createForm.unitCount}
@@ -2087,10 +2098,10 @@ export default function ProhibitedPropertiesPage() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">重要度（誤配リスク）</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_severity_label')}</label>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5].map(v => {
-                      const cfg = SEVERITY_CONFIG[v];
+                      const cfg = SEVERITY_STYLE[v];
                       const selected = Number(createForm.severity) === v;
                       return (
                         <button
@@ -2104,14 +2115,14 @@ export default function ProhibitedPropertiesPage() {
                           }`}
                         >
                           <i className={`bi ${cfg.icon} block text-sm mb-0.5`}></i>
-                          {cfg.label}
+                          {t(SEVERITY_LABEL_KEYS[v])}
                         </button>
                       );
                     })}
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">郵便番号</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_postal_code')}</label>
                   <input
                     type="text"
                     value={createForm.postalCode}
@@ -2121,13 +2132,13 @@ export default function ProhibitedPropertiesPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">禁止理由</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason')}</label>
                   <select
                     value={createForm.prohibitedReasonId}
                     onChange={e => setCreateForm((f: Record<string, any>) => ({ ...f, prohibitedReasonId: e.target.value }))}
                     className={SELECT_CLS}
                   >
-                    <option value="">未選択</option>
+                    <option value="">{t('form_not_selected')}</option>
                     {reasons.filter(r => r.isActive).map(r => (
                       <option key={r.id} value={r.id}>{r.name}</option>
                     ))}
@@ -2135,11 +2146,11 @@ export default function ProhibitedPropertiesPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className="text-xs font-bold text-slate-500 mb-2 block">
-                    <i className="bi bi-geo-alt text-rose-500 mr-1"></i>位置情報（地図をクリックまたはピンをドラッグ）
+                    <i className="bi bi-geo-alt text-rose-500 mr-1"></i>{t('form_location_hint')}
                   </label>
                   <div className="grid grid-cols-2 gap-3 mb-2">
                     <div>
-                      <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">緯度</label>
+                      <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">{t('form_latitude')}</label>
                       <input
                         type="number"
                         step="any"
@@ -2150,7 +2161,7 @@ export default function ProhibitedPropertiesPage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">経度</label>
+                      <label className="text-[10px] font-bold text-slate-400 mb-0.5 block">{t('form_longitude')}</label>
                       <input
                         type="number"
                         step="any"
@@ -2215,13 +2226,13 @@ export default function ProhibitedPropertiesPage() {
                   )}
                 </div>
                 <div className="sm:col-span-2">
-                  <label className="text-xs font-bold text-slate-500 mb-1 block">理由詳細</label>
+                  <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason_detail')}</label>
                   <textarea
                     value={createForm.reasonDetail}
                     onChange={e => setCreateForm((f: Record<string, any>) => ({ ...f, reasonDetail: e.target.value }))}
                     className={INPUT_CLS + ' min-h-[80px]'}
                     rows={3}
-                    placeholder="禁止理由の詳細を入力..."
+                    placeholder={t('form_reason_placeholder')}
                   />
                 </div>
               </div>
@@ -2233,7 +2244,7 @@ export default function ProhibitedPropertiesPage() {
                 onClick={() => setShowCreate(false)}
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
-                キャンセル
+                {t('btn_cancel')}
               </button>
               <button
                 onClick={submitCreate}
@@ -2241,9 +2252,9 @@ export default function ProhibitedPropertiesPage() {
                 className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50"
               >
                 {creating ? (
-                  <><i className="bi bi-arrow-repeat animate-spin"></i>登録中...</>
+                  <><i className="bi bi-arrow-repeat animate-spin"></i>{t('btn_registering')}</>
                 ) : (
-                  <><i className="bi bi-check-lg"></i>登録する</>
+                  <><i className="bi bi-check-lg"></i>{t('btn_register')}</>
                 )}
               </button>
             </div>
@@ -2258,7 +2269,7 @@ export default function ProhibitedPropertiesPage() {
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h2 className="text-lg font-black text-slate-800">
                 <i className="bi bi-pentagon text-rose-500 mr-2"></i>
-                地図で禁止エリアを指定
+                {t('draw_modal_title')}
               </h2>
               <button onClick={closeDrawCreate} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
                 <i className="bi bi-x-lg text-slate-500 text-lg"></i>
@@ -2269,11 +2280,10 @@ export default function ProhibitedPropertiesPage() {
               {/* Instruction */}
               <div className="bg-indigo-50 rounded-xl p-4 border border-indigo-200">
                 <p className="text-sm text-indigo-800 font-bold mb-1">
-                  <i className="bi bi-info-circle mr-1"></i> 操作方法
+                  <i className="bi bi-info-circle mr-1"></i> {t('draw_instruction_title')}
                 </p>
                 <p className="text-xs text-indigo-700">
-                  地図上でクリックしてポリゴン（多角形）を描画してください。頂点をクリックで追加し、最初の頂点をクリックすると閉じます。
-                  描画後はドラッグや頂点の移動で調整できます。
+                  {t('draw_instruction_text')}
                 </p>
               </div>
 
@@ -2286,7 +2296,7 @@ export default function ProhibitedPropertiesPage() {
                         onClick={clearDrawnPolygon}
                         className="bg-white hover:bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border border-rose-200 transition-colors"
                       >
-                        <i className="bi bi-arrow-counterclockwise mr-1"></i>描画をリセット
+                        <i className="bi bi-arrow-counterclockwise mr-1"></i>{t('draw_reset')}
                       </button>
                     </div>
                   )}
@@ -2294,7 +2304,7 @@ export default function ProhibitedPropertiesPage() {
                     <div className="absolute top-3 left-3 z-10 bg-white/95 backdrop-blur-sm rounded-lg px-3 py-2 shadow-md border border-emerald-200">
                       <p className="text-xs font-bold text-emerald-700">
                         <i className="bi bi-check-circle-fill mr-1"></i>
-                        ポリゴン描画完了（{drawnPolygonPaths.length}頂点）
+                        {t('draw_complete', { count: drawnPolygonPaths.length })}
                       </p>
                     </div>
                   )}
@@ -2331,7 +2341,7 @@ export default function ProhibitedPropertiesPage() {
                 </div>
               ) : (
                 <div className="h-[450px] bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 text-sm">
-                  <i className="bi bi-geo-alt text-2xl mr-2"></i>地図を読み込み中...
+                  <i className="bi bi-geo-alt text-2xl mr-2"></i>{t('map_loading_map')}
                 </div>
               )}
 
@@ -2339,13 +2349,13 @@ export default function ProhibitedPropertiesPage() {
               {drawnPolygonPaths.length >= 3 && (
                 <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
                   <p className="text-xs font-bold text-slate-500 mb-1">
-                    <i className="bi bi-braces mr-1"></i>GeoJSON プレビュー
+                    <i className="bi bi-braces mr-1"></i>GeoJSON
                   </p>
                   <p className="text-xs text-slate-600 font-mono break-all max-h-[60px] overflow-y-auto">
                     {polygonPathsToGeoJSON(drawnPolygonPaths).substring(0, 200)}...
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    中心座標: {(() => {
+                    {t('draw_center_coords')}{(() => {
                       const c = calculatePolygonCenter(drawnPolygonPaths);
                       return c ? `${c.lat.toFixed(6)}, ${c.lng.toFixed(6)}` : '-';
                     })()}
@@ -2356,58 +2366,58 @@ export default function ProhibitedPropertiesPage() {
               {/* Form fields */}
               <div>
                 <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                  <i className="bi bi-building text-indigo-500"></i> 禁止エリア情報
+                  <i className="bi bi-building text-indigo-500"></i> {t('draw_area_info')}
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">都道府県</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_prefecture')}</label>
                     <select
                       value={drawCreateForm.prefectureId}
                       onChange={e => handleDrawCreatePrefChange(e.target.value)}
                       className={SELECT_CLS}
                     >
-                      <option value="">未選択</option>
+                      <option value="">{t('form_not_selected')}</option>
                       {prefectures.map(p => (
                         <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">市区町村</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_city')}</label>
                     <select
                       value={drawCreateForm.cityId}
                       onChange={e => setDrawCreateForm((f: Record<string, any>) => ({ ...f, cityId: e.target.value }))}
                       className={SELECT_CLS}
                       disabled={!drawCreateForm.prefectureId}
                     >
-                      <option value="">未選択</option>
+                      <option value="">{t('form_not_selected')}</option>
                       {drawCreateCities.map(c => (
                         <option key={c.id} value={c.id}>{c.name}</option>
                       ))}
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">住所・エリア名 <span className="text-rose-500">*</span></label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('draw_address_area')} <span className="text-rose-500">*</span></label>
                     <input
                       type="text"
                       value={drawCreateForm.address}
                       onChange={e => setDrawCreateForm((f: Record<string, any>) => ({ ...f, address: e.target.value }))}
                       className={INPUT_CLS}
-                      placeholder="例: 渋谷区渋谷1丁目一帯"
+                      placeholder={t('draw_address_placeholder')}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">建物名 / エリア詳細</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('draw_building_detail')}</label>
                     <input
                       type="text"
                       value={drawCreateForm.buildingName}
                       onChange={e => setDrawCreateForm((f: Record<string, any>) => ({ ...f, buildingName: e.target.value }))}
                       className={INPUT_CLS}
-                      placeholder="例: ◯◯団地全域"
+                      placeholder={t('draw_building_placeholder')}
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">郵便番号</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_postal_code')}</label>
                     <input
                       type="text"
                       value={drawCreateForm.postalCode}
@@ -2417,26 +2427,26 @@ export default function ProhibitedPropertiesPage() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">禁止理由</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason')}</label>
                     <select
                       value={drawCreateForm.prohibitedReasonId}
                       onChange={e => setDrawCreateForm((f: Record<string, any>) => ({ ...f, prohibitedReasonId: e.target.value }))}
                       className={SELECT_CLS}
                     >
-                      <option value="">未選択</option>
+                      <option value="">{t('form_not_selected')}</option>
                       {reasons.filter(r => r.isActive).map(r => (
                         <option key={r.id} value={r.id}>{r.name}</option>
                       ))}
                     </select>
                   </div>
                   <div className="sm:col-span-2">
-                    <label className="text-xs font-bold text-slate-500 mb-1 block">理由詳細</label>
+                    <label className="text-xs font-bold text-slate-500 mb-1 block">{t('form_reason_detail')}</label>
                     <textarea
                       value={drawCreateForm.reasonDetail}
                       onChange={e => setDrawCreateForm((f: Record<string, any>) => ({ ...f, reasonDetail: e.target.value }))}
                       className={INPUT_CLS + ' min-h-[80px]'}
                       rows={3}
-                      placeholder="禁止理由の詳細を入力..."
+                      placeholder={t('form_reason_placeholder')}
                     />
                   </div>
                 </div>
@@ -2449,7 +2459,7 @@ export default function ProhibitedPropertiesPage() {
                 onClick={closeDrawCreate}
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
-                キャンセル
+                {t('btn_cancel')}
               </button>
               <button
                 onClick={submitDrawCreate}
@@ -2457,9 +2467,9 @@ export default function ProhibitedPropertiesPage() {
                 className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {drawCreating ? (
-                  <><i className="bi bi-arrow-repeat animate-spin"></i>登録中...</>
+                  <><i className="bi bi-arrow-repeat animate-spin"></i>{t('draw_registering')}</>
                 ) : (
-                  <><i className="bi bi-pentagon"></i>禁止エリアを登録</>
+                  <><i className="bi bi-pentagon"></i>{t('draw_register')}</>
                 )}
               </button>
             </div>

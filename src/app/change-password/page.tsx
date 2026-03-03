@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useTranslation } from '@/i18n';
 
 export default function ChangePasswordPage() {
+  const { t } = useTranslation('change-password');
   const router = useRouter();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -19,7 +21,7 @@ export default function ChangePasswordPage() {
   const hasLower = /[a-z]/.test(newPassword);
   const hasNumber = /[0-9]/.test(newPassword);
   const strengthScore = [hasLength, hasUpper, hasLower, hasNumber].filter(Boolean).length;
-  const strengthLabel = ['', '弱い', '普通', '強い', '非常に強い'][strengthScore] ?? '';
+  const strengthLabel = ['', t('strength_weak'), t('strength_fair'), t('strength_strong'), t('strength_very_strong')][strengthScore] ?? '';
   const strengthColor = ['', 'bg-red-500', 'bg-orange-400', 'bg-blue-500', 'bg-green-500'][strengthScore] ?? '';
   const isMatch = newPassword.length > 0 && newPassword === confirmPassword;
 
@@ -28,11 +30,11 @@ export default function ChangePasswordPage() {
     setErrorMsg('');
 
     if (!hasLength) {
-      setErrorMsg('パスワードは8文字以上で設定してください');
+      setErrorMsg(t('error_min_length'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg('パスワードが一致しません');
+      setErrorMsg(t('error_mismatch'));
       return;
     }
 
@@ -49,10 +51,10 @@ export default function ChangePasswordPage() {
         router.refresh();
       } else {
         const data = await res.json();
-        setErrorMsg(data.error || 'パスワードの変更に失敗しました');
+        setErrorMsg(data.error || t('error_change_failed'));
       }
     } catch {
-      setErrorMsg('通信エラーが発生しました');
+      setErrorMsg(t('error_network'));
     } finally {
       setLoading(false);
     }
@@ -76,8 +78,8 @@ export default function ChangePasswordPage() {
           <div className="w-full flex items-start gap-3 bg-amber-500/10 border border-amber-500/30 rounded-xl px-4 py-3">
             <i className="bi bi-shield-lock-fill text-amber-400 text-xl mt-0.5 shrink-0"></i>
             <div>
-              <p className="text-amber-300 font-bold text-sm">パスワードの変更が必要です</p>
-              <p className="text-amber-400/80 text-xs mt-0.5">初回ログインのため、新しいパスワードを設定してください。</p>
+              <p className="text-amber-300 font-bold text-sm">{t('banner_title')}</p>
+              <p className="text-amber-400/80 text-xs mt-0.5">{t('banner_message')}</p>
             </div>
           </div>
         </div>
@@ -93,14 +95,14 @@ export default function ChangePasswordPage() {
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* 新しいパスワード */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">新しいパスワード</label>
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">{t('label_new_password')}</label>
             <div className="relative">
               <i className="bi bi-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
               <input
                 type={showNew ? 'text' : 'password'}
                 value={newPassword}
                 onChange={e => setNewPassword(e.target.value)}
-                placeholder="8文字以上"
+                placeholder={t('placeholder_new')}
                 className="w-full bg-slate-900/50 border border-slate-700 text-white pl-12 pr-12 py-3 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all placeholder:text-slate-600"
                 required
               />
@@ -129,16 +131,16 @@ export default function ChangePasswordPage() {
                 <div className="flex items-center justify-between px-0.5">
                   <div className="flex gap-3 text-[11px]">
                     <span className={hasLength ? 'text-green-400' : 'text-slate-500'}>
-                      <i className={`bi ${hasLength ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>8文字以上
+                      <i className={`bi ${hasLength ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>{t('rule_length')}
                     </span>
                     <span className={hasUpper ? 'text-green-400' : 'text-slate-500'}>
-                      <i className={`bi ${hasUpper ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>大文字
+                      <i className={`bi ${hasUpper ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>{t('rule_uppercase')}
                     </span>
                     <span className={hasLower ? 'text-green-400' : 'text-slate-500'}>
-                      <i className={`bi ${hasLower ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>小文字
+                      <i className={`bi ${hasLower ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>{t('rule_lowercase')}
                     </span>
                     <span className={hasNumber ? 'text-green-400' : 'text-slate-500'}>
-                      <i className={`bi ${hasNumber ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>数字
+                      <i className={`bi ${hasNumber ? 'bi-check-circle-fill' : 'bi-circle'} mr-1`}></i>{t('rule_number')}
                     </span>
                   </div>
                   <span className={`text-[11px] font-bold ${strengthColor.replace('bg-', 'text-')}`}>
@@ -151,14 +153,14 @@ export default function ChangePasswordPage() {
 
           {/* 確認用パスワード */}
           <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">パスワードの確認</label>
+            <label className="text-xs font-bold text-slate-300 uppercase tracking-wider ml-1">{t('label_confirm_password')}</label>
             <div className="relative">
               <i className="bi bi-lock-fill absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
               <input
                 type={showConfirm ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={e => setConfirmPassword(e.target.value)}
-                placeholder="もう一度入力"
+                placeholder={t('placeholder_confirm')}
                 className={`w-full bg-slate-900/50 border text-white pl-12 pr-12 py-3 rounded-xl focus:ring-2 outline-none transition-all placeholder:text-slate-600 ${
                   confirmPassword.length > 0
                     ? isMatch
@@ -191,12 +193,12 @@ export default function ChangePasswordPage() {
             {loading ? (
               <>
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                変更中...
+                {t('btn_submitting')}
               </>
             ) : (
               <>
                 <i className="bi bi-shield-check text-lg"></i>
-                パスワードを変更してログイン
+                {t('btn_submit')}
               </>
             )}
           </button>

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useTranslation } from '@/i18n';
 
 type AlertCategory = {
   id: number;
@@ -26,10 +27,10 @@ type Alert = {
   resolvedBy: { id: number; lastNameJa: string; firstNameJa: string } | null;
 };
 
-const SEVERITY_CONFIG: Record<string, { label: string; bg: string; text: string; dot: string }> = {
-  CRITICAL: { label: '緊急', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
-  WARNING:  { label: '警告', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
-  INFO:     { label: '情報', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
+const SEVERITY_STYLE: Record<string, { labelKey: string; bg: string; text: string; dot: string }> = {
+  CRITICAL: { labelKey: 'severity_critical', bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
+  WARNING:  { labelKey: 'severity_warning', bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  INFO:     { labelKey: 'severity_info', bg: 'bg-blue-100', text: 'text-blue-700', dot: 'bg-blue-500' },
 };
 
 const ENTITY_LINKS: Record<string, (id: number) => string> = {
@@ -37,6 +38,16 @@ const ENTITY_LINKS: Record<string, (id: number) => string> = {
 };
 
 export default function AlertsPage() {
+  const { t } = useTranslation('alerts');
+
+  const SEVERITY_CONFIG = useMemo(() => {
+    const result: Record<string, { label: string; bg: string; text: string; dot: string }> = {};
+    for (const [key, style] of Object.entries(SEVERITY_STYLE)) {
+      result[key] = { label: t(style.labelKey), ...style };
+    }
+    return result;
+  }, [t]);
+
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [categories, setCategories] = useState<AlertCategory[]>([]);
   const [total, setTotal] = useState(0);
@@ -120,7 +131,7 @@ export default function AlertsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-extrabold text-gray-800 flex items-center gap-2">
-          <i className="bi bi-bell-fill text-indigo-500" /> アラート管理
+          <i className="bi bi-bell-fill text-indigo-500" /> {t('page_title')}
         </h1>
         <div className="text-sm text-gray-500">
           {total} 件
@@ -140,14 +151,14 @@ export default function AlertsPage() {
                   statusFilter === s ? 'bg-white text-indigo-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {s === 'OPEN' ? '未対応' : '対応済み'}
+                {s === 'OPEN' ? t('status_open') : t('status_resolved')}
               </button>
             ))}
           </div>
 
           {/* Severity tabs */}
           <div className="flex bg-gray-100 rounded-xl p-0.5">
-            {[{ key: 'ALL', label: 'すべて' }, { key: 'CRITICAL', label: '緊急' }, { key: 'WARNING', label: '警告' }, { key: 'INFO', label: '情報' }].map(s => (
+            {[{ key: 'ALL', label: t('severity_all') }, { key: 'CRITICAL', label: t('severity_critical') }, { key: 'WARNING', label: t('severity_warning') }, { key: 'INFO', label: t('severity_info') }].map(s => (
               <button
                 key={s.key}
                 onClick={() => setSeverityFilter(s.key)}
@@ -166,7 +177,7 @@ export default function AlertsPage() {
             onChange={(e) => setCategoryFilter(e.target.value)}
             className="border border-gray-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
           >
-            <option value="">全カテゴリ</option>
+            <option value="">{t('filter_all_categories')}</option>
             {categories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -180,7 +191,7 @@ export default function AlertsPage() {
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="タイトル・メッセージで検索..."
+                placeholder={t('search_placeholder')}
                 className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -193,12 +204,12 @@ export default function AlertsPage() {
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
             <tr>
-              <th className="px-5 py-3 text-left">重要度</th>
-              <th className="px-5 py-3 text-left">カテゴリ</th>
-              <th className="px-5 py-3 text-left">タイトル</th>
-              <th className="px-5 py-3 text-left">日時</th>
-              <th className="px-5 py-3 text-center">ステータス</th>
-              <th className="px-5 py-3 text-center w-24">操作</th>
+              <th className="px-5 py-3 text-left">{t('col_severity')}</th>
+              <th className="px-5 py-3 text-left">{t('col_category')}</th>
+              <th className="px-5 py-3 text-left">{t('col_title')}</th>
+              <th className="px-5 py-3 text-left">{t('col_datetime')}</th>
+              <th className="px-5 py-3 text-center">{t('col_status')}</th>
+              <th className="px-5 py-3 text-center w-24">{t('col_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -208,7 +219,7 @@ export default function AlertsPage() {
               </td></tr>
             ) : alerts.length === 0 ? (
               <tr><td colSpan={6} className="px-5 py-12 text-center text-gray-400">
-                アラートがありません
+                {t('empty')}
               </td></tr>
             ) : (
               alerts.map(alert => {
@@ -236,9 +247,9 @@ export default function AlertsPage() {
                     </td>
                     <td className="px-5 py-3 text-center">
                       {alert.status === 'OPEN' ? (
-                        <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded">未対応</span>
+                        <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded">{t('status_open')}</span>
                       ) : (
-                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">対応済み</span>
+                        <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded">{t('status_resolved')}</span>
                       )}
                     </td>
                     <td className="px-5 py-3 text-center">
@@ -247,7 +258,7 @@ export default function AlertsPage() {
                           <a
                             href={ENTITY_LINKS[alert.entityType](alert.entityId)}
                             className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="関連先を見る"
+                            title={t('btn_view_related')}
                           >
                             <i className="bi bi-box-arrow-up-right text-sm" />
                           </a>
@@ -256,7 +267,7 @@ export default function AlertsPage() {
                           <button
                             onClick={() => { setResolveTarget(alert); setResolveNote(''); }}
                             className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                            title="対応済みにする"
+                            title={t('btn_resolve')}
                           >
                             <i className="bi bi-check-circle text-sm" />
                           </button>
@@ -274,7 +285,7 @@ export default function AlertsPage() {
         {totalPages > 1 && (
           <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between">
             <div className="text-xs text-gray-400">
-              {total} 件中 {(page - 1) * 30 + 1} - {Math.min(page * 30, total)} 件
+              {t('pagination_info', { total: String(total), start: String((page - 1) * 30 + 1), end: String(Math.min(page * 30, total)) })}
             </div>
             <div className="flex gap-1">
               <button
@@ -282,14 +293,14 @@ export default function AlertsPage() {
                 onClick={() => setPage(p => p - 1)}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition"
               >
-                前へ
+                {t('previous')}
               </button>
               <button
                 disabled={page >= totalPages}
                 onClick={() => setPage(p => p + 1)}
                 className="px-3 py-1.5 rounded-lg text-xs font-bold border border-gray-200 hover:bg-gray-50 disabled:opacity-40 transition"
               >
-                次へ
+                {t('next')}
               </button>
             </div>
           </div>
@@ -302,7 +313,7 @@ export default function AlertsPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
               <h3 className="font-bold text-gray-800 flex items-center gap-2">
-                <i className="bi bi-check-circle text-emerald-500" /> アラート対応
+                <i className="bi bi-check-circle text-emerald-500" /> {t('resolve_modal_title')}
               </h3>
               <button onClick={() => setResolveTarget(null)} className="text-gray-400 hover:text-gray-600 transition">
                 <i className="bi bi-x-lg" />
@@ -328,18 +339,18 @@ export default function AlertsPage() {
                     href={ENTITY_LINKS[resolveTarget.entityType](resolveTarget.entityId)}
                     className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline font-medium"
                   >
-                    <i className="bi bi-box-arrow-up-right" /> 関連先を確認
+                    <i className="bi bi-box-arrow-up-right" /> {t('btn_view_related_link')}
                   </a>
                 )}
               </div>
 
               {/* Note */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 mb-1">対応メモ</label>
+                <label className="block text-xs font-bold text-gray-500 mb-1">{t('resolve_note_label')}</label>
                 <textarea
                   value={resolveNote}
                   onChange={(e) => setResolveNote(e.target.value)}
-                  placeholder="対応内容を記録..."
+                  placeholder={t('resolve_note_placeholder')}
                   rows={3}
                   className="w-full border border-gray-300 rounded-xl p-3 text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                 />
@@ -350,14 +361,14 @@ export default function AlertsPage() {
                 onClick={() => setResolveTarget(null)}
                 className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-600 font-bold text-sm hover:bg-gray-50 transition"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={handleResolve}
                 disabled={isResolving}
                 className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm disabled:opacity-50 transition flex items-center gap-1.5"
               >
-                {isResolving ? '処理中...' : <><i className="bi bi-check-circle-fill" /> 対応済みにする</>}
+                {isResolving ? t('processing') : <><i className="bi bi-check-circle-fill" /> {t('btn_mark_resolved')}</>}
               </button>
             </div>
           </div>

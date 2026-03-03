@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useTranslation } from '@/i18n';
 
 type Customer = { id: number; name: string; customerCode: string };
 
@@ -18,11 +19,11 @@ type BillingStatement = {
   createdAt: string;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT:     '下書き',
-  CONFIRMED: '確定済み',
-  SENT:      '送付済み',
-  PAID:      '入金済み',
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  DRAFT:     'status_draft',
+  CONFIRMED: 'status_confirmed',
+  SENT:      'status_sent',
+  PAID:      'status_paid',
 };
 const STATUS_COLOR: Record<string, string> = {
   DRAFT:     'bg-slate-100 text-slate-600',
@@ -37,6 +38,7 @@ function getDefaultMonth() {
 }
 
 export default function BillingPage() {
+  const { t } = useTranslation('billing');
   const [statements, setStatements] = useState<BillingStatement[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -110,7 +112,7 @@ export default function BillingPage() {
 
   const handleCreate = async () => {
     if (!newCustomerId || !newMonth || selectedOrderIds.length === 0) {
-      showToast('顧客・請求月・受注を選択してください', 'error'); return;
+      showToast(t('validation_error'), 'error'); return;
     }
     setIsCreating(true);
     const res = await fetch('/api/billing', {
@@ -126,13 +128,13 @@ export default function BillingPage() {
     });
     setIsCreating(false);
     if (res.ok) {
-      showToast('請求まとめを作成しました');
+      showToast(t('created_success'));
       setShowModal(false);
       setNewCustomerId(''); setNewNote(''); setSelectedOrderIds([]);
       fetchStatements();
     } else {
       const err = await res.json();
-      showToast(err.error ?? '作成に失敗しました', 'error');
+      showToast(err.error ?? t('create_error'), 'error');
     }
   };
 
@@ -152,14 +154,14 @@ export default function BillingPage() {
           onClick={() => setShowModal(true)}
           className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all"
         >
-          <i className="bi bi-plus-circle"></i> 請求まとめを作成
+          <i className="bi bi-plus-circle"></i> {t('btn_create')}
         </button>
       </div>
 
       {/* フィルタ */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-5 flex flex-wrap gap-3 items-end">
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">請求月</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_month')}</label>
           <input
             type="month" value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)}
@@ -167,32 +169,32 @@ export default function BillingPage() {
           />
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">顧客</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_customer')}</label>
           <select
             value={filterCustomer}
             onChange={e => setFilterCustomer(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
           >
-            <option value="">全顧客</option>
+            <option value="">{t('filter_all_customers')}</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
           <select
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
           >
-            <option value="">全て</option>
-            {Object.entries(STATUS_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            <option value="">{t('filter_all_status')}</option>
+            {Object.entries(STATUS_LABEL_KEYS).map(([v, lk]) => <option key={v} value={v}>{t(lk)}</option>)}
           </select>
         </div>
         <button
           onClick={fetchStatements}
           className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-sm transition-all"
         >
-          <i className="bi bi-search mr-1"></i>絞り込み
+          <i className="bi bi-search mr-1"></i>{t('filter_btn')}
         </button>
       </div>
 
@@ -200,25 +202,25 @@ export default function BillingPage() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         {isLoading ? (
           <div className="py-20 text-center text-slate-400">
-            <i className="bi bi-hourglass-split animate-spin text-2xl block mb-2"></i>読み込み中...
+            <i className="bi bi-hourglass-split animate-spin text-2xl block mb-2"></i>{t('loading')}
           </div>
         ) : statements.length === 0 ? (
           <div className="py-20 text-center text-slate-400">
             <i className="bi bi-receipt text-4xl block mb-3"></i>
-            <p className="font-bold">請求まとめがありません</p>
-            <p className="text-sm mt-1">「請求まとめを作成」から新規作成してください</p>
+            <p className="font-bold">{t('no_statements')}</p>
+            <p className="text-sm mt-1">{t('no_statements_hint')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
               <tr>
-                <th className="px-4 py-3 font-semibold text-left">請求番号</th>
-                <th className="px-4 py-3 font-semibold text-left">顧客</th>
-                <th className="px-4 py-3 font-semibold text-left">請求月</th>
-                <th className="px-4 py-3 font-semibold text-center">受注件数</th>
-                <th className="px-4 py-3 font-semibold text-right">請求金額（税込）</th>
-                <th className="px-4 py-3 font-semibold text-center">ステータス</th>
-                <th className="px-4 py-3 font-semibold text-center">詳細</th>
+                <th className="px-4 py-3 font-semibold text-left">{t('table_statement_no')}</th>
+                <th className="px-4 py-3 font-semibold text-left">{t('table_customer')}</th>
+                <th className="px-4 py-3 font-semibold text-left">{t('table_month')}</th>
+                <th className="px-4 py-3 font-semibold text-center">{t('table_items')}</th>
+                <th className="px-4 py-3 font-semibold text-right">{t('table_total_incl_tax')}</th>
+                <th className="px-4 py-3 font-semibold text-center">{t('table_status')}</th>
+                <th className="px-4 py-3 font-semibold text-center">{t('table_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -227,11 +229,11 @@ export default function BillingPage() {
                   <td className="px-4 py-3 font-mono text-xs text-slate-600">{s.statementNo}</td>
                   <td className="px-4 py-3 font-bold text-slate-800">{s.customer.name}</td>
                   <td className="px-4 py-3 text-slate-600">{s.billingMonth}</td>
-                  <td className="px-4 py-3 text-center text-slate-600">{s.items.length} 件</td>
+                  <td className="px-4 py-3 text-center text-slate-600">{t('items_count', { count: s.items.length })}</td>
                   <td className="px-4 py-3 text-right font-bold text-slate-800">¥{fmt(s.totalAmount)}</td>
                   <td className="px-4 py-3 text-center">
                     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${STATUS_COLOR[s.status]}`}>
-                      {STATUS_LABEL[s.status]}
+                      {t(STATUS_LABEL_KEYS[s.status])}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -239,7 +241,7 @@ export default function BillingPage() {
                       href={`/billing/${s.id}`}
                       className="inline-flex items-center gap-1 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-lg text-xs transition-all"
                     >
-                      <i className="bi bi-arrow-right-circle"></i> 詳細
+                      <i className="bi bi-arrow-right-circle"></i> {t('btn_detail')}
                     </Link>
                   </td>
                 </tr>
@@ -255,7 +257,7 @@ export default function BillingPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <h2 className="text-lg font-bold text-slate-800">
-                <i className="bi bi-plus-circle text-indigo-600 mr-2"></i>請求まとめを作成
+                <i className="bi bi-plus-circle text-indigo-600 mr-2"></i>{t('modal_title')}
               </h2>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 text-xl">
                 <i className="bi bi-x-lg"></i>
@@ -265,18 +267,18 @@ export default function BillingPage() {
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">顧客 <span className="text-red-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_customer')} <span className="text-red-500">*</span></label>
                   <select
                     value={newCustomerId}
                     onChange={e => setNewCustomerId(e.target.value)}
                     className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   >
-                    <option value="">顧客を選択...</option>
+                    <option value="">{t('modal_customer_placeholder')}</option>
                     {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">請求月 <span className="text-red-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_month')} <span className="text-red-500">*</span></label>
                   <input
                     type="month" value={newMonth}
                     onChange={e => setNewMonth(e.target.value)}
@@ -288,20 +290,20 @@ export default function BillingPage() {
               {/* 未請求受注一覧 */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-2">
-                  請求対象の受注 <span className="text-red-500">*</span>
-                  <span className="ml-2 text-slate-400 font-normal">（請求済みでない受注を表示）</span>
+                  {t('modal_orders_label')} <span className="text-red-500">*</span>
+                  <span className="ml-2 text-slate-400 font-normal">{t('modal_orders_billed_note')}</span>
                 </label>
                 {!newCustomerId ? (
                   <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center text-slate-400 text-sm">
-                    顧客を選択すると対象受注が表示されます
+                    {t('select_customer_hint')}
                   </div>
                 ) : isFetchingOrders ? (
                   <div className="border border-slate-200 rounded-lg p-4 text-center text-slate-400 text-sm">
-                    <i className="bi bi-hourglass-split animate-spin mr-2"></i>読み込み中...
+                    <i className="bi bi-hourglass-split animate-spin mr-2"></i>{t('loading')}
                   </div>
                 ) : availableOrders.length === 0 ? (
                   <div className="border border-dashed border-slate-300 rounded-lg p-6 text-center text-slate-400 text-sm">
-                    この月に未請求の受注はありません
+                    {t('no_unbilled_orders')}
                   </div>
                 ) : (
                   <div className="border border-slate-200 rounded-lg overflow-hidden max-h-48 overflow-y-auto">
@@ -314,9 +316,9 @@ export default function BillingPage() {
                               onChange={e => setSelectedOrderIds(e.target.checked ? availableOrders.map((o:any) => o.id) : [])}
                             />
                           </th>
-                          <th className="px-3 py-2 text-left">受注番号</th>
-                          <th className="px-3 py-2 text-left">件名</th>
-                          <th className="px-3 py-2 text-right">金額</th>
+                          <th className="px-3 py-2 text-left">{t('modal_order_no')}</th>
+                          <th className="px-3 py-2 text-left">{t('modal_order_title')}</th>
+                          <th className="px-3 py-2 text-right">{t('modal_order_amount')}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -329,7 +331,7 @@ export default function BillingPage() {
                               <input type="checkbox" checked={selectedOrderIds.includes(o.id)} onChange={() => {}} />
                             </td>
                             <td className="px-3 py-2 font-mono text-xs text-slate-600">{o.orderNo}</td>
-                            <td className="px-3 py-2 text-slate-700">{o.title ?? '（タイトルなし）'}</td>
+                            <td className="px-3 py-2 text-slate-700">{o.title ?? t('order_no_title')}</td>
                             <td className="px-3 py-2 text-right font-bold text-slate-700">¥{o.totalAmount?.toLocaleString('ja-JP') ?? '―'}</td>
                           </tr>
                         ))}
@@ -339,14 +341,14 @@ export default function BillingPage() {
                 )}
                 {selectedOrderIds.length > 0 && (
                   <p className="text-xs text-indigo-600 font-bold mt-1">
-                    <i className="bi bi-check-circle mr-1"></i>{selectedOrderIds.length} 件選択中
+                    <i className="bi bi-check-circle mr-1"></i>{t('modal_selected', { count: selectedOrderIds.length })}
                   </p>
                 )}
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">支払期限</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_payment_due')}</label>
                   <input
                     type="date" value={newPaymentDue}
                     onChange={e => setNewPaymentDue(e.target.value)}
@@ -356,11 +358,11 @@ export default function BillingPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">備考</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_note')}</label>
                 <textarea
                   rows={2} value={newNote}
                   onChange={e => setNewNote(e.target.value)}
-                  placeholder="請求書に印刷される備考..."
+                  placeholder={t('modal_note_print_placeholder')}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
               </div>
@@ -371,7 +373,7 @@ export default function BillingPage() {
                 onClick={() => setShowModal(false)}
                 className="px-5 py-2.5 text-slate-600 hover:text-slate-800 font-bold rounded-lg border border-slate-300 hover:bg-slate-100 transition-all text-sm"
               >
-                キャンセル
+                {t('btn_cancel')}
               </button>
               <button
                 onClick={handleCreate}
@@ -379,8 +381,8 @@ export default function BillingPage() {
                 className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50 text-sm"
               >
                 {isCreating
-                  ? <><i className="bi bi-hourglass-split animate-spin"></i> 作成中...</>
-                  : <><i className="bi bi-check2-circle"></i> 作成する</>
+                  ? <><i className="bi bi-hourglass-split animate-spin"></i> {t('modal_creating')}</>
+                  : <><i className="bi bi-check2-circle"></i> {t('modal_create_btn')}</>
                 }
               </button>
             </div>

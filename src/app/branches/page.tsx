@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 type Employee = { id: number; lastNameJa: string; firstNameJa: string; isActive: boolean };
 type Branch = any; 
 
 export default function BranchPage() {
   const { showToast } = useNotification();
+  const { t } = useTranslation('branches');
   const [branches, setBranches] = useState<Branch[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -86,7 +88,7 @@ export default function BranchPage() {
       if (!res.ok) throw new Error('Error saving branch');
       setIsFormModalOpen(false);
       fetchData();
-    } catch (e) { showToast('保存に失敗しました', 'error'); }
+    } catch (e) { showToast(t('save_error'), 'error'); }
   };
 
   const del = async () => {
@@ -96,7 +98,7 @@ export default function BranchPage() {
       if (!res.ok) throw new Error('Error deleting branch');
       setIsDeleteModalOpen(false);
       fetchData();
-    } catch (e) { showToast('削除に失敗しました。配布員が紐付いている場合は削除できません', 'error'); }
+    } catch (e) { showToast(t('delete_error'), 'error'); }
   };
 
   // 店長名を表示するためのヘルパー関数
@@ -108,7 +110,7 @@ export default function BranchPage() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <button onClick={() => openForm()} className="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-bold shadow-md">
-          <i className="bi bi-plus-lg"></i> 新規支店登録
+          <i className="bi bi-plus-lg"></i> {t('btn_new_branch')}
         </button>
       </div>
 
@@ -118,15 +120,15 @@ export default function BranchPage() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">支店名</th>
-              <th className="px-6 py-4">営業時間 / 定休日</th>
-              <th className="px-6 py-4">店長体制</th>
-              <th className="px-6 py-4">住所 / Map</th>
-              <th className="px-6 py-4 text-right">操作</th>
+              <th className="px-6 py-4">{t('table_branch_name')}</th>
+              <th className="px-6 py-4">{t('table_hours_holidays')}</th>
+              <th className="px-6 py-4">{t('table_managers')}</th>
+              <th className="px-6 py-4">{t('table_address_map')}</th>
+              <th className="px-6 py-4 text-right">{t('table_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td colSpan={5} className="p-8 text-center">読み込み中...</td></tr> : 
+            {isLoading ? <tr><td colSpan={5} className="p-8 text-center">{t('loading')}</td></tr> :
              branches.map(b => {
                const managers = [getManagerName(b.manager1), getManagerName(b.manager2), getManagerName(b.manager3), getManagerName(b.manager4)].filter(Boolean);
                
@@ -137,7 +139,7 @@ export default function BranchPage() {
                     <div className="font-mono text-xs text-slate-400">{b.nameEn}</div>
                     {b.prefix && (
                       <span className="inline-block mt-1 bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded font-mono">
-                        {b.prefix} — 次: {b.prefix}{String((b.staffIdSeq ?? 0) + 1).padStart(3, '0')}
+                        {b.prefix} — {t('next_id')}{b.prefix}{String((b.staffIdSeq ?? 0) + 1).padStart(3, '0')}
                       </span>
                     )}
                   </td>
@@ -145,7 +147,7 @@ export default function BranchPage() {
                     <div className="text-slate-700"><i className="bi bi-clock mr-1 text-slate-400"></i> {b.openingTime || '-'}</div>
                     <div className="text-slate-500 text-xs mt-1"><i className="bi bi-calendar-x mr-1 text-rose-400"></i> {b.closedDays || '-'}</div>
                     {b.alternateBranch && (
-                      <div className="text-slate-500 text-xs mt-1"><i className="bi bi-arrow-right-circle mr-1 text-amber-500"></i> 代替: {b.alternateBranch.nameJa}</div>
+                      <div className="text-slate-500 text-xs mt-1"><i className="bi bi-arrow-right-circle mr-1 text-amber-500"></i> {t('alternate_branch')}{b.alternateBranch.nameJa}</div>
                     )}
                   </td>
                   <td className="px-6 py-4 text-sm">
@@ -163,7 +165,7 @@ export default function BranchPage() {
                     <div className="truncate max-w-[200px] text-xs text-slate-600 mb-1">{b.address || '-'}</div>
                     {b.googleMapUrl && (
                       <a href={b.googleMapUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-500 hover:underline flex items-center gap-1">
-                        <i className="bi bi-geo-alt-fill"></i> Mapを開く
+                        <i className="bi bi-geo-alt-fill"></i> {t('open_map')}
                       </a>
                     )}
                   </td>
@@ -184,24 +186,24 @@ export default function BranchPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-              <h3 className="font-bold text-slate-800">{currentId ? '支店情報を編集' : '新規支店登録'}</h3>
+              <h3 className="font-bold text-slate-800">{currentId ? t('form_title_edit') : t('form_title_new')}</h3>
               <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             
             <form onSubmit={save} className="p-6 overflow-y-auto space-y-6">
               {/* 基本情報 */}
               <div>
-                <h4 className="font-bold text-sm text-orange-600 border-b border-orange-100 pb-2 mb-4">基本情報</h4>
+                <h4 className="font-bold text-sm text-orange-600 border-b border-orange-100 pb-2 mb-4">{t('section_basic')}</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <div><label className="text-xs font-bold text-slate-600">支店名 (日本語) *</label><input required name="nameJa" value={formData.nameJa} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 高田馬場" /></div>
-                  <div><label className="text-xs font-bold text-slate-600">支店名 (英語) *</label><input required name="nameEn" value={formData.nameEn} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono" placeholder="例: Takadanobaba" /></div>
+                  <div><label className="text-xs font-bold text-slate-600">{t('form_name_ja')} *</label><input required name="nameJa" value={formData.nameJa} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder={t('form_name_ja_placeholder')} /></div>
+                  <div><label className="text-xs font-bold text-slate-600">{t('form_name_en')} *</label><input required name="nameEn" value={formData.nameEn} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono" placeholder={t('form_name_en_placeholder')} /></div>
                   <div>
-                    <label className="text-xs font-bold text-slate-600">スタッフIDプレフィックス</label>
-                    <input name="prefix" value={(formData as any).prefix} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono uppercase" placeholder="例: MBF" maxLength={10} />
-                    <p className="text-[10px] text-slate-400 mt-1">配布員登録時のスタッフID自動生成に使用（例: MBF001）</p>
+                    <label className="text-xs font-bold text-slate-600">{t('form_prefix')}</label>
+                    <input name="prefix" value={(formData as any).prefix} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm font-mono uppercase" placeholder={t('form_prefix_placeholder')} maxLength={10} />
+                    <p className="text-[10px] text-slate-400 mt-1">{t('form_prefix_hint')}</p>
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-slate-600">現在のシーケンス番号</label>
+                    <label className="text-xs font-bold text-slate-600">{t('form_seq_number')}</label>
                     <input
                       type="number"
                       name="staffIdSeq"
@@ -212,33 +214,33 @@ export default function BranchPage() {
                       placeholder="0"
                     />
                     <p className="text-[10px] text-slate-400 mt-1">
-                      次のスタッフIDは {(formData as any).prefix || 'PREFIX'}{String(Number((formData as any).staffIdSeq ?? 0) + 1).padStart(3, '0')} になります
+                      {t('form_next_id_hint', { prefix: (formData as any).prefix || 'PREFIX', nextId: String(Number((formData as any).staffIdSeq ?? 0) + 1).padStart(3, '0') })}
                     </p>
                   </div>
-                  <div className="col-span-2"><label className="text-xs font-bold text-slate-600">住所</label><input name="address" value={formData.address} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
-                  <div className="col-span-2"><label className="text-xs font-bold text-slate-600">Google Map URL</label><input name="googleMapUrl" value={formData.googleMapUrl} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="https://maps.app.goo.gl/..." /></div>
-                  <div><label className="text-xs font-bold text-slate-600">開店時間</label><input type="time" name="openingTime" value={formData.openingTime} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
-                  <div><label className="text-xs font-bold text-slate-600">定休日</label><input name="closedDays" value={formData.closedDays} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 火曜日" /></div>
+                  <div className="col-span-2"><label className="text-xs font-bold text-slate-600">{t('form_address')}</label><input name="address" value={formData.address} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
+                  <div className="col-span-2"><label className="text-xs font-bold text-slate-600">{t('form_google_map_url')}</label><input name="googleMapUrl" value={formData.googleMapUrl} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="https://maps.app.goo.gl/..." /></div>
+                  <div><label className="text-xs font-bold text-slate-600">{t('form_opening_time')}</label><input type="time" name="openingTime" value={formData.openingTime} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
+                  <div><label className="text-xs font-bold text-slate-600">{t('form_closed_days')}</label><input name="closedDays" value={formData.closedDays} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder={t('form_closed_days_placeholder')} /></div>
                   <div>
-                    <label className="text-xs font-bold text-slate-600">定休日の代替出勤先</label>
+                    <label className="text-xs font-bold text-slate-600">{t('form_alternate_branch')}</label>
                     <select name="alternateBranchId" value={(formData as any).alternateBranchId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
-                      <option value="">未設定</option>
+                      <option value="">{t('form_none')}</option>
                       {branches.filter((br: any) => br.id !== currentId).map((br: any) => <option key={br.id} value={br.id}>{br.nameJa}</option>)}
                     </select>
-                    <p className="text-[10px] text-slate-400 mt-1">定休日にシフト登録した配布員に表示される出勤先</p>
+                    <p className="text-[10px] text-slate-400 mt-1">{t('form_alternate_hint')}</p>
                   </div>
                 </div>
               </div>
 
               {/* 店長設定 */}
               <div>
-                <h4 className="font-bold text-sm text-orange-600 border-b border-orange-100 pb-2 mb-4">店長設定 (最大4名)</h4>
+                <h4 className="font-bold text-sm text-orange-600 border-b border-orange-100 pb-2 mb-4">{t('section_managers')}</h4>
                 <div className="grid grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map(num => (
                     <div key={num}>
-                      <label className="text-xs font-bold text-slate-600">店長 {num}</label>
+                      <label className="text-xs font-bold text-slate-600">{t('form_manager_label', { num })}</label>
                       <select name={`manager${num}Id`} value={(formData as any)[`manager${num}Id`]} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
-                        <option value="">未設定</option>
+                        <option value="">{t('form_unselected')}</option>
                         {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
                       </select>
                     </div>
@@ -247,8 +249,8 @@ export default function BranchPage() {
               </div>
 
               <div className="pt-4 border-t flex justify-end gap-3">
-                <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-5 py-2.5 text-slate-600 text-sm font-bold">キャンセル</button>
-                <button type="submit" className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-bold shadow-md">{currentId ? '更新する' : '登録する'}</button>
+                <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-5 py-2.5 text-slate-600 text-sm font-bold">{t('btn_cancel')}</button>
+                <button type="submit" className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-sm font-bold shadow-md">{currentId ? t('btn_update') : t('btn_register')}</button>
               </div>
             </form>
           </div>
@@ -259,11 +261,11 @@ export default function BranchPage() {
       {isDeleteModalOpen && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white p-6 rounded-xl text-center max-w-sm w-full">
-            <h3 className="font-bold text-lg mb-2 text-slate-800">支店を削除しますか？</h3>
-            <p className="text-sm text-slate-500 mb-6">この操作は元に戻せません。</p>
+            <h3 className="font-bold text-lg mb-2 text-slate-800">{t('delete_confirm')}</h3>
+            <p className="text-sm text-slate-500 mb-6">{t('delete_warning')}</p>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">キャンセル</button>
-              <button onClick={del} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold">削除する</button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg font-bold">{t('btn_cancel')}</button>
+              <button onClick={del} className="px-4 py-2 bg-rose-600 text-white rounded-lg font-bold">{t('btn_delete')}</button>
             </div>
           </div>
         </div>

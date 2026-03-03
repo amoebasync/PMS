@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import Pagination from '@/components/ui/Pagination';
+import { useTranslation } from '@/i18n';
 
 // ──────────────────────────────────────────
 // 型定義
@@ -84,6 +85,7 @@ function addDays(dateStr: string, days: number) {
 
 export default function DistributorShiftsPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('distributor-shifts');
 
   // タブ
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
@@ -177,7 +179,7 @@ export default function DistributorShiftsPage() {
       setWeekDates(json.dates || []);
       setWeekDistributors(json.distributors || []);
     } catch {
-      showToast('シフトデータの取得に失敗しました', 'error');
+      showToast(t('error_fetch_weekly'), 'error');
     }
     setWeekLoading(false);
   }, [weekStartDate, filterBranchId, showToast]);
@@ -207,7 +209,7 @@ export default function DistributorShiftsPage() {
       setTotal(json.total || 0);
       setTotalPages(json.totalPages || 1);
     } catch {
-      showToast('シフト一覧の取得に失敗しました', 'error');
+      showToast(t('error_fetch_list'), 'error');
     }
     setListLoading(false);
   }, [page, filterDateFrom, filterDateTo, filterBranchId, filterSearch, filterStatus, showToast]);
@@ -244,11 +246,11 @@ export default function DistributorShiftsPage() {
 
   const handleSave = async () => {
     if (!editingShift && !formDistributorId) {
-      showToast('配布員を選択してください', 'warning');
+      showToast(t('error_select_distributor'), 'warning');
       return;
     }
     if (!formDate) {
-      showToast('日付を入力してください', 'warning');
+      showToast(t('error_select_date'), 'warning');
       return;
     }
 
@@ -269,35 +271,35 @@ export default function DistributorShiftsPage() {
       });
 
       if (res.status === 409) {
-        showToast('この配布員はこの日付に既にシフトが登録されています', 'error');
+        showToast(t('error_duplicate'), 'error');
         setFormSaving(false);
         return;
       }
       if (!res.ok) throw new Error();
 
-      showToast(editingShift ? 'シフトを更新しました' : 'シフトを作成しました', 'success');
+      showToast(editingShift ? t('toast_updated') : t('toast_created'), 'success');
       setShowModal(false);
       refreshData();
     } catch {
-      showToast('保存に失敗しました', 'error');
+      showToast(t('save_error'), 'error');
     }
     setFormSaving(false);
   };
 
   const handleDeleteShift = async (shiftId: number, distributorName: string, date: string) => {
     const confirmed = await showConfirm(
-      `${distributorName} の ${formatDate(date)} のシフトを削除しますか？`,
-      { variant: 'danger', confirmLabel: '削除' }
+      t('confirm_delete', { name: distributorName, date: formatDate(date) }),
+      { variant: 'danger', confirmLabel: t('confirm_delete_btn') }
     );
     if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/distributor-shifts/${shiftId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
-      showToast('シフトを削除しました', 'success');
+      showToast(t('toast_deleted'), 'success');
       refreshData();
     } catch {
-      showToast('削除に失敗しました', 'error');
+      showToast(t('delete_error'), 'error');
     }
   };
 
@@ -348,7 +350,7 @@ export default function DistributorShiftsPage() {
             }`}
           >
             <i className={`bi ${tab === 'calendar' ? 'bi-calendar-week' : 'bi-list-ul'} mr-1.5`}></i>
-            {tab === 'calendar' ? '週間シフト' : '一覧'}
+            {tab === 'calendar' ? t('tab_calendar') : t('tab_list')}
             {activeTab === tab && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />
             )}
@@ -359,13 +361,13 @@ export default function DistributorShiftsPage() {
       {/* 共通フィルタ: 支店 */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2">
-          <label className="text-xs font-medium text-slate-500">支店</label>
+          <label className="text-xs font-medium text-slate-500">{t('filter_branch')}</label>
           <select
             value={filterBranchId}
             onChange={e => setFilterBranchId(e.target.value)}
             className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           >
-            <option value="">全支店</option>
+            <option value="">{t('filter_all_branches')}</option>
             {branches.map(b => (
               <option key={b.id} value={b.id}>{b.nameJa}</option>
             ))}
@@ -378,7 +380,7 @@ export default function DistributorShiftsPage() {
                      bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
         >
           <i className="bi bi-plus-lg text-xs"></i>
-          シフト追加
+          {t('btn_add_shift')}
         </button>
       </div>
 
@@ -405,7 +407,7 @@ export default function DistributorShiftsPage() {
               onClick={goToday}
               className="px-3 py-1 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
             >
-              今日
+              {t('today')}
             </button>
             {weekDates.length > 0 && (
               <h3 className="text-sm font-bold text-slate-800">
@@ -427,7 +429,7 @@ export default function DistributorShiftsPage() {
               <thead>
                 <tr className="bg-slate-50/80">
                   <th className="text-left px-4 py-3 font-semibold text-slate-600 border-b border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10 min-w-[180px]">
-                    配布員
+                    {t('table_distributor')}
                   </th>
                   {weekDates.map(dateStr => {
                     const d = new Date(dateStr + 'T00:00:00');
@@ -468,7 +470,7 @@ export default function DistributorShiftsPage() {
                   <tr>
                     <td colSpan={1 + weekDates.length} className="text-center py-12 text-slate-400">
                       <i className="bi bi-people text-3xl mb-2 block"></i>
-                      <p className="text-sm">有効な配布員がいません</p>
+                      <p className="text-sm">{t('no_distributors')}</p>
                     </td>
                   </tr>
                 ) : (
@@ -532,7 +534,7 @@ export default function DistributorShiftsPage() {
                 <tfoot>
                   <tr className="bg-slate-50/80">
                     <td className="px-4 py-2.5 border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10">
-                      <span className="text-xs font-bold text-slate-500">合計</span>
+                      <span className="text-xs font-bold text-slate-500">{t('total')}</span>
                     </td>
                     {weekDates.map(dateStr => {
                       const count = dailyCounts[dateStr] || 0;
@@ -543,7 +545,7 @@ export default function DistributorShiftsPage() {
                           className={`text-center py-2.5 border-r border-slate-100 ${isToday ? 'bg-indigo-50/60' : ''}`}
                         >
                           <span className={`text-sm font-bold ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
-                            {count}名
+                            {count}{t('people_suffix')}
                           </span>
                         </td>
                       );
@@ -562,7 +564,7 @@ export default function DistributorShiftsPage() {
           {/* フィルタバー */}
           <div className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">開始日</label>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('list_start_date')}</label>
               <input
                 type="date"
                 value={filterDateFrom}
@@ -571,7 +573,7 @@ export default function DistributorShiftsPage() {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">終了日</label>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('list_end_date')}</label>
               <input
                 type="date"
                 value={filterDateTo}
@@ -580,25 +582,25 @@ export default function DistributorShiftsPage() {
               />
             </div>
             <div>
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">ステータス</label>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('table_status')}</label>
               <select
                 value={filterStatus}
                 onChange={e => setFilterStatus(e.target.value)}
                 className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
-                <option value="">全て</option>
+                <option value="">{t('list_filter_all')}</option>
                 {STATUS_OPTIONS.map(o => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
+                  <option key={o.value} value={o.value}>{t(`status_${o.value.toLowerCase()}`)}</option>
                 ))}
               </select>
             </div>
             <div className="flex-1 min-w-[180px]">
-              <label className="block text-[11px] font-medium text-slate-400 mb-1">検索</label>
+              <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('list_search')}</label>
               <div className="relative">
                 <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                 <input
                   type="text"
-                  placeholder="名前・Staff ID"
+                  placeholder={t('list_search_placeholder')}
                   value={filterSearch}
                   onChange={e => setFilterSearch(e.target.value)}
                   className="w-full text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -616,20 +618,20 @@ export default function DistributorShiftsPage() {
             ) : listShifts.length === 0 ? (
               <div className="text-center py-12 text-slate-400">
                 <i className="bi bi-calendar-x text-3xl mb-2 block"></i>
-                <p className="text-sm">シフトデータがありません</p>
+                <p className="text-sm">{t('no_shifts')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50/80">
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">日付</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">配布員</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">Staff ID</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">支店</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">ステータス</th>
-                      <th className="text-left px-4 py-3 font-semibold text-slate-600">メモ</th>
-                      <th className="text-center px-4 py-3 font-semibold text-slate-600 w-24">操作</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_date')}</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_distributor')}</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_staff_id')}</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_branch')}</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_status')}</th>
+                      <th className="text-left px-4 py-3 font-semibold text-slate-600">{t('table_memo')}</th>
+                      <th className="text-center px-4 py-3 font-semibold text-slate-600 w-24">{t('table_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -642,21 +644,31 @@ export default function DistributorShiftsPage() {
                         <td className="px-4 py-3 font-medium">{shift.distributor.name}</td>
                         <td className="px-4 py-3 text-slate-500 font-mono text-xs">{shift.distributor.staffId}</td>
                         <td className="px-4 py-3 text-slate-500">{shift.distributor.branch?.nameJa || '-'}</td>
-                        <td className="px-4 py-3">{getStatusBadge(shift.status)}</td>
+                        <td className="px-4 py-3">
+                          {(() => {
+                            const opt = STATUS_OPTIONS.find(o => o.value === shift.status);
+                            if (!opt) return <span className="text-xs text-slate-500">{shift.status}</span>;
+                            return (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${opt.color}`}>
+                                {t(`status_${shift.status.toLowerCase()}`)}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-4 py-3 text-slate-500 max-w-[200px] truncate">{shift.note || '-'}</td>
                         <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center gap-1">
                             <button
                               onClick={() => openEditModal(shift)}
                               className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition-colors"
-                              title="編集"
+                              title={t('edit')}
                             >
                               <i className="bi bi-pencil text-xs"></i>
                             </button>
                             <button
                               onClick={() => handleDelete(shift)}
                               className="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-red-600 transition-colors"
-                              title="削除"
+                              title={t('delete')}
                             >
                               <i className="bi bi-trash text-xs"></i>
                             </button>
@@ -687,7 +699,7 @@ export default function DistributorShiftsPage() {
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-800">
                 <i className={`bi ${editingShift ? 'bi-pencil' : 'bi-plus-circle'} mr-2 text-indigo-600`}></i>
-                {editingShift ? 'シフト編集' : 'シフト追加'}
+                {editingShift ? t('modal_title_edit') : t('modal_title_new')}
               </h3>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
                 <i className="bi bi-x-lg text-sm"></i>
@@ -698,7 +710,7 @@ export default function DistributorShiftsPage() {
             <div className="p-5 space-y-4">
               {/* 配布員 */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">配布員 <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">{t('form_distributor')} <span className="text-red-500">*</span></label>
                 {editingShift || selectedDistributor ? (
                   <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
                     editingShift ? 'bg-slate-50 border-slate-200' : 'bg-indigo-50 border-indigo-200'
@@ -726,7 +738,7 @@ export default function DistributorShiftsPage() {
                       value={distributorSearch}
                       onChange={e => setDistributorSearch(e.target.value)}
                       onFocus={() => { if (distributorOptions.length > 0) setShowDistributorDropdown(true); }}
-                      placeholder="名前またはStaff IDで検索..."
+                      placeholder={t('form_search_placeholder')}
                       className="w-full text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                     {showDistributorDropdown && distributorOptions.length > 0 && (
@@ -754,7 +766,7 @@ export default function DistributorShiftsPage() {
 
               {/* 日付 */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">日付 <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">{t('form_date')} <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   value={formDate}
@@ -766,14 +778,14 @@ export default function DistributorShiftsPage() {
               {/* ステータス（編集時のみ） */}
               {editingShift && (
                 <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">ステータス</label>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">{t('form_status')}</label>
                   <select
                     value={formStatus}
                     onChange={e => setFormStatus(e.target.value)}
                     className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     {STATUS_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
+                      <option key={o.value} value={o.value}>{t(`status_${o.value.toLowerCase()}`)}</option>
                     ))}
                   </select>
                 </div>
@@ -781,12 +793,12 @@ export default function DistributorShiftsPage() {
 
               {/* メモ */}
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">メモ</label>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">{t('form_memo')}</label>
                 <textarea
                   value={formNote}
                   onChange={e => setFormNote(e.target.value)}
                   rows={2}
-                  placeholder="メモ（任意）"
+                  placeholder={t('form_memo_placeholder')}
                   className="w-full text-sm border border-slate-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
                 />
               </div>
@@ -798,7 +810,7 @@ export default function DistributorShiftsPage() {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={handleSave}
@@ -808,10 +820,10 @@ export default function DistributorShiftsPage() {
                 {formSaving ? (
                   <span className="flex items-center gap-1.5">
                     <div className="animate-spin h-3.5 w-3.5 border-2 border-white border-t-transparent rounded-full" />
-                    保存中...
+                    {t('saving')}
                   </span>
                 ) : (
-                  editingShift ? '更新' : '作成'
+                  editingShift ? t('btn_update') : t('btn_create')
                 )}
               </button>
             </div>

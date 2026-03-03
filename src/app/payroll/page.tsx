@@ -2,17 +2,23 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
-const EMP_TYPE_MAP: Record<string, string> = { FULL_TIME: '正社員', PART_TIME: 'アルバイト', OUTSOURCE: '業務委託' };
+const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
 const EMP_TYPE_COLOR: Record<string, string> = {
   FULL_TIME: 'bg-blue-50 text-blue-700 border-blue-200',
   PART_TIME: 'bg-emerald-50 text-emerald-700 border-emerald-200',
   OUTSOURCE: 'bg-violet-50 text-violet-700 border-violet-200',
 };
-const STATUS_MAP: Record<string, { label: string; color: string }> = {
-  DRAFT:     { label: '下書き', color: 'bg-amber-100 text-amber-700' },
-  CONFIRMED: { label: '確定済', color: 'bg-emerald-100 text-emerald-700' },
-  PAID:      { label: '支払済', color: 'bg-blue-100 text-blue-700' },
+const STATUS_STYLE: Record<string, string> = {
+  DRAFT:     'bg-amber-100 text-amber-700',
+  CONFIRMED: 'bg-emerald-100 text-emerald-700',
+  PAID:      'bg-blue-100 text-blue-700',
+};
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  DRAFT:     'status_draft',
+  CONFIRMED: 'status_confirmed',
+  PAID:      'status_paid',
 };
 
 type PayrollRecord = {
@@ -52,6 +58,7 @@ const fmt = (n: number) => `¥${n.toLocaleString()}`;
 
 export default function PayrollPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('payroll');
   const today = new Date();
   const [cycle, setCycle] = useState<'MONTHLY' | 'WEEKLY'>('MONTHLY');
   const [year, setYear] = useState(today.getFullYear());
@@ -108,9 +115,9 @@ export default function PayrollPage() {
   useEffect(() => { fetchRecords(); }, [cycle, year, month, weekStart, filterStatus]);
 
   const handleCalculate = async () => {
-    const label = cycle === 'MONTHLY' ? `${year}年${month}月` : `週：${weekStart}〜`;
-    const target = cycle === 'MONTHLY' ? '正社員（月次）' : 'アルバイト・業務委託（週次）';
-    if (!await showConfirm(`${label} の ${target} の給与を一括計算します。既存の下書きは上書きされます。続行しますか？`, { variant: 'warning', title: '給与計算の確認', confirmLabel: '計算する' })) return;
+    const label = cycle === 'MONTHLY' ? `${year}/${month}` : `${weekStart}~`;
+    const target = cycle === 'MONTHLY' ? t('calculate_monthly_target') : t('calculate_weekly_target');
+    if (!await showConfirm(t('calculate_confirm', { label, target }), { variant: 'warning', title: t('calculate_confirm_title'), confirmLabel: t('calculate_btn') })) return;
 
     setIsCalculating(true);
     try {
@@ -125,18 +132,18 @@ export default function PayrollPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        showToast(`計算完了 / 作成:${data.created}件 / 更新:${data.updated}件 / スキップ:${data.skipped}件`, 'success');
+        showToast(t('calculate_success', { created: data.created, updated: data.updated, skipped: data.skipped }), 'success');
         fetchRecords();
       } else {
-        showToast(`エラー: ${data.error}`, 'error');
+        showToast(t('calculate_error', { error: data.error }), 'error');
       }
-    } catch (e) { showToast('通信エラーが発生しました', 'error'); }
+    } catch (e) { showToast(t('comm_error'), 'error'); }
     setIsCalculating(false);
   };
 
   const handleBatchConfirm = async () => {
     if (selectedIds.size === 0) return;
-    if (!await showConfirm(`選択した ${selectedIds.size} 件を確定します。よろしいですか？`, { variant: 'primary', confirmLabel: '確定する' })) return;
+    if (!await showConfirm(t('batch_confirm_msg', { count: selectedIds.size }), { variant: 'primary', confirmLabel: t('batch_confirm_btn') })) return;
     try {
       await Promise.all(
         Array.from(selectedIds).map(id =>
@@ -149,11 +156,11 @@ export default function PayrollPage() {
       );
       setSelectedIds(new Set());
       fetchRecords();
-    } catch (e) { showToast('確定処理に失敗しました', 'error'); }
+    } catch (e) { showToast(t('batch_confirm_error'), 'error'); }
   };
 
   const handleDelete = async (id: number) => {
-    if (!await showConfirm('この下書きレコードを削除しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('delete_confirm'), { variant: 'danger', confirmLabel: t('delete_btn') })) return;
     const res = await fetch(`/api/payroll/${id}`, { method: 'DELETE' });
     if (res.ok) fetchRecords();
     else { const d = await res.json(); showToast(d.error, 'error'); }
@@ -220,12 +227,12 @@ export default function PayrollPage() {
       {/* 操作バー */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">計算サイクル</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_cycle')}</label>
           <div className="flex gap-2">
             {(['MONTHLY', 'WEEKLY'] as const).map(c => (
               <button key={c} onClick={() => setCycle(c)}
                 className={`px-4 py-2 rounded-lg text-sm font-bold border transition-colors ${cycle === c ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400'}`}>
-                {c === 'MONTHLY' ? '月次（正社員）' : '週次（アルバイト・委託）'}
+                {c === 'MONTHLY' ? t('cycle_monthly_label') : t('cycle_weekly_label')}
               </button>
             ))}
           </div>
@@ -234,42 +241,42 @@ export default function PayrollPage() {
         {cycle === 'MONTHLY' ? (
           <>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">対象年</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_year_label')}</label>
               <select value={year} onChange={e => setYear(parseInt(e.target.value))}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer min-w-[90px]">
-                {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}年</option>)}
+                {[2024,2025,2026,2027].map(y => <option key={y} value={y}>{y}{t('filter_year_suffix')}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">対象月</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_month_label')}</label>
               <select value={month} onChange={e => setMonth(parseInt(e.target.value))}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white cursor-pointer min-w-[80px]">
-                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}月</option>)}
+                {Array.from({length:12},(_,i)=>i+1).map(m => <option key={m} value={m}>{m}{t('filter_month_suffix')}</option>)}
               </select>
             </div>
           </>
         ) : (
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">週開始日</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_week_start_label')}</label>
             <input type="date" value={weekStart} onChange={e => setWeekStart(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white" />
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer">
-            <option value="ALL">すべて</option>
-            <option value="DRAFT">下書き</option>
-            <option value="CONFIRMED">確定済</option>
-            <option value="PAID">支払済</option>
+            <option value="ALL">{t('filter_status_all')}</option>
+            <option value="DRAFT">{t('status_draft')}</option>
+            <option value="CONFIRMED">{t('status_confirmed')}</option>
+            <option value="PAID">{t('status_paid')}</option>
           </select>
         </div>
 
         <button onClick={handleCalculate} disabled={isCalculating}
           className="ml-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
-          {isCalculating ? <><i className="bi bi-arrow-repeat animate-spin"></i> 計算中...</> : <><i className="bi bi-calculator-fill"></i> 一括計算を実行する</>}
+          {isCalculating ? <><i className="bi bi-arrow-repeat animate-spin"></i> {t('calculating')}</> : <><i className="bi bi-calculator-fill"></i> {t('btn_calculate_label')}</>}
         </button>
       </div>
 
@@ -277,9 +284,9 @@ export default function PayrollPage() {
       {!isLoading && filteredRecords.length > 0 && (
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: '対象人数', value: `${summary.count} 名`, icon: 'bi-people-fill', color: 'text-slate-700' },
-            { label: '総支給合計', value: fmt(summary.grossTotal), icon: 'bi-cash-coin', color: 'text-indigo-600' },
-            { label: '差引支給合計', value: fmt(summary.netTotal), icon: 'bi-wallet2', color: 'text-emerald-600' },
+            { label: t('summary_count'), value: `${summary.count} ${t('summary_count_unit')}`, icon: 'bi-people-fill', color: 'text-slate-700' },
+            { label: t('summary_gross_total'), value: fmt(summary.grossTotal), icon: 'bi-cash-coin', color: 'text-indigo-600' },
+            { label: t('summary_net_total'), value: fmt(summary.netTotal), icon: 'bi-wallet2', color: 'text-emerald-600' },
           ].map(c => (
             <div key={c.label} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
               <div className="text-xs font-bold text-slate-500 flex items-center gap-1"><i className={`bi ${c.icon}`}></i>{c.label}</div>
@@ -292,11 +299,11 @@ export default function PayrollPage() {
       {/* 一括確定ボタン */}
       {selectedIds.size > 0 && (
         <div className="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-3">
-          <span className="text-sm font-bold text-indigo-700">{selectedIds.size} 件選択中</span>
+          <span className="text-sm font-bold text-indigo-700">{t('selected_count', { count: selectedIds.size })}</span>
           <button onClick={handleBatchConfirm} className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-1.5 rounded-lg text-sm font-bold transition-colors flex items-center gap-1">
-            <i className="bi bi-check2-circle"></i> 選択を確定する
+            <i className="bi bi-check2-circle"></i> {t('btn_confirm_selected')}
           </button>
-          <button onClick={() => setSelectedIds(new Set())} className="text-slate-500 text-sm hover:text-slate-700">キャンセル</button>
+          <button onClick={() => setSelectedIds(new Set())} className="text-slate-500 text-sm hover:text-slate-700">{t('btn_cancel')}</button>
         </div>
       )}
 
@@ -308,32 +315,33 @@ export default function PayrollPage() {
               <th className="px-3 py-3">
                 <input type="checkbox" checked={allDraftSelected} onChange={toggleAll} className="rounded" />
               </th>
-              <th className="px-3 py-3 whitespace-nowrap">社員コード / 氏名</th>
-              <th className="px-3 py-3 whitespace-nowrap">種別</th>
-              <th className="px-3 py-3 whitespace-nowrap">期間</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">総支給</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">欠勤控除</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">社保計</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">所得税</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">住民税</th>
-              <th className="px-3 py-3 text-right whitespace-nowrap">差引支給</th>
-              <th className="px-3 py-3 text-center whitespace-nowrap">ステータス</th>
-              <th className="px-3 py-3 text-right w-px whitespace-nowrap">操作</th>
+              <th className="px-3 py-3 whitespace-nowrap">{t('table_employee_code_name')}</th>
+              <th className="px-3 py-3 whitespace-nowrap">{t('table_emp_type_label')}</th>
+              <th className="px-3 py-3 whitespace-nowrap">{t('table_period_label')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_gross_pay')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_absent_deduction')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_social_total')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_income_tax')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_resident_tax')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_net_pay')}</th>
+              <th className="px-3 py-3 text-center whitespace-nowrap">{t('table_status_label')}</th>
+              <th className="px-3 py-3 text-right w-px whitespace-nowrap">{t('table_actions_label')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={12} className="p-8 text-center text-slate-400">読み込み中...</td></tr>
+              <tr><td colSpan={12} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
             ) : filteredRecords.length === 0 ? (
               <tr>
                 <td colSpan={12} className="p-12 text-center">
                   <i className="bi bi-calculator text-4xl text-slate-300 block mb-2"></i>
-                  <p className="text-slate-400 text-sm">データがありません。「一括計算を実行する」で給与を計算してください。</p>
+                  <p className="text-slate-400 text-sm">{t('no_data_hint_full')}</p>
                 </td>
               </tr>
             ) : filteredRecords.map(r => {
               const socialTotal = r.healthInsurance + r.pensionInsurance + r.employmentInsurance;
-              const statusInfo = STATUS_MAP[r.status];
+              const statusStyle = STATUS_STYLE[r.status] || '';
+              const statusLabelKey = STATUS_LABEL_KEYS[r.status] || r.status;
               return (
                 <tr key={r.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-3 py-3">
@@ -353,7 +361,7 @@ export default function PayrollPage() {
                   </td>
                   <td className="px-3 py-3">
                     <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${EMP_TYPE_COLOR[r.employmentType] || 'bg-slate-50 text-slate-500'}`}>
-                      {EMP_TYPE_MAP[r.employmentType] || r.employmentType}
+                      {t(EMP_TYPE_LABEL_KEYS[r.employmentType] || r.employmentType)}
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
@@ -373,8 +381,8 @@ export default function PayrollPage() {
                   <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{r.residentTax > 0 ? fmt(r.residentTax) : '-'}</td>
                   <td className="px-3 py-3 text-right font-mono font-black text-indigo-600 whitespace-nowrap">{fmt(r.netPay)}</td>
                   <td className="px-3 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusInfo.color}`}>{statusInfo.label}</span>
-                    {r.holidayWorkDays > 0 && <div className="text-[9px] text-orange-500 mt-0.5">休日出勤 {r.holidayWorkDays}日</div>}
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusStyle}`}>{t(statusLabelKey)}</span>
+                    {r.holidayWorkDays > 0 && <div className="text-[9px] text-orange-500 mt-0.5">{t('holiday_work_days', { days: r.holidayWorkDays })}</div>}
                   </td>
                   <td className="px-3 py-3 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"><i className="bi bi-pencil-square"></i></button>
@@ -399,7 +407,7 @@ export default function PayrollPage() {
                 <div className="text-xs font-mono opacity-70">{editRecord.employee.employeeCode}</div>
                 <div className="text-lg font-black">{editRecord.employee.lastNameJa} {editRecord.employee.firstNameJa}</div>
                 <div className="text-xs opacity-80 mt-0.5">
-                  {EMP_TYPE_MAP[editRecord.employmentType]} ／
+                  {t(EMP_TYPE_LABEL_KEYS[editRecord.employmentType])} /
                   {new Date(editRecord.periodStart).toLocaleDateString('ja-JP')} 〜 {new Date(editRecord.periodEnd).toLocaleDateString('ja-JP')}
                 </div>
               </div>
@@ -410,70 +418,70 @@ export default function PayrollPage() {
               {/* 読み取り専用サマリー */}
               <div className="bg-slate-50 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">基本給</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_base_salary')}</div>
                   <div className="font-mono font-bold text-slate-700">{fmt(editRecord.baseSalary)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">手当</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_allowance')}</div>
                   <div className="font-mono font-bold text-slate-700">{fmt(editRecord.allowance)}</div>
                 </div>
                 <div>
-                  <div className="text-[10px] text-slate-400 font-bold uppercase">総支給額</div>
+                  <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_gross_pay')}</div>
                   <div className="font-mono font-black text-lg text-indigo-600">{fmt(editRecord.grossPay)}</div>
                 </div>
                 {editRecord.employmentType === 'FULL_TIME' ? (
                   <>
                     <div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">所定稼働日数</div>
-                      <div className="font-bold text-slate-700">{editRecord.workingDaysInPeriod} 日</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_working_days')}</div>
+                      <div className="font-bold text-slate-700">{editRecord.workingDaysInPeriod} {t('days_unit')}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] text-slate-400 font-bold uppercase">欠勤日数</div>
-                      <div className="font-bold text-slate-700">{editRecord.absentDays} 日</div>
+                      <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_absent_days_label')}</div>
+                      <div className="font-bold text-slate-700">{editRecord.absentDays} {t('days_unit')}</div>
                     </div>
                     {editRecord.holidayWorkDays > 0 && (
                       <div>
-                        <div className="text-[10px] text-orange-400 font-bold uppercase">休日出勤</div>
-                        <div className="font-bold text-orange-600">{editRecord.holidayWorkDays} 日</div>
+                        <div className="text-[10px] text-orange-400 font-bold uppercase">{t('edit_holiday_work')}</div>
+                        <div className="font-bold text-orange-600">{editRecord.holidayWorkDays} {t('days_unit')}</div>
                       </div>
                     )}
                   </>
                 ) : (
                   <div>
-                    <div className="text-[10px] text-slate-400 font-bold uppercase">総労働時間</div>
-                    <div className="font-bold text-slate-700">{editRecord.totalWorkHours.toFixed(1)} 時間</div>
+                    <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_total_work_hours')}</div>
+                    <div className="font-bold text-slate-700">{editRecord.totalWorkHours.toFixed(1)} {t('hours_unit')}</div>
                   </div>
                 )}
               </div>
 
               {/* 控除額編集 */}
               <div>
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1"><i className="bi bi-dash-circle"></i> 控除額（編集可）</h3>
+                <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-1"><i className="bi bi-dash-circle"></i> {t('edit_deductions_section')}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {editRecord.employmentType === 'FULL_TIME' && (
                     <div>
-                      <label className="block text-xs font-bold text-slate-500 mb-1">欠勤控除額</label>
+                      <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_absent_deduction_label')}</label>
                       <input type="number" value={editForm.absentDeduction} onChange={e => setEditForm((p:any) => ({...p, absentDeduction: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                     </div>
                   )}
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">健康保険料</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_health_insurance_label')}</label>
                     <input type="number" value={editForm.healthInsurance} onChange={e => setEditForm((p:any) => ({...p, healthInsurance: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">厚生年金保険料</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_pension_label')}</label>
                     <input type="number" value={editForm.pensionInsurance} onChange={e => setEditForm((p:any) => ({...p, pensionInsurance: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">雇用保険料</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_employment_insurance_label')}</label>
                     <input type="number" value={editForm.employmentInsurance} onChange={e => setEditForm((p:any) => ({...p, employmentInsurance: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">所得税</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_income_tax_label')}</label>
                     <input type="number" value={editForm.incomeTax} onChange={e => setEditForm((p:any) => ({...p, incomeTax: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1">住民税</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_resident_tax_label')}</label>
                     <input type="number" value={editForm.residentTax} onChange={e => setEditForm((p:any) => ({...p, residentTax: e.target.value}))} className={inputCls} disabled={editRecord.status === 'PAID'} />
                   </div>
                 </div>
@@ -482,17 +490,17 @@ export default function PayrollPage() {
               {/* ライブ計算 */}
               <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex justify-between items-center">
                 <div>
-                  <div className="text-xs font-bold text-indigo-500">控除合計</div>
+                  <div className="text-xs font-bold text-indigo-500">{t('edit_deduction_total')}</div>
                   <div className="font-mono font-bold text-slate-700">{fmt(liveDeductions)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-xs font-bold text-indigo-500">差引支給額</div>
+                  <div className="text-xs font-bold text-indigo-500">{t('edit_net_pay_label')}</div>
                   <div className="font-mono font-black text-2xl text-indigo-600">{fmt(liveNetPay)}</div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1">備考</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1">{t('edit_note_label')}</label>
                 <textarea value={editForm.note} onChange={e => setEditForm((p:any) => ({...p, note: e.target.value}))}
                   className="w-full border border-slate-200 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none" rows={2}
                   disabled={editRecord.status === 'PAID'} />
@@ -501,23 +509,23 @@ export default function PayrollPage() {
 
             {/* フッター */}
             <div className="border-t border-slate-100 px-6 py-4 flex justify-end gap-3 bg-slate-50">
-              <button onClick={() => setEditRecord(null)} className="px-4 py-2 text-slate-600 hover:text-slate-800 font-bold text-sm">キャンセル</button>
+              <button onClick={() => setEditRecord(null)} className="px-4 py-2 text-slate-600 hover:text-slate-800 font-bold text-sm">{t('btn_cancel')}</button>
               {editRecord.status !== 'PAID' && (
                 <>
                   <button onClick={() => handleSave()} disabled={isSaving}
                     className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-sm rounded-lg transition-colors disabled:opacity-50">
-                    保存する
+                    {t('btn_save')}
                   </button>
                   {editRecord.status === 'DRAFT' && (
                     <button onClick={() => handleSave('CONFIRMED')} disabled={isSaving}
                       className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-lg shadow-md transition-colors disabled:opacity-50 flex items-center gap-1">
-                      <i className="bi bi-check2-circle"></i> 確定する
+                      <i className="bi bi-check2-circle"></i> {t('btn_confirm')}
                     </button>
                   )}
                   {editRecord.status === 'CONFIRMED' && (
                     <button onClick={() => handleSave('PAID')} disabled={isSaving}
                       className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm rounded-lg shadow-md transition-colors disabled:opacity-50 flex items-center gap-1">
-                      <i className="bi bi-wallet2"></i> 支払済にする
+                      <i className="bi bi-wallet2"></i> {t('btn_mark_paid')}
                     </button>
                   )}
                 </>

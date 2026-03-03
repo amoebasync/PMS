@@ -7,6 +7,7 @@ import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 import Pagination from '@/components/ui/Pagination';
 
 // ──────────────────────────────────────────
@@ -109,17 +110,17 @@ type Applicant = {
 // ──────────────────────────────────────────
 // 定数
 // ──────────────────────────────────────────
-const FLOW_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  INTERVIEW_WAITING:   { label: '面接待ち',   color: 'bg-amber-100 text-amber-700' },
-  NO_SHOW:             { label: 'NO SHOW',    color: 'bg-rose-100 text-rose-700' },
-  TRAINING_WAITING:    { label: '研修待ち',   color: 'bg-blue-100 text-blue-700' },
-  TRAINING_COMPLETED:  { label: '研修完了',   color: 'bg-emerald-100 text-emerald-700' },
+const FLOW_STATUS_MAP: Record<string, { labelKey: string; color: string }> = {
+  INTERVIEW_WAITING:   { labelKey: 'flow_interview_waiting',   color: 'bg-amber-100 text-amber-700' },
+  NO_SHOW:             { labelKey: 'flow_no_show',    color: 'bg-rose-100 text-rose-700' },
+  TRAINING_WAITING:    { labelKey: 'flow_training_waiting',   color: 'bg-blue-100 text-blue-700' },
+  TRAINING_COMPLETED:  { labelKey: 'flow_training_completed',   color: 'bg-emerald-100 text-emerald-700' },
 };
 
-const HIRING_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  IN_PROGRESS: { label: '選考中',  color: 'bg-slate-100 text-slate-600' },
-  HIRED:       { label: '採用',    color: 'bg-emerald-100 text-emerald-700' },
-  REJECTED:    { label: '不採用',  color: 'bg-rose-100 text-rose-700' },
+const HIRING_STATUS_MAP: Record<string, { labelKey: string; color: string }> = {
+  IN_PROGRESS: { labelKey: 'hiring_in_progress',  color: 'bg-slate-100 text-slate-600' },
+  HIRED:       { labelKey: 'hiring_hired',    color: 'bg-emerald-100 text-emerald-700' },
+  REJECTED:    { labelKey: 'hiring_rejected',  color: 'bg-rose-100 text-rose-700' },
 };
 
 const LIMIT = 20;
@@ -253,11 +254,11 @@ function SearchableSelect<T>({
 // ──────────────────────────────────────────
 // サブコンポーネント: ScoreSelector
 // ──────────────────────────────────────────
-const ScoreSelector = ({ value, onChange, label }: { value: number | null; onChange: (v: number) => void; label: string }) => (
+const ScoreSelector = ({ value, onChange, label, lowLabel = '低', highLabel = '高' }: { value: number | null; onChange: (v: number) => void; label: string; lowLabel?: string; highLabel?: string }) => (
   <div>
     <label className="block text-xs font-bold text-slate-500 mb-1.5">{label}</label>
     <div className="flex gap-1 items-end">
-      <span className="text-[10px] text-slate-400 pb-2.5 mr-0.5">低</span>
+      <span className="text-[10px] text-slate-400 pb-2.5 mr-0.5">{lowLabel}</span>
       {[1, 2, 3, 4, 5].map(n => (
         <button
           key={n}
@@ -276,7 +277,7 @@ const ScoreSelector = ({ value, onChange, label }: { value: number | null; onCha
           {n}
         </button>
       ))}
-      <span className="text-[10px] text-slate-400 pb-2.5 ml-0.5">高</span>
+      <span className="text-[10px] text-slate-400 pb-2.5 ml-0.5">{highLabel}</span>
     </div>
   </div>
 );
@@ -286,6 +287,7 @@ const ScoreSelector = ({ value, onChange, label }: { value: number | null; onCha
 // ──────────────────────────────────────────
 export default function ApplicantsPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('applicants');
   const calendarRef = useRef<FullCalendar>(null);
   const trainingCalendarRef = useRef<FullCalendar>(null);
   const trainingDateRangeRef = useRef<{ from: string; to: string } | null>(null);
@@ -360,7 +362,7 @@ export default function ApplicantsPage() {
   const handleSaveTrainingEval = async () => {
     if (!trainingEvalTargetId) return;
     if (!trainingEvalForm.attendance) {
-      showToast('出欠を選択してください', 'error');
+      showToast(t('training_eval_select_attendance'), 'error');
       return;
     }
     setTrainingEvalSaving(true);
@@ -387,13 +389,13 @@ export default function ApplicantsPage() {
         body: JSON.stringify(payload),
       });
       if (res.ok) {
-        showToast('研修評価を保存しました', 'success');
+        showToast(t('training_eval_saved'), 'success');
         setTrainingEvalTargetId(null);
         await fetchTrainingMgmt();
       } else {
-        showToast('更新に失敗しました', 'error');
+        showToast(t('update_failed'), 'error');
       }
-    } catch { showToast('エラーが発生しました', 'error'); }
+    } catch { showToast(t('error_occurred'), 'error'); }
     setTrainingEvalSaving(false);
   };
 
@@ -548,7 +550,7 @@ export default function ApplicantsPage() {
     } catch {
       if (!silent) {
         setSlots([]);
-        showToast('スロットの取得に失敗しました', 'error');
+        showToast(t('slot_fetch_failed'), 'error');
       }
     } finally {
       if (!silent) setCalendarLoading(false);
@@ -680,12 +682,12 @@ export default function ApplicantsPage() {
       if (res.ok) {
         setRegisteredDistributorId(data.distributorId);
         setShowDistributorForm(false);
-        showToast('配布員として登録しました', 'success');
+        showToast(t('eval_distributor_success'), 'success');
       } else {
-        showToast(data.error || '登録に失敗しました', 'error');
+        showToast(data.error || t('eval_distributor_failed'), 'error');
       }
     } catch {
-      showToast('登録に失敗しました', 'error');
+      showToast(t('eval_distributor_failed'), 'error');
     } finally {
       setRegistering(false);
     }
@@ -706,16 +708,16 @@ export default function ApplicantsPage() {
     const url = buildApplyUrl();
     try {
       await navigator.clipboard.writeText(url);
-      showToast('リンクをコピーしました', 'success');
+      showToast(t('link_copied'), 'success');
     } catch {
-      showToast('コピーに失敗しました', 'error');
+      showToast(t('link_copy_failed'), 'error');
     }
   };
 
   // 手動登録
   const handleManualRegister = async () => {
     if (!manualRegForm.name.trim() || !manualRegForm.email.trim() || !manualRegForm.jobCategoryId) {
-      showToast('氏名・メール・職種は必須です', 'warning');
+      showToast(t('manual_required_fields'), 'warning');
       return;
     }
     setManualRegSaving(true);
@@ -737,25 +739,25 @@ export default function ApplicantsPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '登録に失敗しました');
+      if (!res.ok) throw new Error(data.error || t('eval_distributor_failed'));
       setShowManualRegisterModal(false);
       const shouldSendEmail = manualRegForm.sendInterviewEmail;
       setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'en', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
       fetchApplicants(1);
       fetchSlots();
       if (shouldSendEmail) {
-        showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
+        showToast(t('manual_registered_sending'), 'success');
         try {
           await fetch(`/api/applicants/${data.id}/send-interview-invitation`, { method: 'POST' });
-          showToast('面接案内メールを送信しました', 'success');
+          showToast(t('eval_invitation_sent'), 'success');
         } catch {
-          showToast('面接案内メールの送信に失敗しました', 'error');
+          showToast(t('eval_invitation_failed'), 'error');
         }
       } else {
-        showToast('応募者を登録しました', 'success');
+        showToast(t('manual_registered'), 'success');
       }
     } catch (e: any) {
-      showToast(e.message || '登録に失敗しました', 'error');
+      showToast(e.message || t('eval_distributor_failed'), 'error');
     } finally {
       setManualRegSaving(false);
     }
@@ -770,10 +772,10 @@ export default function ApplicantsPage() {
         method: 'POST',
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || '送信に失敗しました');
-      showToast('面接案内メールを送信しました', 'success');
+      if (!res.ok) throw new Error(data.error || t('eval_invitation_failed'));
+      showToast(t('eval_invitation_sent'), 'success');
     } catch (e: any) {
-      showToast(e.message || '面接案内メールの送信に失敗しました', 'error');
+      showToast(e.message || t('eval_invitation_failed'), 'error');
     } finally {
       setSendingInvitation(false);
     }
@@ -820,7 +822,7 @@ export default function ApplicantsPage() {
     const bg = allDone ? '#10b981' : fillRate >= 100 ? '#ef4444' : fillRate >= 70 ? '#f59e0b' : slot.bookedCount > 0 ? '#6366f1' : '#94a3b8';
     return {
       id: String(slot.id),
-      title: `${slot.bookedCount}/${slot.capacity}名`,
+      title: `${slot.bookedCount}/${slot.capacity}${t('training_persons')}`,
       start: slot.startTime,
       end: slot.endTime,
       backgroundColor: bg,
@@ -838,7 +840,7 @@ export default function ApplicantsPage() {
     const interviewerName = slot.interviewer ? `${slot.interviewer.lastNameJa} ${slot.interviewer.firstNameJa}` : '';
     return {
       id: String(slot.id),
-      title: isBooked ? slot.applicant!.name : '空きスロット',
+      title: isBooked ? slot.applicant!.name : t('empty_slot'),
       start: slot.startTime,
       end: slot.endTime,
       backgroundColor: isBooked ? '#6366f1' : '#10b981',
@@ -883,13 +885,13 @@ export default function ApplicantsPage() {
         body: JSON.stringify({ capacity: editCapacity }),
       });
       if (res.ok) {
-        showToast('定員を更新しました', 'success');
+        showToast(t('training_capacity_saved'), 'success');
         await fetchTrainingMgmt();
       } else {
         const err = await res.json();
-        showToast(err.error || '更新に失敗しました', 'error');
+        showToast(err.error || t('update_failed'), 'error');
       }
-    } catch { showToast('エラーが発生しました', 'error'); }
+    } catch { showToast(t('error_occurred'), 'error'); }
     setSavingCapacity(false);
   };
 
@@ -932,22 +934,22 @@ export default function ApplicantsPage() {
     const start = new Date(selectedTrainingSlot.startTime);
     const dateStr = start.toLocaleString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit' });
     const ok = await showConfirm(
-      `このスロットを削除しますか？\n${dateStr}`,
-      { variant: 'danger', confirmLabel: '削除', title: '研修スロット削除' }
+      t('training_slot_delete_confirm', { dateStr }),
+      { variant: 'danger', confirmLabel: t('delete'), title: t('training_slot_delete_title') }
     );
     if (!ok) return;
     setDeletingSlot(true);
     try {
       const res = await fetch(`/api/training-slots/${selectedTrainingSlot.id}`, { method: 'DELETE' });
       if (res.ok) {
-        showToast('スロットを削除しました', 'success');
+        showToast(t('training_slot_deleted'), 'success');
         closeTrainingSlotPanel();
         await fetchTrainingMgmt();
       } else {
         const err = await res.json();
-        showToast(err.error || '削除に失敗しました', 'error');
+        showToast(err.error || t('eval_delete_failed'), 'error');
       }
-    } catch { showToast('エラーが発生しました', 'error'); }
+    } catch { showToast(t('error_occurred'), 'error'); }
     setDeletingSlot(false);
   };
 
@@ -982,20 +984,20 @@ export default function ApplicantsPage() {
       openEvalModal(slot.applicant.id);
     } else {
       const ok = await showConfirm(
-        `この空きスロットを削除しますか？\n${new Date(slot.startTime).toLocaleString('ja-JP')}`,
-        { variant: 'danger', confirmLabel: '削除', title: 'スロット削除' }
+        t('slot_delete_confirm', { dateTime: new Date(slot.startTime).toLocaleString('ja-JP') }),
+        { variant: 'danger', confirmLabel: t('delete'), title: t('slot_delete_title') }
       );
       if (ok) {
         try {
           const res = await fetch(`/api/interview-slots/${slot.id}`, { method: 'DELETE' });
           if (!res.ok) {
             const err = await res.json();
-            throw new Error(err.error || '削除に失敗しました');
+            throw new Error(err.error || t('eval_delete_failed'));
           }
-          showToast('スロットを削除しました', 'success');
+          showToast(t('slot_deleted'), 'success');
           fetchSlots();
         } catch (e: any) {
-          showToast(e.message || 'スロットの削除に失敗しました', 'error');
+          showToast(e.message || t('slot_delete_failed'), 'error');
         }
       }
     }
@@ -1004,11 +1006,11 @@ export default function ApplicantsPage() {
   // スロット一括作成
   const handleCreateSlots = async () => {
     if (!slotForm.date) {
-      showToast('日付を入力してください', 'warning');
+      showToast(t('slot_create_date_required'), 'warning');
       return;
     }
     if (slotForm.startHour >= slotForm.endHour) {
-      showToast('終了時刻は開始時刻より後にしてください', 'warning');
+      showToast(t('slot_create_time_error'), 'warning');
       return;
     }
     setSlotCreating(true);
@@ -1026,14 +1028,14 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '作成に失敗しました');
+        throw new Error(err.error || t('slot_create_failed'));
       }
       const data = await res.json();
-      showToast(`${data.count}件のスロットを作成しました`, 'success');
+      showToast(t('slot_create_success', { count: data.count }), 'success');
       setShowSlotModal(false);
       fetchSlots();
     } catch (e: any) {
-      showToast(e.message || 'スロットの作成に失敗しました', 'error');
+      showToast(e.message || t('slot_create_failed'), 'error');
     } finally {
       setSlotCreating(false);
     }
@@ -1088,7 +1090,7 @@ export default function ApplicantsPage() {
         fetchTrainingSlots();
       }
     } catch {
-      showToast('応募者情報の取得に失敗しました', 'error');
+      showToast(t('eval_fetch_failed'), 'error');
       closeEvalModal();
     } finally {
       setEvalLoading(false);
@@ -1131,7 +1133,7 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '保存に失敗しました');
+        throw new Error(err.error || t('eval_save_failed'));
       }
 
       // 研修スロット処理
@@ -1145,9 +1147,9 @@ export default function ApplicantsPage() {
           });
           if (!bookRes.ok) {
             const err = await bookRes.json();
-            showToast(`研修スロットの予約に失敗しました: ${err.error || ''}`, 'error');
+            showToast(`${t('eval_training_book_failed')}: ${err.error || ''}`, 'error');
           } else {
-            showToast('応募者情報を保存し、研修スロットを予約しました', 'success');
+            showToast(t('eval_training_booked'), 'success');
             trainingBooked = true;
           }
         } else if (trainingBookingMode === 'later') {
@@ -1157,23 +1159,23 @@ export default function ApplicantsPage() {
             body: JSON.stringify({ trainingSlotId: null, sendInvite: true }),
           });
           if (!inviteRes.ok) {
-            showToast('研修案内メールの送信に失敗しました', 'error');
+            showToast(t('eval_training_invite_failed'), 'error');
           } else {
-            showToast('応募者情報を保存し、研修案内メールを送信しました', 'success');
+            showToast(t('eval_training_invite_sent'), 'success');
           }
         } else {
-          showToast('応募者情報を保存しました', 'success');
+          showToast(t('eval_saved'), 'success');
         }
 
       } else {
-        showToast('応募者情報を保存しました', 'success');
+        showToast(t('eval_saved'), 'success');
       }
 
       closeEvalModal();
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '保存に失敗しました', 'error');
+      showToast(e.message || t('eval_save_failed'), 'error');
     } finally {
       setEvalSaving(false);
     }
@@ -1183,22 +1185,22 @@ export default function ApplicantsPage() {
   const handleCancelInterview = async () => {
     if (!selectedApplicant) return;
     const ok = await showConfirm(
-      `「${selectedApplicant.name}」の面接をキャンセルしますか？\nスロットが解放されます。`,
-      { variant: 'danger', confirmLabel: 'キャンセルする', title: '面接キャンセル' }
+      t('eval_cancel_interview_confirm', { name: selectedApplicant.name }),
+      { variant: 'danger', confirmLabel: t('eval_cancel_interview_confirm_label'), title: t('eval_cancel_interview_title') }
     );
     if (!ok) return;
     try {
       const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-interview`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'キャンセルに失敗しました');
+        throw new Error(err.error || t('eval_cancel_interview_failed'));
       }
-      showToast('面接をキャンセルしました', 'success');
+      showToast(t('eval_cancel_interview_success'), 'success');
       openEvalModal(selectedApplicant.id);
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '面接キャンセルに失敗しました', 'error');
+      showToast(e.message || t('eval_cancel_interview_failed'), 'error');
     }
   };
 
@@ -1206,8 +1208,8 @@ export default function ApplicantsPage() {
   const handleNoShow = async () => {
     if (!selectedApplicant) return;
     const ok = await showConfirm(
-      `「${selectedApplicant.name}」を面接不参加（NO SHOW）として記録しますか？`,
-      { variant: 'danger', confirmLabel: 'NO SHOWを記録', title: '面接不参加（NO SHOW）' }
+      t('eval_no_show_confirm', { name: selectedApplicant.name }),
+      { variant: 'danger', confirmLabel: t('eval_no_show_confirm_label'), title: t('eval_no_show_title') }
     );
     if (!ok) return;
     try {
@@ -1218,13 +1220,13 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'NO SHOWの記録に失敗しました');
+        throw new Error(err.error || t('eval_no_show_failed'));
       }
-      showToast('NO SHOWを記録しました', 'success');
+      showToast(t('eval_no_show_success'), 'success');
       openEvalModal(selectedApplicant.id);
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || 'NO SHOWの記録に失敗しました', 'error');
+      showToast(e.message || t('eval_no_show_failed'), 'error');
     }
   };
 
@@ -1244,7 +1246,7 @@ export default function ApplicantsPage() {
         prev ? { ...prev, interviewSlot: { ...prev.interviewSlot!, interviewer: updatedSlot.interviewer } } : prev
       );
     } catch {
-      alert('担当者の変更に失敗しました');
+      alert(t('eval_interviewer_change_failed'));
     }
   };
 
@@ -1252,22 +1254,22 @@ export default function ApplicantsPage() {
   const handleDeleteApplicant = async () => {
     if (!selectedApplicant) return;
     const ok = await showConfirm(
-      `「${selectedApplicant.name}」を削除しますか？\nこの操作は取り消せません。`,
-      { variant: 'danger', confirmLabel: '削除する', title: '応募者削除' }
+      t('eval_delete_confirm', { name: selectedApplicant.name }),
+      { variant: 'danger', confirmLabel: t('delete'), title: t('eval_delete_title') }
     );
     if (!ok) return;
     try {
       const res = await fetch(`/api/applicants/${selectedApplicant.id}`, { method: 'DELETE' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '削除に失敗しました');
+        throw new Error(err.error || t('eval_delete_failed'));
       }
-      showToast(`「${selectedApplicant.name}」を削除しました`, 'success');
+      showToast(t('eval_deleted', { name: selectedApplicant.name }), 'success');
       closeEvalModal();
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '削除に失敗しました', 'error');
+      showToast(e.message || t('eval_delete_failed'), 'error');
     }
   };
 
@@ -1304,15 +1306,15 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '日程変更に失敗しました');
+        throw new Error(err.error || t('eval_reschedule_failed'));
       }
-      showToast('面接日程を変更しました', 'success');
+      showToast(t('eval_reschedule_success'), 'success');
       setShowReschedulePanel(false);
       openEvalModal(selectedApplicant.id);
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '面接日程変更に失敗しました', 'error');
+      showToast(e.message || t('eval_reschedule_failed'), 'error');
     } finally {
       setRescheduleLoading(false);
     }
@@ -1322,43 +1324,43 @@ export default function ApplicantsPage() {
   const handleCancelTraining = async () => {
     if (!selectedApplicant) return;
     const ok = await showConfirm(
-      `「${selectedApplicant.name}」の研修予約をキャンセルしますか？`,
-      { variant: 'danger', confirmLabel: 'キャンセルする', title: '研修キャンセル' }
+      t('training_cancel_confirm', { name: selectedApplicant.name }),
+      { variant: 'danger', confirmLabel: t('training_cancel_confirm_label'), title: t('training_cancel_title') }
     );
     if (!ok) return;
     try {
       const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-training`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'キャンセルに失敗しました');
+        throw new Error(err.error || t('training_cancel_failed'));
       }
-      showToast('研修予約をキャンセルしました', 'success');
+      showToast(t('training_cancel_success'), 'success');
       openEvalModal(selectedApplicant.id);
       fetchTrainingMgmt();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '研修キャンセルに失敗しました', 'error');
+      showToast(e.message || t('training_cancel_failed'), 'error');
     }
   };
 
   // ── 研修キャンセル（カレンダーモーダルから） ──
   const handleCancelTrainingFromModal = async (applicantId: number, applicantName: string) => {
     const ok = await showConfirm(
-      `「${applicantName}」の研修予約をキャンセルしますか？`,
-      { variant: 'danger', confirmLabel: 'キャンセルする', title: '研修キャンセル' }
+      t('training_cancel_confirm', { name: applicantName }),
+      { variant: 'danger', confirmLabel: t('training_cancel_confirm_label'), title: t('training_cancel_title') }
     );
     if (!ok) return;
     try {
       const res = await fetch(`/api/applicants/${applicantId}/cancel-training`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'キャンセルに失敗しました');
+        throw new Error(err.error || t('training_cancel_failed'));
       }
-      showToast('研修予約をキャンセルしました', 'success');
+      showToast(t('training_cancel_success'), 'success');
       fetchTrainingMgmt();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '研修キャンセルに失敗しました', 'error');
+      showToast(e.message || t('training_cancel_failed'), 'error');
     }
   };
 
@@ -1374,15 +1376,15 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '日程変更に失敗しました');
+        throw new Error(err.error || t('training_reschedule_failed'));
       }
-      showToast('研修日程を変更しました', 'success');
+      showToast(t('training_reschedule_success'), 'success');
       setShowTrainingReschedulePanel(false);
       openEvalModal(selectedApplicant.id);
       fetchTrainingMgmt();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '研修日程変更に失敗しました', 'error');
+      showToast(e.message || t('training_reschedule_failed'), 'error');
     } finally {
       setTrainingRescheduleLoading(false);
     }
@@ -1400,16 +1402,16 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '日程変更に失敗しました');
+        throw new Error(err.error || t('training_reschedule_failed'));
       }
-      showToast('研修日程を変更しました', 'success');
+      showToast(t('training_reschedule_success'), 'success');
       setTrainingRescheduleTargetId(null);
       setTrainingRescheduleMode(null);
       setCalendarNewTrainingSlotId(null);
       fetchTrainingMgmt();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || '研修日程変更に失敗しました', 'error');
+      showToast(e.message || t('training_reschedule_failed'), 'error');
     } finally {
       setCalendarRescheduleLoading(false);
     }
@@ -1418,8 +1420,8 @@ export default function ApplicantsPage() {
   // ── 研修日程変更メール送信（カレンダーモーダルから） ──
   const handleSendTrainingRescheduleEmail = async (applicantId: number, applicantName: string) => {
     const ok = await showConfirm(
-      `「${applicantName}」に研修日程の変更メールを送信しますか？\n本人がリンクから新しい日程を選択できます。`,
-      { variant: 'primary', confirmLabel: 'メール送信', title: '研修日程変更メール' }
+      t('training_reschedule_email_confirm', { name: applicantName }),
+      { variant: 'primary', confirmLabel: t('training_reschedule_email_confirm_label'), title: t('training_reschedule_email_title') }
     );
     if (!ok) return;
     try {
@@ -1429,21 +1431,21 @@ export default function ApplicantsPage() {
       const res = await fetch(`/api/applicants/${applicantId}/send-training-invite`, { method: 'POST' });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'メール送信に失敗しました');
+        throw new Error(err.error || t('training_reschedule_email_failed'));
       }
-      showToast('研修日程変更メールを送信しました', 'success');
+      showToast(t('training_reschedule_email_sent'), 'success');
       setTrainingActionMenuId(null);
       fetchTrainingMgmt();
       fetchApplicants(page);
     } catch (e: any) {
-      showToast(e.message || 'メール送信に失敗しました', 'error');
+      showToast(e.message || t('training_reschedule_email_failed'), 'error');
     }
   };
 
   // 職種作成
   const handleCreateJobCategory = async () => {
     if (!newJobCat.nameJa.trim()) {
-      showToast('職種名（日本語）を入力してください', 'warning');
+      showToast(t('jobcat_name_required'), 'warning');
       return;
     }
     setJobCatCreating(true);
@@ -1458,13 +1460,13 @@ export default function ApplicantsPage() {
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || '作成に失敗しました');
+        throw new Error(err.error || t('jobcat_create_failed'));
       }
-      showToast('職種を作成しました', 'success');
+      showToast(t('jobcat_created'), 'success');
       setNewJobCat({ nameJa: '', nameEn: '' });
       fetchJobCategories();
     } catch (e: any) {
-      showToast(e.message || '職種の作成に失敗しました', 'error');
+      showToast(e.message || t('jobcat_create_failed'), 'error');
     } finally {
       setJobCatCreating(false);
     }
@@ -1572,7 +1574,7 @@ export default function ApplicantsPage() {
               }`}
             >
               <i className="bi bi-calendar3"></i>
-              カレンダー
+              {t('tab_calendar')}
               {activeTab === 'calendar' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
@@ -1589,7 +1591,7 @@ export default function ApplicantsPage() {
               }`}
             >
               <i className="bi bi-list-ul"></i>
-              応募者一覧
+              {t('tab_list')}
               {activeTab === 'list' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
@@ -1606,7 +1608,7 @@ export default function ApplicantsPage() {
               }`}
             >
               <i className="bi bi-mortarboard-fill"></i>
-              研修管理
+              {t('tab_training')}
               {activeTab === 'training' && (
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
@@ -1621,22 +1623,22 @@ export default function ApplicantsPage() {
                   className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
                 >
                   <i className="bi bi-link-45deg text-indigo-500"></i>
-                  応募ページ
+                  {t('btn_apply_page')}
                   <i className="bi bi-chevron-down text-[10px] text-slate-400"></i>
                 </button>
                 {showLinkPopover && (
                   <>
                     <div className="fixed inset-0 z-[999]" onClick={() => setShowLinkPopover(false)} />
                     <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[1000] p-4 space-y-3">
-                      <div className="text-xs font-black text-slate-700 mb-1">応募ページリンク生成</div>
+                      <div className="text-xs font-black text-slate-700 mb-1">{t('apply_link_title')}</div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">言語</label>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_language')}</label>
                         <div className="flex gap-2">
                           <button
                             onClick={() => setLinkLang('ja')}
                             className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${linkLang === 'ja' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                           >
-                            日本語
+                            {t('apply_link_lang_ja')}
                           </button>
                           <button
                             onClick={() => setLinkLang('en')}
@@ -1647,13 +1649,13 @@ export default function ApplicantsPage() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-[11px] font-bold text-slate-500 mb-1">求人媒体</label>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_media')}</label>
                         <select
                           value={linkMediaId}
                           onChange={e => setLinkMediaId(e.target.value)}
                           className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                         >
-                          <option value="">なし</option>
+                          <option value="">{t('apply_link_media_none')}</option>
                           {recruitingMediaList.filter(m => m.isActive).map(m => (
                             <option key={m.id} value={m.id}>{m.nameJa}{m.code ? ` (${m.code})` : ''}</option>
                           ))}
@@ -1668,7 +1670,7 @@ export default function ApplicantsPage() {
                           className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"
                         >
                           <i className="bi bi-clipboard"></i>
-                          コピー
+                          {t('apply_link_copy')}
                         </button>
                         <a
                           href={buildApplyUrl()}
@@ -1677,7 +1679,7 @@ export default function ApplicantsPage() {
                           className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
                         >
                           <i className="bi bi-box-arrow-up-right"></i>
-                          開く
+                          {t('apply_link_open')}
                         </a>
                       </div>
                     </div>
@@ -1692,7 +1694,7 @@ export default function ApplicantsPage() {
                 className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
               >
                 <i className="bi bi-person-plus-fill text-emerald-500"></i>
-                手動登録
+                {t('btn_manual_register')}
               </button>
               <button
                 onClick={() => {
@@ -1702,14 +1704,14 @@ export default function ApplicantsPage() {
                 className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
               >
                 <i className="bi bi-tags-fill text-violet-500"></i>
-                職種マスタ
+                {t('btn_job_category_master')}
               </button>
               <a
                 href="/settings?tab=interviewSlot"
                 className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
               >
                 <i className="bi bi-gear-fill text-slate-400"></i>
-                スロット設定
+                {t('btn_slot_settings')}
               </a>
             </div>
           </div>
@@ -1721,7 +1723,7 @@ export default function ApplicantsPage() {
                 <div className="flex items-center justify-center py-20">
                   <div className="flex items-center gap-3 text-slate-400">
                     <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-medium">読み込み中...</span>
+                    <span className="text-sm font-medium">{t('calendar_loading')}</span>
                   </div>
                 </div>
               ) : (
@@ -1736,9 +1738,9 @@ export default function ApplicantsPage() {
                     right: 'dayGridMonth,timeGridWeek',
                   }}
                   buttonText={{
-                    today: '今日',
-                    month: '月',
-                    week: '週',
+                    today: t('calendar_today'),
+                    month: t('calendar_month'),
+                    week: t('calendar_week'),
                   }}
                   events={calendarEvents}
                   dateClick={handleDateClick}
@@ -1778,7 +1780,7 @@ export default function ApplicantsPage() {
                       <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                       <input
                         type="text"
-                        placeholder="氏名・メールで検索..."
+                        placeholder={t('list_search_placeholder')}
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         className="w-full border border-slate-200 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
@@ -1790,21 +1792,21 @@ export default function ApplicantsPage() {
                     onChange={e => setFilterFlowStatus(e.target.value)}
                     className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                   >
-                    <option value="">フロー: すべて</option>
-                    <option value="INTERVIEW_WAITING">面接待ち</option>
-                    <option value="NO_SHOW">NO SHOW</option>
-                    <option value="TRAINING_WAITING">研修待ち</option>
-                    <option value="TRAINING_COMPLETED">研修完了</option>
+                    <option value="">{t('list_filter_flow_all')}</option>
+                    <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
+                    <option value="NO_SHOW">{t('flow_no_show')}</option>
+                    <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
+                    <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
                   </select>
                   <select
                     value={filterHiringStatus}
                     onChange={e => setFilterHiringStatus(e.target.value)}
                     className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                   >
-                    <option value="">採用: すべて</option>
-                    <option value="IN_PROGRESS">選考中</option>
-                    <option value="HIRED">採用</option>
-                    <option value="REJECTED">不採用</option>
+                    <option value="">{t('list_filter_hiring_all')}</option>
+                    <option value="IN_PROGRESS">{t('hiring_in_progress')}</option>
+                    <option value="HIRED">{t('hiring_hired')}</option>
+                    <option value="REJECTED">{t('hiring_rejected')}</option>
                   </select>
                 </div>
               </div>
@@ -1814,13 +1816,13 @@ export default function ApplicantsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">氏名</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">メール</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">職種</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">面接日時</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">フロー</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">採用ステータス</th>
-                      <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">操作</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_name')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_email')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_job_category')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_interview_date')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_flow')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_hiring_status')}</th>
+                      <th className="text-center px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('th_actions')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1839,7 +1841,7 @@ export default function ApplicantsPage() {
                         <td colSpan={7} className="px-4 py-16 text-center">
                           <div className="flex flex-col items-center gap-3 text-slate-400">
                             <i className="bi bi-person-x text-4xl"></i>
-                            <p className="text-sm font-medium">応募者が見つかりません</p>
+                            <p className="text-sm font-medium">{t('no_applicants')}</p>
                           </div>
                         </td>
                       </tr>
@@ -1873,20 +1875,20 @@ export default function ApplicantsPage() {
                                   })}
                                 </span>
                               ) : (
-                                <span className="text-xs text-slate-400">未設定</span>
+                                <span className="text-xs text-slate-400">{t('interview_unset')}</span>
                               )}
                             </td>
                             <td className="px-4 py-3">
                               {flow && (
                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${flow.color}`}>
-                                  {flow.label}
+                                  {t(flow.labelKey)}
                                 </span>
                               )}
                             </td>
                             <td className="px-4 py-3">
                               {hiring && (
                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${hiring.color}`}>
-                                  {hiring.label}
+                                  {t(hiring.labelKey)}
                                 </span>
                               )}
                             </td>
@@ -1898,7 +1900,7 @@ export default function ApplicantsPage() {
                                 }}
                                 className="text-indigo-600 hover:text-indigo-800 text-xs font-bold transition-colors"
                               >
-                                詳細
+                                {t('btn_detail')}
                               </button>
                             </td>
                           </tr>
@@ -1932,25 +1934,25 @@ export default function ApplicantsPage() {
                         const res = await fetch('/api/training-slots/generate', { method: 'POST' });
                         const data = await res.json();
                         if (res.ok) {
-                          showToast(data.message || 'スロットを生成しました', 'success');
+                          showToast(data.message || t('training_generated'), 'success');
                           fetchTrainingMgmt();
                         } else {
-                          showToast(data.error || '生成に失敗しました', 'error');
+                          showToast(data.error || t('training_generate_failed'), 'error');
                         }
-                      } catch { showToast('エラーが発生しました', 'error'); }
+                      } catch { showToast(t('error_occurred'), 'error'); }
                     }}
                     className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
                   >
                     <i className="bi bi-arrow-clockwise"></i>
-                    今すぐ生成
+                    {t('training_generate_now')}
                   </button>
                   {/* 凡例 */}
                   <div className="flex items-center gap-3 ml-auto text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>空き</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>予約あり</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>残りわずか</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>満員</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>全員完了</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>{t('training_legend_empty')}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>{t('training_legend_booked')}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>{t('training_legend_few')}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>{t('training_legend_full')}</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>{t('training_legend_done')}</span>
                   </div>
                 </div>
               </div>
@@ -1961,7 +1963,7 @@ export default function ApplicantsPage() {
                   <div className="flex items-center justify-center py-20">
                     <div className="flex items-center gap-3 text-slate-400">
                       <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="text-sm font-medium">読み込み中...</span>
+                      <span className="text-sm font-medium">{t('calendar_loading')}</span>
                     </div>
                   </div>
                 ) : (
@@ -1975,7 +1977,7 @@ export default function ApplicantsPage() {
                       center: 'title',
                       right: 'dayGridMonth,timeGridWeek',
                     }}
-                    buttonText={{ today: '今日', month: '月', week: '週' }}
+                    buttonText={{ today: t('calendar_today'), month: t('calendar_month'), week: t('calendar_week') }}
                     events={trainingCalendarEvents}
                     eventClick={handleTrainingEventClick}
                     datesSet={handleTrainingDatesSet}
@@ -1991,7 +1993,7 @@ export default function ApplicantsPage() {
                         <div className="px-1 py-0.5 overflow-hidden h-full flex flex-col gap-0.5 cursor-pointer">
                           <div className="flex items-center justify-between gap-1">
                             <div className="text-[11px] font-bold truncate">{arg.timeText}</div>
-                            <div className="text-[11px] shrink-0 opacity-90">{slot.bookedCount}/{slot.capacity}名</div>
+                            <div className="text-[11px] shrink-0 opacity-90">{slot.bookedCount}/{slot.capacity}{t('training_persons')}</div>
                           </div>
                           {slot.location && <div className="text-[10px] truncate opacity-80"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</div>}
                           {slot.capacity > 0 && (
@@ -2062,7 +2064,7 @@ export default function ApplicantsPage() {
               <div className="overflow-y-auto flex-1">
                 {/* 定員設定 */}
                 <div className="px-6 py-4 border-b border-slate-100">
-                  <div className="text-xs font-bold text-slate-500 mb-2">定員設定</div>
+                  <div className="text-xs font-bold text-slate-500 mb-2">{t('training_slot_capacity')}</div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setEditCapacity(v => Math.max(1, v - 1))}
@@ -2084,7 +2086,7 @@ export default function ApplicantsPage() {
                     >
                       <i className="bi bi-plus text-sm"></i>
                     </button>
-                    <span className="text-sm text-slate-500">名</span>
+                    <span className="text-sm text-slate-500">{t('training_slot_capacity_unit')}</span>
                     <button
                       onClick={handleSaveCapacity}
                       disabled={savingCapacity || editCapacity === slot.capacity}
@@ -2095,7 +2097,7 @@ export default function ApplicantsPage() {
                       ) : (
                         <i className="bi bi-check2"></i>
                       )}
-                      保存
+                      {t('eval_btn_save')}
                     </button>
                   </div>
                   {/* 埋まり具合バー */}
@@ -2107,16 +2109,16 @@ export default function ApplicantsPage() {
                       ></div>
                     </div>
                     <span className="text-xs font-bold text-slate-600 shrink-0">
-                      {slot.bookedCount}/{slot.capacity}名
+                      {slot.bookedCount}/{slot.capacity}{t('training_slot_capacity_unit')}
                     </span>
                   </div>
                 </div>
 
                 {/* 参加者リスト */}
                 <div className="px-6 py-4">
-                  <div className="text-xs font-bold text-slate-500 mb-2">参加者</div>
+                  <div className="text-xs font-bold text-slate-500 mb-2">{t('training_slot_participants')}</div>
                   {slot.applicants.length === 0 ? (
-                    <p className="text-xs text-slate-400 italic">参加者なし</p>
+                    <p className="text-xs text-slate-400 italic">{t('training_slot_no_participants')}</p>
                   ) : (
                     <div className="space-y-2">
                       {slot.applicants.map(app => {
@@ -2146,14 +2148,14 @@ export default function ApplicantsPage() {
                                 <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
                                   {app.registeredDistributorId ? (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
-                                      <i className="bi bi-person-badge mr-0.5"></i>配布員登録済
+                                      <i className="bi bi-person-badge mr-0.5"></i>{t('training_slot_distributor_registered')}
                                     </span>
                                   ) : null}
                                   {isNoShow ? (
                                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">NO SHOW</span>
                                   ) : flow && (
                                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${flow.color}`}>
-                                      {flow.label}
+                                      {t(flow.labelKey)}
                                     </span>
                                   )}
                                 </div>
@@ -2162,7 +2164,7 @@ export default function ApplicantsPage() {
                                 <button
                                   onClick={(e) => { e.stopPropagation(); isEvalOpen ? setTrainingEvalTargetId(null) : handleOpenTrainingEval(app); }}
                                   className="text-xs font-bold text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors shrink-0 ml-2"
-                                  title="評価を編集"
+                                  title={t('training_slot_edit_eval')}
                                 >
                                   <i className={`bi ${isEvalOpen ? 'bi-chevron-up' : 'bi-pencil-square'}`}></i>
                                 </button>
@@ -2173,13 +2175,13 @@ export default function ApplicantsPage() {
                                     className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
                                   >
                                     <i className="bi bi-clipboard-check"></i>
-                                    評価・完了
+                                    {t('training_slot_eval_complete')}
                                   </button>
                                   <div className="relative">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id); }}
                                       className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                      title="アクション"
+                                      title={t('training_slot_action')}
                                     >
                                       <i className="bi bi-three-dots-vertical text-sm"></i>
                                     </button>
@@ -2198,7 +2200,7 @@ export default function ApplicantsPage() {
                                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
                                           >
                                             <i className="bi bi-calendar2-event text-indigo-500"></i>
-                                            日程を変更する
+                                            {t('training_slot_reschedule')}
                                           </button>
                                           <button
                                             onClick={() => {
@@ -2208,7 +2210,7 @@ export default function ApplicantsPage() {
                                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left"
                                           >
                                             <i className="bi bi-envelope text-amber-500"></i>
-                                            日程変更メールを送信
+                                            {t('training_slot_reschedule_email')}
                                           </button>
                                           <div className="border-t border-slate-100 my-1"></div>
                                           <button
@@ -2219,7 +2221,7 @@ export default function ApplicantsPage() {
                                             className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left"
                                           >
                                             <i className="bi bi-x-circle text-rose-500"></i>
-                                            研修をキャンセル
+                                            {t('training_slot_cancel')}
                                           </button>
                                         </div>
                                       </>
@@ -2234,31 +2236,31 @@ export default function ApplicantsPage() {
                               <div className="mt-1 px-3 py-3 rounded-lg border border-slate-200 bg-white space-y-2">
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                                   <div>
-                                    <span className="text-slate-400">メール</span>
+                                    <span className="text-slate-400">{t('training_detail_email')}</span>
                                     <p className="text-slate-700 font-medium truncate">{app.email || '—'}</p>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400">電話</span>
+                                    <span className="text-slate-400">{t('training_detail_phone')}</span>
                                     <p className="text-slate-700 font-medium">{app.phone || '—'}</p>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400">国籍</span>
+                                    <span className="text-slate-400">{t('training_detail_country')}</span>
                                     <p className="text-slate-700 font-medium">{app.countryName || '—'}</p>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400">職種</span>
+                                    <span className="text-slate-400">{t('training_detail_job')}</span>
                                     <p className="text-slate-700 font-medium">{app.jobCategoryName || '—'}</p>
                                   </div>
                                   <div>
-                                    <span className="text-slate-400">採用ステータス</span>
-                                    {hiring && <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${hiring.color}`}>{hiring.label}</span>}
+                                    <span className="text-slate-400">{t('training_detail_hiring')}</span>
+                                    {hiring && <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${hiring.color}`}>{t(hiring.labelKey)}</span>}
                                   </div>
                                   <div>
-                                    <span className="text-slate-400">配布員登録</span>
+                                    <span className="text-slate-400">{t('training_detail_distributor')}</span>
                                     <p className="text-slate-700 font-medium">
                                       {app.registeredDistributorId
                                         ? <span className="text-indigo-600 font-bold">ID: {app.registeredDistributorId}</span>
-                                        : <span className="text-slate-400">未登録</span>}
+                                        : <span className="text-slate-400">{t('training_detail_not_registered')}</span>}
                                     </p>
                                   </div>
                                 </div>
@@ -2271,7 +2273,7 @@ export default function ApplicantsPage() {
                                   className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors mt-1"
                                 >
                                   <i className="bi bi-box-arrow-up-right"></i>
-                                  応募者詳細を開く
+                                  {t('training_detail_open')}
                                 </button>
                               </div>
                             )}
@@ -2281,7 +2283,7 @@ export default function ApplicantsPage() {
                               <div className="mt-1 p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-4">
                                 {/* 出欠 */}
                                 <div>
-                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">出欠</label>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('training_eval_attendance')}</label>
                                   <div className="flex gap-2">
                                     <button
                                       type="button"
@@ -2293,7 +2295,7 @@ export default function ApplicantsPage() {
                                       }`}
                                     >
                                       <i className="bi bi-check-circle"></i>
-                                      出席
+                                      {t('training_eval_attended')}
                                     </button>
                                     <button
                                       type="button"
@@ -2305,7 +2307,7 @@ export default function ApplicantsPage() {
                                       }`}
                                     >
                                       <i className="bi bi-x-circle"></i>
-                                      NO SHOW
+                                      {t('training_eval_absent')}
                                     </button>
                                   </div>
                                 </div>
@@ -2313,22 +2315,22 @@ export default function ApplicantsPage() {
                                 {/* 評価項目（出席時のみ） */}
                                 {trainingEvalForm.attendance === 'ATTENDED' && (
                                   <div className="space-y-3">
-                                    <ScoreSelector label="理解度" value={trainingEvalForm.understandingScore} onChange={v => setTrainingEvalForm(f => ({ ...f, understandingScore: v }))} />
-                                    <ScoreSelector label="コミュニケーション" value={trainingEvalForm.communicationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, communicationScore: v }))} />
-                                    <ScoreSelector label="スピード" value={trainingEvalForm.speedScore} onChange={v => setTrainingEvalForm(f => ({ ...f, speedScore: v }))} />
-                                    <ScoreSelector label="やる気" value={trainingEvalForm.motivationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, motivationScore: v }))} />
+                                    <ScoreSelector label={t('training_eval_understanding')} lowLabel={t('score_low')} highLabel={t('score_high')} value={trainingEvalForm.understandingScore} onChange={v => setTrainingEvalForm(f => ({ ...f, understandingScore: v }))} />
+                                    <ScoreSelector label={t('training_eval_communication')} lowLabel={t('score_low')} highLabel={t('score_high')} value={trainingEvalForm.communicationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, communicationScore: v }))} />
+                                    <ScoreSelector label={t('training_eval_speed')} lowLabel={t('score_low')} highLabel={t('score_high')} value={trainingEvalForm.speedScore} onChange={v => setTrainingEvalForm(f => ({ ...f, speedScore: v }))} />
+                                    <ScoreSelector label={t('training_eval_motivation')} lowLabel={t('score_low')} highLabel={t('score_high')} value={trainingEvalForm.motivationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, motivationScore: v }))} />
                                   </div>
                                 )}
 
                                 {/* メモ */}
                                 <div>
-                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">メモ</label>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('training_eval_notes')}</label>
                                   <textarea
                                     value={trainingEvalForm.notes}
                                     onChange={e => setTrainingEvalForm(f => ({ ...f, notes: e.target.value }))}
                                     rows={2}
                                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white resize-none"
-                                    placeholder="研修メモ..."
+                                    placeholder={t('training_eval_notes_placeholder')}
                                   />
                                 </div>
 
@@ -2338,7 +2340,7 @@ export default function ApplicantsPage() {
                                     onClick={() => setTrainingEvalTargetId(null)}
                                     className="text-xs font-bold text-slate-500 hover:text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
                                   >
-                                    キャンセル
+                                    {t('cancel')}
                                   </button>
                                   <button
                                     onClick={handleSaveTrainingEval}
@@ -2350,7 +2352,7 @@ export default function ApplicantsPage() {
                                     ) : (
                                       <i className="bi bi-check2"></i>
                                     )}
-                                    {isCompleted ? '評価を更新' : '研修完了として保存'}
+                                    {isCompleted ? t('training_eval_update') : t('training_eval_save_complete')}
                                   </button>
                                 </div>
                               </div>
@@ -2363,10 +2365,10 @@ export default function ApplicantsPage() {
                                   <span className="text-rose-600 font-bold">NO SHOW</span>
                                 ) : (
                                   <div className="flex items-center gap-3 text-slate-500">
-                                    <span>理解: <b className="text-slate-700">{app.trainingUnderstandingScore}</b></span>
-                                    <span>コミュ: <b className="text-slate-700">{app.trainingCommunicationScore}</b></span>
-                                    <span>速度: <b className="text-slate-700">{app.trainingSpeedScore}</b></span>
-                                    <span>意欲: <b className="text-slate-700">{app.trainingMotivationScore}</b></span>
+                                    <span>{t('training_eval_summary_understanding')}: <b className="text-slate-700">{app.trainingUnderstandingScore}</b></span>
+                                    <span>{t('training_eval_summary_communication')}: <b className="text-slate-700">{app.trainingCommunicationScore}</b></span>
+                                    <span>{t('training_eval_summary_speed')}: <b className="text-slate-700">{app.trainingSpeedScore}</b></span>
+                                    <span>{t('training_eval_summary_motivation')}: <b className="text-slate-700">{app.trainingMotivationScore}</b></span>
                                   </div>
                                 )}
                                 {app.trainingNotes && <div className="text-slate-400 mt-0.5 truncate">{app.trainingNotes}</div>}
@@ -2390,7 +2392,7 @@ export default function ApplicantsPage() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="text-xs font-black text-indigo-700">
                         <i className="bi bi-calendar2-event mr-1"></i>
-                        {targetApp.name} の研修日程を変更
+                        {targetApp.name}{t('training_reschedule_title')}
                       </div>
                       <button
                         onClick={() => { setTrainingRescheduleTargetId(null); setTrainingRescheduleMode(null); }}
@@ -2400,7 +2402,7 @@ export default function ApplicantsPage() {
                       </button>
                     </div>
                     {trainingSlots.length === 0 ? (
-                      <p className="text-xs text-slate-500 italic">空き研修スロットがありません</p>
+                      <p className="text-xs text-slate-500 italic">{t('training_reschedule_no_slots')}</p>
                     ) : (
                       <div className="space-y-1.5 max-h-40 overflow-y-auto">
                         {trainingSlots.map(ts => {
@@ -2423,7 +2425,7 @@ export default function ApplicantsPage() {
                               }`}
                             >
                               <span>{dateLabel} {timeLabel} {ts.location ? `@ ${ts.location}` : ''}</span>
-                              <span className="text-[10px] text-slate-400">残{ts.remainingCapacity}/{ts.capacity}</span>
+                              <span className="text-[10px] text-slate-400">{t('training_reschedule_remaining', { remaining: ts.remainingCapacity, capacity: ts.capacity })}</span>
                             </button>
                           );
                         })}
@@ -2439,7 +2441,7 @@ export default function ApplicantsPage() {
                       ) : (
                         <i className="bi bi-check2"></i>
                       )}
-                      この日程に変更する
+                      {t('training_reschedule_confirm')}
                     </button>
                   </div>
                 );
@@ -2458,12 +2460,12 @@ export default function ApplicantsPage() {
                     ) : (
                       <i className="bi bi-trash3"></i>
                     )}
-                    この枠を削除
+                    {t('training_slot_delete_btn')}
                   </button>
                 ) : (
                   <p className="text-xs text-slate-400 text-center">
                     <i className="bi bi-info-circle mr-1"></i>
-                    参加者がいる枠は削除できません
+                    {t('training_slot_delete_disabled')}
                   </p>
                 )}
               </div>
@@ -2484,7 +2486,7 @@ export default function ApplicantsPage() {
                 <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <i className="bi bi-calendar-plus text-emerald-600"></i>
                 </div>
-                <h2 className="text-lg font-black text-slate-800">面接スロット作成</h2>
+                <h2 className="text-lg font-black text-slate-800">{t('slot_create_title')}</h2>
               </div>
               <button
                 onClick={() => setShowSlotModal(false)}
@@ -2498,7 +2500,7 @@ export default function ApplicantsPage() {
             <div className="p-6 space-y-4">
               {/* 日付 */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">日付</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('slot_create_date')}</label>
                 <input
                   type="date"
                   value={slotForm.date}
@@ -2510,7 +2512,7 @@ export default function ApplicantsPage() {
               {/* 開始・終了時刻 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">開始時刻</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('slot_create_start')}</label>
                   <select
                     value={slotForm.startHour}
                     onChange={e => setSlotForm(f => ({ ...f, startHour: Number(e.target.value) }))}
@@ -2522,7 +2524,7 @@ export default function ApplicantsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">終了時刻</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('slot_create_end')}</label>
                   <select
                     value={slotForm.endHour}
                     onChange={e => setSlotForm(f => ({ ...f, endHour: Number(e.target.value) }))}
@@ -2537,7 +2539,7 @@ export default function ApplicantsPage() {
 
               {/* 間隔 */}
               <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">間隔</label>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('slot_create_interval')}</label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2548,7 +2550,7 @@ export default function ApplicantsPage() {
                       onChange={() => setSlotForm(f => ({ ...f, intervalMinutes: 30 }))}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm font-medium text-slate-700">30分</span>
+                    <span className="text-sm font-medium text-slate-700">{t('slot_create_30min')}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -2559,7 +2561,7 @@ export default function ApplicantsPage() {
                       onChange={() => setSlotForm(f => ({ ...f, intervalMinutes: 60 }))}
                       className="text-indigo-600 focus:ring-indigo-500"
                     />
-                    <span className="text-sm font-medium text-slate-700">60分</span>
+                    <span className="text-sm font-medium text-slate-700">{t('slot_create_60min')}</span>
                   </label>
                 </div>
               </div>
@@ -2567,7 +2569,7 @@ export default function ApplicantsPage() {
               {/* Google Meet URL */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  Google Meet URL <span className="text-slate-400 font-normal">(任意)</span>
+                  {t('slot_create_meet_url')} <span className="text-slate-400 font-normal">{t('slot_create_meet_optional')}</span>
                 </label>
                 <input
                   type="url"
@@ -2584,7 +2586,7 @@ export default function ApplicantsPage() {
                   <p className="text-xs font-bold text-indigo-700">
                     <i className="bi bi-info-circle mr-1.5"></i>
                     {slotForm.date} {slotForm.startHour}:00 〜 {slotForm.endHour}:00 / {slotForm.intervalMinutes}分間隔
-                    = {Math.floor((slotForm.endHour - slotForm.startHour) * 60 / slotForm.intervalMinutes)}件のスロット
+                    {t('slot_create_preview', { count: Math.floor((slotForm.endHour - slotForm.startHour) * 60 / slotForm.intervalMinutes) })}
                   </p>
                 </div>
               )}
@@ -2596,7 +2598,7 @@ export default function ApplicantsPage() {
                 onClick={() => setShowSlotModal(false)}
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={handleCreateSlots}
@@ -2604,7 +2606,7 @@ export default function ApplicantsPage() {
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {slotCreating && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                作成
+                {t('slot_create_btn')}
               </button>
             </div>
           </div>
@@ -2630,12 +2632,12 @@ export default function ApplicantsPage() {
                     <h2 className="text-lg font-black text-slate-800">{selectedApplicant.name}</h2>
                     {FLOW_STATUS_MAP[selectedApplicant.flowStatus] && (
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${FLOW_STATUS_MAP[selectedApplicant.flowStatus].color}`}>
-                        {FLOW_STATUS_MAP[selectedApplicant.flowStatus].label}
+                        {t(FLOW_STATUS_MAP[selectedApplicant.flowStatus].labelKey)}
                       </span>
                     )}
                     {HIRING_STATUS_MAP[selectedApplicant.hiringStatus] && (
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${HIRING_STATUS_MAP[selectedApplicant.hiringStatus].color}`}>
-                        {HIRING_STATUS_MAP[selectedApplicant.hiringStatus].label}
+                        {t(HIRING_STATUS_MAP[selectedApplicant.hiringStatus].labelKey)}
                       </span>
                     )}
                   </div>
@@ -2655,7 +2657,7 @@ export default function ApplicantsPage() {
                 <div className="flex items-center justify-center py-16">
                   <div className="flex items-center gap-3 text-slate-400">
                     <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                    <span className="text-sm font-medium">読み込み中...</span>
+                    <span className="text-sm font-medium">{t('loading')}</span>
                   </div>
                 </div>
               ) : selectedApplicant ? (
@@ -2664,13 +2666,13 @@ export default function ApplicantsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <i className="bi bi-person-fill text-indigo-600"></i>
-                      <h3 className="text-sm font-black text-slate-800">基本情報</h3>
+                      <h3 className="text-sm font-black text-slate-800">{t('eval_section_basic')}</h3>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4">
                       {/* 個人情報 */}
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">氏名</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_name')}</p>
                           <input
                             type="text"
                             value={evalForm.name}
@@ -2680,7 +2682,7 @@ export default function ApplicantsPage() {
                         </div>
                         <div>
                           <p className={`text-xs font-bold mb-0.5 ${!evalForm.birthday ? 'text-red-500' : 'text-slate-400'}`}>
-                            生年月日{!evalForm.birthday && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                            {t('eval_birthday')}{!evalForm.birthday && <span className="ml-1 text-[10px] font-medium">{t('eval_birthday_required')}</span>}
                           </p>
                           <input
                             type="date"
@@ -2691,17 +2693,17 @@ export default function ApplicantsPage() {
                         </div>
                         <div>
                           <p className={`text-xs font-bold mb-0.5 ${!evalForm.gender ? 'text-red-500' : 'text-slate-400'}`}>
-                            性別{!evalForm.gender && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                            {t('eval_gender')}{!evalForm.gender && <span className="ml-1 text-[10px] font-medium">{t('eval_gender_required')}</span>}
                           </p>
                           <select
                             value={evalForm.gender}
                             onChange={e => setEvalForm(f => ({ ...f, gender: e.target.value }))}
                             className={`w-full text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white border ${!evalForm.gender ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                           >
-                            <option value="">未設定</option>
-                            <option value="male">男性</option>
-                            <option value="female">女性</option>
-                            <option value="other">その他</option>
+                            <option value="">{t('eval_gender_unset')}</option>
+                            <option value="male">{t('eval_gender_male')}</option>
+                            <option value="female">{t('eval_gender_female')}</option>
+                            <option value="other">{t('eval_gender_other')}</option>
                           </select>
                         </div>
                       </div>
@@ -2711,7 +2713,7 @@ export default function ApplicantsPage() {
                       {/* 連絡先 */}
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div className="col-span-1">
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">メール</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_email')}</p>
                           <input
                             type="email"
                             value={evalForm.email}
@@ -2720,7 +2722,7 @@ export default function ApplicantsPage() {
                           />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">電話</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_phone')}</p>
                           <input
                             type="tel"
                             value={evalForm.phone}
@@ -2730,13 +2732,13 @@ export default function ApplicantsPage() {
                           />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">言語</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_language')}</p>
                           <select
                             value={evalForm.language}
                             onChange={e => setEvalForm(f => ({ ...f, language: e.target.value }))}
                             className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
                           >
-                            <option value="ja">日本語</option>
+                            <option value="ja">{t('eval_language_ja')}</option>
                             <option value="en">English</option>
                           </select>
                         </div>
@@ -2747,26 +2749,26 @@ export default function ApplicantsPage() {
                       {/* 応募情報 */}
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">職種</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_job_category')}</p>
                           <select
                             value={evalForm.jobCategoryId}
                             onChange={e => setEvalForm(f => ({ ...f, jobCategoryId: e.target.value }))}
                             className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
                           >
-                            <option value="">選択してください</option>
+                            <option value="">{t('eval_select_placeholder')}</option>
                             {jobCategories.filter(jc => jc.isActive).map(jc => (
                               <option key={jc.id} value={jc.id}>{jc.nameJa}</option>
                             ))}
                           </select>
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">応募経路</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_recruiting_media')}</p>
                           <select
                             value={evalForm.recruitingMediaId}
                             onChange={e => setEvalForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
                             className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                           >
-                            <option value="">未設定</option>
+                            <option value="">{t('eval_recruiting_unset')}</option>
                             {recruitingMediaList.map(m => (
                               <option key={m.id} value={m.id}>{m.nameJa}</option>
                             ))}
@@ -2779,7 +2781,7 @@ export default function ApplicantsPage() {
                       {/* 面接情報 */}
                       <div className="grid grid-cols-3 gap-x-4 gap-y-3">
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">面接日時</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interview_date')}</p>
                           {selectedApplicant.interviewSlot ? (
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-sm text-slate-700">
@@ -2804,11 +2806,11 @@ export default function ApplicantsPage() {
                               )}
                             </div>
                           ) : (
-                            <p className="text-sm text-slate-400">未設定</p>
+                            <p className="text-sm text-slate-400">{t('interview_unset')}</p>
                           )}
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">面接担当者</p>
+                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interviewer')}</p>
                           {selectedApplicant.interviewSlot ? (
                             <select
                               className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
@@ -2818,7 +2820,7 @@ export default function ApplicantsPage() {
                                 handleChangeInterviewer(val ? Number(val) : null);
                               }}
                             >
-                              <option value="">未設定</option>
+                              <option value="">{t('eval_interviewer_unset')}</option>
                               {interviewerEmployees.map((emp) => (
                                 <option key={emp.id} value={emp.id}>
                                   {emp.lastNameJa} {emp.firstNameJa}
@@ -2826,7 +2828,7 @@ export default function ApplicantsPage() {
                               ))}
                             </select>
                           ) : (
-                            <p className="text-sm text-slate-400">面接未予約</p>
+                            <p className="text-sm text-slate-400">{t('eval_interview_not_booked')}</p>
                           )}
                         </div>
                       </div>
@@ -2839,14 +2841,14 @@ export default function ApplicantsPage() {
                             onClick={() => openReschedulePanel()}
                             className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
                           >
-                            <i className="bi bi-calendar-plus"></i>日程変更
+                            <i className="bi bi-calendar-plus"></i>{t('eval_reschedule')}
                           </button>
                           <button
                             type="button"
                             onClick={handleCancelInterview}
                             className="text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-200 transition-colors inline-flex items-center gap-1"
                           >
-                            <i className="bi bi-x-circle"></i>面接キャンセル
+                            <i className="bi bi-x-circle"></i>{t('eval_cancel_interview')}
                           </button>
                           {selectedApplicant.flowStatus !== 'NO_SHOW' && (
                             <button
@@ -2874,7 +2876,7 @@ export default function ApplicantsPage() {
                             ) : (
                               <i className="bi bi-envelope-fill"></i>
                             )}
-                            面接案内メールを送信
+                            {t('eval_send_invitation')}
                           </button>
                         </div>
                       )}
@@ -2883,7 +2885,7 @@ export default function ApplicantsPage() {
                       {showReschedulePanel && (
                         <div className="mt-3 pt-3 border-t border-slate-200">
                           <div className="flex items-center justify-between mb-2">
-                            <h4 className="text-xs font-black text-indigo-700">新しい日程を選択</h4>
+                            <h4 className="text-xs font-black text-indigo-700">{t('eval_reschedule_title')}</h4>
                             <button type="button" onClick={() => setShowReschedulePanel(false)} className="text-slate-400 hover:text-slate-600 text-xs">
                               <i className="bi bi-x-lg"></i>
                             </button>
@@ -2893,7 +2895,7 @@ export default function ApplicantsPage() {
                               <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                             </div>
                           ) : availableSlots.length === 0 ? (
-                            <p className="text-xs text-slate-400 py-2">空きスロットがありません</p>
+                            <p className="text-xs text-slate-400 py-2">{t('eval_reschedule_no_slots')}</p>
                           ) : (
                             <>
                               <div className="max-h-48 overflow-y-auto space-y-1">
@@ -2923,7 +2925,7 @@ export default function ApplicantsPage() {
                                 disabled={!selectedNewSlotId || rescheduleLoading}
                                 className="mt-2 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors"
                               >
-                                {rescheduleLoading ? '変更中...' : 'この日程に変更する'}
+                                {rescheduleLoading ? t('eval_reschedule_changing') : t('eval_reschedule_confirm')}
                               </button>
                             </>
                           )}
@@ -2936,12 +2938,12 @@ export default function ApplicantsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <i className="bi bi-geo-alt-fill text-indigo-600"></i>
-                      <h3 className="text-sm font-black text-slate-800">国籍・在留資格・住所</h3>
+                      <h3 className="text-sm font-black text-slate-800">{t('eval_section_nationality')}</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className={`block text-xs font-bold mb-1.5 ${!evalForm.countryId ? 'text-red-500' : 'text-slate-500'}`}>
-                          国籍{!evalForm.countryId && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                          {t('eval_country')}{!evalForm.countryId && <span className="ml-1 text-[10px] font-medium">{t('eval_country_required')}</span>}
                         </label>
                         <SearchableSelect
                           options={countries}
@@ -2949,9 +2951,9 @@ export default function ApplicantsPage() {
                           onChange={(v) => setEvalForm(f => ({ ...f, countryId: v }))}
                           getOptionValue={(c) => String(c.id)}
                           getOptionLabel={(c) => `${c.name}（${c.nameEn}）`}
-                          placeholder="選択してください"
-                          searchPlaceholder="国名で検索..."
-                          noResultsText="該当する国がありません"
+                          placeholder={t('eval_select_placeholder')}
+                          searchPlaceholder={t('eval_country_search')}
+                          noResultsText={t('eval_country_no_results')}
                           error={!evalForm.countryId}
                           filterFn={(c, search) => {
                             const s = search.toLowerCase();
@@ -2963,14 +2965,14 @@ export default function ApplicantsPage() {
                       {!isJapanese(evalForm.countryId) && (
                         <div>
                           <label className={`block text-xs font-bold mb-1.5 ${!evalForm.visaTypeId ? 'text-red-500' : 'text-slate-500'}`}>
-                            在留資格{!evalForm.visaTypeId && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                            {t('eval_visa_type')}{!evalForm.visaTypeId && <span className="ml-1 text-[10px] font-medium">{t('eval_visa_required')}</span>}
                           </label>
                           <select
                             value={evalForm.visaTypeId}
                             onChange={e => setEvalForm(f => ({ ...f, visaTypeId: e.target.value }))}
                             className={`w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white border ${!evalForm.visaTypeId ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                           >
-                            <option value="">選択してください</option>
+                            <option value="">{t('eval_select_placeholder')}</option>
                             {visaTypes.map(v => (
                               <option key={v.id} value={v.id}>{v.name}</option>
                             ))}
@@ -2979,7 +2981,7 @@ export default function ApplicantsPage() {
                       )}
 
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">郵便番号</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_postal_code')}</label>
                         <input
                           type="text"
                           value={evalForm.postalCode}
@@ -2989,22 +2991,22 @@ export default function ApplicantsPage() {
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">住所</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_address')}</label>
                         <input
                           type="text"
                           value={evalForm.address}
                           onChange={e => setEvalForm(f => ({ ...f, address: e.target.value }))}
-                          placeholder="東京都..."
+                          placeholder={t('eval_address_placeholder')}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">建物名・部屋番号</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_building')}</label>
                         <input
                           type="text"
                           value={evalForm.building}
                           onChange={e => setEvalForm(f => ({ ...f, building: e.target.value }))}
-                          placeholder="マンション名 101号室"
+                          placeholder={t('eval_building_placeholder')}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         />
                       </div>
@@ -3015,7 +3017,7 @@ export default function ApplicantsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <i className="bi bi-clipboard-check text-indigo-600"></i>
-                      <h3 className="text-sm font-black text-slate-800">面接評価</h3>
+                      <h3 className="text-sm font-black text-slate-800">{t('eval_section_interview')}</h3>
                     </div>
                     <div className="space-y-4">
                       {/* 他の仕事 */}
@@ -3028,7 +3030,7 @@ export default function ApplicantsPage() {
                               onChange={e => setEvalForm(f => ({ ...f, hasOtherJob: e.target.checked }))}
                               className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="text-sm font-bold text-slate-700">他の仕事をやっているか</span>
+                            <span className="text-sm font-bold text-slate-700">{t('eval_other_job')}</span>
                           </label>
                           {evalForm.hasOtherJob && (
                             <div className="mt-2 ml-6">
@@ -3036,7 +3038,7 @@ export default function ApplicantsPage() {
                                 type="text"
                                 value={evalForm.otherJobDetails}
                                 onChange={e => setEvalForm(f => ({ ...f, otherJobDetails: e.target.value }))}
-                                placeholder="詳細を入力..."
+                                placeholder={t('eval_other_job_details_placeholder')}
                                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                               />
                             </div>
@@ -3053,29 +3055,37 @@ export default function ApplicantsPage() {
                             onChange={e => setEvalForm(f => ({ ...f, hasBankInJapan: e.target.checked }))}
                             className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                           />
-                          <span className="text-sm font-bold text-slate-700">日本で発行された口座はあるか</span>
+                          <span className="text-sm font-bold text-slate-700">{t('eval_bank_account')}</span>
                         </label>
                       </div>
 
                       {/* スコア */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <ScoreSelector
-                          label="日本語能力"
+                          label={t('eval_score_japanese')}
+                          lowLabel={t('score_low')}
+                          highLabel={t('score_high')}
                           value={evalForm.japaneseLevel}
                           onChange={v => setEvalForm(f => ({ ...f, japaneseLevel: v }))}
                         />
                         <ScoreSelector
-                          label="英語能力"
+                          label={t('eval_score_english')}
+                          lowLabel={t('score_low')}
+                          highLabel={t('score_high')}
                           value={evalForm.englishLevel}
                           onChange={v => setEvalForm(f => ({ ...f, englishLevel: v }))}
                         />
                         <ScoreSelector
-                          label="コミュニケーション"
+                          label={t('eval_score_communication')}
+                          lowLabel={t('score_low')}
+                          highLabel={t('score_high')}
                           value={evalForm.communicationScore}
                           onChange={v => setEvalForm(f => ({ ...f, communicationScore: v }))}
                         />
                         <ScoreSelector
-                          label="印象"
+                          label={t('eval_score_impression')}
+                          lowLabel={t('score_low')}
+                          highLabel={t('score_high')}
                           value={evalForm.impressionScore}
                           onChange={v => setEvalForm(f => ({ ...f, impressionScore: v }))}
                         />
@@ -3083,12 +3093,12 @@ export default function ApplicantsPage() {
 
                       {/* 備考 */}
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">備考欄</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_interview_notes')}</label>
                         <textarea
                           value={evalForm.interviewNotes}
                           onChange={e => setEvalForm(f => ({ ...f, interviewNotes: e.target.value }))}
                           rows={3}
-                          placeholder="面接時のメモ..."
+                          placeholder={t('eval_interview_notes_placeholder')}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white resize-none"
                         />
                       </div>
@@ -3099,24 +3109,24 @@ export default function ApplicantsPage() {
                   <div>
                     <div className="flex items-center gap-2 mb-3">
                       <i className="bi bi-arrow-left-right text-indigo-600"></i>
-                      <h3 className="text-sm font-black text-slate-800">ステータス変更</h3>
+                      <h3 className="text-sm font-black text-slate-800">{t('eval_section_status')}</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">フローステータス</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_flow_status')}</label>
                         <select
                           value={evalForm.flowStatus}
                           onChange={e => setEvalForm(f => ({ ...f, flowStatus: e.target.value }))}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         >
-                          <option value="INTERVIEW_WAITING">面接待ち</option>
-                          <option value="NO_SHOW">NO SHOW</option>
-                          <option value="TRAINING_WAITING">研修待ち</option>
-                          <option value="TRAINING_COMPLETED">研修完了</option>
+                          <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
+                          <option value="NO_SHOW">{t('flow_no_show')}</option>
+                          <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
+                          <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
                         </select>
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">採用ステータス</label>
+                        <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_hiring_status')}</label>
                         <select
                           value={evalForm.hiringStatus}
                           onChange={e => {
@@ -3127,9 +3137,9 @@ export default function ApplicantsPage() {
                           }}
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         >
-                          <option value="IN_PROGRESS">選考中</option>
-                          <option value="HIRED">採用</option>
-                          <option value="REJECTED">不採用</option>
+                          <option value="IN_PROGRESS">{t('hiring_in_progress')}</option>
+                          <option value="HIRED">{t('hiring_hired')}</option>
+                          <option value="REJECTED">{t('hiring_rejected')}</option>
                         </select>
                       </div>
                     </div>
@@ -3139,7 +3149,7 @@ export default function ApplicantsPage() {
                       <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
                         <i className="bi bi-exclamation-triangle-fill text-amber-500 mt-0.5"></i>
                         <p className="text-xs font-bold text-amber-700">
-                          採用通知メールが自動送信されます
+                          {t('eval_hiring_notification')}
                         </p>
                       </div>
                     )}
@@ -3150,7 +3160,7 @@ export default function ApplicantsPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <i className="bi bi-mortarboard text-indigo-600"></i>
-                        <h3 className="text-sm font-black text-slate-800">研修スロット設定</h3>
+                        <h3 className="text-sm font-black text-slate-800">{t('eval_section_training')}</h3>
                       </div>
 
                       {/* 既に研修スロットが設定済みの場合 */}
@@ -3161,7 +3171,7 @@ export default function ApplicantsPage() {
                                 <i className="bi bi-check-circle-fill text-emerald-500"></i>
                               </div>
                               <div className="flex-1">
-                                <p className="text-xs font-bold text-emerald-700 mb-1">研修日程確定</p>
+                                <p className="text-xs font-bold text-emerald-700 mb-1">{t('eval_training_confirmed')}</p>
                                 <div className="space-y-1">
                                   <div className="flex items-center gap-2">
                                     <i className="bi bi-calendar-event text-slate-400 text-xs"></i>
@@ -3208,14 +3218,14 @@ export default function ApplicantsPage() {
                                 }}
                                 className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
                               >
-                                <i className="bi bi-calendar-plus"></i>日程変更
+                                <i className="bi bi-calendar-plus"></i>{t('eval_training_reschedule')}
                               </button>
                               <button
                                 type="button"
                                 onClick={handleCancelTraining}
                                 className="text-rose-600 hover:bg-rose-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-rose-200 transition-colors inline-flex items-center gap-1"
                               >
-                                <i className="bi bi-x-circle"></i>研修キャンセル
+                                <i className="bi bi-x-circle"></i>{t('eval_training_cancel')}
                               </button>
                             </div>
 
@@ -3223,7 +3233,7 @@ export default function ApplicantsPage() {
                             {showTrainingReschedulePanel && (
                               <div className="pt-3 border-t border-slate-200">
                                 <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-xs font-black text-indigo-700">新しい研修日程を選択</h4>
+                                  <h4 className="text-xs font-black text-indigo-700">{t('eval_training_reschedule_title')}</h4>
                                   <button type="button" onClick={() => setShowTrainingReschedulePanel(false)} className="text-slate-400 hover:text-slate-600 text-xs">
                                     <i className="bi bi-x-lg"></i>
                                   </button>
@@ -3233,7 +3243,7 @@ export default function ApplicantsPage() {
                                     <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
                                   </div>
                                 ) : availableTrainingSlots.length === 0 ? (
-                                  <p className="text-xs text-slate-400 py-2">空き研修スロットがありません</p>
+                                  <p className="text-xs text-slate-400 py-2">{t('eval_training_no_slots')}</p>
                                 ) : (
                                   <>
                                     <div className="max-h-48 overflow-y-auto space-y-1">
@@ -3255,7 +3265,7 @@ export default function ApplicantsPage() {
                                               }`}
                                             >
                                               <span className="font-bold">{dateStr}</span> {timeStr}
-                                              <span className="ml-2 text-[11px] text-slate-400">残{slot.remainingCapacity}名</span>
+                                              <span className="ml-2 text-[11px] text-slate-400">{t('eval_training_remaining', { remaining: slot.remainingCapacity })}</span>
                                               {slot.location && <span className="ml-2 text-[11px] text-slate-400">{slot.location}</span>}
                                             </button>
                                           );
@@ -3267,7 +3277,7 @@ export default function ApplicantsPage() {
                                       disabled={!selectedNewTrainingSlotId || trainingRescheduleLoading}
                                       className="mt-2 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold disabled:opacity-50 transition-colors"
                                     >
-                                      {trainingRescheduleLoading ? '変更中...' : 'この日程に変更する'}
+                                      {trainingRescheduleLoading ? t('eval_reschedule_changing') : t('eval_reschedule_confirm')}
                                     </button>
                                   </>
                                 )}
@@ -3292,7 +3302,7 @@ export default function ApplicantsPage() {
                               }}
                               className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="text-sm font-bold text-slate-700">今すぐ指定</span>
+                            <span className="text-sm font-bold text-slate-700">{t('eval_training_mode_now')}</span>
                           </label>
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -3306,21 +3316,21 @@ export default function ApplicantsPage() {
                               }}
                               className="text-indigo-600 focus:ring-indigo-500"
                             />
-                            <span className="text-sm font-bold text-slate-700">後でメールで案内</span>
+                            <span className="text-sm font-bold text-slate-700">{t('eval_training_mode_later')}</span>
                           </label>
                         </div>
 
                         {/* 今すぐ指定: カレンダーピッカー */}
                         {trainingBookingMode === 'now' && (
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-2">研修日時を選択</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-2">{t('eval_training_select_date')}</label>
                             {loadingTrainingSlots ? (
                               <div className="flex items-center gap-2 text-slate-400 text-sm">
                                 <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-                                読み込み中...
+                                {t('loading')}
                               </div>
                             ) : trainingSlots.length === 0 ? (
-                              <p className="text-sm text-slate-400">利用可能な研修スロットがありません</p>
+                              <p className="text-sm text-slate-400">{t('eval_training_no_available')}</p>
                             ) : (() => {
                               // スロットを日付ごとにグループ化
                               const slotsByDate: Record<string, TrainingSlotOption[]> = {};
@@ -3351,7 +3361,7 @@ export default function ApplicantsPage() {
                                       <i className="bi bi-chevron-left text-xs"></i>
                                     </button>
                                     <span className="text-sm font-bold text-slate-700">
-                                      {year}年{month + 1}月
+                                      {year}/{month + 1}
                                     </span>
                                     <button type="button" onClick={() => setCalendarViewDate(prev => {
                                       const d = new Date(prev.year, prev.month + 1);
@@ -3404,7 +3414,7 @@ export default function ApplicantsPage() {
                                   {/* 選択日のスロット一覧 */}
                                   {selectedCalendarDate && (
                                     <div className="border-t border-slate-200 p-2 bg-slate-50 space-y-1.5">
-                                      <p className="text-[11px] font-bold text-slate-500 px-1">{selectedCalendarDate} のスロット</p>
+                                      <p className="text-[11px] font-bold text-slate-500 px-1">{t('eval_training_date_slots', { date: selectedCalendarDate })}</p>
                                       {slotsForSelected.map(slot => {
                                         const start = new Date(slot.startTime);
                                         const end = new Date(slot.endTime);
@@ -3427,7 +3437,7 @@ export default function ApplicantsPage() {
                                             <div className="flex items-center gap-2">
                                               {slot.location && <span className={`text-[11px] ${isSlotSelected ? 'text-indigo-200' : 'text-slate-400'}`}>{slot.location}</span>}
                                               <span className={`text-[11px] font-bold ${isSlotSelected ? 'text-indigo-200' : slot.remainingCapacity <= 1 ? 'text-rose-500' : 'text-emerald-600'}`}>
-                                                残{slot.remainingCapacity}名
+                                                {t('eval_training_slot_remaining', { remaining: slot.remainingCapacity })}
                                               </span>
                                               {isSlotSelected && <i className="bi bi-check-circle-fill text-white"></i>}
                                             </div>
@@ -3447,7 +3457,7 @@ export default function ApplicantsPage() {
                           <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                             <i className="bi bi-envelope-fill text-blue-500 mt-0.5"></i>
                             <p className="text-xs text-blue-700 font-medium">
-                              保存時に研修予約リンクをメール送信します
+                              {t('eval_training_later_note')}
                             </p>
                           </div>
                         )}
@@ -3461,20 +3471,20 @@ export default function ApplicantsPage() {
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <i className="bi bi-person-badge text-emerald-600"></i>
-                        <h3 className="text-sm font-black text-slate-800">配布員登録</h3>
+                        <h3 className="text-sm font-black text-slate-800">{t('eval_section_distributor')}</h3>
                       </div>
 
                       {registeredDistributorId ? (
                         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
                           <i className="bi bi-check-circle-fill text-emerald-500"></i>
                           <p className="text-xs font-bold text-emerald-700">
-                            配布員として登録済み（スタッフID: {registeredDistributorId}）
+                            {t('eval_distributor_registered', { id: registeredDistributorId })}
                           </p>
                         </div>
                       ) : showDistributorForm ? (
                         <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">所属支店 <span className="text-rose-500">*</span></label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_branch')} <span className="text-rose-500">*</span></label>
                             <select
                               value={distForm.branchId}
                               onChange={e => {
@@ -3484,32 +3494,32 @@ export default function ApplicantsPage() {
                               }}
                               className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
                             >
-                              <option value="">選択してください</option>
+                              <option value="">{t('eval_select_placeholder')}</option>
                               {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}{b.prefix ? ` (${b.prefix})` : ''}</option>)}
                             </select>
                           </div>
                           <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">スタッフID</label>
+                            <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_staff_id')}</label>
                             <div className="relative">
                               <input
                                 type="text"
                                 value={distForm.staffId}
                                 onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
-                                placeholder={distForm.branchId ? '支店のプレフィックスで自動入力' : '支店を選択してください'}
+                                placeholder={distForm.branchId ? t('eval_distributor_staff_placeholder_branch') : t('eval_distributor_staff_placeholder_select')}
                                 className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none font-mono"
                               />
                               {staffIdLoading && (
                                 <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                               )}
                             </div>
-                            <p className="text-[10px] text-slate-400 mt-1">支店選択時に自動入力されます。変更も可能です。</p>
+                            <p className="text-[10px] text-slate-400 mt-1">{t('eval_distributor_staff_note')}</p>
                           </div>
                           <div className="flex gap-2 pt-1">
                             <button
                               onClick={() => setShowDistributorForm(false)}
                               className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors"
                             >
-                              キャンセル
+                              {t('cancel')}
                             </button>
                             <button
                               onClick={handleRegisterAsDistributor}
@@ -3517,7 +3527,7 @@ export default function ApplicantsPage() {
                               className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
                             >
                               {registering && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                              登録する
+                              {t('eval_distributor_register_btn')}
                             </button>
                           </div>
                         </div>
@@ -3536,7 +3546,7 @@ export default function ApplicantsPage() {
                   className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-sm transition-colors border border-rose-200 flex items-center gap-1.5"
                 >
                   <i className="bi bi-trash3"></i>
-                  削除
+                  {t('eval_btn_delete')}
                 </button>
                 <div className="flex gap-3">
                   {selectedApplicant.hiringStatus === 'HIRED' && !showDistributorForm && (
@@ -3546,7 +3556,7 @@ export default function ApplicantsPage() {
                         className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
                       >
                         <i className="bi bi-check-circle-fill"></i>
-                        配布員登録済み
+                        {t('eval_distributor_registered_btn')}
                       </button>
                     ) : (
                       <button
@@ -3561,7 +3571,7 @@ export default function ApplicantsPage() {
                         className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
                       >
                         <i className="bi bi-person-plus"></i>
-                        配布員登録
+                        {t('eval_distributor_register')}
                       </button>
                     )
                   )}
@@ -3569,7 +3579,7 @@ export default function ApplicantsPage() {
                     onClick={closeEvalModal}
                     className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                   >
-                    キャンセル
+                    {t('cancel')}
                   </button>
                   <button
                     onClick={handleSaveEval}
@@ -3578,7 +3588,7 @@ export default function ApplicantsPage() {
                   >
                     {evalSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                     <i className="bi bi-check-lg"></i>
-                    保存
+                    {t('eval_btn_save')}
                   </button>
                 </div>
               </div>
@@ -3599,7 +3609,7 @@ export default function ApplicantsPage() {
                 <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <i className="bi bi-person-plus-fill text-emerald-600"></i>
                 </div>
-                <h2 className="text-lg font-black text-slate-800">応募者を手動登録</h2>
+                <h2 className="text-lg font-black text-slate-800">{t('manual_title')}</h2>
               </div>
               <button
                 onClick={() => setShowManualRegisterModal(false)}
@@ -3614,19 +3624,19 @@ export default function ApplicantsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    氏名 <span className="text-rose-500">*</span>
+                    {t('manual_name')} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
                     value={manualRegForm.name}
                     onChange={e => setManualRegForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder="山田 太郎"
+                    placeholder={t('manual_name_placeholder')}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    メールアドレス <span className="text-rose-500">*</span>
+                    {t('manual_email')} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="email"
@@ -3641,7 +3651,7 @@ export default function ApplicantsPage() {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    電話番号 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_phone')} <span className="text-slate-400 font-normal">{t('manual_phone_optional')}</span>
                   </label>
                   <input
                     type="tel"
@@ -3653,7 +3663,7 @@ export default function ApplicantsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    生年月日 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_birthday')} <span className="text-slate-400 font-normal">{t('manual_birthday_optional')}</span>
                   </label>
                   <input
                     type="date"
@@ -3664,17 +3674,17 @@ export default function ApplicantsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    性別 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_gender')} <span className="text-slate-400 font-normal">{t('manual_gender_optional')}</span>
                   </label>
                   <select
                     value={manualRegForm.gender}
                     onChange={e => setManualRegForm(f => ({ ...f, gender: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   >
-                    <option value="">未選択</option>
-                    <option value="male">男性</option>
-                    <option value="female">女性</option>
-                    <option value="other">その他</option>
+                    <option value="">{t('manual_gender_unset')}</option>
+                    <option value="male">{t('manual_gender_male')}</option>
+                    <option value="female">{t('manual_gender_female')}</option>
+                    <option value="other">{t('manual_gender_other')}</option>
                   </select>
                 </div>
               </div>
@@ -3682,14 +3692,14 @@ export default function ApplicantsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    職種 <span className="text-rose-500">*</span>
+                    {t('manual_job_category')} <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={manualRegForm.jobCategoryId}
                     onChange={e => setManualRegForm(f => ({ ...f, jobCategoryId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   >
-                    <option value="">選択してください</option>
+                    <option value="">{t('eval_select_placeholder')}</option>
                     {jobCategories.map(cat => (
                       <option key={cat.id} value={cat.id}>{cat.nameJa}</option>
                     ))}
@@ -3697,14 +3707,14 @@ export default function ApplicantsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    求人媒体 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_recruiting_media')} <span className="text-slate-400 font-normal">{t('manual_recruiting_optional')}</span>
                   </label>
                   <select
                     value={manualRegForm.recruitingMediaId}
                     onChange={e => setManualRegForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   >
-                    <option value="">選択なし</option>
+                    <option value="">{t('manual_recruiting_unset')}</option>
                     {recruitingMediaList.filter(m => m.isActive).map(m => (
                       <option key={m.id} value={m.id}>{m.nameJa}</option>
                     ))}
@@ -3715,14 +3725,14 @@ export default function ApplicantsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    国籍 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_country')} <span className="text-slate-400 font-normal">{t('manual_country_optional')}</span>
                   </label>
                   <select
                     value={manualRegForm.countryId}
                     onChange={e => setManualRegForm(f => ({ ...f, countryId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   >
-                    <option value="">未選択</option>
+                    <option value="">{t('manual_country_unset')}</option>
                     {countries.map(c => (
                       <option key={c.id} value={c.id}>{c.name}</option>
                     ))}
@@ -3730,14 +3740,14 @@ export default function ApplicantsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
-                    在留資格 <span className="text-slate-400 font-normal">（任意）</span>
+                    {t('manual_visa')} <span className="text-slate-400 font-normal">{t('manual_visa_optional')}</span>
                   </label>
                   <select
                     value={manualRegForm.visaTypeId}
                     onChange={e => setManualRegForm(f => ({ ...f, visaTypeId: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                   >
-                    <option value="">未選択</option>
+                    <option value="">{t('manual_visa_unset')}</option>
                     {visaTypes.map(v => (
                       <option key={v.id} value={v.id}>{v.name}</option>
                     ))}
@@ -3747,7 +3757,7 @@ export default function ApplicantsPage() {
 
               <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1">メール言語</label>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">{t('manual_email_lang')}</label>
                   <div className="flex gap-4">
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
@@ -3758,7 +3768,7 @@ export default function ApplicantsPage() {
                         onChange={() => setManualRegForm(f => ({ ...f, language: 'ja' }))}
                         className="text-indigo-600 focus:ring-indigo-500"
                       />
-                      <span className="text-sm font-medium text-slate-700">日本語</span>
+                      <span className="text-sm font-medium text-slate-700">{t('manual_email_lang_ja')}</span>
                     </label>
                     <label className="flex items-center gap-1.5 cursor-pointer">
                       <input
@@ -3780,7 +3790,7 @@ export default function ApplicantsPage() {
                     onChange={e => setManualRegForm(f => ({ ...f, sendInterviewEmail: e.target.checked }))}
                     className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                   />
-                  <span className="text-sm font-medium text-slate-700">面接案内メール送信</span>
+                  <span className="text-sm font-medium text-slate-700">{t('manual_send_interview_email')}</span>
                 </label>
               </div>
             </div>
@@ -3791,7 +3801,7 @@ export default function ApplicantsPage() {
                 onClick={() => setShowManualRegisterModal(false)}
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={handleManualRegister}
@@ -3800,7 +3810,7 @@ export default function ApplicantsPage() {
               >
                 {manualRegSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                 <i className="bi bi-person-plus-fill"></i>
-                登録する
+                {t('manual_register_btn')}
               </button>
             </div>
           </div>
@@ -3819,7 +3829,7 @@ export default function ApplicantsPage() {
                 <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
                   <i className="bi bi-tags-fill text-indigo-600"></i>
                 </div>
-                <h2 className="text-lg font-black text-slate-800">職種マスタ管理</h2>
+                <h2 className="text-lg font-black text-slate-800">{t('jobcat_title')}</h2>
               </div>
               <button
                 onClick={() => setShowJobCatModal(false)}
@@ -3833,20 +3843,20 @@ export default function ApplicantsPage() {
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {/* 新規追加フォーム */}
               <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-                <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider">新規追加</h4>
+                <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider">{t('jobcat_new')}</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5">職種名（日本語）</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('jobcat_name_ja')}</label>
                     <input
                       type="text"
                       value={newJobCat.nameJa}
                       onChange={e => setNewJobCat(f => ({ ...f, nameJa: e.target.value }))}
-                      placeholder="配布スタッフ"
+                      placeholder={t('jobcat_name_ja_placeholder')}
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-slate-500 mb-1.5">職種名（英語）</label>
+                    <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('jobcat_name_en')}</label>
                     <input
                       type="text"
                       value={newJobCat.nameEn}
@@ -3863,13 +3873,13 @@ export default function ApplicantsPage() {
                 >
                   {jobCatCreating && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                   <i className="bi bi-plus-lg"></i>
-                  追加
+                  {t('jobcat_add_btn')}
                 </button>
               </div>
 
               {/* 一覧 */}
               <div>
-                <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">登録済み職種</h4>
+                <h4 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-2">{t('jobcat_list_title')}</h4>
                 {jobCatLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
@@ -3877,7 +3887,7 @@ export default function ApplicantsPage() {
                 ) : jobCategories.length === 0 ? (
                   <div className="text-center py-8 text-slate-400">
                     <i className="bi bi-tags text-2xl block mb-2"></i>
-                    <p className="text-xs font-medium">職種が登録されていません</p>
+                    <p className="text-xs font-medium">{t('jobcat_no_categories')}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -3892,11 +3902,11 @@ export default function ApplicantsPage() {
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="text-xs text-slate-400">
-                            {cat._count?.applicants || 0}名
+                            {t('jobcat_applicant_count', { count: cat._count?.applicants || 0 })}
                           </span>
                           {!cat.isActive && (
                             <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">
-                              無効
+                              {t('jobcat_inactive')}
                             </span>
                           )}
                         </div>
@@ -3913,7 +3923,7 @@ export default function ApplicantsPage() {
                 onClick={() => setShowJobCatModal(false)}
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
-                閉じる
+                {t('close')}
               </button>
             </div>
           </div>

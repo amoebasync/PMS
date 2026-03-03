@@ -14,7 +14,7 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const [departments, industries, countries, visaTypes, banks] = await Promise.all([
+  const [departments, industries, countries, visaTypes, banks, roles] = await Promise.all([
     prisma.department.findMany({
       orderBy: { id: 'asc' },
       include: { _count: { select: { employees: true } } },
@@ -34,9 +34,12 @@ export async function GET() {
     prisma.bank.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     }),
+    prisma.role.findMany({
+      orderBy: { id: 'asc' },
+    }),
   ]);
 
-  return NextResponse.json({ departments, industries, countries, visaTypes, banks });
+  return NextResponse.json({ departments, industries, countries, visaTypes, banks, roles });
 }
 
 export async function POST(request: Request) {

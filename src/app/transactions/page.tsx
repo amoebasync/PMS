@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 const TYPE_MAP: Record<string, { label: string, color: string, icon: string }> = {
   RECEIVE: { label: '納品(入庫)', color: 'bg-blue-100 text-blue-700 border-blue-200', icon: 'bi-box-arrow-in-down' },
@@ -20,6 +21,7 @@ const getTodayStr = () => {
 };
 
 export default function TransactionsPage() {
+  const { t } = useTranslation('transactions');
   const { showToast, showConfirm } = useNotification();
   const [transactions, setTransactions] = useState<any[]>([]);
   const [flyers, setFlyers] = useState<any[]>([]);
@@ -106,21 +108,21 @@ export default function TransactionsPage() {
       if (!res.ok) throw new Error();
       setIsModalOpen(false);
       fetchData();
-    } catch (e) { showToast('保存に失敗しました', 'error'); }
+    } catch (e) { showToast(t('save_error'), 'error'); }
     setIsSaving(false);
   };
 
   const del = async (id: number) => {
-    if (!await showConfirm('この入出庫履歴を削除しますか？', { variant: 'danger', detail: '完了済みの場合は自動的に在庫が再計算されて元に戻ります', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_delete'), { variant: 'danger', detail: t('confirm_delete_detail'), confirmLabel: t('confirm_delete_btn') })) return;
     try {
       await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
       fetchData();
-    } catch (e) { showToast('削除に失敗しました', 'error'); }
+    } catch (e) { showToast(t('delete_error'), 'error'); }
   };
 
   // ワンクリック完了処理
   const markAsCompleted = async (tx: any) => {
-    if (!await showConfirm('このトランザクションを「完了」に変更し、在庫に反映させますか？', { variant: 'primary', confirmLabel: '完了にする' })) return;
+    if (!await showConfirm(t('confirm_complete'), { variant: 'primary', confirmLabel: t('confirm_complete_btn') })) return;
     try {
       const payload = {
         flyerId: tx.flyerId.toString(),
@@ -139,7 +141,7 @@ export default function TransactionsPage() {
       });
       if (!res.ok) throw new Error();
       fetchData();
-    } catch (e) { showToast('ステータスの更新に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_status_update'), 'error'); }
   };
 
   // --- フィルタリング ---
@@ -179,7 +181,7 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex justify-end">
         <button onClick={() => openModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold shadow-md transition-all">
-          <i className="bi bi-plus-lg mr-2"></i>入出庫を登録
+          <i className="bi bi-plus-lg mr-2"></i>{t('btn_new')}
         </button>
       </div>
 
@@ -191,9 +193,9 @@ export default function TransactionsPage() {
               <i className="bi bi-exclamation-triangle-fill"></i>
             </div>
             <div>
-              <p className="text-xs text-rose-600 font-bold uppercase tracking-wider">アラート</p>
+              <p className="text-xs text-rose-600 font-bold uppercase tracking-wider">{t('alert_label')}</p>
               <p className="text-sm font-bold text-slate-800">
-                予定日を過ぎた <span className="text-xl font-black text-rose-600 mx-1">{pastPendingCount}</span> 件の未納品データがあります
+                {t('alert_past_pending')} <span className="text-xl font-black text-rose-600 mx-1">{pastPendingCount}</span> {t('alert_past_pending_suffix')}
               </p>
             </div>
           </div>
@@ -201,7 +203,7 @@ export default function TransactionsPage() {
             onClick={() => setShowPastUncompleted(!showPastUncompleted)}
             className={`px-4 py-2 font-bold text-sm rounded-lg transition-colors border ${showPastUncompleted ? 'bg-rose-600 text-white border-rose-600 shadow' : 'bg-white text-rose-600 border-rose-200 hover:bg-rose-100'}`}
           >
-            {showPastUncompleted ? '抽出を解除' : '該当データを確認する'}
+            {showPastUncompleted ? t('alert_release') : t('alert_show')}
           </button>
         </div>
       )}
@@ -209,28 +211,28 @@ export default function TransactionsPage() {
       {/* 検索・フィルタバー */}
       <div className={`bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end transition-opacity ${showPastUncompleted ? 'opacity-50 pointer-events-none' : ''}`}>
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (FROM)</label>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('period_from')}</label>
           {/* ★ 変更: handleDateFromChange を設定 */}
           <input type="date" value={dateFrom} onChange={handleDateFromChange} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (TO)</label>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('period_to')}</label>
           <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
         </div>
         <div>
-          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ステータス</label>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('filter_status')}</label>
           <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-            <option value="ALL">すべて</option>
-            <option value="PENDING">未納品</option>
-            <option value="COMPLETED">完了</option>
-            <option value="CANCELED">キャンセル</option>
+            <option value="ALL">{t('filter_all')}</option>
+            <option value="PENDING">{t('filter_pending')}</option>
+            <option value="COMPLETED">{t('filter_completed')}</option>
+            <option value="CANCELED">{t('filter_canceled')}</option>
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">キーワード検索</label>
+          <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('search_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2 text-slate-400 text-sm"></i>
-            <input type="text" placeholder="チラシ名、顧客名、コード..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
+            <input type="text" placeholder={t('search_placeholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
           </div>
         </div>
       </div>
@@ -241,64 +243,65 @@ export default function TransactionsPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-6 py-4">日付 (予定/実績)</th>
-              <th className="px-6 py-4">種別</th>
-              <th className="px-6 py-4">対象チラシ / クライアント</th>
-              <th className="px-6 py-4 text-right">増減枚数</th>
-              <th className="px-6 py-4">担当者 / 備考</th>
-              <th className="px-6 py-4 text-center">ステータス <span className="font-normal lowercase">(Click to Action)</span></th>
-              <th className="px-6 py-4 text-right">操作</th>
+              <th className="px-6 py-4">{t('table_date')}</th>
+              <th className="px-6 py-4">{t('table_type')}</th>
+              <th className="px-6 py-4">{t('table_flyer_client')}</th>
+              <th className="px-6 py-4 text-right">{t('table_count')}</th>
+              <th className="px-6 py-4">{t('table_person_note')}</th>
+              <th className="px-6 py-4 text-center">{t('table_status')} <span className="font-normal lowercase">{t('table_status_hint')}</span></th>
+              <th className="px-6 py-4 text-right">{t('table_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {isLoading ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">読み込み中...</td></tr> : 
-             filtered.length === 0 ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">該当するデータがありません</td></tr> :
-             filtered.map(t => {
-               const type = TYPE_MAP[t.transactionType];
-               const sign = t.transactionType === 'RECEIVE' ? '+' : t.transactionType === 'TRANSFER' ? '±' : '-';
+            {isLoading ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">{t('loading')}</td></tr> :
+             filtered.length === 0 ? <tr><td colSpan={7} className="p-8 text-center text-slate-400">{t('no_data')}</td></tr> :
+             filtered.map(tx => {
+               const type = TYPE_MAP[tx.transactionType];
+               const typeLabel = t(`type_${tx.transactionType.toLowerCase()}`);
+               const sign = tx.transactionType === 'RECEIVE' ? '+' : tx.transactionType === 'TRANSFER' ? '±' : '-';
                return (
-                <tr key={t.id} className="hover:bg-slate-50">
+                <tr key={tx.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 font-mono font-bold text-slate-700 text-base">
-                    {new Date(t.expectedAt).toLocaleDateString('ja-JP')}
+                    {new Date(tx.expectedAt).toLocaleDateString('ja-JP')}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-md border ${type.color}`}>
-                      <i className={type.icon}></i> {type.label}
+                      <i className={type.icon}></i> {typeLabel}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-[10px] text-slate-500 font-bold mb-0.5 truncate max-w-[200px]">{t.flyer?.customer?.name || '顧客不明'}</div>
-                    <div className="font-bold text-slate-800 mb-1 truncate max-w-[200px]" title={t.flyer?.name}>{t.flyer?.name}</div>
+                    <div className="text-[10px] text-slate-500 font-bold mb-0.5 truncate max-w-[200px]">{tx.flyer?.customer?.name || t('customer_unknown')}</div>
+                    <div className="font-bold text-slate-800 mb-1 truncate max-w-[200px]" title={tx.flyer?.name}>{tx.flyer?.name}</div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <div className={`font-black text-lg ${t.transactionType === 'RECEIVE' ? 'text-blue-600' : 'text-rose-600'}`}>
-                      {sign}{t.count.toLocaleString()} <span className="text-xs font-normal text-slate-500">枚</span>
+                    <div className={`font-black text-lg ${tx.transactionType === 'RECEIVE' ? 'text-blue-600' : 'text-rose-600'}`}>
+                      {sign}{tx.count.toLocaleString()} <span className="text-xs font-normal text-slate-500">{t('sheets')}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-xs">
-                    <div className="font-bold text-slate-700">{t.employee ? `${t.employee.lastNameJa} ${t.employee.firstNameJa}` : '未指定'}</div>
-                    <div className="text-slate-500 mt-1 truncate max-w-[150px]" title={t.note}>{t.note || '-'}</div>
+                    <div className="font-bold text-slate-700">{tx.employee ? `${tx.employee.lastNameJa} ${tx.employee.firstNameJa}` : t('person_unset')}</div>
+                    <div className="text-slate-500 mt-1 truncate max-w-[150px]" title={tx.note}>{tx.note || '-'}</div>
                   </td>
-                  
+
                   <td className="px-6 py-4 text-center">
-                    {t.status === 'PENDING' ? (
-                      <button onClick={() => markAsCompleted(t)} className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-200 hover:shadow-sm transition-all flex items-center gap-1.5 border border-amber-300 mx-auto">
-                         <i className="bi bi-clock-history"></i> 未納品 <i className="bi bi-chevron-right opacity-50"></i>
+                    {tx.status === 'PENDING' ? (
+                      <button onClick={() => markAsCompleted(tx)} className="bg-amber-100 text-amber-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-amber-200 hover:shadow-sm transition-all flex items-center gap-1.5 border border-amber-300 mx-auto">
+                         <i className="bi bi-clock-history"></i> {t('status_pending')} <i className="bi bi-chevron-right opacity-50"></i>
                       </button>
-                    ) : t.status === 'COMPLETED' ? (
+                    ) : tx.status === 'COMPLETED' ? (
                       <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 w-fit mx-auto">
-                        <i className="bi bi-check-circle-fill"></i> 完了
+                        <i className="bi bi-check-circle-fill"></i> {t('status_completed')}
                       </span>
                     ) : (
                       <span className="bg-slate-100 text-slate-600 border border-slate-200 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 w-fit mx-auto">
-                        <i className="bi bi-x-circle-fill"></i> キャンセル
+                        <i className="bi bi-x-circle-fill"></i> {t('status_canceled')}
                       </span>
                     )}
                   </td>
 
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => openModal(t)} className="p-2 text-slate-400 hover:text-blue-600"><i className="bi bi-pencil-square text-lg"></i></button>
-                    <button onClick={() => del(t.id)} className="p-2 text-slate-400 hover:text-rose-600"><i className="bi bi-trash text-lg"></i></button>
+                    <button onClick={() => openModal(tx)} className="p-2 text-slate-400 hover:text-blue-600"><i className="bi bi-pencil-square text-lg"></i></button>
+                    <button onClick={() => del(tx.id)} className="p-2 text-slate-400 hover:text-rose-600"><i className="bi bi-trash text-lg"></i></button>
                   </td>
                 </tr>
                )
@@ -313,68 +316,68 @@ export default function TransactionsPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
             <div className="p-5 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-              <h3 className="font-bold text-slate-800"><i className="bi bi-box-seam text-blue-600 mr-2"></i>{currentId ? '入出庫の編集' : '入出庫の登録'}</h3>
+              <h3 className="font-bold text-slate-800"><i className="bi bi-box-seam text-blue-600 mr-2"></i>{currentId ? t('modal_title_edit') : t('modal_title_new')}</h3>
               <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             
             <form onSubmit={save} className="p-6 overflow-y-auto space-y-5">
               <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">対象チラシ *</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_flyer')}</label>
                 <select required value={form.flyerId} onChange={e => setForm({...form, flyerId: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500">
-                  <option value="">選択してください</option>
-                  {flyers.map(f => <option key={f.id} value={f.id}>{f.customer?.name} - {f.name} (在庫: {f.stockCount})</option>)}
+                  <option value="">{t('form_select_placeholder')}</option>
+                  {flyers.map(f => <option key={f.id} value={f.id}>{f.customer?.name} - {f.name} ({t('form_flyer_option', { count: f.stockCount })})</option>)}
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">入出庫の種類 *</label>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_type')}</label>
                   <select required value={form.transactionType} onChange={e => setForm({...form, transactionType: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500">
-                    <option value="RECEIVE">納品 (入庫)</option>
-                    <option value="PICKUP">引取 (出庫)</option>
-                    <option value="TRANSFER">拠点移動</option>
-                    <option value="DISPOSE">廃棄・調整</option>
+                    <option value="RECEIVE">{t('form_type_receive')}</option>
+                    <option value="PICKUP">{t('form_type_pickup')}</option>
+                    <option value="TRANSFER">{t('form_type_transfer')}</option>
+                    <option value="DISPOSE">{t('form_type_dispose')}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">対象枚数 *</label>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_count')}</label>
                   <div className="relative">
                     <input type="number" required min="1" value={form.count} onChange={e => setForm({...form, count: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white pr-8 text-right font-bold text-blue-600 focus:ring-2 focus:ring-blue-500" placeholder="1000" />
-                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">枚</span>
+                    <span className="absolute right-3 top-2.5 text-slate-400 text-sm">{t('sheets')}</span>
                   </div>
                 </div>
-                
+
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">発生日 (予定/実績) *</label>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_date')}</label>
                   <input type="date" required value={form.expectedAt} onChange={e => setForm({...form, expectedAt: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600 block mb-1">ステータス *</label>
+                  <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_status')}</label>
                   <select required value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white font-bold text-indigo-700">
-                    <option value="COMPLETED">完了 (在庫に即反映)</option>
-                    <option value="PENDING">未納品 (反映待機)</option>
-                    <option value="CANCELED">キャンセル</option>
+                    <option value="COMPLETED">{t('form_status_completed')}</option>
+                    <option value="PENDING">{t('form_status_pending')}</option>
+                    <option value="CANCELED">{t('form_status_canceled')}</option>
                   </select>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">担当者 (社内確認者・ドライバー)</label>
+                <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_person')}</label>
                 <select value={form.employeeId} onChange={e => setForm({...form, employeeId: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white">
-                  <option value="">(ログインユーザーを自動設定)</option>
+                  <option value="">{t('form_person_auto')}</option>
                   {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="text-xs font-bold text-slate-600 block mb-1">備考</label>
-                <input type="text" value={form.note} onChange={e => setForm({...form, note: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white" placeholder="〇〇便にて到着、など" />
+                <label className="text-xs font-bold text-slate-600 block mb-1">{t('form_note')}</label>
+                <input type="text" value={form.note} onChange={e => setForm({...form, note: e.target.value})} className="w-full border p-2.5 rounded-lg text-sm bg-white" placeholder={t('form_note_placeholder')} />
               </div>
 
               <div className="pt-4 flex justify-end gap-3 mt-4 border-t">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">キャンセル</button>
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">{t('cancel')}</button>
                 <button type="submit" disabled={isSaving} className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50">
-                  {isSaving ? '保存中...' : '在庫を更新して保存'}
+                  {isSaving ? t('saving') : t('btn_save')}
                 </button>
               </div>
             </form>

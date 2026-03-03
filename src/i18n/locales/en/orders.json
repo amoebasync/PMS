@@ -1,0 +1,102 @@
+{
+  "btn_new_order": "Create New Order",
+
+  "alert_action_required": "Action Required",
+  "alert_pending_payment": " <span class=\"underline decoration-orange-300 decoration-2\">pending payment(s)</span> require attention",
+  "alert_pending_review": " <span class=\"underline decoration-yellow-300 decoration-2\">pending review(s)</span> require attention",
+
+  "filter_keyword": "Keyword Search",
+  "filter_keyword_placeholder": "Order number, project name, customer name...",
+  "filter_source": "Order Source",
+  "filter_status": "Status",
+  "filter_sales_rep": "Sales Rep",
+  "filter_all": "All",
+  "filter_source_web": "EC (Web)",
+  "filter_source_sales": "Sales (Internal)",
+
+  "status_draft": "Draft",
+  "status_planning": "Planning",
+  "status_pending_payment": "Awaiting Payment",
+  "status_pending_review": "Awaiting Review",
+  "status_adjusting": "Adjustment Required",
+  "status_confirmed": "Confirmed (Arranging)",
+  "status_in_progress": "In Progress",
+  "status_completed": "Completed",
+  "status_canceled": "Canceled",
+
+  "th_order_no": "Order No. / Date",
+  "th_customer": "Customer / Project",
+  "th_sales_rep": "Sales Rep",
+  "th_breakdown": "Breakdown",
+  "th_total_amount": "Total Amount",
+  "th_status": "Status",
+  "th_actions": "Actions",
+
+  "badge_ec": "EC",
+  "badge_ec_tooltip": "Order via EC site",
+  "badge_sales": "Sales",
+  "badge_sales_tooltip": "Order via internal system",
+
+  "badge_posting": "Post",
+  "badge_posting_tooltip": "Posting",
+  "badge_print": "Print",
+  "badge_print_tooltip": "Print arrangement",
+  "badge_insert": "Insert",
+  "badge_insert_tooltip": "Newspaper insert",
+  "badge_design": "Design",
+  "badge_design_tooltip": "Design",
+
+  "sales_rep_unassigned": "Unassigned",
+  "click_to_process": "Click to process",
+
+  "empty_title": "No orders found",
+  "empty_description": "Adjust your search criteria or create a new order",
+
+  "delete_confirm": "Delete this order?",
+  "delete_confirm_title": "Delete Order",
+  "delete_failed": "Failed to delete",
+
+  "status_update_failed": "Failed to update status",
+  "communication_error": "A communication error occurred",
+
+  "payment_confirm": "Confirm payment for order {{orderNo}} ({{customerName}}) and proceed to review?",
+  "payment_confirm_label": "Confirm & Proceed",
+
+  "review_modal_title": "Order Review & Approval",
+  "review_loading": "Loading data...",
+  "review_detail_failed": "Failed to load order details",
+
+  "review_title_unset": "No project title",
+  "review_tax_included": "Tax included",
+
+  "review_content_title": "Order Details",
+  "review_plan_label": "Plan:",
+  "review_plan_print_posting": "Print + Posting",
+  "review_plan_posting_only": "Posting Only",
+  "review_planned_count": "Planned Quantity:",
+  "review_count_unit": "pcs",
+  "review_area_count": "Distribution Areas:",
+  "review_area_unit": "locations",
+  "review_period": "Distribution Period:",
+  "review_unset": "TBD",
+
+  "review_payment_method": "Payment Method:",
+  "review_payment_credit": "Credit Card",
+  "review_payment_bank": "Bank Transfer / Invoice",
+  "review_payment_status": "Payment Status:",
+  "review_payment_completed": "Paid (Completed)",
+  "review_payment_pending": "Unpaid",
+
+  "approve_confirm": "Approve this order and confirm arrangement?",
+  "approve_confirm_label": "Approve",
+  "reject_reason_required": "Please enter a reason for rejection",
+  "reject_confirm": "Reject this order and return it?",
+  "reject_confirm_label": "Reject",
+  "reject_reason_label": "Reason for Rejection (Required)",
+  "reject_reason_placeholder": "e.g., Distribution area capacity is insufficient. Please adjust the quantity.",
+  "reject_reason_note": "* This reason will be notified and displayed to the client.",
+
+  "btn_reject": "Reject",
+  "btn_approve": "Approve & Arrange",
+  "btn_close": "Close"
+}

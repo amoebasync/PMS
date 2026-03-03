@@ -100,6 +100,7 @@ export async function POST(request: Request) {
       success: true,
       user: { name: employee.lastNameJa },
       mustChangePassword: employee.mustChangePassword,
+      language: employee.language || 'ja',
     });
 
   } catch (error) {

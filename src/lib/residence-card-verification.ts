@@ -208,24 +208,59 @@ export async function triggerAutoVerification(distributorId: number): Promise<vo
       },
     });
 
-    // MISMATCH の場合はアラートを生成
+    // MISMATCH の場合はアラートを生成（AlertDefinitionの設定に従う）
     if (!result.overallMatch) {
       try {
-        const category = await prisma.alertCategory.findFirst({ where: { name: '配布員' } });
-        if (category) {
+        const alertDef = await prisma.alertDefinition.findUnique({
+          where: { code: 'RESIDENCE_CARD_MISMATCH' },
+        });
+
+        // AlertDefinitionが無効の場合はスキップ
+        if (alertDef && alertDef.isEnabled) {
           const dist = await prisma.flyerDistributor.findUnique({
             where: { id: distributorId },
             select: { name: true, staffId: true },
           });
           const staffLabel = dist?.staffId ? `[${dist.staffId}]` : '';
+          const title = `在留カード不一致: ${staffLabel}${dist?.name || ''}`;
+          const message = `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`;
+
           await createAlert({
-            categoryId: category.id,
-            severity: 'WARNING',
-            title: `在留カード不一致: ${staffLabel}${dist?.name || ''}`,
-            message: `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`,
+            categoryId: alertDef.categoryId,
+            severity: alertDef.severity,
+            title,
+            message,
             entityType: 'FlyerDistributor',
             entityId: distributorId,
           });
+
+          // 通知生成
+          if (alertDef.notifyEnabled) {
+            const { createAlertNotification } = await import('@/lib/alert-notifications');
+            const latestAlert = await prisma.alert.findFirst({
+              where: { entityType: 'FlyerDistributor', entityId: distributorId, categoryId: alertDef.categoryId, status: 'OPEN' },
+              orderBy: { createdAt: 'desc' },
+            });
+            await createAlertNotification(alertDef, latestAlert?.id ?? null, title, message);
+          }
+        } else {
+          // AlertDefinitionがない場合は従来のフォールバック
+          const category = await prisma.alertCategory.findFirst({ where: { name: '配布員' } });
+          if (category) {
+            const dist = await prisma.flyerDistributor.findUnique({
+              where: { id: distributorId },
+              select: { name: true, staffId: true },
+            });
+            const staffLabel = dist?.staffId ? `[${dist.staffId}]` : '';
+            await createAlert({
+              categoryId: category.id,
+              severity: 'WARNING',
+              title: `在留カード不一致: ${staffLabel}${dist?.name || ''}`,
+              message: `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`,
+              entityType: 'FlyerDistributor',
+              entityId: distributorId,
+            });
+          }
         }
       } catch (alertError) {
         console.error('[ResidenceCardVerification] Failed to create alert:', alertError);

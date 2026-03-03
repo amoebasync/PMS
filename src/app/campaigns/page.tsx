@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 type Campaign = {
   id: number;
@@ -22,6 +23,7 @@ const initialForm = {
 };
 
 export default function CampaignsPage() {
+  const { t } = useTranslation('campaigns');
   const { showToast } = useNotification();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function CampaignsPage() {
       setIsFormModalOpen(false);
       fetchData();
     } catch {
-      showToast('保存に失敗しました', 'error');
+      showToast(t('save_error'), 'error');
     }
   };
 
@@ -101,7 +103,7 @@ export default function CampaignsPage() {
       setIsDeleteModalOpen(false);
       fetchData();
     } catch {
-      showToast('削除に失敗しました', 'error');
+      showToast(t('delete_error'), 'error');
     }
   };
 
@@ -117,7 +119,7 @@ export default function CampaignsPage() {
           onClick={() => openFormModal()}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md flex items-center gap-2"
         >
-          <i className="bi bi-plus-lg"></i> 新規キャンペーン作成
+          <i className="bi bi-plus-lg"></i> {t('btn_create')}
         </button>
       </div>
 
@@ -127,19 +129,19 @@ export default function CampaignsPage() {
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
-              <th className="px-6 py-4 font-semibold">キャンペーン名</th>
-              <th className="px-6 py-4 font-semibold">説明</th>
-              <th className="px-6 py-4 font-semibold">開始日</th>
-              <th className="px-6 py-4 font-semibold">終了日</th>
-              <th className="px-6 py-4 font-semibold">ステータス</th>
-              <th className="px-6 py-4 font-semibold text-right">操作</th>
+              <th className="px-6 py-4 font-semibold">{t('col_name')}</th>
+              <th className="px-6 py-4 font-semibold">{t('col_description')}</th>
+              <th className="px-6 py-4 font-semibold">{t('col_start_date')}</th>
+              <th className="px-6 py-4 font-semibold">{t('col_end_date')}</th>
+              <th className="px-6 py-4 font-semibold">{t('col_status')}</th>
+              <th className="px-6 py-4 font-semibold text-right">{t('col_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-400">読み込み中...</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
             ) : campaigns.length === 0 ? (
-              <tr><td colSpan={6} className="p-8 text-center text-slate-400">キャンペーンが登録されていません</td></tr>
+              <tr><td colSpan={6} className="p-8 text-center text-slate-400">{t('empty')}</td></tr>
             ) : (
               campaigns.map((camp) => (
                 <tr key={camp.id} className="hover:bg-slate-50 transition-colors">
@@ -149,9 +151,9 @@ export default function CampaignsPage() {
                   <td className="px-6 py-4 text-sm text-slate-600">{formatDate(camp.endDate)}</td>
                   <td className="px-6 py-4">
                     {camp.isActive ? (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">有効</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">{t('active')}</span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">無効</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">{t('inactive')}</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right space-x-2">
@@ -175,25 +177,25 @@ export default function CampaignsPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg animate-fade-in-up">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl">
-              <h3 className="font-bold text-slate-800">{currentId ? 'キャンペーンを編集' : '新規キャンペーン作成'}</h3>
+              <h3 className="font-bold text-slate-800">{currentId ? t('modal_title_edit') : t('modal_title_create')}</h3>
               <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-bold text-slate-600">キャンペーン名 <span className="text-rose-500">*</span></label>
-                <input name="name" value={formData.name} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-lg mt-1" placeholder="例: 春のチラシ割引キャンペーン" />
+                <label className="text-xs font-bold text-slate-600">{t('label_name')} <span className="text-rose-500">*</span></label>
+                <input name="name" value={formData.name} onChange={handleInputChange} required className="w-full px-3 py-2 border rounded-lg mt-1" placeholder={t('placeholder_name')} />
               </div>
               <div>
-                <label className="text-xs font-bold text-slate-600">説明</label>
-                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border rounded-lg mt-1" placeholder="キャンペーンの詳細説明" />
+                <label className="text-xs font-bold text-slate-600">{t('label_description')}</label>
+                <textarea name="description" value={formData.description} onChange={handleInputChange} rows={3} className="w-full px-3 py-2 border rounded-lg mt-1" placeholder={t('placeholder_description')} />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-slate-600">開始日</label>
+                  <label className="text-xs font-bold text-slate-600">{t('label_start_date')}</label>
                   <input type="date" name="startDate" value={formData.startDate} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg mt-1" />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-slate-600">終了日</label>
+                  <label className="text-xs font-bold text-slate-600">{t('label_end_date')}</label>
                   <input type="date" name="endDate" value={formData.endDate} onChange={handleInputChange} className="w-full px-3 py-2 border rounded-lg mt-1" />
                 </div>
               </div>
@@ -206,12 +208,12 @@ export default function CampaignsPage() {
                   onChange={handleInputChange}
                   className="w-4 h-4 rounded border-slate-300 text-indigo-600"
                 />
-                <label htmlFor="isActive" className="text-sm font-bold text-slate-600">有効</label>
+                <label htmlFor="isActive" className="text-sm font-bold text-slate-600">{t('label_active')}</label>
               </div>
               <div className="pt-4 flex justify-end gap-3">
-                <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-bold text-sm">キャンセル</button>
+                <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-5 py-2.5 text-slate-600 font-bold text-sm">{t('cancel')}</button>
                 <button type="submit" className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-sm shadow-md">
-                  {currentId ? '更新する' : '作成する'}
+                  {currentId ? t('btn_update') : t('btn_create_submit')}
                 </button>
               </div>
             </form>
@@ -226,11 +228,11 @@ export default function CampaignsPage() {
             <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
             </div>
-            <h3 className="font-bold text-slate-800 text-lg mb-2">キャンペーンを無効化しますか？</h3>
-            <p className="text-slate-500 text-sm mb-6">キャンペーンのステータスが「無効」に変更されます。</p>
+            <h3 className="font-bold text-slate-800 text-lg mb-2">{t('delete_title')}</h3>
+            <p className="text-slate-500 text-sm mb-6">{t('delete_message')}</p>
             <div className="flex justify-center gap-3">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm">キャンセル</button>
-              <button onClick={executeDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-sm shadow-md">無効化</button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm">{t('cancel')}</button>
+              <button onClick={executeDelete} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-sm shadow-md">{t('btn_deactivate')}</button>
             </div>
           </div>
         </div>

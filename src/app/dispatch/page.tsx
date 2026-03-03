@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 const getTodayStr = () => {
   const today = new Date();
@@ -39,6 +40,7 @@ const getStickyStyle = (left: number, isHeader: boolean): React.CSSProperties =>
 });
 
 export default function DispatchPage() {
+  const { t } = useTranslation('dispatch');
   const { showToast, showConfirm } = useNotification();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [unassignedItems, setUnassignedItems] = useState<any[]>([]);
@@ -108,13 +110,13 @@ export default function DispatchPage() {
     const data = JSON.parse(dataStr);
 
     if (data.areaId !== targetAreaId) {
-      showToast('エラー: 配布先エリアが異なるため、このスケジュールには組み込めません。', 'error');
+      showToast(t('error_different_area'), 'error');
       return;
     }
 
     const targetSchedule = enrichedSchedules.find(s => s.id === targetScheduleId);
     if (targetSchedule && isFlyerDuplicate(targetSchedule, data)) {
-      showToast('エラー: このスケジュールには、すでに同じチラシが組み込まれています。', 'error');
+      showToast(t('error_duplicate_flyer'), 'error');
       return;
     }
 
@@ -132,7 +134,7 @@ export default function DispatchPage() {
         });
         if (res.ok) fetchData();
       }
-    } catch (err) { showToast('処理に失敗しました', 'error'); }
+    } catch (err) { showToast(t('error_process_failed'), 'error'); }
   };
 
   const handleCreateScheduleFromUnassigned = async (odaId: number, endDateStr: string | null) => {
@@ -144,13 +146,13 @@ export default function DispatchPage() {
       });
       if (res.ok) {
         if (targetDate < dateFrom || targetDate > dateTo) {
-          showToast(`チラシの完了期限日（${targetDate}）に合わせてスケジュールを作成しました。表示期間を自動調整します。`, 'success');
+          showToast(t('toast_schedule_created', { date: targetDate }), 'success');
           setDateFrom(targetDate); setDateTo(targetDate);
         } else {
           fetchData();
         }
       }
-    } catch (e) { showToast('スケジュールの作成に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_create_schedule_failed'), 'error'); }
   };
 
   const updateScheduleProp = async (scheduleId: number, field: string, value: string) => {
@@ -162,7 +164,7 @@ export default function DispatchPage() {
       if (res.ok) {
         setSchedules(prev => prev.map(s => s.id === scheduleId ? { ...s, [field]: value } : s));
       }
-    } catch (e) { showToast('更新に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_update_failed'), 'error'); }
   };
 
   const updateItemPlannedCount = async (itemId: number, newCount: string) => {
@@ -172,29 +174,29 @@ export default function DispatchPage() {
         body: JSON.stringify({ itemId, plannedCount: newCount })
       });
       if (res.ok) fetchData();
-    } catch (e) { showToast('枚数の更新に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_count_update_failed'), 'error'); }
   };
 
   const handleAdjustCount = async (itemId: number, currentCount: number, excess: number) => {
     const newCount = Math.max(0, currentCount - excess);
-    if (!await showConfirm(`配布予定枚数を ${excess.toLocaleString()} 枚オーバーしています。この枠の枚数を ${currentCount.toLocaleString()}枚 から 【${newCount.toLocaleString()}枚】 に自動調整しますか？`, { variant: 'warning', confirmLabel: '調整する' })) return;
+    if (!await showConfirm(t('confirm_adjust_count', { excess: excess.toLocaleString(), current: currentCount.toLocaleString(), new: newCount.toLocaleString() }), { variant: 'warning', confirmLabel: t('confirm_adjust_btn') })) return;
     await updateItemPlannedCount(itemId, newCount.toString());
   };
 
   const removeFlyerFromSchedule = async (itemId: number) => {
-    if (!await showConfirm('このチラシをスケジュールから外して、未手配に戻しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_remove_from_schedule'), { variant: 'danger', confirmLabel: t('confirm_remove_btn') })) return;
     try {
       const res = await fetch(`/api/schedules/items?id=${itemId}`, { method: 'DELETE' });
       if (res.ok) fetchData();
-    } catch (e) { showToast('削除に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_delete_failed'), 'error'); }
   };
 
   const deleteSchedule = async (scheduleId: number) => {
-    if (!await showConfirm('このスケジュール枠自体を削除しますか？(※組み込まれているチラシはすべて未手配に戻ります)', { variant: 'danger', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_delete_schedule'), { variant: 'danger', confirmLabel: t('confirm_remove_btn') })) return;
     try {
       const res = await fetch(`/api/schedules/${scheduleId}`, { method: 'DELETE' });
       if (res.ok) fetchData();
-    } catch (e) { showToast('削除に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_delete_failed'), 'error'); }
   };
 
   const executeMoveFromModal = async () => {
@@ -202,7 +204,7 @@ export default function DispatchPage() {
 
     const targetSchedule = enrichedSchedules.find(s => s.id === parseInt(targetMoveScheduleId));
     if (targetSchedule && isFlyerDuplicate(targetSchedule, { type: 'SCHEDULED', itemId: movingItem.id, flyerId: movingItem.flyerId, flyerCode: movingItem.flyerCode, flyerName: movingItem.flyerName })) {
-      showToast('エラー: このスケジュールには、すでに同じチラシが組み込まれています。', 'error');
+      showToast(t('error_duplicate_flyer'), 'error');
       return;
     }
 
@@ -214,7 +216,7 @@ export default function DispatchPage() {
       if (res.ok) {
         setMovingItem(null); setTargetMoveScheduleId(''); fetchData();
       }
-    } catch (e) { showToast('移動に失敗しました', 'error'); }
+    } catch (e) { showToast(t('error_move_failed'), 'error'); }
   };
 
   const handleMoveToNewSchedule = async () => {
@@ -236,7 +238,7 @@ export default function DispatchPage() {
       setMovingItem(null);
       fetchData();
     } catch (e) {
-      showToast('新規スケジュールの作成＆移動に失敗しました', 'error');
+      showToast(t('error_create_move_failed'), 'error');
     }
   };
 
@@ -268,16 +270,16 @@ export default function DispatchPage() {
         if (isDanger) scheduleHasAlert = true;
 
         let alertReasons = [];
-        if (isOverCount) alertReasons.push("予定枚数超過");
-        if (isBeforeStart) alertReasons.push("開始日前");
-        if (isOverSpareDate) alertReasons.push("予備期限超過");
-        if (isWarning) alertReasons.push("配布期限超過");
+        if (isOverCount) alertReasons.push(t('alert_count_over_full'));
+        if (isBeforeStart) alertReasons.push(t('alert_before_start'));
+        if (isOverSpareDate) alertReasons.push(t('alert_spare_over_full'));
+        if (isWarning) alertReasons.push(t('alert_deadline_over_full'));
 
         let shortAlert = null;
-        if (isOverCount) shortAlert = { text: "枚数超過", color: "bg-rose-100 text-rose-700 border-rose-300" };
-        else if (isOverSpareDate) shortAlert = { text: "予備超過", color: "bg-rose-100 text-rose-700 border-rose-300" };
-        else if (isBeforeStart) shortAlert = { text: "開始日前", color: "bg-rose-100 text-rose-700 border-rose-300" };
-        else if (isOverEndDate) shortAlert = { text: "期限超過", color: "bg-amber-100 text-amber-700 border-amber-300" };
+        if (isOverCount) shortAlert = { text: t('alert_count_over'), color: "bg-rose-100 text-rose-700 border-rose-300" };
+        else if (isOverSpareDate) shortAlert = { text: t('alert_spare_over'), color: "bg-rose-100 text-rose-700 border-rose-300" };
+        else if (isBeforeStart) shortAlert = { text: t('alert_before_start'), color: "bg-rose-100 text-rose-700 border-rose-300" };
+        else if (isOverEndDate) shortAlert = { text: t('alert_deadline_over'), color: "bg-amber-100 text-amber-700 border-amber-300" };
 
         return { ...item, isOverCount, isDanger, isWarning, hasAlert: isDanger, alertReasons, shortAlert };
       });
@@ -349,42 +351,42 @@ export default function DispatchPage() {
       <div className="flex-none bg-white p-4 rounded-xl shadow-sm border border-slate-200">
         <div className="flex items-center gap-6 mb-4">
           <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-            <i className="bi bi-diagram-3-fill text-indigo-600"></i>ディスパッチ (スケジュール編成)
+            <i className="bi bi-diagram-3-fill text-indigo-600"></i>{t('page_title')}
           </h1>
           <button 
             onClick={() => setShowOnlyAlerts(!showOnlyAlerts)}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-full font-bold text-sm transition-colors border ${showOnlyAlerts ? 'bg-rose-100 text-rose-700 border-rose-200 shadow-md' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'}`}
           >
             <i className={`bi ${alertCount > 0 ? 'bi-exclamation-triangle-fill text-rose-500' : 'bi-check-circle-fill text-emerald-500'}`}></i>
-            アラート対象: {alertCount}件
-            <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 ml-1">{showOnlyAlerts ? '解除' : '絞り込む'}</span>
+            {t('alert_target', { count: alertCount })}
+            <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded text-slate-600 ml-1">{showOnlyAlerts ? t('alert_release') : t('alert_filter')}</span>
           </button>
         </div>
         
         <div className="flex flex-wrap gap-4 items-end">
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (FROM)</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('period_from')}</label>
             {/* ★ 変更: handleDateFromChange を設定 */}
             <input type="date" value={dateFrom} onChange={handleDateFromChange} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">期間 (TO)</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('period_to')}</label>
             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">ステータス</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('filter_status')}</label>
             <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-              <option value="ALL">すべて</option>
-              <option value="UNSTARTED">未開始 (未完了)</option>
-              <option value="IN_PROGRESS">配布中</option>
-              <option value="COMPLETED">完了</option>
+              <option value="ALL">{t('filter_status_all')}</option>
+              <option value="UNSTARTED">{t('filter_status_unstarted')}</option>
+              <option value="IN_PROGRESS">{t('filter_status_in_progress')}</option>
+              <option value="COMPLETED">{t('filter_status_completed')}</option>
             </select>
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">検索 (チラシ, 人, エリア)</label>
+            <label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase tracking-wider">{t('search_label')}</label>
             <div className="relative">
               <i className="bi bi-search absolute left-3 top-2 text-slate-400 text-sm"></i>
-              <input type="text" placeholder="キーワード..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
+              <input type="text" placeholder={t('search_placeholder')} value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
             </div>
           </div>
         </div>
@@ -397,13 +399,13 @@ export default function DispatchPage() {
           {/* 左側: 未手配リスト */}
           <div className="w-[280px] shrink-0 flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full overflow-hidden z-10">
             <div className="flex-none p-3 bg-slate-800 text-white flex justify-between items-center rounded-t-xl">
-              <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> 未手配の依頼</h3>
+              <h3 className="font-bold text-sm"><i className="bi bi-inbox-fill mr-1"></i> {t('unassigned_title')}</h3>
               <span className="bg-white/20 px-2 py-0.5 rounded text-xs font-bold">{filteredUnassignedItems.length}</span>
             </div>
             
             <div className="flex-1 overflow-y-auto p-3 space-y-3 custom-scrollbar bg-slate-50">
-              {isLoading ? <div className="text-center text-slate-400 text-sm py-10">読み込み中...</div> :
-               filteredUnassignedItems.length === 0 ? <div className="text-center text-slate-400 text-sm py-10">この期間の未手配依頼はありません。</div> :
+              {isLoading ? <div className="text-center text-slate-400 text-sm py-10">{t('loading')}</div> :
+               filteredUnassignedItems.length === 0 ? <div className="text-center text-slate-400 text-sm py-10">{t('unassigned_empty')}</div> :
                filteredUnassignedItems.map(oda => {
                  const od = oda.orderDistribution;
                  const stat = orderStats[`${od.orderId}_${od.flyerId}`];
@@ -416,7 +418,7 @@ export default function DispatchPage() {
                      className={`p-3 rounded-lg shadow-sm border cursor-move transition-all group relative ${stat?.isOver ? 'bg-rose-50 border-rose-300' : 'bg-white border-slate-200 hover:border-indigo-400'}`}
                    >
                      <div className="text-[10px] font-bold text-indigo-600 mb-1 flex justify-between">
-                       <span className="truncate pr-1">{od.order?.customer?.name || '顧客不明'}</span>
+                       <span className="truncate pr-1">{od.order?.customer?.name || t('unassigned_customer_unknown')}</span>
                        <span className="shrink-0 bg-indigo-100 px-1 rounded text-indigo-800">{od.flyer?.size?.name || ''}</span>
                      </div>
                      <div className="text-xs font-bold text-slate-800 mb-1 line-clamp-1" title={od.flyer?.name}>{od.flyer?.name}</div>
@@ -427,10 +429,10 @@ export default function DispatchPage() {
                          {od.startDate ? new Date(od.startDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'} 〜 <span className="font-bold text-rose-600">{od.endDate ? new Date(od.endDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'}</span>
                        </div>
                        <div className="flex justify-between text-slate-500">
-                         <span>全体依頼数:</span><span className="font-bold">{od.plannedCount?.toLocaleString()}枚</span>
+                         <span>{t('unassigned_total_requested')}</span><span className="font-bold">{od.plannedCount?.toLocaleString()}{t('unassigned_sheets')}</span>
                        </div>
                        <div className={`flex justify-between ${stat?.isOver ? 'text-rose-600 font-bold' : 'text-emerald-600'}`}>
-                         <span>手配済合計:</span><span>{stat?.totalAssigned?.toLocaleString() || 0}枚</span>
+                         <span>{t('unassigned_total_assigned')}</span><span>{stat?.totalAssigned?.toLocaleString() || 0}{t('unassigned_sheets')}</span>
                        </div>
                      </div>
                      
@@ -439,14 +441,14 @@ export default function DispatchPage() {
                        className="mt-2 w-full text-[10px] bg-indigo-50 text-indigo-600 py-1.5 rounded font-bold hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-200 shadow-sm flex items-center justify-center gap-1"
                        title="このチラシの完了期限日でスケジュールを作成します"
                      >
-                       <i className="bi bi-calendar-plus"></i> この期限日で枠を作成
+                       <i className="bi bi-calendar-plus"></i> {t('unassigned_create_btn')}
                      </button>
                    </div>
                  )
                })}
             </div>
             <div className="flex-none p-2 text-center text-[10px] text-slate-500 bg-slate-100 border-t border-slate-200 rounded-b-xl">
-              右の枠へドラッグ＆ドロップで配置
+              {t('unassigned_drag_hint')}
             </div>
           </div>
 
@@ -462,14 +464,14 @@ export default function DispatchPage() {
               <table className="text-left text-[11px] whitespace-nowrap border-separate border-spacing-0 w-max min-w-full">
                 <thead>
                   <tr>
-                    <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(0, true)} onClick={() => handleSort('date')}>日付 {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th className={`min-w-[160px] w-[160px] ${thBaseClass}`} style={getStickyStyle(100, true)} onClick={() => handleSort('areaCode')}>エリア {sortConfig.key === 'areaCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(260, true)} onClick={() => handleSort('branch')}>支店 {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
-                    <th className={`min-w-[120px] w-[120px] ${thBaseClass}`} style={getStickyStyle(360, true)}>配布員</th>
-                    <th className={`min-w-[90px] w-[90px] ${thBaseClass} border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={getStickyStyle(480, true)}>状態</th>
+                    <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(0, true)} onClick={() => handleSort('date')}>{t('table_date')} {sortConfig.key === 'date' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th className={`min-w-[160px] w-[160px] ${thBaseClass}`} style={getStickyStyle(100, true)} onClick={() => handleSort('areaCode')}>{t('table_area')} {sortConfig.key === 'areaCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th className={`min-w-[100px] w-[100px] ${thBaseClass}`} style={getStickyStyle(260, true)} onClick={() => handleSort('branch')}>{t('table_branch')} {sortConfig.key === 'branch' && (sortConfig.direction === 'asc' ? '▲' : '▼')}</th>
+                    <th className={`min-w-[120px] w-[120px] ${thBaseClass}`} style={getStickyStyle(360, true)}>{t('table_distributor')}</th>
+                    <th className={`min-w-[90px] w-[90px] ${thBaseClass} border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={getStickyStyle(480, true)}>{t('table_status')}</th>
                     
                     {[1, 2, 3, 4, 5, 6].map(num => (
-                      <th key={num} className={`sticky top-0 z-40 min-w-[180px] text-center bg-indigo-50/50 ${thBaseClass}`}>チラシ {num}</th>
+                      <th key={num} className={`sticky top-0 z-40 min-w-[180px] text-center bg-indigo-50/50 ${thBaseClass}`}>{t('table_flyer_n', { n: num })}</th>
                     ))}
                     <th className={`sticky top-0 z-40 w-[40px] text-center bg-slate-50 ${thBaseClass}`}><i className="bi bi-trash"></i></th>
                   </tr>
@@ -494,19 +496,19 @@ export default function DispatchPage() {
                       </td>
                       <td className={`min-w-[100px] w-[100px] ${tdBaseClass}`} style={getStickyStyle(260, false)}>
                         <select value={schedule.branchId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'branchId', e.target.value)} className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-full text-[10px] truncate cursor-pointer">
-                          <option value="">未設定</option>
+                          <option value="">{t('unset')}</option>
                           {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
                         </select>
                       </td>
                       <td className={`min-w-[120px] w-[120px] ${tdBaseClass}`} style={getStickyStyle(360, false)}>
                         <select value={schedule.distributorId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'distributorId', e.target.value)} className="border border-slate-200 bg-slate-50 rounded p-1 w-full text-[10px] focus:ring-2 focus:ring-indigo-500 truncate cursor-pointer">
-                          <option value="">未割当</option>
+                          <option value="">{t('unassigned_distributor')}</option>
                           {distributors.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                         </select>
                       </td>
                       <td className={`min-w-[90px] w-[90px] ${tdBaseClass} border-r-2 border-r-slate-200 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]`} style={getStickyStyle(480, false)}>
                         <select value={schedule.status} onChange={(e) => updateScheduleProp(schedule.id, 'status', e.target.value)} className="border-0 bg-transparent font-bold p-1 rounded w-full text-[10px] cursor-pointer">
-                          <option value="UNSTARTED">未開始</option><option value="IN_PROGRESS">配布中</option><option value="COMPLETED">完了</option>
+                          <option value="UNSTARTED">{t('status_unstarted')}</option><option value="IN_PROGRESS">{t('status_in_progress')}</option><option value="COMPLETED">{t('status_completed')}</option>
                         </select>
                       </td>
 
@@ -552,7 +554,7 @@ export default function DispatchPage() {
                                     
                                     <div className="flex justify-between items-center font-mono mt-1">
                                       <span className="truncate">
-                                        期限: <span className={`font-bold ${item.isOverSpareDate ? 'text-rose-600' : item.isOverEndDate ? 'text-amber-600' : 'text-slate-600'}`}>
+                                        {t('flyer_deadline')} <span className={`font-bold ${item.isOverSpareDate ? 'text-rose-600' : item.isOverEndDate ? 'text-amber-600' : 'text-slate-600'}`}>
                                           {item.endDate ? new Date(item.endDate).toLocaleDateString('ja-JP', {month:'short', day:'numeric'}) : '-'}
                                         </span>
                                       </span>
@@ -569,7 +571,7 @@ export default function DispatchPage() {
                                 </div>
                                 
                                 <div className="mt-1 pt-1 border-t border-slate-100/50 flex items-center justify-between">
-                                  <span className="text-[9px] text-slate-500">予定枚数:</span>
+                                  <span className="text-[9px] text-slate-500">{t('flyer_planned_count')}</span>
                                   <div className="flex items-center">
                                     <input 
                                       type="number" 
@@ -578,7 +580,7 @@ export default function DispatchPage() {
                                       onBlur={fetchData} 
                                       className={`w-14 text-right border rounded px-1 py-0.5 focus:outline-none focus:ring-1 ${item.isOverCount ? 'border-rose-300 bg-white text-rose-600 font-bold' : 'border-slate-200 bg-slate-50 text-indigo-600 font-bold'}`}
                                     />
-                                    <span className="ml-0.5 text-[9px] text-slate-500">枚</span>
+                                    <span className="ml-0.5 text-[9px] text-slate-500">{t('unassigned_sheets')}</span>
                                   </div>
                                 </div>
 
@@ -587,13 +589,13 @@ export default function DispatchPage() {
                                     onClick={() => handleAdjustCount(item.id, item.plannedCount, excessCount)}
                                     className="mt-1 w-full text-[9px] bg-rose-100 text-rose-700 py-0.5 rounded hover:bg-rose-200 transition-colors font-bold flex items-center justify-center gap-1"
                                   >
-                                    <i className="bi bi-magic"></i>枚数を自動調整
+                                    <i className="bi bi-magic"></i>{t('flyer_auto_adjust')}
                                   </button>
                                 )}
                                 
                                 <div className="absolute top-0.5 right-0.5 opacity-0 group-hover/card:opacity-100 transition-opacity flex gap-0.5 bg-white/95 backdrop-blur rounded px-1 shadow border border-slate-200">
-                                  <button onClick={() => setMovingItem(item)} className="text-indigo-500 hover:text-indigo-700 p-0.5" title="移動"><i className="bi bi-arrow-left-right"></i></button>
-                                  <button onClick={() => removeFlyerFromSchedule(item.id)} className="text-rose-400 hover:text-rose-600 p-0.5" title="枠から外す"><i className="bi bi-x-circle-fill"></i></button>
+                                  <button onClick={() => setMovingItem(item)} className="text-indigo-500 hover:text-indigo-700 p-0.5" title={t('flyer_move_title')}><i className="bi bi-arrow-left-right"></i></button>
+                                  <button onClick={() => removeFlyerFromSchedule(item.id)} className="text-rose-400 hover:text-rose-600 p-0.5" title={t('flyer_remove_title')}><i className="bi bi-x-circle-fill"></i></button>
                                 </div>
                               </div>
                             ) : (
@@ -622,24 +624,24 @@ export default function DispatchPage() {
         <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
-              <h3 className="font-bold text-slate-800">チラシの移動</h3>
+              <h3 className="font-bold text-slate-800">{t('move_modal_title')}</h3>
               <button onClick={() => setMovingItem(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             <div className="p-6 space-y-4">
               <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-100">
-                <p className="text-xs text-indigo-800 font-bold mb-1">対象のチラシ:</p>
+                <p className="text-xs text-indigo-800 font-bold mb-1">{t('move_modal_target_flyer')}</p>
                 <p className="text-sm font-bold">{movingItem.flyerName}</p>
-                {movingItem.flyerCode && <p className="text-xs text-indigo-600 mt-1">コード: {movingItem.flyerCode}</p>}
+                {movingItem.flyerCode && <p className="text-xs text-indigo-600 mt-1">{t('move_modal_code', { code: movingItem.flyerCode })}</p>}
               </div>
               
               <div>
-                <label className="text-xs font-bold text-slate-600 block mb-2">移動先のスケジュールを選択 (同一エリアのみ表示)</label>
+                <label className="text-xs font-bold text-slate-600 block mb-2">{t('move_modal_select_label')}</label>
                 <select 
                   value={targetMoveScheduleId} 
                   onChange={(e) => setTargetMoveScheduleId(e.target.value)}
                   className="w-full border p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 mb-3 bg-white"
                 >
-                  <option value="">-- 既存のスケジュール枠へ移動 --</option>
+                  <option value="">{t('move_modal_select_placeholder')}</option>
                   {schedules
                     .filter(s => {
                       const movingAreaId = schedules.find(ms => ms.id === movingItem?.scheduleId)?.areaId;
@@ -647,25 +649,25 @@ export default function DispatchPage() {
                     })
                     .map(s => (
                     <option key={s.id} value={s.id}>
-                      {new Date(s.date).toLocaleDateString('ja-JP')} - {s.distributor?.name || '未割当'}
+                      {new Date(s.date).toLocaleDateString('ja-JP')} - {s.distributor?.name || t('unassigned_distributor')}
                     </option>
                   ))}
                 </select>
 
                 <div className="border-t border-slate-200 pt-3 mt-2">
-                  <p className="text-[10px] text-slate-500 mb-2">または、新しい枠（スケジュール）を作成して移動します</p>
+                  <p className="text-[10px] text-slate-500 mb-2">{t('move_modal_new_schedule_hint')}</p>
                   <button 
                     onClick={handleMoveToNewSchedule}
                     className="w-full py-2 border-2 border-indigo-200 text-indigo-600 font-bold rounded-lg hover:bg-indigo-50 transition-colors text-sm flex items-center justify-center gap-2"
                   >
-                    <i className="bi bi-plus-lg"></i> 新規スケジュール枠を作って移動
+                    <i className="bi bi-plus-lg"></i> {t('move_modal_create_and_move')}
                   </button>
                 </div>
               </div>
             </div>
             <div className="p-4 border-t flex justify-end gap-3 bg-slate-50 rounded-b-xl">
-              <button onClick={() => setMovingItem(null)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg">キャンセル</button>
-              <button onClick={executeMoveFromModal} disabled={!targetMoveScheduleId} className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg shadow">選択した枠へ移動</button>
+              <button onClick={() => setMovingItem(null)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg">{t('cancel')}</button>
+              <button onClick={executeMoveFromModal} disabled={!targetMoveScheduleId} className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 rounded-lg shadow">{t('move_modal_execute')}</button>
             </div>
           </div>
         </div>

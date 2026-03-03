@@ -3,26 +3,28 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 import SkeletonRow from '@/components/ui/SkeletonRow';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 
-const STATUS_MAP: Record<string, { label: string, color: string, icon: string }> = {
-  DRAFT: { label: '下書き', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200', icon: 'bi-pencil' },
-  PLANNING: { label: '提案中', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200', icon: 'bi-chat-dots' },
-  PENDING_PAYMENT: { label: '入金確認待ち', color: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 hover:shadow', icon: 'bi-coin' },
-  PENDING_REVIEW: { label: '審査待ち', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 hover:shadow', icon: 'bi-hourglass-split' },
-  ADJUSTING: { label: '要調整・修正', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200', icon: 'bi-exclamation-triangle-fill' },
-  CONFIRMED: { label: '手配中(確定)', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200', icon: 'bi-check-circle-fill' },
-  IN_PROGRESS: { label: '作業・配布中', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200', icon: 'bi-truck' },
-  COMPLETED: { label: '完了', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200', icon: 'bi-flag-fill' },
-  CANCELED: { label: 'キャンセル', color: 'bg-slate-200 text-slate-500 hover:bg-slate-300', icon: 'bi-x-circle-fill' },
+const STATUS_MAP: Record<string, { labelKey: string, color: string, icon: string }> = {
+  DRAFT: { labelKey: 'status_draft', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200', icon: 'bi-pencil' },
+  PLANNING: { labelKey: 'status_planning', color: 'bg-slate-100 text-slate-500 hover:bg-slate-200', icon: 'bi-chat-dots' },
+  PENDING_PAYMENT: { labelKey: 'status_pending_payment', color: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 hover:shadow', icon: 'bi-coin' },
+  PENDING_REVIEW: { labelKey: 'status_pending_review', color: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 hover:shadow', icon: 'bi-hourglass-split' },
+  ADJUSTING: { labelKey: 'status_adjusting', color: 'bg-rose-100 text-rose-700 hover:bg-rose-200', icon: 'bi-exclamation-triangle-fill' },
+  CONFIRMED: { labelKey: 'status_confirmed', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200', icon: 'bi-check-circle-fill' },
+  IN_PROGRESS: { labelKey: 'status_in_progress', color: 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200', icon: 'bi-truck' },
+  COMPLETED: { labelKey: 'status_completed', color: 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200', icon: 'bi-flag-fill' },
+  CANCELED: { labelKey: 'status_canceled', color: 'bg-slate-200 text-slate-500 hover:bg-slate-300', icon: 'bi-x-circle-fill' },
 };
 
 const LIMIT = 20;
 
 export default function OrdersListPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('orders');
   const [orders, setOrders] = useState<any[]>([]);
   const [salesReps, setSalesReps] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -133,11 +135,11 @@ export default function OrdersListPage() {
 
   const del = async (e: React.MouseEvent, id: number) => {
     e.preventDefault();
-    if (!await showConfirm('この受注データを削除しますか？', { variant: 'danger', confirmLabel: '削除する', title: '受注データの削除' })) return;
+    if (!await showConfirm(t('delete_confirm'), { variant: 'danger', confirmLabel: t('delete'), title: t('delete_confirm_title') })) return;
     try {
       const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
       if (res.ok) fetchOrders(buildQuery());
-    } catch { showToast('削除に失敗しました', 'error'); }
+    } catch { showToast(t('delete_failed'), 'error'); }
   };
 
   // ★ ステータス更新APIを呼び出す共通関数
@@ -154,16 +156,16 @@ export default function OrdersListPage() {
         setShowRejectInput(false);
         fetchOrders(buildQuery());
       } else {
-        showToast('ステータス更新に失敗しました', 'error');
+        showToast(t('status_update_failed'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('communication_error'), 'error');
     }
   };
 
   // ★ 入金確認アクション
   const handlePaymentConfirm = async (order: any) => {
-    const ok = await showConfirm(`受注番号 ${order.orderNo} (${order.customer?.name}) の入金を確認し、審査待ちへ進めますか？`, { variant: 'primary', confirmLabel: '確認・進める' });
+    const ok = await showConfirm(t('payment_confirm', { orderNo: order.orderNo, customerName: order.customer?.name }), { variant: 'primary', confirmLabel: t('payment_confirm_label') });
     if (ok) {
       updateOrderStatus(order.id, 'PENDING_REVIEW', 'PAYMENT_CONFIRMED');
     }
@@ -181,21 +183,21 @@ export default function OrdersListPage() {
         setReviewOrderData(await res.json());
       }
     } catch {
-      showToast('詳細データの取得に失敗しました', 'error');
+      showToast(t('review_detail_failed'), 'error');
       setReviewModalOpen(false);
     }
     setIsReviewLoading(false);
   };
 
   const handleApprove = async () => {
-    const ok = await showConfirm('この発注を承認し、受注確定(手配中)としますか？', { variant: 'primary', confirmLabel: '承認する' });
+    const ok = await showConfirm(t('approve_confirm'), { variant: 'primary', confirmLabel: t('approve_confirm_label') });
     if (ok) updateOrderStatus(reviewOrderData.id, 'CONFIRMED', 'APPROVE');
   };
 
   const handleReject = async () => {
     if (!showRejectInput) { setShowRejectInput(true); return; }
-    if (!rejectComment.trim()) { showToast('不承認の理由を入力してください', 'warning'); return; }
-    const ok = await showConfirm('この発注を不承認として差し戻しますか？', { variant: 'danger', confirmLabel: '不承認にする' });
+    if (!rejectComment.trim()) { showToast(t('reject_reason_required'), 'warning'); return; }
+    const ok = await showConfirm(t('reject_confirm'), { variant: 'danger', confirmLabel: t('reject_confirm_label') });
     if (ok) updateOrderStatus(reviewOrderData.id, 'ADJUSTING', 'REJECT', rejectComment);
   };
 
@@ -203,7 +205,7 @@ export default function OrdersListPage() {
     <div className="space-y-6">
       <div className="flex justify-end gap-2 mb-4">
         <Link href="/orders/new" className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
-          <i className="bi bi-plus-lg"></i> 新規受注の登録
+          <i className="bi bi-plus-lg"></i> {t('btn_new_order')}
         </Link>
       </div>
 
@@ -216,10 +218,10 @@ export default function OrdersListPage() {
                 <i className="bi bi-coin"></i>
               </div>
               <div>
-                <p className="text-xs text-orange-600 font-bold uppercase tracking-wider">要確認アクション</p>
+                <p className="text-xs text-orange-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
                 <p className="text-sm font-bold text-slate-800">
                   <span className="text-2xl font-black text-orange-600 mr-1">{pendingPaymentCount}</span>
-                  件の <span className="underline decoration-orange-300 decoration-2">入金待ち</span> があります
+                  <span dangerouslySetInnerHTML={{ __html: t('alert_pending_payment') }} />
                 </p>
               </div>
             </div>
@@ -230,10 +232,10 @@ export default function OrdersListPage() {
                 <i className="bi bi-ui-checks"></i>
               </div>
               <div>
-                <p className="text-xs text-yellow-600 font-bold uppercase tracking-wider">要確認アクション</p>
+                <p className="text-xs text-yellow-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
                 <p className="text-sm font-bold text-slate-800">
                   <span className="text-2xl font-black text-yellow-600 mr-1">{pendingReviewCount}</span>
-                  件の <span className="underline decoration-yellow-300 decoration-2">審査待ち</span> があります
+                  <span dangerouslySetInnerHTML={{ __html: t('alert_pending_review') }} />
                 </p>
               </div>
             </div>
@@ -243,12 +245,12 @@ export default function OrdersListPage() {
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[250px]">
-          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
             <input
               type="text"
-              placeholder="受注番号、案件名、顧客名など..."
+              placeholder={t('filter_keyword_placeholder')}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -257,39 +259,39 @@ export default function OrdersListPage() {
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">受注経路</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_source')}</label>
           <select
             value={filterSource}
             onChange={(e) => handleFilterChange({ filterSource: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="ALL">すべて</option>
-            <option value="WEB_EC">EC経由 (WEB)</option>
-            <option value="SALES_INTERNAL">営業経由 (社内)</option>
+            <option value="ALL">{t('filter_all')}</option>
+            <option value="WEB_EC">{t('filter_source_web')}</option>
+            <option value="SALES_INTERNAL">{t('filter_source_sales')}</option>
           </select>
         </div>
 
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
           <select
             value={filterStatus}
             onChange={(e) => handleFilterChange({ filterStatus: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="ALL">すべて</option>
+            <option value="ALL">{t('filter_all')}</option>
             {Object.entries(STATUS_MAP).map(([key, val]) => (
-              <option key={key} value={key}>{val.label}</option>
+              <option key={key} value={key}>{t(val.labelKey)}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">担当営業</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_sales_rep')}</label>
           <select
             value={filterSalesRep}
             onChange={(e) => handleFilterChange({ filterSalesRep: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[140px] bg-white cursor-pointer"
           >
-            <option value="ALL">すべて</option>
+            <option value="ALL">{t('filter_all')}</option>
             {salesReps.map(rep => (
               <option key={rep.id} value={String(rep.id)}>{rep.lastNameJa} {rep.firstNameJa}</option>
             ))}
@@ -303,23 +305,23 @@ export default function OrdersListPage() {
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
               <th className="px-3 py-3 whitespace-nowrap cursor-pointer select-none hover:bg-slate-100" onClick={() => handleSort('orderDate')}>
-                受注番号 / 受注日 <SortIcon col="orderDate" />
+                {t('th_order_no')} <SortIcon col="orderDate" />
               </th>
-              <th className="px-3 py-3">顧客名 / 案件名</th>
-              <th className="px-3 py-3 whitespace-nowrap">担当営業</th>
-              <th className="px-3 py-3 whitespace-nowrap">依頼内訳</th>
+              <th className="px-3 py-3">{t('th_customer')}</th>
+              <th className="px-3 py-3 whitespace-nowrap">{t('th_sales_rep')}</th>
+              <th className="px-3 py-3 whitespace-nowrap">{t('th_breakdown')}</th>
               <th className="px-3 py-3 text-right whitespace-nowrap cursor-pointer select-none hover:bg-slate-100" onClick={() => handleSort('totalAmount')}>
-                受注総額 <SortIcon col="totalAmount" />
+                {t('th_total_amount')} <SortIcon col="totalAmount" />
               </th>
-              <th className="px-3 py-3 text-center whitespace-nowrap">ステータス</th>
-              <th className="px-3 py-3 text-right w-px whitespace-nowrap">操作</th>
+              <th className="px-3 py-3 text-center whitespace-nowrap">{t('th_status')}</th>
+              <th className="px-3 py-3 text-right w-px whitespace-nowrap">{t('th_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <SkeletonRow rows={8} cols={7} />
             ) : orders.length === 0 ? (
-              <EmptyState icon="bi-briefcase" title="該当する受注データがありません" description="検索条件を変更するか、新規受注を登録してください" />
+              <EmptyState icon="bi-briefcase" title={t('empty_title')} description={t('empty_description')} />
             ) : (
               sortedOrders.map(o => {
                 const status = STATUS_MAP[o.status] || STATUS_MAP['PLANNING'];
@@ -335,9 +337,9 @@ export default function OrdersListPage() {
                       <div className="flex items-center gap-1.5">
                         <Link href={`/orders/${o.id}`} className="font-mono font-bold text-xs text-indigo-600 hover:underline">{o.orderNo}</Link>
                         {o.orderSource === 'WEB_EC' ? (
-                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200" title="ECサイト経由の発注">EC経由</span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-fuchsia-100 text-fuchsia-700 border border-fuchsia-200" title={t('badge_ec_tooltip')}>{t('badge_ec')}</span>
                         ) : (
-                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title="社内システムでの発注">営業経由</span>
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title={t('badge_sales_tooltip')}>{t('badge_sales')}</span>
                         )}
                       </div>
                       <div className="text-[11px] text-slate-400 mt-0.5">{new Date(o.orderDate).toLocaleDateString()}</div>
@@ -348,14 +350,14 @@ export default function OrdersListPage() {
                       {o.title && <div className="text-[11px] text-slate-500 mt-0.5 truncate" title={o.title}>{o.title}</div>}
                     </td>
 
-                    <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">{o.salesRep ? `${o.salesRep.lastNameJa} ${o.salesRep.firstNameJa}` : '未定'}</td>
+                    <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">{o.salesRep ? `${o.salesRep.lastNameJa} ${o.salesRep.firstNameJa}` : t('sales_rep_unassigned')}</td>
 
                     <td className="px-3 py-3">
                       <div className="flex gap-1">
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDist ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="ポスティング">ポス</span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasPrint ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="印刷手配">印刷</span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasNews ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="新聞折込">折込</span>
-                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDesign ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title="デザイン">デザ</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDist ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title={t('badge_posting_tooltip')}>{t('badge_posting')}</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasPrint ? 'bg-teal-50 text-teal-700 border-teal-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title={t('badge_print_tooltip')}>{t('badge_print')}</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasNews ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title={t('badge_insert_tooltip')}>{t('badge_insert')}</span>
+                        <span className={`px-1.5 py-0.5 text-[9px] font-bold rounded border ${hasDesign ? 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200' : 'bg-slate-50 text-slate-300 border-slate-100'}`} title={t('badge_design_tooltip')}>{t('badge_design')}</span>
                       </div>
                     </td>
 
@@ -368,13 +370,13 @@ export default function OrdersListPage() {
                         <button
                           onClick={() => o.status === 'PENDING_PAYMENT' ? handlePaymentConfirm(o) : openReviewModal(o.id)}
                           className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all whitespace-nowrap ${status.color}`}
-                          title="クリックして処理を進める"
+                          title={t('click_to_process')}
                         >
-                          <i className={`bi ${status.icon}`}></i> {status.label} <i className="bi bi-chevron-right opacity-50"></i>
+                          <i className={`bi ${status.icon}`}></i> {t(status.labelKey)} <i className="bi bi-chevron-right opacity-50"></i>
                         </button>
                       ) : (
                         <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${status.color}`}>
-                          <i className={`bi ${status.icon}`}></i> {status.label}
+                          <i className={`bi ${status.icon}`}></i> {t(status.labelKey)}
                         </span>
                       )}
                     </td>
@@ -399,21 +401,21 @@ export default function OrdersListPage() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden max-h-[90vh]">
             <div className="bg-yellow-50 p-5 border-b border-yellow-200 flex justify-between items-center">
               <h3 className="font-bold text-yellow-800 text-lg flex items-center gap-2">
-                <i className="bi bi-ui-checks"></i> 発注の審査・承認
+                <i className="bi bi-ui-checks"></i> {t('review_modal_title')}
               </h3>
               <button onClick={() => setReviewModalOpen(false)} className="text-yellow-600 hover:text-yellow-800"><i className="bi bi-x-lg text-xl"></i></button>
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar bg-slate-50 flex-1">
               {isReviewLoading || !reviewOrderData ? (
-                <div className="text-center py-20 text-slate-500 font-bold"><div className="w-8 h-8 border-4 border-yellow-200 border-t-yellow-500 rounded-full animate-spin mx-auto mb-3"></div>データを読み込んでいます...</div>
+                <div className="text-center py-20 text-slate-500 font-bold"><div className="w-8 h-8 border-4 border-yellow-200 border-t-yellow-500 rounded-full animate-spin mx-auto mb-3"></div>{t('review_loading')}</div>
               ) : (
                 <div className="space-y-6">
                   <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="col-span-2">
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Customer / Title</div>
                       <div className="font-bold text-slate-800">{reviewOrderData.customer?.name}</div>
-                      <div className="text-sm text-slate-600">{reviewOrderData.title || '案件名未設定'}</div>
+                      <div className="text-sm text-slate-600">{reviewOrderData.title || t('review_title_unset')}</div>
                     </div>
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Order No. / Date</div>
@@ -423,12 +425,12 @@ export default function OrdersListPage() {
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Total Amount</div>
                       <div className="font-black text-xl text-indigo-600">¥{reviewOrderData.totalAmount?.toLocaleString() || '-'}</div>
-                      <div className="text-[10px] text-slate-400">税込</div>
+                      <div className="text-[10px] text-slate-400">{t('review_tax_included')}</div>
                     </div>
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 font-bold text-sm text-slate-700">依頼内容</div>
+                    <div className="bg-slate-100 px-4 py-2 border-b border-slate-200 font-bold text-sm text-slate-700">{t('review_content_title')}</div>
                     <div className="p-4 space-y-4">
                       {reviewOrderData.distributions?.map((dist: any, idx: number) => {
                         const isPrinting = reviewOrderData.printings?.some((p: any) => p.flyerId === dist.flyerId);
@@ -440,10 +442,10 @@ export default function OrdersListPage() {
                             <div className="flex-1">
                               <h4 className="font-bold text-slate-800 text-sm mb-1">{dist.flyer?.name}</h4>
                               <div className="text-xs text-slate-600 space-y-1">
-                                <div><span className="text-slate-400">プラン:</span> {isPrinting ? '印刷＋ポスティング' : 'ポスティングのみ'} ({dist.method})</div>
-                                <div><span className="text-slate-400">予定枚数:</span> <span className="font-bold">{dist.plannedCount?.toLocaleString()}</span> 枚</div>
-                                <div><span className="text-slate-400">配布エリア:</span> {dist.areas?.length || 0} ヶ所</div>
-                                <div><span className="text-slate-400">配布期間:</span> {dist.startDate ? new Date(dist.startDate).toLocaleDateString() : '未定'} 〜 <span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString() : '未定'}</span></div>
+                                <div><span className="text-slate-400">{t('review_plan_label')}</span> {isPrinting ? t('review_plan_print_posting') : t('review_plan_posting_only')} ({dist.method})</div>
+                                <div><span className="text-slate-400">{t('review_planned_count')}</span> <span className="font-bold">{dist.plannedCount?.toLocaleString()}</span> {t('review_count_unit')}</div>
+                                <div><span className="text-slate-400">{t('review_area_count')}</span> {dist.areas?.length || 0} {t('review_area_unit')}</div>
+                                <div><span className="text-slate-400">{t('review_period')}</span> {dist.startDate ? new Date(dist.startDate).toLocaleDateString() : t('review_unset')} ~ <span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString() : t('review_unset')}</span></div>
                               </div>
                             </div>
                           </div>
@@ -455,15 +457,15 @@ export default function OrdersListPage() {
                   {reviewOrderData.payments?.[0] && (
                     <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
                       <div className="text-sm">
-                        <span className="text-slate-400 mr-2">支払方法:</span>
-                        <span className="font-bold">{reviewOrderData.payments[0].method === 'CREDIT_CARD' ? 'クレジットカード' : '銀行振込・請求書'}</span>
+                        <span className="text-slate-400 mr-2">{t('review_payment_method')}</span>
+                        <span className="font-bold">{reviewOrderData.payments[0].method === 'CREDIT_CARD' ? t('review_payment_credit') : t('review_payment_bank')}</span>
                       </div>
                       <div className="text-sm">
-                        <span className="text-slate-400 mr-2">入金状況:</span>
+                        <span className="text-slate-400 mr-2">{t('review_payment_status')}</span>
                         {reviewOrderData.payments[0].status === 'COMPLETED' ? (
-                          <span className="font-bold text-emerald-600"><i className="bi bi-check-circle-fill mr-1"></i>入金済 (決済完了)</span>
+                          <span className="font-bold text-emerald-600"><i className="bi bi-check-circle-fill mr-1"></i>{t('review_payment_completed')}</span>
                         ) : (
-                          <span className="font-bold text-rose-500"><i className="bi bi-exclamation-circle-fill mr-1"></i>未入金</span>
+                          <span className="font-bold text-rose-500"><i className="bi bi-exclamation-circle-fill mr-1"></i>{t('review_payment_pending')}</span>
                         )}
                       </div>
                     </div>
@@ -471,14 +473,14 @@ export default function OrdersListPage() {
 
                   {showRejectInput && (
                     <div className="bg-rose-50 p-5 rounded-xl border border-rose-200 animate-in fade-in slide-in-from-top-2">
-                      <label className="block text-sm font-bold text-rose-700 mb-2">不承認・差し戻しの理由（必須）</label>
+                      <label className="block text-sm font-bold text-rose-700 mb-2">{t('reject_reason_label')}</label>
                       <textarea
                         value={rejectComment}
                         onChange={(e) => setRejectComment(e.target.value)}
                         className="w-full h-24 border border-rose-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-rose-500 outline-none"
-                        placeholder="例: 配布エリアの容量が不足しているため、部数の調整をお願いいたします。"
+                        placeholder={t('reject_reason_placeholder')}
                       ></textarea>
-                      <p className="text-[10px] text-rose-500 mt-1">※この理由はクライアントにも通知・表示されます。</p>
+                      <p className="text-[10px] text-rose-500 mt-1">{t('reject_reason_note')}</p>
                     </div>
                   )}
                 </div>
@@ -487,9 +489,9 @@ export default function OrdersListPage() {
 
             <div className="bg-white border-t border-slate-200 p-5 flex justify-between items-center shrink-0">
               {showRejectInput ? (
-                <button onClick={() => setShowRejectInput(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors">キャンセル</button>
+                <button onClick={() => setShowRejectInput(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors">{t('cancel')}</button>
               ) : (
-                <button onClick={() => setReviewModalOpen(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors">閉じる</button>
+                <button onClick={() => setReviewModalOpen(false)} className="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-100 rounded-lg transition-colors">{t('btn_close')}</button>
               )}
               <div className="flex gap-3">
                 <button
@@ -497,7 +499,7 @@ export default function OrdersListPage() {
                   disabled={isReviewLoading}
                   className="px-6 py-2.5 border-2 border-rose-200 text-rose-600 hover:bg-rose-50 font-bold rounded-xl transition-all disabled:opacity-50"
                 >
-                  <i className="bi bi-arrow-return-left mr-2"></i>不承認にする
+                  <i className="bi bi-arrow-return-left mr-2"></i>{t('btn_reject')}
                 </button>
                 {!showRejectInput && (
                   <button
@@ -505,7 +507,7 @@ export default function OrdersListPage() {
                     disabled={isReviewLoading}
                     className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all disabled:opacity-50"
                   >
-                    <i className="bi bi-check-circle-fill mr-2"></i>承認して手配へ進む
+                    <i className="bi bi-check-circle-fill mr-2"></i>{t('btn_approve')}
                   </button>
                 )}
               </div>

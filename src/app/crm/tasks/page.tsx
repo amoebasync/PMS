@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 import {
   AssigneeMultiSelect,
   AutocompleteInput,
@@ -70,39 +71,41 @@ type TaskTemplate = {
   updatedAt: string;
 };
 
-// ===== 定数 =====
-const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
-  HIGH:   { label: '高', cls: 'bg-red-100 text-red-700 border border-red-200' },
-  MEDIUM: { label: '中', cls: 'bg-yellow-100 text-yellow-700 border border-yellow-200' },
-  LOW:    { label: '低', cls: 'bg-green-100 text-green-700 border border-green-200' },
+// ===== 定数（スタイル情報のみ、ラベルはt()で解決） =====
+const PRIORITY_STYLE: Record<string, { labelKey: string; cls: string }> = {
+  HIGH:   { labelKey: 'priority_high', cls: 'bg-red-100 text-red-700 border border-red-200' },
+  MEDIUM: { labelKey: 'priority_medium', cls: 'bg-yellow-100 text-yellow-700 border border-yellow-200' },
+  LOW:    { labelKey: 'priority_low', cls: 'bg-green-100 text-green-700 border border-green-200' },
 };
 
-const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  PENDING:     { label: '未着手', cls: 'bg-slate-100 text-slate-600' },
-  IN_PROGRESS: { label: '進行中', cls: 'bg-blue-100 text-blue-700' },
-  DONE:        { label: '完了',   cls: 'bg-green-100 text-green-700' },
+const STATUS_STYLE: Record<string, { labelKey: string; cls: string }> = {
+  PENDING:     { labelKey: 'status_pending', cls: 'bg-slate-100 text-slate-600' },
+  IN_PROGRESS: { labelKey: 'status_in_progress', cls: 'bg-blue-100 text-blue-700' },
+  DONE:        { labelKey: 'status_done',   cls: 'bg-green-100 text-green-700' },
 };
 
-const RECURRENCE_LABELS: Record<string, string> = {
-  ONCE: '一回のみ', DAILY: '毎日', WEEKLY: '毎週', MONTHLY: '毎月', YEARLY: '毎年',
+const RECURRENCE_KEYS: Record<string, string> = {
+  ONCE: 'recurrence_once', DAILY: 'recurrence_daily', WEEKLY: 'recurrence_weekly', MONTHLY: 'recurrence_monthly', YEARLY: 'recurrence_yearly',
 };
 
-const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+const DAY_LABEL_KEYS = ['day_sun', 'day_mon', 'day_tue', 'day_wed', 'day_thu', 'day_fri', 'day_sat'];
 
 // ===== ヘルパー =====
-function formatRecurrence(type: string, value: string | null): string {
-  const base = RECURRENCE_LABELS[type] || type;
+function formatRecurrence(type: string, value: string | null, t: (key: string) => string): string {
+  const key = RECURRENCE_KEYS[type];
+  const base = key ? t(key) : type;
   if (!value) return base;
   switch (type) {
     case 'WEEKLY': {
       const days = value.split(',').map(s => parseInt(s.trim()));
-      return `${base}（${days.map(d => DAY_LABELS[d] || d).join('・')}）`;
+      const dayLabels = DAY_LABEL_KEYS.map(k => t(k));
+      return `${base}（${days.map(d => dayLabels[d] || d).join('・')}）`;
     }
     case 'MONTHLY':
-      return `${base} ${value.trim()}日`;
+      return `${base} ${value.trim()}${t('day_suffix')}`;
     case 'YEARLY': {
       const [m, d] = value.split('-');
-      return `${base} ${parseInt(m)}月${parseInt(d)}日`;
+      return `${base} ${parseInt(m)}${t('month_suffix')}${parseInt(d)}${t('day_suffix')}`;
     }
     default:
       return base;
@@ -128,7 +131,22 @@ function countAssignees(tmpl: TaskTemplate): number {
 // ===== メインページ =====
 export default function CrmTasksPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('tasks');
   const [activeTab, setActiveTab] = useState<'tasks' | 'templates'>('tasks');
+
+  const PRIORITY_CONFIG = useMemo<Record<string, { label: string; cls: string }>>(() => ({
+    HIGH:   { label: t('priority_high'), cls: PRIORITY_STYLE.HIGH.cls },
+    MEDIUM: { label: t('priority_medium'), cls: PRIORITY_STYLE.MEDIUM.cls },
+    LOW:    { label: t('priority_low'), cls: PRIORITY_STYLE.LOW.cls },
+  }), [t]);
+
+  const STATUS_CONFIG = useMemo<Record<string, { label: string; cls: string }>>(() => ({
+    PENDING:     { label: t('status_pending'), cls: STATUS_STYLE.PENDING.cls },
+    IN_PROGRESS: { label: t('status_in_progress'), cls: STATUS_STYLE.IN_PROGRESS.cls },
+    DONE:        { label: t('status_done'), cls: STATUS_STYLE.DONE.cls },
+  }), [t]);
+
+  const DAY_LABELS = useMemo(() => DAY_LABEL_KEYS.map(k => t(k)), [t]);
 
   // 共通マスタ
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -332,9 +350,9 @@ export default function CrmTasksPage() {
     if (res.ok) {
       setIsTaskModalOpen(false);
       fetchTasks();
-      showToast(editingTask ? 'タスクを更新しました' : 'タスクを作成しました', 'success');
+      showToast(editingTask ? t('toast_task_updated') : t('toast_task_created'), 'success');
     } else {
-      showToast('保存に失敗しました', 'error');
+      showToast(t('save_error'), 'error');
     }
     setIsSubmittingTask(false);
   };
@@ -348,11 +366,11 @@ export default function CrmTasksPage() {
   };
 
   const handleDeleteTask = async (taskId: number) => {
-    if (!await showConfirm('このタスクを削除しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_delete_task'), { variant: 'danger', confirmLabel: t('delete') })) return;
     const res = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
     if (res.ok) {
       setTasks(prev => prev.filter(t => t.id !== taskId));
-      showToast('タスクを削除しました', 'success');
+      showToast(t('toast_task_deleted'), 'success');
     }
   };
 
@@ -361,13 +379,13 @@ export default function CrmTasksPage() {
     const result: SelectedAssignee[] = [];
     ((tmpl.targetEmployeeIds as number[]) || []).forEach(eid => {
       const emp = employees.find(e => e.id === eid);
-      result.push({ type: 'employee', id: eid, label: emp ? `${emp.lastNameJa} ${emp.firstNameJa}` : `社員#${eid}` });
+      result.push({ type: 'employee', id: eid, label: emp ? `${emp.lastNameJa} ${emp.firstNameJa}` : `${t('employee')}#${eid}` });
     });
     ((tmpl.targetDepartmentIds as number[]) || []).forEach(did => {
-      result.push({ type: 'department', id: did, label: deptMap[did] || `部署#${did}` });
+      result.push({ type: 'department', id: did, label: deptMap[did] || `${t('department')}#${did}` });
     });
     ((tmpl.targetBranchIds as number[]) || []).forEach(bid => {
-      result.push({ type: 'branch', id: bid, label: branchMap[bid] || `支店#${bid}` });
+      result.push({ type: 'branch', id: bid, label: branchMap[bid] || `${t('branch')}#${bid}` });
     });
     return result;
   };
@@ -467,19 +485,19 @@ export default function CrmTasksPage() {
     if (res.ok) {
       setIsTmplModalOpen(false);
       fetchTemplates();
-      showToast(editingTmpl ? 'テンプレートを更新しました' : 'テンプレートを作成しました', 'success');
+      showToast(editingTmpl ? t('toast_template_updated') : t('toast_template_created'), 'success');
     } else {
-      showToast('保存に失敗しました', 'error');
+      showToast(t('save_error'), 'error');
     }
     setIsSubmittingTmpl(false);
   };
 
   const handleDeleteTmpl = async (tmplId: number) => {
-    if (!await showConfirm('このテンプレートを削除しますか？', { variant: 'danger', confirmLabel: '削除する' })) return;
+    if (!await showConfirm(t('confirm_delete_template'), { variant: 'danger', confirmLabel: t('delete') })) return;
     const res = await fetch(`/api/task-templates/${tmplId}`, { method: 'DELETE' });
     if (res.ok) {
       setTemplates(prev => prev.filter(t => t.id !== tmplId));
-      showToast('テンプレートを削除しました', 'success');
+      showToast(t('toast_template_deleted'), 'success');
     }
   };
 
@@ -491,7 +509,7 @@ export default function CrmTasksPage() {
     });
     if (res.ok) {
       setTemplates(prev => prev.map(t => t.id === tmpl.id ? { ...t, isActive: !t.isActive } : t));
-      showToast(`テンプレートを${tmpl.isActive ? '無効' : '有効'}にしました`, 'success');
+      showToast(tmpl.isActive ? t('toast_template_toggled_off') : t('toast_template_toggled_on'), 'success');
     }
   };
 
@@ -533,7 +551,7 @@ export default function CrmTasksPage() {
         if (a.branch) items.push(a.branch.nameJa);
       });
       if (items.length <= 2) return items.join(', ');
-      return `${items[0]} 他${items.length - 1}名`;
+      return `${items[0]} +${items.length - 1}`;
     }
     if (task.assignee) return `${task.assignee.lastNameJa} ${task.assignee.firstNameJa}`;
     return '—';
@@ -554,7 +572,7 @@ export default function CrmTasksPage() {
             }`}
           >
             <i className="bi bi-list-check"></i>
-            タスク一覧
+            {t('tab_tasks')}
             {activeTab === 'tasks' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
             )}
@@ -566,7 +584,7 @@ export default function CrmTasksPage() {
             }`}
           >
             <i className="bi bi-arrow-repeat"></i>
-            定期タスク設定
+            {t('tab_templates')}
             {activeTab === 'templates' && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
             )}
@@ -579,7 +597,7 @@ export default function CrmTasksPage() {
               <button onClick={openTmplCreate}
                 className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors">
                 <i className="bi bi-plus-lg text-indigo-500"></i>
-                テンプレート作成
+                {t('btn_create_template')}
               </button>
             )}
           </div>
@@ -599,8 +617,8 @@ export default function CrmTasksPage() {
                   className="flex items-center gap-3 bg-red-50 border-2 border-red-200 rounded-xl px-5 py-3 hover:bg-red-100 transition-all text-left">
                   <i className="bi bi-exclamation-triangle-fill text-red-500 text-2xl"></i>
                   <div>
-                    <p className="text-xs font-bold text-red-500 uppercase tracking-wide">期限超過</p>
-                    <p className="text-2xl font-extrabold text-red-600 leading-none">{overdueCount}<span className="text-sm font-bold ml-1">件</span></p>
+                    <p className="text-xs font-bold text-red-500 uppercase tracking-wide">{t('overdue')}</p>
+                    <p className="text-2xl font-extrabold text-red-600 leading-none">{overdueCount}<span className="text-sm font-bold ml-1">{t('overdue_count')}</span></p>
                   </div>
                 </button>
               )}
@@ -609,8 +627,8 @@ export default function CrmTasksPage() {
                   className="flex items-center gap-3 bg-orange-50 border-2 border-orange-200 rounded-xl px-5 py-3 hover:bg-orange-100 transition-all text-left">
                   <i className="bi bi-clock-fill text-orange-500 text-2xl"></i>
                   <div>
-                    <p className="text-xs font-bold text-orange-500 uppercase tracking-wide">本日期限</p>
-                    <p className="text-2xl font-extrabold text-orange-600 leading-none">{todayCount}<span className="text-sm font-bold ml-1">件</span></p>
+                    <p className="text-xs font-bold text-orange-500 uppercase tracking-wide">{t('due_today')}</p>
+                    <p className="text-2xl font-extrabold text-orange-600 leading-none">{todayCount}<span className="text-sm font-bold ml-1">{t('today_count')}</span></p>
                   </div>
                 </button>
               )}
@@ -619,68 +637,68 @@ export default function CrmTasksPage() {
           {!isLoadingTasks && overdueCount === 0 && todayCount === 0 && tasks.length > 0 && (
             <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-5 py-3 text-green-600">
               <i className="bi bi-check-circle-fill text-lg"></i>
-              <span className="text-sm font-bold">期限超過・本日期限のタスクはありません</span>
+              <span className="text-sm font-bold">{t('no_overdue')}</span>
             </div>
           )}
 
           {/* 検索・フィルタ */}
           <div className="bg-slate-50 p-4 rounded-xl flex flex-wrap gap-3 items-end">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
               <div className="relative">
                 <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
                 <input type="text" value={filterKeyword} onChange={e => setFilterKeyword(e.target.value)}
-                  placeholder="タスク名・顧客・担当者..."
+                  placeholder={t('filter_keyword_placeholder')}
                   className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">カテゴリ</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_category')}</label>
               <select value={filterCategoryId} onChange={e => setFilterCategoryId(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[110px] bg-white cursor-pointer">
-                <option value="">すべて</option>
+                <option value="">{t('filter_all')}</option>
                 {taskCategories.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[110px] bg-white cursor-pointer">
-                <option value="">すべて</option>
-                <option value="PENDING">未着手</option>
-                <option value="IN_PROGRESS">進行中</option>
-                <option value="DONE">完了</option>
+                <option value="">{t('filter_all')}</option>
+                <option value="PENDING">{t('status_pending')}</option>
+                <option value="IN_PROGRESS">{t('status_in_progress')}</option>
+                <option value="DONE">{t('status_done')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">優先度</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_priority')}</label>
               <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[100px] bg-white cursor-pointer">
-                <option value="">すべて</option>
-                <option value="HIGH">高</option>
-                <option value="MEDIUM">中</option>
-                <option value="LOW">低</option>
+                <option value="">{t('filter_all')}</option>
+                <option value="HIGH">{t('priority_high')}</option>
+                <option value="MEDIUM">{t('priority_medium')}</option>
+                <option value="LOW">{t('priority_low')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">担当者</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_assignee')}</label>
               <select value={filterAssignee} onChange={e => setFilterAssignee(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer">
-                <option value="">すべて</option>
+                <option value="">{t('filter_all')}</option>
                 {employees.map(emp => (
                   <option key={emp.id} value={emp.id}>{emp.lastNameJa} {emp.firstNameJa}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">期限</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_due')}</label>
               <select value={filterDue} onChange={e => setFilterDue(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer">
-                <option value="">すべて</option>
-                <option value="today">本日期限</option>
-                <option value="overdue">期限超過</option>
+                <option value="">{t('filter_all')}</option>
+                <option value="today">{t('filter_due_today')}</option>
+                <option value="overdue">{t('filter_due_overdue')}</option>
               </select>
             </div>
             {/* マイタスク */}
@@ -691,13 +709,13 @@ export default function CrmTasksPage() {
               }`}
             >
               <i className={`bi ${filterMyTasks ? 'bi-person-check-fill' : 'bi-person'}`}></i>
-              マイタスク
+              {t('my_tasks')}
             </button>
             {hasFilter && (
               <button
                 onClick={() => { setFilterStatus(''); setFilterPriority(''); setFilterAssignee(''); setFilterDue(''); setFilterKeyword(''); setFilterCategoryId(''); setFilterMyTasks(false); }}
                 className="text-slate-500 hover:text-slate-700 text-sm flex items-center gap-1 pb-0.5">
-                <i className="bi bi-x-circle"></i> リセット
+                <i className="bi bi-x-circle"></i> {t('btn_reset')}
               </button>
             )}
           </div>
@@ -711,20 +729,20 @@ export default function CrmTasksPage() {
             ) : displayTasks.length === 0 ? (
               <div className="text-center py-16 text-slate-400">
                 <i className="bi bi-check2-all text-4xl mb-3 block"></i>
-                <p className="text-sm">タスクがありません</p>
+                <p className="text-sm">{t('empty_tasks')}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-12">優先度</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">タスク</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">種類</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">関連先</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">担当者</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">期限</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">状態</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-12">{t('col_priority')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_task')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_type')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_related')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_assignee')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">{t('col_due_date')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_status')}</th>
                       <th className="px-4 py-3 w-24"></th>
                     </tr>
                   </thead>
@@ -791,14 +809,14 @@ export default function CrmTasksPage() {
                             {isOverdue ? (
                               <div>
                                 <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-red-200">
-                                  <i className="bi bi-exclamation-triangle-fill"></i> 超過
+                                  <i className="bi bi-exclamation-triangle-fill"></i> {t('overdue_badge')}
                                 </span>
                                 <p className="text-xs text-red-600 font-bold mt-0.5">{formatDueDate(task.dueDate)}</p>
                               </div>
                             ) : isDueToday ? (
                               <div>
                                 <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-orange-200">
-                                  <i className="bi bi-clock-fill"></i> 本日
+                                  <i className="bi bi-clock-fill"></i> {t('today_badge')}
                                 </span>
                                 <p className="text-xs text-orange-600 font-bold mt-0.5">{formatDueDate(task.dueDate)}</p>
                               </div>
@@ -812,14 +830,14 @@ export default function CrmTasksPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                               {task.status !== 'DONE' && (
-                                <button onClick={() => handleQuickDone(task.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors" title="完了にする">
+                                <button onClick={() => handleQuickDone(task.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors" title={t('btn_mark_done')}>
                                   <i className="bi bi-check-lg text-base"></i>
                                 </button>
                               )}
-                              <button onClick={() => openTaskEdit(task)} className="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title="編集">
+                              <button onClick={() => openTaskEdit(task)} className="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title={t('edit')}>
                                 <i className="bi bi-pencil text-base"></i>
                               </button>
-                              <button onClick={() => handleDeleteTask(task.id)} className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition-colors" title="削除">
+                              <button onClick={() => handleDeleteTask(task.id)} className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition-colors" title={t('delete')}>
                                 <i className="bi bi-trash text-base"></i>
                               </button>
                             </div>
@@ -845,9 +863,9 @@ export default function CrmTasksPage() {
           ) : templates.length === 0 ? (
             <div className="text-center py-16 text-slate-400">
               <i className="bi bi-arrow-repeat text-4xl mb-3 block"></i>
-              <p className="text-sm">定期タスクテンプレートがありません</p>
+              <p className="text-sm">{t('empty_templates')}</p>
               <button onClick={openTmplCreate} className="mt-3 text-indigo-600 text-sm font-bold hover:underline">
-                <i className="bi bi-plus-lg mr-1"></i>テンプレートを作成
+                <i className="bi bi-plus-lg mr-1"></i>{t('btn_create_template_link')}
               </button>
             </div>
           ) : (
@@ -855,14 +873,14 @@ export default function CrmTasksPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-100 bg-slate-50">
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">タイトル</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">種類</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">サイクル</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">優先度</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">担当者</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">完了条件</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">有効</th>
-                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">最終生成</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_title')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_type')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_cycle')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_priority')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_assignee')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_completion_rule')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_active')}</th>
+                    <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_last_generated')}</th>
                     <th className="px-4 py-3 w-24"></th>
                   </tr>
                 </thead>
@@ -885,7 +903,7 @@ export default function CrmTasksPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600">
-                          {formatRecurrence(tmpl.recurrenceType, tmpl.recurrenceValue)}
+                          {formatRecurrence(tmpl.recurrenceType, tmpl.recurrenceValue, t)}
                         </td>
                         <td className="px-4 py-3">
                           <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${pcfg.cls}`}>{pcfg.label}</span>
@@ -896,7 +914,7 @@ export default function CrmTasksPage() {
                           ) : '—'}
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-600">
-                          {tmpl.completionRule === 'SHARED' ? '共有' : '個別'}
+                          {tmpl.completionRule === 'SHARED' ? t('completion_shared') : t('completion_individual')}
                         </td>
                         <td className="px-4 py-3">
                           <button onClick={() => handleToggleActive(tmpl)}
@@ -905,14 +923,14 @@ export default function CrmTasksPage() {
                           </button>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400">
-                          {tmpl.lastGeneratedAt ? new Date(tmpl.lastGeneratedAt).toLocaleDateString('ja-JP') : '未実行'}
+                          {tmpl.lastGeneratedAt ? new Date(tmpl.lastGeneratedAt).toLocaleDateString('ja-JP') : t('not_executed')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => openTmplEdit(tmpl)} className="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title="編集">
+                            <button onClick={() => openTmplEdit(tmpl)} className="text-slate-500 hover:bg-slate-100 p-1.5 rounded-lg transition-colors" title={t('edit')}>
                               <i className="bi bi-pencil text-base"></i>
                             </button>
-                            <button onClick={() => handleDeleteTmpl(tmpl.id)} className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition-colors" title="削除">
+                            <button onClick={() => handleDeleteTmpl(tmpl.id)} className="text-red-400 hover:bg-red-50 p-1.5 rounded-lg transition-colors" title={t('delete')}>
                               <i className="bi bi-trash text-base"></i>
                             </button>
                           </div>
@@ -936,7 +954,7 @@ export default function CrmTasksPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTaskModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-              <h2 className="font-bold text-slate-800 text-lg">タスクを編集</h2>
+              <h2 className="font-bold text-slate-800 text-lg">{t('modal_edit_task')}</h2>
               <button onClick={() => setIsTaskModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <i className="bi bi-x-lg text-xl"></i>
               </button>
@@ -944,26 +962,26 @@ export default function CrmTasksPage() {
             <form onSubmit={handleTaskSubmit} className="p-6 space-y-4">
               {/* タイトル */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">タイトル <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_title')} <span className="text-red-500">*</span></label>
                 <input type="text" value={taskForm.title} onChange={e => setTaskForm(f => ({ ...f, title: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
               </div>
               {/* 詳細 */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">詳細</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_detail')}</label>
                 <textarea value={taskForm.description} onChange={e => setTaskForm(f => ({ ...f, description: e.target.value }))}
                   rows={3} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
               {/* カテゴリ */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">タスク種類</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_task_type')}</label>
                 <div className="flex flex-wrap gap-2">
                   <button type="button"
                     onClick={() => setTaskForm(f => ({ ...f, categoryId: '', customerId: '', distributorId: '', branchId: '' }))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
                       !taskForm.categoryId ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
                     }`}>
-                    指定なし
+                    {t('label_no_type')}
                   </button>
                   {taskCategories.map(cat => (
                     <button key={cat.id} type="button"
@@ -982,7 +1000,7 @@ export default function CrmTasksPage() {
               {/* 期限・優先度 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">期限 <span className="text-red-500">*</span></label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_due_date')} <span className="text-red-500">*</span></label>
                   <input type="date" value={taskForm.dueDate} onChange={e => setTaskForm(f => ({ ...f, dueDate: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
                   <div className="mt-2 flex items-center gap-3">
@@ -990,7 +1008,7 @@ export default function CrmTasksPage() {
                       <input type="checkbox" checked={taskForm.isAllDay}
                         onChange={e => setTaskForm(f => ({ ...f, isAllDay: e.target.checked, dueTime: e.target.checked ? '' : f.dueTime }))}
                         className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
-                      <span className="text-xs text-slate-600">終日</span>
+                      <span className="text-xs text-slate-600">{t('label_all_day')}</span>
                     </label>
                     {!taskForm.isAllDay && (
                       <input type="time" value={taskForm.dueTime}
@@ -1000,19 +1018,19 @@ export default function CrmTasksPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">優先度</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_priority')}</label>
                   <select value={taskForm.priority} onChange={e => setTaskForm(f => ({ ...f, priority: e.target.value }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="HIGH">高</option><option value="MEDIUM">中</option><option value="LOW">低</option>
+                    <option value="HIGH">{t('priority_high')}</option><option value="MEDIUM">{t('priority_medium')}</option><option value="LOW">{t('priority_low')}</option>
                   </select>
                 </div>
               </div>
               {/* ステータス */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">ステータス</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_status')}</label>
                 <select value={taskForm.status} onChange={e => setTaskForm(f => ({ ...f, status: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="PENDING">未着手</option><option value="IN_PROGRESS">進行中</option><option value="DONE">完了</option>
+                  <option value="PENDING">{t('status_pending')}</option><option value="IN_PROGRESS">{t('status_in_progress')}</option><option value="DONE">{t('status_done')}</option>
                 </select>
               </div>
               {/* 関連先（カテゴリに応じて変化）*/}
@@ -1021,11 +1039,11 @@ export default function CrmTasksPage() {
                 return (
                   <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-3">
                     <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                      <i className="bi bi-link-45deg"></i> 関連先
+                      <i className="bi bi-link-45deg"></i> {t('label_related')}
                     </p>
                     {catCode === 'SALES' && (
                       <AutocompleteInput
-                        value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                        value={taskForm.customerId} label={t('label_customer')} placeholder={t('customer_placeholder')}
                         fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
                         onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id })); setFormCustomerName(name); }}
                         onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
@@ -1034,7 +1052,7 @@ export default function CrmTasksPage() {
                     )}
                     {catCode === 'FIELD' && (
                       <AutocompleteInput
-                        value={taskForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                        value={taskForm.distributorId} label={t('label_distributor')} placeholder={t('distributor_placeholder')}
                         fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
                         onSelect={(id, name) => { setTaskForm(f => ({ ...f, distributorId: id })); setFormDistributorName(name); }}
                         onClear={() => { setTaskForm(f => ({ ...f, distributorId: '' })); setFormDistributorName(''); }}
@@ -1044,17 +1062,17 @@ export default function CrmTasksPage() {
                     {!catCode && (
                       <>
                         <AutocompleteInput
-                          value={taskForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                          value={taskForm.customerId} label={t('label_customer')} placeholder={t('customer_placeholder')}
                           fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
                           onSelect={(id, name) => { setTaskForm(f => ({ ...f, customerId: id, distributorId: '' })); setFormCustomerName(name); setFormDistributorName(''); }}
                           onClear={() => { setTaskForm(f => ({ ...f, customerId: '' })); setFormCustomerName(''); }}
                           displayText={formCustomerName}
                         />
                         <div className="flex items-center gap-2 text-xs text-slate-400">
-                          <div className="flex-1 border-t border-slate-200"></div><span>または</span><div className="flex-1 border-t border-slate-200"></div>
+                          <div className="flex-1 border-t border-slate-200"></div><span>{t('label_or')}</span><div className="flex-1 border-t border-slate-200"></div>
                         </div>
                         <AutocompleteInput
-                          value={taskForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                          value={taskForm.distributorId} label={t('label_distributor')} placeholder={t('distributor_placeholder')}
                           fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
                           onSelect={(id, name) => { setTaskForm(f => ({ ...f, distributorId: id, customerId: '' })); setFormDistributorName(name); setFormCustomerName(''); }}
                           onClear={() => { setTaskForm(f => ({ ...f, distributorId: '' })); setFormDistributorName(''); }}
@@ -1063,7 +1081,7 @@ export default function CrmTasksPage() {
                       </>
                     )}
                     {catCode === 'ADMIN' && (
-                      <p className="text-xs text-slate-400 italic">アドミンタスクには関連先がありません</p>
+                      <p className="text-xs text-slate-400 italic">{t('label_admin_no_related')}</p>
                     )}
                   </div>
                 );
@@ -1073,10 +1091,10 @@ export default function CrmTasksPage() {
               {/* ボタン */}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setIsTaskModalOpen(false)}
-                  className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">キャンセル</button>
+                  className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">{t('cancel')}</button>
                 <button type="submit" disabled={isSubmittingTask}
                   className="bg-indigo-600 text-white text-sm font-bold px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                  {isSubmittingTask ? '保存中...' : '更新'}
+                  {isSubmittingTask ? t('saving') : t('btn_update')}
                 </button>
               </div>
             </form>
@@ -1090,7 +1108,7 @@ export default function CrmTasksPage() {
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTmplModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
-              <h2 className="font-bold text-slate-800 text-lg">{editingTmpl ? 'テンプレートを編集' : '新規テンプレート'}</h2>
+              <h2 className="font-bold text-slate-800 text-lg">{editingTmpl ? t('modal_edit_template') : t('modal_create_template')}</h2>
               <button onClick={() => setIsTmplModalOpen(false)} className="text-slate-400 hover:text-slate-600">
                 <i className="bi bi-x-lg text-xl"></i>
               </button>
@@ -1098,7 +1116,7 @@ export default function CrmTasksPage() {
             <form onSubmit={handleTmplSubmit} className="p-6 space-y-4">
               {/* タスク種類 — 一番上にボタン表示 */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">タスク種類 <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_task_type')} <span className="text-red-500">*</span></label>
                 <div className="flex flex-wrap gap-2">
                   {taskCategories.map(cat => (
                     <button key={cat.id} type="button"
@@ -1116,22 +1134,22 @@ export default function CrmTasksPage() {
               </div>
               {/* タイトル */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">タイトル <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_title')} <span className="text-red-500">*</span></label>
                 <input type="text" value={tmplForm.title} onChange={e => setTmplForm(f => ({ ...f, title: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" required />
               </div>
               {/* 詳細 */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">説明</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_description')}</label>
                 <textarea value={tmplForm.description} onChange={e => setTmplForm(f => ({ ...f, description: e.target.value }))}
                   rows={2} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
               </div>
               {/* 優先度 */}
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">優先度</label>
+                <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_priority')}</label>
                 <select value={tmplForm.priority} onChange={e => setTmplForm(f => ({ ...f, priority: e.target.value }))}
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                  <option value="HIGH">高</option><option value="MEDIUM">中</option><option value="LOW">低</option>
+                  <option value="HIGH">{t('priority_high')}</option><option value="MEDIUM">{t('priority_medium')}</option><option value="LOW">{t('priority_low')}</option>
                 </select>
               </div>
               {/* 関連先（カテゴリ依存） */}
@@ -1141,7 +1159,7 @@ export default function CrmTasksPage() {
                   <>
                     {catCode === 'SALES' && (
                       <AutocompleteInput
-                        value={tmplForm.customerId} label="顧客" placeholder="顧客名を入力して検索..."
+                        value={tmplForm.customerId} label={t('label_customer')} placeholder={t('customer_placeholder')}
                         fetchUrl={q => `/api/customers?search=${encodeURIComponent(q)}`}
                         onSelect={(id, name) => { setTmplForm(f => ({ ...f, customerId: id })); setTmplCustomerName(name); }}
                         onClear={() => { setTmplForm(f => ({ ...f, customerId: '' })); setTmplCustomerName(''); }}
@@ -1150,7 +1168,7 @@ export default function CrmTasksPage() {
                     )}
                     {catCode === 'FIELD' && (
                       <AutocompleteInput
-                        value={tmplForm.distributorId} label="配布員" placeholder="配布員の名前・スタッフIDを入力..."
+                        value={tmplForm.distributorId} label={t('label_distributor')} placeholder={t('distributor_placeholder')}
                         fetchUrl={q => `/api/distributors?search=${encodeURIComponent(q)}`}
                         onSelect={(id, name) => { setTmplForm(f => ({ ...f, distributorId: id })); setTmplDistributorName(name); }}
                         onClear={() => { setTmplForm(f => ({ ...f, distributorId: '' })); setTmplDistributorName(''); }}
@@ -1164,23 +1182,23 @@ export default function CrmTasksPage() {
               {/* サイクル設定 */}
               <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-3">
                 <p className="text-xs font-bold text-slate-500 flex items-center gap-1">
-                  <i className="bi bi-arrow-repeat"></i> サイクル設定
+                  <i className="bi bi-arrow-repeat"></i> {t('cycle_settings')}
                 </p>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">繰り返しタイプ</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_recurrence_type')}</label>
                   <select value={tmplForm.recurrenceType} onChange={e => setTmplForm(f => ({ ...f, recurrenceType: e.target.value, weeklyDays: [], monthlyDay: '1', yearlyMonth: '01', yearlyDay: '01' }))}
                     className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <option value="ONCE">一回のみ</option>
-                    <option value="DAILY">毎日</option>
-                    <option value="WEEKLY">毎週</option>
-                    <option value="MONTHLY">毎月</option>
-                    <option value="YEARLY">毎年</option>
+                    <option value="ONCE">{t('recurrence_once')}</option>
+                    <option value="DAILY">{t('recurrence_daily')}</option>
+                    <option value="WEEKLY">{t('recurrence_weekly')}</option>
+                    <option value="MONTHLY">{t('recurrence_monthly')}</option>
+                    <option value="YEARLY">{t('recurrence_yearly')}</option>
                   </select>
                 </div>
                 {/* WEEKLY: 曜日チェックボックス */}
                 {tmplForm.recurrenceType === 'WEEKLY' && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-2">曜日を選択</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_select_days')}</label>
                     <div className="flex gap-1.5">
                       {DAY_LABELS.map((label, idx) => (
                         <button key={idx} type="button"
@@ -1206,11 +1224,11 @@ export default function CrmTasksPage() {
                 {/* MONTHLY: 日付選択 */}
                 {tmplForm.recurrenceType === 'MONTHLY' && (
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">毎月の実行日</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_monthly_day')}</label>
                     <select value={tmplForm.monthlyDay} onChange={e => setTmplForm(f => ({ ...f, monthlyDay: e.target.value }))}
                       className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                       {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                        <option key={d} value={d.toString()}>{d}日</option>
+                        <option key={d} value={d.toString()}>{d}{t('day_suffix')}</option>
                       ))}
                     </select>
                   </div>
@@ -1219,20 +1237,20 @@ export default function CrmTasksPage() {
                 {tmplForm.recurrenceType === 'YEARLY' && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">月</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_month')}</label>
                       <select value={tmplForm.yearlyMonth} onChange={e => setTmplForm(f => ({ ...f, yearlyMonth: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                          <option key={m} value={String(m).padStart(2, '0')}>{m}月</option>
+                          <option key={m} value={String(m).padStart(2, '0')}>{m}{t('month_suffix')}</option>
                         ))}
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">日</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_day')}</label>
                       <select value={tmplForm.yearlyDay} onChange={e => setTmplForm(f => ({ ...f, yearlyDay: e.target.value }))}
                         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                         {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                          <option key={d} value={String(d).padStart(2, '0')}>{d}日</option>
+                          <option key={d} value={String(d).padStart(2, '0')}>{d}{t('day_suffix')}</option>
                         ))}
                       </select>
                     </div>
@@ -1243,7 +1261,7 @@ export default function CrmTasksPage() {
               {/* 期限時刻設定 */}
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">
-                  <i className="bi bi-clock mr-1"></i>期限時刻
+                  <i className="bi bi-clock mr-1"></i>{t('label_due_time')}
                 </label>
                 <div className="flex items-center gap-3">
                   <input type="time" value={tmplForm.dueTime}
@@ -1252,10 +1270,10 @@ export default function CrmTasksPage() {
                   {tmplForm.dueTime && (
                     <button type="button" onClick={() => setTmplForm(f => ({ ...f, dueTime: '' }))}
                       className="text-xs text-slate-400 hover:text-slate-600">
-                      <i className="bi bi-x-circle mr-0.5"></i>クリア
+                      <i className="bi bi-x-circle mr-0.5"></i>{t('label_due_time_clear')}
                     </button>
                   )}
-                  <span className="text-xs text-slate-400">※未設定の場合は終日タスクとして生成</span>
+                  <span className="text-xs text-slate-400">{t('label_due_time_note')}</span>
                 </div>
               </div>
 
@@ -1266,7 +1284,7 @@ export default function CrmTasksPage() {
               {tmplAssignees.length >= 2 && (
                 <div className="border border-slate-100 rounded-xl p-4 bg-slate-50">
                   <p className="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1">
-                    <i className="bi bi-check2-square"></i> 完了条件
+                    <i className="bi bi-check2-square"></i> {t('label_completion_rule')}
                   </p>
                   <div className="flex gap-3">
                     <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
@@ -1278,8 +1296,8 @@ export default function CrmTasksPage() {
                         className="hidden" />
                       <i className={`bi bi-people-fill ${tmplForm.completionRule === 'SHARED' ? 'text-indigo-500' : 'text-slate-400'}`}></i>
                       <div>
-                        <p className="font-bold">共有タスク</p>
-                        <p className="text-[11px] opacity-70">1つのタスクを全員で共有</p>
+                        <p className="font-bold">{t('label_shared_task')}</p>
+                        <p className="text-[11px] opacity-70">{t('label_shared_desc')}</p>
                       </div>
                     </label>
                     <label className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border cursor-pointer transition-all text-sm ${
@@ -1291,8 +1309,8 @@ export default function CrmTasksPage() {
                         className="hidden" />
                       <i className={`bi bi-person-fill ${tmplForm.completionRule === 'INDIVIDUAL' ? 'text-indigo-500' : 'text-slate-400'}`}></i>
                       <div>
-                        <p className="font-bold">個別タスク</p>
-                        <p className="text-[11px] opacity-70">担当者ごとに独立タスク</p>
+                        <p className="font-bold">{t('label_individual_task')}</p>
+                        <p className="text-[11px] opacity-70">{t('label_individual_desc')}</p>
                       </div>
                     </label>
                   </div>
@@ -1301,7 +1319,7 @@ export default function CrmTasksPage() {
 
               {/* 有効/無効 */}
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-600">テンプレートを有効にする</span>
+                <span className="text-xs font-bold text-slate-600">{t('label_enable_template')}</span>
                 <button type="button" onClick={() => setTmplForm(f => ({ ...f, isActive: !f.isActive }))}
                   className={`w-12 h-6 rounded-full relative transition-colors ${tmplForm.isActive ? 'bg-green-500' : 'bg-slate-300'}`}>
                   <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${tmplForm.isActive ? 'left-6' : 'left-0.5'}`}></span>
@@ -1311,10 +1329,10 @@ export default function CrmTasksPage() {
               {/* ボタン */}
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setIsTmplModalOpen(false)}
-                  className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">キャンセル</button>
+                  className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">{t('cancel')}</button>
                 <button type="submit" disabled={isSubmittingTmpl}
                   className="bg-indigo-600 text-white text-sm font-bold px-5 py-2 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                  {isSubmittingTmpl ? '保存中...' : editingTmpl ? '更新' : '作成'}
+                  {isSubmittingTmpl ? t('saving') : editingTmpl ? t('btn_update') : t('btn_create')}
                 </button>
               </div>
             </form>

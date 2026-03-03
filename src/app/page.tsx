@@ -2,17 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useTranslation } from '@/i18n';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
 /* ------------------------------------------------------------------ */
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: string; bgColor: string; textColor: string; badgeBg: string; badgeText: string }> = {
-  UPDATE:      { label: 'アップデート', icon: 'bi-stars',                    bgColor: 'bg-indigo-50',  textColor: 'text-indigo-500',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-600' },
-  MAINTENANCE: { label: 'メンテナンス', icon: 'bi-tools',                     bgColor: 'bg-rose-50',    textColor: 'text-rose-500',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-600' },
-  IMPORTANT:   { label: '重要',         icon: 'bi-exclamation-triangle-fill', bgColor: 'bg-amber-50',   textColor: 'text-amber-500',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700' },
-  NOTICE:      { label: 'お知らせ',     icon: 'bi-bell-fill',                 bgColor: 'bg-emerald-50', textColor: 'text-emerald-500', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-600' },
-  OTHER:       { label: 'その他',       icon: 'bi-megaphone-fill',            bgColor: 'bg-slate-50',   textColor: 'text-slate-400',   badgeBg: 'bg-slate-100',  badgeText: 'text-slate-600' },
+const CATEGORY_STYLE: Record<string, { labelKey: string; icon: string; bgColor: string; textColor: string; badgeBg: string; badgeText: string }> = {
+  UPDATE:      { labelKey: 'category_update',      icon: 'bi-stars',                    bgColor: 'bg-indigo-50',  textColor: 'text-indigo-500',  badgeBg: 'bg-indigo-50',  badgeText: 'text-indigo-600' },
+  MAINTENANCE: { labelKey: 'category_maintenance',  icon: 'bi-tools',                     bgColor: 'bg-rose-50',    textColor: 'text-rose-500',    badgeBg: 'bg-rose-50',    badgeText: 'text-rose-600' },
+  IMPORTANT:   { labelKey: 'category_important',    icon: 'bi-exclamation-triangle-fill', bgColor: 'bg-amber-50',   textColor: 'text-amber-500',   badgeBg: 'bg-amber-50',   badgeText: 'text-amber-700' },
+  NOTICE:      { labelKey: 'category_notice',       icon: 'bi-bell-fill',                 bgColor: 'bg-emerald-50', textColor: 'text-emerald-500', badgeBg: 'bg-emerald-50', badgeText: 'text-emerald-600' },
+  OTHER:       { labelKey: 'category_other',        icon: 'bi-megaphone-fill',            bgColor: 'bg-slate-50',   textColor: 'text-slate-400',   badgeBg: 'bg-slate-100',  badgeText: 'text-slate-600' },
 };
 
 /* ------------------------------------------------------------------ */
@@ -56,12 +57,13 @@ function StatCard({ title, value, subValue, icon, accentColor }: {
 /*  AlertCard                                                         */
 /* ------------------------------------------------------------------ */
 
-function AlertCard({ href, icon, title, message, count, color }: {
+function AlertCard({ href, icon, title, message, count, countSuffix, color }: {
   href: string;
   icon: string;
   title: string;
   message: string;
   count: number;
+  countSuffix?: string;
   color: 'orange' | 'rose' | 'red' | 'purple';
 }) {
   const styles = {
@@ -81,7 +83,7 @@ function AlertCard({ href, icon, title, message, count, color }: {
         <div>
           <h4 className={`font-bold ${s.titleText} text-sm`}>{title}</h4>
           <p className={`text-xs ${s.bodyText} mt-0.5`}>
-            {message} <span className={`font-extrabold text-base ${s.countText}`}>{count}</span> 件あります
+            {message} <span className={`font-extrabold text-base ${s.countText}`}>{count}</span> {countSuffix}
           </p>
         </div>
       </div>
@@ -95,6 +97,7 @@ function AlertCard({ href, icon, title, message, count, color }: {
 /* ------------------------------------------------------------------ */
 
 export default function Dashboard() {
+  const { t } = useTranslation('dashboard');
   const [dbStatus, setDbStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
   const [latency, setLatency] = useState<number | null>(null);
   const [data, setData] = useState<any>(null);
@@ -151,23 +154,24 @@ export default function Dashboard() {
             <AlertCard
               href="/alerts"
               icon="bi-bell-fill"
-              title={data.alertSummary.criticalAlertCount > 0 ? '緊急アラートあり' : '未対応アラート'}
-              message="未対応のアラートが"
+              title={data.alertSummary.criticalAlertCount > 0 ? t('alert_urgent') : t('alert_open')}
+              message={t('alert_open_message')}
+              countSuffix={t('alert_count_suffix')}
               count={data.alertSummary.openAlertCount}
               color={data.alertSummary.criticalAlertCount > 0 ? 'red' : 'orange'}
             />
           )}
           {data.alerts.orders > 0 && (
-            <AlertCard href="/orders" icon="bi-briefcase-fill" title="発注の確認・審査待ち" message="未処理の発注が" count={data.alerts.orders} color="orange" />
+            <AlertCard href="/orders" icon="bi-briefcase-fill" title={t('alert_orders_title')} message={t('alert_orders_message')} count={data.alerts.orders} countSuffix={t('alert_count_suffix')} color="orange" />
           )}
           {data.alerts.approvals > 0 && (
-            <AlertCard href="/approvals" icon="bi-person-check-fill" title="人事・経費の承認待ち" message="未承認の申請が" count={data.alerts.approvals} color="rose" />
+            <AlertCard href="/approvals" icon="bi-person-check-fill" title={t('alert_approvals_title')} message={t('alert_approvals_message')} count={data.alerts.approvals} countSuffix={t('alert_count_suffix')} color="rose" />
           )}
           {data.crm?.overdueTaskCount > 0 && (
-            <AlertCard href="/crm/tasks?dueDate=overdue" icon="bi-exclamation-triangle-fill" title="期限超過タスク" message="期限を超えたタスクが" count={data.crm.overdueTaskCount} color="red" />
+            <AlertCard href="/crm/tasks?dueDate=overdue" icon="bi-exclamation-triangle-fill" title={t('alert_overdue_title')} message={t('alert_overdue_message')} count={data.crm.overdueTaskCount} countSuffix={t('alert_count_suffix')} color="red" />
           )}
           {data.quality?.unresolvedComplaintCount > 0 && (
-            <AlertCard href="/quality/complaints" icon="bi-exclamation-triangle-fill" title="未対応クレーム" message="未対応のクレームが" count={data.quality.unresolvedComplaintCount} color="purple" />
+            <AlertCard href="/quality/complaints" icon="bi-exclamation-triangle-fill" title={t('alert_complaint_title')} message={t('alert_complaint_message')} count={data.quality.unresolvedComplaintCount} countSuffix={t('alert_count_suffix')} color="purple" />
           )}
         </div>
       )}
@@ -175,41 +179,41 @@ export default function Dashboard() {
       {/* ── KPI Cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="今月の売上合計"
+          title={t('kpi_monthly_sales')}
           value={`¥${(data?.kpi?.monthlySales || 0).toLocaleString()}`}
           icon="bi-currency-yen"
           accentColor="blue"
-          subValue={<><i className="bi bi-info-circle mr-1" />受注確定済みの累計</>}
+          subValue={<><i className="bi bi-info-circle mr-1" />{t('kpi_sales_sub')}</>}
         />
         <StatCard
-          title="本日の稼働スタッフ"
-          value={`${data?.kpi?.distributorsTotal || 0} 名`}
+          title={t('kpi_active_staff')}
+          value={`${data?.kpi?.distributorsTotal || 0} ${t('kpi_staff_unit')}`}
           icon="bi-bicycle"
           accentColor="emerald"
           subValue={
             <span className={data?.kpi?.distributorsCompleted > 0 ? 'text-emerald-500' : ''}>
-              <i className="bi bi-check-circle-fill mr-1" />うち {data?.kpi?.distributorsCompleted || 0}名 が業務完了
+              <i className="bi bi-check-circle-fill mr-1" />{t('kpi_staff_completed', { count: data?.kpi?.distributorsCompleted || 0 })}
             </span>
           }
         />
         <StatCard
-          title="本日の配布タスク"
-          value={`${(data?.kpi?.flyersPlanned || 0).toLocaleString()} 枚`}
+          title={t('kpi_distribution_tasks')}
+          value={`${(data?.kpi?.flyersPlanned || 0).toLocaleString()}${t('kpi_sheets_unit')}`}
           icon="bi-send-fill"
           accentColor="violet"
           subValue={
             <span className={data?.kpi?.flyersActual > 0 ? 'text-violet-500' : ''}>
               <i className="bi bi-check-circle-fill mr-1" />
-              {data?.kpi?.flyersActual ? Math.floor((data.kpi.flyersActual / data.kpi.flyersPlanned) * 100) : 0}% ({data?.kpi?.flyersActual?.toLocaleString() || 0}枚) 完了
+              {t('kpi_completed_pct', { pct: data?.kpi?.flyersActual ? Math.floor((data.kpi.flyersActual / data.kpi.flyersPlanned) * 100) : 0, count: data?.kpi?.flyersActual?.toLocaleString() || 0 })}
             </span>
           }
         />
         <StatCard
-          title="管理エリア総数"
-          value="1,240 ヶ所"
+          title={t('kpi_managed_areas')}
+          value={t('kpi_areas_value')}
           icon="bi-geo-alt-fill"
           accentColor="slate"
-          subValue={<><i className="bi bi-house-heart mr-1" />配布可能 385,200世帯</>}
+          subValue={<><i className="bi bi-house-heart mr-1" />{t('kpi_households')}</>}
         />
       </div>
 
@@ -220,14 +224,14 @@ export default function Dashboard() {
         <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col">
           <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
             <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
-              <i className="bi bi-megaphone-fill text-indigo-500" /> 全体お知らせ
+              <i className="bi bi-megaphone-fill text-indigo-500" /> {t('announcements_title')}
             </h3>
             {isSuperAdmin && (
               <Link
                 href="/announcements"
                 className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-2.5 py-1 rounded-lg transition-colors"
               >
-                <i className="bi bi-gear-fill text-[10px]" /> 管理
+                <i className="bi bi-gear-fill text-[10px]" /> {t('announcements_manage')}
               </Link>
             )}
           </div>
@@ -237,16 +241,16 @@ export default function Dashboard() {
                 <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mb-3">
                   <i className="bi bi-megaphone text-xl" />
                 </div>
-                <p className="text-gray-500 text-sm font-medium">お知らせはまだありません</p>
+                <p className="text-gray-500 text-sm font-medium">{t('announcements_empty')}</p>
                 {isSuperAdmin && (
                   <Link href="/announcements" className="mt-2 text-xs text-indigo-500 hover:underline">
-                    お知らせを投稿する →
+                    {t('announcements_post')}
                   </Link>
                 )}
               </div>
             ) : (
               announcements.map((a, i) => {
-                const cfg = CATEGORY_CONFIG[a.category] || CATEGORY_CONFIG.OTHER;
+                const cfg = CATEGORY_STYLE[a.category] || CATEGORY_STYLE.OTHER;
                 const dateStr = new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
                 return (
                   <React.Fragment key={a.id}>
@@ -257,7 +261,7 @@ export default function Dashboard() {
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className={`text-[10px] font-bold ${cfg.badgeText} ${cfg.badgeBg} px-2 py-0.5 rounded`}>{cfg.label}</span>
+                          <span className={`text-[10px] font-bold ${cfg.badgeText} ${cfg.badgeBg} px-2 py-0.5 rounded`}>{t(cfg.labelKey)}</span>
                           <span className="text-[10px] text-gray-400 font-mono">{dateStr}</span>
                         </div>
                         <h4 className="font-bold text-gray-800 text-sm mb-1">{a.title}</h4>
@@ -279,17 +283,17 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                  <i className="bi bi-check2-all text-indigo-500" /> 本日のタスク
+                  <i className="bi bi-check2-all text-indigo-500" /> {t('tasks_title')}
                 </h3>
-                <Link href="/crm/tasks" className="text-xs text-blue-600 hover:underline font-medium">すべて見る</Link>
+                <Link href="/crm/tasks" className="text-xs text-blue-600 hover:underline font-medium">{t('tasks_view_all')}</Link>
               </div>
               {data.crm.dueTodayTaskCount > 0 && (
                 <div className="mb-3 text-xs text-orange-600 bg-orange-50 px-3 py-2 rounded-xl font-medium">
-                  <i className="bi bi-clock-fill mr-1" /> 本日期限: {data.crm.dueTodayTaskCount} 件
+                  <i className="bi bi-clock-fill mr-1" /> {t('tasks_due_today', { count: data.crm.dueTodayTaskCount })}
                 </div>
               )}
               {data.crm.myTasks.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">担当タスクなし</p>
+                <p className="text-xs text-gray-400 text-center py-4">{t('tasks_none')}</p>
               ) : (
                 <div className="space-y-1">
                   {data.crm.myTasks.map((task: any) => {
@@ -323,7 +327,7 @@ export default function Dashboard() {
                             if (res.ok) setData(await res.json());
                           }}
                           className="text-emerald-600 hover:bg-emerald-50 p-1 rounded-lg transition-colors shrink-0"
-                          title="完了"
+                          title={t('tasks_complete')}
                         >
                           <i className="bi bi-check-lg text-base" />
                         </button>
@@ -340,9 +344,9 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                  <i className="bi bi-award-fill text-amber-500" /> 配布員パフォーマンス
+                  <i className="bi bi-award-fill text-amber-500" /> {t('performance_title')}
                 </h3>
-                <Link href="/distributors" className="text-xs text-blue-600 hover:underline font-medium">すべて見る →</Link>
+                <Link href="/distributors" className="text-xs text-blue-600 hover:underline font-medium">{t('performance_view_all')}</Link>
               </div>
               {data.evaluation.topDistributors?.length > 0 && (
                 <div className="mb-4">
@@ -365,13 +369,13 @@ export default function Dashboard() {
               )}
               {data.evaluation.attentionDistributors?.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-2">要注意</p>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider mb-2">{t('performance_attention')}</p>
                   <div className="space-y-1.5">
                     {data.evaluation.attentionDistributors.slice(0, 5).map((d: any, i: number) => (
                       <div key={d.id || i} className="flex items-center justify-between">
                         <span className="text-sm text-gray-700 truncate flex-1">{d.name}</span>
                         <span className="text-xs font-bold text-red-500">
-                          <i className="bi bi-exclamation-triangle-fill mr-0.5" />{d.complaintCount}件
+                          <i className="bi bi-exclamation-triangle-fill mr-0.5" />{t('performance_complaints', { count: d.complaintCount })}
                         </span>
                       </div>
                     ))}
@@ -379,7 +383,7 @@ export default function Dashboard() {
                 </div>
               )}
               {(!data.evaluation.topDistributors?.length && !data.evaluation.attentionDistributors?.length) && (
-                <p className="text-xs text-gray-400 text-center py-4">評価データなし</p>
+                <p className="text-xs text-gray-400 text-center py-4">{t('performance_no_data')}</p>
               )}
             </div>
           )}
@@ -389,7 +393,7 @@ export default function Dashboard() {
             <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
-                  <i className="bi bi-laptop text-fuchsia-500" /> ECポータル利用状況
+                  <i className="bi bi-laptop text-fuchsia-500" /> {t('ec_portal_title')}
                 </h3>
                 {data.ec.activeUsers > 0 && (
                   <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
@@ -399,16 +403,16 @@ export default function Dashboard() {
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-end border-b border-gray-100 pb-2.5">
-                  <div className="text-xs text-gray-500 font-medium">現在見ている人 <span className="text-[9px] text-gray-400 ml-1">(直近1H)</span></div>
-                  <div className="text-xl font-extrabold text-gray-800 tracking-tight">{data.ec.activeUsers}<span className="text-xs font-medium text-gray-400 ml-0.5">人</span></div>
+                  <div className="text-xs text-gray-500 font-medium">{t('ec_active_users')} <span className="text-[9px] text-gray-400 ml-1">{t('ec_active_users_suffix')}</span></div>
+                  <div className="text-xl font-extrabold text-gray-800 tracking-tight">{data.ec.activeUsers}<span className="text-xs font-medium text-gray-400 ml-0.5">{t('ec_active_users_unit')}</span></div>
                 </div>
                 <div className="flex justify-between items-end border-b border-gray-100 pb-2.5">
-                  <div className="text-xs text-gray-500 font-medium">今月の新規登録</div>
-                  <div className="text-base font-bold text-gray-700">{data.ec.newUsersThisMonth}<span className="text-[10px] font-medium text-gray-400 ml-0.5">件</span></div>
+                  <div className="text-xs text-gray-500 font-medium">{t('ec_new_registrations')}</div>
+                  <div className="text-base font-bold text-gray-700">{data.ec.newUsersThisMonth}<span className="text-[10px] font-medium text-gray-400 ml-0.5">{t('ec_count_unit')}</span></div>
                 </div>
                 <div className="flex justify-between items-end">
-                  <div className="text-xs text-gray-500 font-medium">累計登録アカウント</div>
-                  <div className="text-sm font-bold text-gray-700">{data.ec.totalUsers}<span className="text-[10px] font-medium text-gray-400 ml-0.5">件</span></div>
+                  <div className="text-xs text-gray-500 font-medium">{t('ec_total_accounts')}</div>
+                  <div className="text-sm font-bold text-gray-700">{data.ec.totalUsers}<span className="text-[10px] font-medium text-gray-400 ml-0.5">{t('ec_count_unit')}</span></div>
                 </div>
               </div>
             </div>

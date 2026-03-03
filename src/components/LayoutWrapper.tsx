@@ -8,48 +8,94 @@ import { NotificationProvider } from '@/components/ui/NotificationProvider';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import Link from 'next/link';
 import TaskCreateModal from '@/components/TaskCreateModal';
+import { LanguageProvider, useLanguage } from '@/i18n';
+import { useTranslation } from '@/i18n';
+import type { Language } from '@/i18n';
 
-// ページタイトルマップ（アイコン付き）
-const PAGE_TITLES: Record<string, { title: string; icon: string }> = {
-  '/':                              { title: 'ダッシュボード',    icon: 'bi-grid-1x2-fill' },
-  '/attendance':                    { title: 'マイ勤怠・経費',    icon: 'bi-clock-history' },
-  '/dispatch':                      { title: 'ディスパッチ',      icon: 'bi-diagram-3-fill' },
-  '/schedules':                     { title: 'スケジュール照会',  icon: 'bi-calendar-check' },
-  '/orders':                        { title: '受注管理',          icon: 'bi-briefcase-fill' },
-  '/billing':                       { title: '請求管理',          icon: 'bi-receipt-cutoff' },
-  '/crm/tasks':                     { title: 'タスク',            icon: 'bi-list-task' },
-  '/crm/leads':                     { title: '見込み客管理',      icon: 'bi-person-plus-fill' },
-  '/customers':                     { title: '顧客管理',          icon: 'bi-buildings-fill' },
-  '/campaigns':                     { title: 'キャンペーン',      icon: 'bi-megaphone-fill' },
-  '/areas':                         { title: 'エリア管理',        icon: 'bi-geo-alt-fill' },
-  '/flyers':                        { title: 'チラシ管理',        icon: 'bi-file-earmark-richtext' },
-  '/transactions':                  { title: '入出庫・納品管理',  icon: 'bi-box-seam' },
-  '/partners':                      { title: '外注先マスタ',      icon: 'bi-truck' },
-  '/quality/complaints':            { title: 'クレーム管理',      icon: 'bi-exclamation-triangle-fill' },
-  '/quality/prohibited-properties': { title: '配布禁止物件',      icon: 'bi-house-x-fill' },
-  '/employees':                     { title: '社員管理',          icon: 'bi-person-badge-fill' },
-  '/distributors':                  { title: '配布員管理',        icon: 'bi-bicycle' },
-  '/distributor-shifts':            { title: 'シフト管理',        icon: 'bi-calendar-week' },
-  '/distributors/payroll':          { title: '配布員給与',        icon: 'bi-wallet2' },
-  '/applicants':                    { title: '応募者管理',        icon: 'bi-person-lines-fill' },
-  '/branches':                      { title: '支店管理',          icon: 'bi-shop' },
-  '/approvals':                     { title: '人事・経費承認',    icon: 'bi-check2-square' },
-  '/payroll':                       { title: '給与計算',          icon: 'bi-cash-stack' },
-  '/settings':                      { title: 'システム設定',      icon: 'bi-gear-fill' },
-  '/audit-logs':                    { title: '監査ログ',          icon: 'bi-shield-check' },
-  '/profile':                       { title: 'プロフィール編集',  icon: 'bi-person-gear' },
-  '/announcements':                 { title: '全体お知らせ',      icon: 'bi-megaphone' },
-  '/pricing':                       { title: '価格設定',          icon: 'bi-tags-fill' },
-  '/settings/company':              { title: '自社情報設定',      icon: 'bi-building' },
+// ページアイコンマップ
+const PAGE_ICONS: Record<string, string> = {
+  '/':                              'bi-grid-1x2-fill',
+  '/attendance':                    'bi-clock-history',
+  '/dispatch':                      'bi-diagram-3-fill',
+  '/schedules':                     'bi-calendar-check',
+  '/orders':                        'bi-briefcase-fill',
+  '/billing':                       'bi-receipt-cutoff',
+  '/crm/tasks':                     'bi-list-task',
+  '/crm/leads':                     'bi-person-plus-fill',
+  '/customers':                     'bi-buildings-fill',
+  '/campaigns':                     'bi-megaphone-fill',
+  '/areas':                         'bi-geo-alt-fill',
+  '/flyers':                        'bi-file-earmark-richtext',
+  '/transactions':                  'bi-box-seam',
+  '/partners':                      'bi-truck',
+  '/quality/complaints':            'bi-exclamation-triangle-fill',
+  '/quality/prohibited-properties': 'bi-house-x-fill',
+  '/employees':                     'bi-person-badge-fill',
+  '/distributors':                  'bi-bicycle',
+  '/distributor-shifts':            'bi-calendar-week',
+  '/distributors/payroll':          'bi-wallet2',
+  '/applicants':                    'bi-person-lines-fill',
+  '/branches':                      'bi-shop',
+  '/approvals':                     'bi-check2-square',
+  '/payroll':                       'bi-cash-stack',
+  '/settings':                      'bi-gear-fill',
+  '/audit-logs':                    'bi-shield-check',
+  '/profile':                       'bi-person-gear',
+  '/announcements':                 'bi-megaphone',
+  '/pricing':                       'bi-tags-fill',
+  '/settings/company':              'bi-building',
 };
 
-function getPageInfo(pathname: string): { title: string; icon: string } {
-  if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname];
-  const sorted = Object.keys(PAGE_TITLES).sort((a, b) => b.length - a.length);
+// パス → 翻訳キー（sidebar.json の page_titles）
+const PAGE_TITLE_KEYS: Record<string, string> = {
+  '/':                              'page_titles.dashboard',
+  '/attendance':                    'page_titles.my_attendance',
+  '/dispatch':                      'page_titles.dispatch',
+  '/schedules':                     'page_titles.schedule_inquiry',
+  '/orders':                        'page_titles.order_management',
+  '/billing':                       'page_titles.billing_management',
+  '/crm/tasks':                     'page_titles.tasks',
+  '/crm/leads':                     'page_titles.lead_management',
+  '/customers':                     'page_titles.customer_management',
+  '/campaigns':                     'page_titles.campaigns',
+  '/areas':                         'page_titles.area_management',
+  '/flyers':                        'page_titles.flyer_management',
+  '/transactions':                  'page_titles.inventory_management',
+  '/partners':                      'page_titles.partner_management',
+  '/quality/complaints':            'page_titles.complaint_management',
+  '/quality/prohibited-properties': 'page_titles.prohibited_properties',
+  '/employees':                     'page_titles.employee_management',
+  '/distributors':                  'page_titles.distributor_management',
+  '/distributor-shifts':            'page_titles.shift_management',
+  '/distributors/payroll':          'page_titles.distributor_payroll',
+  '/applicants':                    'page_titles.applicant_management',
+  '/branches':                      'page_titles.branch_management',
+  '/approvals':                     'page_titles.hr_expense_approval',
+  '/payroll':                       'page_titles.payroll',
+  '/settings':                      'page_titles.system_settings',
+  '/audit-logs':                    'page_titles.audit_logs',
+  '/profile':                       'page_titles.profile_edit',
+  '/announcements':                 'page_titles.announcements',
+  '/pricing':                       'page_titles.pricing',
+  '/settings/company':              'page_titles.company_settings',
+};
+
+function getPageIcon(pathname: string): string {
+  if (PAGE_ICONS[pathname]) return PAGE_ICONS[pathname];
+  const sorted = Object.keys(PAGE_ICONS).sort((a, b) => b.length - a.length);
   for (const key of sorted) {
-    if (key !== '/' && pathname.startsWith(key)) return PAGE_TITLES[key];
+    if (key !== '/' && pathname.startsWith(key)) return PAGE_ICONS[key];
   }
-  return { title: 'PMS Pro', icon: 'bi-app' };
+  return 'bi-app';
+}
+
+function getPageTitleKey(pathname: string): string | null {
+  if (PAGE_TITLE_KEYS[pathname]) return PAGE_TITLE_KEYS[pathname];
+  const sorted = Object.keys(PAGE_TITLE_KEYS).sort((a, b) => b.length - a.length);
+  for (const key of sorted) {
+    if (key !== '/' && pathname.startsWith(key)) return PAGE_TITLE_KEYS[key];
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -68,6 +114,8 @@ function TopHeader({
   const pathname = usePathname();
   const router = useRouter();
   const { showToast } = useNotification();
+  const { t } = useTranslation('sidebar');
+  const { lang, setLang } = useLanguage();
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLinksOpen, setIsLinksOpen] = useState(false);
@@ -75,12 +123,21 @@ function TopHeader({
   const menuRef = useRef<HTMLDivElement>(null);
   const linksRef = useRef<HTMLDivElement>(null);
 
-  const { title: pageTitle, icon: pageIcon } = getPageInfo(pathname);
+  const pageIcon = getPageIcon(pathname);
+  const pageTitleKey = getPageTitleKey(pathname);
+  const pageTitle = pageTitleKey ? t(pageTitleKey) : 'PMS Pro';
 
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data) setUserProfile(data); })
+      .then(data => {
+        if (data) {
+          setUserProfile(data);
+          if (data.language && data.language !== lang) {
+            setLang(data.language as Language);
+          }
+        }
+      })
       .catch(() => {});
     fetch('/api/settings/system')
       .then(r => r.ok ? r.json() : null)
@@ -90,6 +147,7 @@ function TopHeader({
         }
       })
       .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   useEffect(() => {
@@ -111,8 +169,12 @@ function TopHeader({
       router.push('/login');
       router.refresh();
     } catch {
-      showToast('ログアウトに失敗しました', 'error');
+      showToast(t('logout_error'), 'error');
     }
+  };
+
+  const toggleLanguage = () => {
+    setLang(lang === 'ja' ? 'en' : 'ja');
   };
 
   // tiramis.co.jp ドメインの場合のみ authuser パラメータを付与
@@ -138,15 +200,16 @@ function TopHeader({
         </h1>
       </div>
 
-      {/* 右側: タスク追加 + 通知 + プロフィール */}
+      {/* 右側: タスク追加 + 言語切替 + 通知 + プロフィール */}
       <div className="flex items-center gap-2 shrink-0">
         <button
           onClick={onOpenTaskModal}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[13px] font-semibold
-                     bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+                     border-[1.5px] border-indigo-600 text-indigo-600 bg-transparent
+                     hover:bg-indigo-50 transition-colors"
         >
           <i className="bi bi-plus-lg text-xs"></i>
-          <span className="hidden lg:inline">タスク追加</span>
+          <span className="hidden lg:inline">{t('add_task')}</span>
         </button>
 
         <div className="w-px h-6 bg-gray-200 mx-1" />
@@ -187,7 +250,7 @@ function TopHeader({
           <div className="relative" ref={linksRef}>
             <button
               onClick={() => setIsLinksOpen(!isLinksOpen)}
-              title="リンク集"
+              title={t('links')}
               className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-indigo-600"
             >
               <i className="bi bi-grid-3x3-gap-fill text-[16px]"></i>
@@ -195,7 +258,7 @@ function TopHeader({
             {isLinksOpen && (
               <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-[920]">
                 <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
-                  <div className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">リンク集</div>
+                  <div className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">{t('links')}</div>
                 </div>
                 <div className="py-1 max-h-64 overflow-y-auto">
                   {headerLinks.map((link, idx) => (
@@ -216,6 +279,32 @@ function TopHeader({
             )}
           </div>
         )}
+
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+
+        {/* 言語切替トグル */}
+        <button
+          onClick={toggleLanguage}
+          title={lang === 'ja' ? 'Switch to English' : '日本語に切り替え'}
+          className="relative flex items-center h-8 w-[68px] rounded-full bg-gray-100 p-0.5 transition-colors hover:bg-gray-200/80 group"
+        >
+          {/* sliding pill */}
+          <span
+            className={`absolute top-0.5 h-7 w-[33px] rounded-full bg-white shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 ease-in-out ${
+              lang === 'en' ? 'left-[33px]' : 'left-0.5'
+            }`}
+          />
+          <span className={`relative z-10 flex-1 flex items-center justify-center text-[11px] font-bold transition-colors duration-200 ${
+            lang === 'ja' ? 'text-gray-800' : 'text-gray-400'
+          }`}>
+            JA
+          </span>
+          <span className={`relative z-10 flex-1 flex items-center justify-center text-[11px] font-bold transition-colors duration-200 ${
+            lang === 'en' ? 'text-gray-800' : 'text-gray-400'
+          }`}>
+            EN
+          </span>
+        </button>
 
         <div className="w-px h-6 bg-gray-200 mx-1" />
 
@@ -271,14 +360,14 @@ function TopHeader({
                   className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
                 >
                   <i className="bi bi-person-gear text-gray-400 w-4 text-center"></i>
-                  プロフィール編集
+                  {t('profile_edit')}
                 </Link>
                 <button
                   onClick={handleLogout}
                   className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-rose-600 hover:bg-rose-50 transition-colors"
                 >
                   <i className="bi bi-box-arrow-right text-rose-400 w-4 text-center"></i>
-                  ログアウト
+                  {t('logout')}
                 </button>
               </div>
             </div>
@@ -332,69 +421,73 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
 
   if (isAuthPage || isPortalPage || isDistributorPage || isAppPrivacyPage || isApplyPage || isPublicBookingPage) {
     return (
-      <NotificationProvider>
-        <main className={`w-full min-h-screen m-0 p-0 ${isAuthPage ? 'bg-[#0f172a]' : ''}`}>
-          {children}
-        </main>
-      </NotificationProvider>
+      <LanguageProvider>
+        <NotificationProvider>
+          <main className={`w-full min-h-screen m-0 p-0 ${isAuthPage ? 'bg-[#0f172a]' : ''}`}>
+            {children}
+          </main>
+        </NotificationProvider>
+      </LanguageProvider>
     );
   }
 
   return (
-    <NotificationProvider>
-      <div className="flex min-h-screen bg-[#f0f2f5]">
+    <LanguageProvider>
+      <NotificationProvider>
+        <div className="flex min-h-screen bg-[#f0f2f5]">
 
-        {/* モバイルヘッダー */}
-        <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-[1100] flex items-center px-4 gap-3">
-          <button
-            onClick={() => setIsMobileOpen(true)}
-            className="text-gray-500 hover:text-gray-900 transition-colors"
-            aria-label="メニューを開く"
-          >
-            <i className="bi bi-list text-2xl" />
-          </button>
-          <span className="font-extrabold text-gray-900 tracking-wide flex-1">
-            PMS <span className="text-blue-600">Pro</span>
-          </span>
-          <button
-            onClick={() => setIsGlobalTaskModalOpen(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold
-                       bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-          >
-            <i className="bi bi-plus-lg text-[10px]"></i>
-          </button>
-          <NotificationBell />
+          {/* モバイルヘッダー */}
+          <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-[1100] flex items-center px-4 gap-3">
+            <button
+              onClick={() => setIsMobileOpen(true)}
+              className="text-gray-500 hover:text-gray-900 transition-colors"
+              aria-label="Open menu"
+            >
+              <i className="bi bi-list text-2xl" />
+            </button>
+            <span className="font-extrabold text-gray-900 tracking-wide flex-1">
+              PMS <span className="text-blue-600">Pro</span>
+            </span>
+            <button
+              onClick={() => setIsGlobalTaskModalOpen(true)}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold
+                         bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+            >
+              <i className="bi bi-plus-lg text-[10px]"></i>
+            </button>
+            <NotificationBell />
+          </div>
+
+          {/* サイドバー */}
+          <Sidebar
+            isCollapsed={isSidebarCollapsed}
+            toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            isMobileOpen={isMobileOpen}
+            onMobileClose={() => setIsMobileOpen(false)}
+          />
+
+          {/* トップヘッダー（デスクトップ） */}
+          <div className="hidden md:block">
+            <TopHeader isSidebarCollapsed={isSidebarCollapsed} onOpenTaskModal={() => setIsGlobalTaskModalOpen(true)} />
+          </div>
+
+          {/* メインコンテンツ */}
+          <main className={`
+            flex-1 transition-all duration-300 min-h-screen
+            pt-[80px] pb-6 px-4 md:px-8
+            ${isSidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}
+          `}>
+            {children}
+          </main>
+
+          {/* グローバルタスク作成モーダル */}
+          <TaskCreateModal
+            isOpen={isGlobalTaskModalOpen}
+            onClose={() => setIsGlobalTaskModalOpen(false)}
+            onCreated={() => window.dispatchEvent(new Event('task-created'))}
+          />
         </div>
-
-        {/* サイドバー */}
-        <Sidebar
-          isCollapsed={isSidebarCollapsed}
-          toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          isMobileOpen={isMobileOpen}
-          onMobileClose={() => setIsMobileOpen(false)}
-        />
-
-        {/* トップヘッダー（デスクトップ） */}
-        <div className="hidden md:block">
-          <TopHeader isSidebarCollapsed={isSidebarCollapsed} onOpenTaskModal={() => setIsGlobalTaskModalOpen(true)} />
-        </div>
-
-        {/* メインコンテンツ */}
-        <main className={`
-          flex-1 transition-all duration-300 min-h-screen
-          pt-[80px] pb-6 px-4 md:px-8
-          ${isSidebarCollapsed ? 'md:ml-[72px]' : 'md:ml-[240px]'}
-        `}>
-          {children}
-        </main>
-
-        {/* グローバルタスク作成モーダル */}
-        <TaskCreateModal
-          isOpen={isGlobalTaskModalOpen}
-          onClose={() => setIsGlobalTaskModalOpen(false)}
-          onCreated={() => window.dispatchEvent(new Event('task-created'))}
-        />
-      </div>
-    </NotificationProvider>
+      </NotificationProvider>
+    </LanguageProvider>
   );
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 type Area = {
   id: number;
@@ -39,6 +40,7 @@ function EditModal({
   onClose: () => void;
   onSaved: (updated: Area) => void;
 }) {
+  const { t } = useTranslation('areas');
   const { showToast } = useNotification();
   const [form, setForm] = useState({
     town_name: area.town_name,
@@ -70,10 +72,10 @@ function EditModal({
       });
       if (!res.ok) throw new Error();
       const updated = await res.json();
-      showToast('エリア情報を更新しました', 'success');
+      showToast(t('toast_update_success'), 'success');
       onSaved(updated);
     } catch {
-      showToast('更新に失敗しました', 'error');
+      showToast(t('toast_update_error'), 'error');
     } finally {
       setSaving(false);
     }
@@ -99,7 +101,7 @@ function EditModal({
           {/* 町名 / 丁目 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">町名</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_town_name')}</label>
               <input
                 name="town_name"
                 value={form.town_name}
@@ -109,7 +111,7 @@ function EditModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">丁目名</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_chome_name')}</label>
               <input
                 name="chome_name"
                 value={form.chome_name}
@@ -122,7 +124,7 @@ function EditModal({
           {/* 世帯数 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">総世帯数</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_total_households')}</label>
               <input
                 name="door_to_door_count"
                 type="number"
@@ -134,7 +136,7 @@ function EditModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">集合住宅数</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_multi_family')}</label>
               <input
                 name="multi_family_count"
                 type="number"
@@ -150,7 +152,7 @@ function EditModal({
           {/* 配布可能数 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">配布可能数（生）</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_cap_raw')}</label>
               <input
                 name="posting_cap_raw"
                 type="number"
@@ -162,7 +164,7 @@ function EditModal({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">配布可能数（NG除外後）</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_cap_ng')}</label>
               <input
                 name="posting_cap_with_ng"
                 type="number"
@@ -178,29 +180,29 @@ function EditModal({
           {/* エリアランク / 有効/無効 */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">エリアランク</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('modal_area_rank')}</label>
               <select
                 name="area_rank_id"
                 value={form.area_rank_id}
                 onChange={handleChange}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
               >
-                <option value="">未設定</option>
+                <option value="">{t('unset')}</option>
                 {areaRanks.map(r => (
-                  <option key={r.id} value={String(r.id)}>{r.name}（¥{r.postingUnitPrice}/部）</option>
+                  <option key={r.id} value={String(r.id)}>{r.name}{t('per_unit', { price: r.postingUnitPrice })}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+              <label className="block text-xs font-bold text-slate-500 mb-1">{t('status')}</label>
               <select
                 name="is_client_visible"
                 value={form.is_client_visible}
                 onChange={handleChange}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white"
               >
-                <option value="1">有効（ECポータルに表示）</option>
-                <option value="0">無効（非表示）</option>
+                <option value="1">{t('modal_status_active')}</option>
+                <option value="0">{t('modal_status_inactive')}</option>
               </select>
             </div>
           </div>
@@ -208,14 +210,14 @@ function EditModal({
           {/* ボタン */}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-              キャンセル
+              {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={saving}
               className="px-5 py-2 text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow transition-colors disabled:opacity-50"
             >
-              {saving ? '保存中...' : '保存する'}
+              {saving ? t('saving') : t('save_btn')}
             </button>
           </div>
         </form>
@@ -226,6 +228,7 @@ function EditModal({
 
 // --- メインページ ---
 export default function AreasPage() {
+  const { t } = useTranslation('areas');
   const [areas, setAreas] = useState<Area[]>([]);
   const [loading, setLoading] = useState(true);
   const [prefectures, setPrefectures] = useState<Prefecture[]>([]);
@@ -335,7 +338,7 @@ export default function AreasPage() {
     <div className="space-y-6">
       <div className="flex justify-end gap-2 mb-4">
         <button className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all">
-          <i className="bi bi-plus-lg"></i> 新規登録
+          <i className="bi bi-plus-lg"></i> {t('btn_new')}
         </button>
       </div>
 
@@ -343,12 +346,12 @@ export default function AreasPage() {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         {/* キーワード（複合住所検索対応） */}
         <div className="flex-1 min-w-[220px]">
-          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('search_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
             <input
               type="text"
-              placeholder="例: 東京都新宿区高田馬場１丁目"
+              placeholder={t('search_placeholder')}
               value={searchQuery}
               onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -358,7 +361,7 @@ export default function AreasPage() {
 
         {/* 都道府県 */}
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">都道府県</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_prefecture')}</label>
           <select
             value={prefectureId}
             onChange={(e) => {
@@ -367,7 +370,7 @@ export default function AreasPage() {
             }}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[130px] bg-white cursor-pointer"
           >
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {prefectures.map(p => (
               <option key={p.id} value={String(p.id)}>{p.name}</option>
             ))}
@@ -376,14 +379,14 @@ export default function AreasPage() {
 
         {/* 市区町村（都道府県選択後に有効化） */}
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">市区町村</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_city')}</label>
           <select
             value={cityId}
             onChange={(e) => handleFilterChange({ cityId: e.target.value })}
             disabled={!prefectureId}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[150px] bg-white cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {cities.map(c => (
               <option key={c.id} value={String(c.id)}>{c.name}</option>
             ))}
@@ -392,15 +395,15 @@ export default function AreasPage() {
 
         {/* 有効/無効 */}
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('status')}</label>
           <select
             value={isVisible}
             onChange={(e) => handleFilterChange({ isVisible: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="">すべて</option>
-            <option value="1">有効のみ</option>
-            <option value="0">無効のみ</option>
+            <option value="">{t('filter_all')}</option>
+            <option value="1">{t('filter_active_only')}</option>
+            <option value="0">{t('filter_inactive_only')}</option>
           </select>
         </div>
       </div>
@@ -411,15 +414,15 @@ export default function AreasPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase border-b border-slate-200">
             <tr>
-              <th className="px-4 py-3 font-semibold whitespace-nowrap">コード</th>
-              <th className="px-4 py-3 font-semibold whitespace-nowrap">都道府県</th>
-              <th className="px-4 py-3 font-semibold whitespace-nowrap">市区町村</th>
-              <th className="px-4 py-3 font-semibold">町名 / 丁目</th>
-              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">総世帯数</th>
-              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap text-indigo-600">配布可能数</th>
-              <th className="px-4 py-3 font-semibold whitespace-nowrap">ランク</th>
-              <th className="px-4 py-3 font-semibold whitespace-nowrap text-center">状態</th>
-              <th className="px-4 py-3 font-semibold text-center">操作</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">{t('table_code')}</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">{t('table_prefecture')}</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">{t('table_city')}</th>
+              <th className="px-4 py-3 font-semibold">{t('table_town_chome')}</th>
+              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap">{t('table_total_households')}</th>
+              <th className="px-4 py-3 font-semibold text-right whitespace-nowrap text-indigo-600">{t('table_distribution_cap')}</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap">{t('table_rank')}</th>
+              <th className="px-4 py-3 font-semibold whitespace-nowrap text-center">{t('table_state')}</th>
+              <th className="px-4 py-3 font-semibold text-center">{t('actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -436,8 +439,8 @@ export default function AreasPage() {
             ) : areas.length === 0 ? (
               <EmptyState
                 icon="bi-map"
-                title="該当するエリアが見つかりません"
-                description="検索条件やフィルターを変更してお試しください。"
+                title={t('empty_title')}
+                description={t('empty_description')}
               />
             ) : areas.map((area) => (
               <tr key={area.id} className={`hover:bg-slate-50 transition-colors ${area.is_client_visible === 0 ? 'opacity-50' : ''}`}>
@@ -458,16 +461,16 @@ export default function AreasPage() {
                 </td>
                 <td className="px-4 py-3 text-center">
                   {area.is_client_visible === 1 ? (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">有効</span>
+                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">{t('active')}</span>
                   ) : (
-                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">無効</span>
+                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-medium">{t('inactive')}</span>
                   )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <button
                     onClick={() => setEditTarget(area)}
                     className="text-slate-400 hover:text-indigo-600 transition-colors p-1 rounded hover:bg-indigo-50"
-                    title="編集"
+                    title={t('edit')}
                   >
                     <i className="bi bi-pencil-square"></i>
                   </button>

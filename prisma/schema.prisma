@@ -147,6 +147,7 @@ model Employee {
   approvedAttendances Attendance[] @relation("AttendanceApprover")
 
   avatarUrl      String?       @map("avatar_url") @db.Text
+  language       String?       @default("ja") @db.VarChar(5)
 
   isActive            Boolean   @default(true) @map("is_active")
   mustChangePassword  Boolean   @default(false) @map("must_change_password")
@@ -201,6 +202,9 @@ model Employee {
 
   // アラート
   resolvedAlerts              Alert[]              @relation("AlertResolver")
+
+  // 通知受信
+  receivedNotifications       AdminNotification[]  @relation("NotificationRecipient")
 
   @@map("employees")
 }
@@ -879,6 +883,22 @@ enum IncompleteReason {
 enum AdminNotificationType {
   DISTRIBUTION_START    // 配布開始
   DISTRIBUTION_FINISH   // 配布完了
+  ALERT                 // アラート通知
+}
+
+// --- アラート定義の周期 ---
+enum AlertFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+// --- アラート定義の対象タイプ ---
+enum AlertTargetType {
+  ALL          // 全管理者
+  ROLE         // 特定役職
+  DEPARTMENT   // 特定部署
+  EMPLOYEE     // 特定社員
 }
 
 // ==========================================
@@ -2622,19 +2642,25 @@ model PauseEvent {
 
 // --- 管理者通知 ---
 model AdminNotification {
-  id             Int                    @id @default(autoincrement())
-  type           AdminNotificationType
-  title          String                 @db.VarChar(200)
-  message        String?                @db.Text
-  scheduleId     Int?                   @map("schedule_id")
-  distributorId  Int?                   @map("distributor_id")
-  isRead         Boolean                @default(false) @map("is_read")
-  createdAt      DateTime               @default(now()) @map("created_at")
+  id                  Int                    @id @default(autoincrement())
+  type                AdminNotificationType
+  title               String                 @db.VarChar(200)
+  message             String?                @db.Text
+  scheduleId          Int?                   @map("schedule_id")
+  distributorId       Int?                   @map("distributor_id")
+  recipientId         Int?                   @map("recipient_id")
+  alertDefinitionId   Int?                   @map("alert_definition_id")
+  alertId             Int?                   @map("alert_id")
+  isRead              Boolean                @default(false) @map("is_read")
+  createdAt           DateTime               @default(now()) @map("created_at")
 
-  schedule       DistributionSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
-  distributor    FlyerDistributor?      @relation(fields: [distributorId], references: [id])
+  schedule            DistributionSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  distributor         FlyerDistributor?      @relation(fields: [distributorId], references: [id])
+  recipient           Employee?              @relation("NotificationRecipient", fields: [recipientId], references: [id])
+  alertDefinition     AlertDefinition?       @relation(fields: [alertDefinitionId], references: [id])
 
   @@index([isRead, createdAt])
+  @@index([recipientId, isRead, createdAt])
   @@map("admin_notifications")
 }
 
@@ -2662,7 +2688,8 @@ model AlertCategory {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
 
-  alerts    Alert[]
+  alerts           Alert[]
+  alertDefinitions AlertDefinition[]
 
   @@map("alert_categories")
 }
@@ -2691,4 +2718,31 @@ model Alert {
   @@index([entityType, entityId])
   @@index([createdAt])
   @@map("alerts")
+}
+
+// --- アラート定義（設定可能なアラートルール） ---
+model AlertDefinition {
+  id              Int              @id @default(autoincrement())
+  code            String           @unique @db.VarChar(50)
+  name            String           @db.VarChar(100)
+  description     String?          @db.Text
+
+  isEnabled       Boolean          @default(true) @map("is_enabled")
+
+  categoryId      Int              @map("category_id")
+  category        AlertCategory    @relation(fields: [categoryId], references: [id])
+  severity        AlertSeverity    @default(WARNING)
+  frequency       AlertFrequency   @default(DAILY)
+
+  targetType      AlertTargetType  @default(ALL) @map("target_type")
+  targetIds       String?          @map("target_ids") @db.Text
+
+  notifyEnabled   Boolean          @default(true) @map("notify_enabled")
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  notifications   AdminNotification[]
+
+  @@map("alert_definitions")
 }

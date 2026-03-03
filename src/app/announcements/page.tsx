@@ -1,17 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTranslation } from '@/i18n';
 
-// カテゴリ設定マップ
-const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  UPDATE:      { label: 'アップデート', color: 'indigo',  icon: 'bi-stars' },
-  MAINTENANCE: { label: 'メンテナンス', color: 'rose',    icon: 'bi-tools' },
-  IMPORTANT:   { label: '重要',         color: 'amber',   icon: 'bi-exclamation-triangle-fill' },
-  NOTICE:      { label: 'お知らせ',     color: 'emerald', icon: 'bi-bell-fill' },
-  OTHER:       { label: 'その他',       color: 'slate',   icon: 'bi-megaphone-fill' },
+// カテゴリ設定マップ（ラベルはi18nキーとして保持）
+const CATEGORY_STYLE: Record<string, { labelKey: string; color: string; icon: string }> = {
+  UPDATE:      { labelKey: 'cat_update',      color: 'indigo',  icon: 'bi-stars' },
+  MAINTENANCE: { labelKey: 'cat_maintenance', color: 'rose',    icon: 'bi-tools' },
+  IMPORTANT:   { labelKey: 'cat_important',   color: 'amber',   icon: 'bi-exclamation-triangle-fill' },
+  NOTICE:      { labelKey: 'cat_notice',      color: 'emerald', icon: 'bi-bell-fill' },
+  OTHER:       { labelKey: 'cat_other',       color: 'slate',   icon: 'bi-megaphone-fill' },
 };
-
-const CATEGORIES = Object.entries(CATEGORY_CONFIG).map(([value, cfg]) => ({ value, ...cfg }));
 
 interface Announcement {
   id: number;
@@ -27,8 +26,8 @@ interface Announcement {
 const initialForm = { title: '', content: '', category: 'OTHER' };
 
 // カテゴリバッジコンポーネント
-const CategoryBadge = ({ category }: { category: string }) => {
-  const cfg = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.OTHER;
+const CategoryBadge = ({ category, t }: { category: string; t: (key: string) => string }) => {
+  const style = CATEGORY_STYLE[category] || CATEGORY_STYLE.OTHER;
   const colorMap: Record<string, string> = {
     indigo:  'bg-indigo-50 text-indigo-600 border-indigo-200',
     rose:    'bg-rose-50 text-rose-600 border-rose-200',
@@ -37,13 +36,24 @@ const CategoryBadge = ({ category }: { category: string }) => {
     slate:   'bg-slate-100 text-slate-600 border-slate-200',
   };
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${colorMap[cfg.color] || colorMap.slate}`}>
-      <i className={`bi ${cfg.icon}`}></i> {cfg.label}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${colorMap[style.color] || colorMap.slate}`}>
+      <i className={`bi ${style.icon}`}></i> {t(style.labelKey)}
     </span>
   );
 };
 
 export default function AnnouncementsPage() {
+  const { t } = useTranslation('announcements');
+
+  const CATEGORY_CONFIG = useMemo(() => {
+    const result: Record<string, { label: string; color: string; icon: string }> = {};
+    for (const [key, style] of Object.entries(CATEGORY_STYLE)) {
+      result[key] = { label: t(style.labelKey), color: style.color, icon: style.icon };
+    }
+    return result;
+  }, [t]);
+  const CATEGORIES = useMemo(() => Object.entries(CATEGORY_CONFIG).map(([value, cfg]) => ({ value, ...cfg })), [CATEGORY_CONFIG]);
+
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -121,7 +131,7 @@ export default function AnnouncementsPage() {
       setIsFormModalOpen(false);
       await fetchData();
     } catch {
-      alert('保存に失敗しました');
+      alert(t('save_error'));
     } finally {
       setIsSaving(false);
     }
@@ -137,7 +147,7 @@ export default function AnnouncementsPage() {
       setCurrentId(null);
       await fetchData();
     } catch {
-      alert('削除に失敗しました');
+      alert(t('delete_error'));
     } finally {
       setIsDeleting(false);
     }
@@ -160,7 +170,7 @@ export default function AnnouncementsPage() {
         <div className="flex justify-between items-end border-b border-slate-200 pb-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-              <i className="bi bi-megaphone-fill text-indigo-600"></i> 全体お知らせ管理
+              <i className="bi bi-megaphone-fill text-indigo-600"></i> {t('page_title')}
             </h1>
           </div>
         </div>
@@ -168,8 +178,8 @@ export default function AnnouncementsPage() {
           <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="bi bi-shield-lock-fill text-2xl"></i>
           </div>
-          <h3 className="font-bold text-rose-800 text-lg mb-2">アクセス権限がありません</h3>
-          <p className="text-rose-600 text-sm">このページは SUPER_ADMIN のみ閲覧・操作できます。</p>
+          <h3 className="font-bold text-rose-800 text-lg mb-2">{t('access_denied_title')}</h3>
+          <p className="text-rose-600 text-sm">{t('access_denied_message')}</p>
         </div>
       </div>
     );
@@ -183,7 +193,7 @@ export default function AnnouncementsPage() {
           onClick={openCreate}
           className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-indigo-200 transition-all"
         >
-          <i className="bi bi-plus-lg"></i> 新規投稿
+          <i className="bi bi-plus-lg"></i> {t('btn_new_post')}
         </button>
       </div>
 
@@ -194,26 +204,26 @@ export default function AnnouncementsPage() {
             <div className="w-14 h-14 bg-indigo-50 text-indigo-400 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-megaphone text-2xl"></i>
             </div>
-            <p className="text-slate-500 font-medium">お知らせはまだありません</p>
-            <p className="text-slate-400 text-sm mt-1">「新規投稿」からお知らせを作成してください</p>
+            <p className="text-slate-500 font-medium">{t('empty_title')}</p>
+            <p className="text-slate-400 text-sm mt-1">{t('empty_message')}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">カテゴリ</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">タイトル</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">投稿者</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">投稿日</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">操作</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-36">{t('col_category')}</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">{t('col_title')}</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">{t('col_author')}</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider w-32">{t('col_posted_date')}</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider w-24">{t('col_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {announcements.map(a => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
-                    <CategoryBadge category={a.category} />
+                    <CategoryBadge category={a.category} t={t} />
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-800 text-sm">{a.title}</div>
@@ -230,14 +240,14 @@ export default function AnnouncementsPage() {
                       <button
                         onClick={() => openEdit(a)}
                         className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
-                        title="編集"
+                        title={t('edit')}
                       >
                         <i className="bi bi-pencil-square text-base"></i>
                       </button>
                       <button
                         onClick={() => openDelete(a.id)}
                         className="text-slate-400 hover:text-rose-600 transition-colors p-1"
-                        title="削除"
+                        title={t('delete')}
                       >
                         <i className="bi bi-trash3 text-base"></i>
                       </button>
@@ -259,7 +269,7 @@ export default function AnnouncementsPage() {
             <div className="px-6 py-5 border-b border-slate-200 bg-white flex justify-between items-center rounded-t-2xl">
               <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
                 <i className="bi bi-megaphone-fill text-indigo-600"></i>
-                {currentId ? 'お知らせを編集' : '新規お知らせを投稿'}
+                {currentId ? t('modal_title_edit') : t('modal_title_create')}
               </h3>
               <button
                 onClick={() => setIsFormModalOpen(false)}
@@ -274,7 +284,7 @@ export default function AnnouncementsPage() {
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-5">
                 {/* カテゴリ */}
                 <div>
-                  <label className={labelClass}>カテゴリ</label>
+                  <label className={labelClass}>{t('label_category')}</label>
                   <select
                     name="category"
                     value={formData.category}
@@ -290,14 +300,14 @@ export default function AnnouncementsPage() {
 
                 {/* タイトル */}
                 <div>
-                  <label className={labelClass}>タイトル <span className="text-rose-500">*</span></label>
+                  <label className={labelClass}>{t('label_title')} <span className="text-rose-500">*</span></label>
                   <input
                     type="text"
                     name="title"
                     value={formData.title}
                     onChange={handleInputChange}
                     className={inputClass}
-                    placeholder="例: システムメンテナンスのお知らせ"
+                    placeholder={t('placeholder_title')}
                     maxLength={255}
                     required
                   />
@@ -305,14 +315,14 @@ export default function AnnouncementsPage() {
 
                 {/* 本文 */}
                 <div>
-                  <label className={labelClass}>本文 <span className="text-rose-500">*</span></label>
+                  <label className={labelClass}>{t('label_content')} <span className="text-rose-500">*</span></label>
                   <textarea
                     name="content"
                     value={formData.content}
                     onChange={handleInputChange}
                     className={inputClass + ' resize-none'}
                     rows={6}
-                    placeholder="お知らせの内容を入力してください..."
+                    placeholder={t('placeholder_content')}
                     required
                   />
                 </div>
@@ -326,7 +336,7 @@ export default function AnnouncementsPage() {
                 onClick={() => setIsFormModalOpen(false)}
                 className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={save}
@@ -334,9 +344,9 @@ export default function AnnouncementsPage() {
                 className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-indigo-200 transition-all"
               >
                 {isSaving ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 保存中...</>
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> {t('saving')}</>
                 ) : (
-                  <><i className="bi bi-check-lg"></i> {currentId ? '変更を保存' : '投稿する'}</>
+                  <><i className="bi bi-check-lg"></i> {currentId ? t('btn_save_changes') : t('btn_post')}</>
                 )}
               </button>
             </div>
@@ -351,14 +361,14 @@ export default function AnnouncementsPage() {
             <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
             </div>
-            <h3 className="font-black text-slate-800 text-lg mb-2">本当に削除しますか？</h3>
-            <p className="text-slate-500 text-sm mb-6">このお知らせは完全に削除され、ダッシュボードから表示されなくなります。</p>
+            <h3 className="font-black text-slate-800 text-lg mb-2">{t('delete_confirm_title')}</h3>
+            <p className="text-slate-500 text-sm mb-6">{t('delete_confirm_message')}</p>
             <div className="flex justify-center gap-3">
               <button
                 onClick={() => { setIsDeleteModalOpen(false); setCurrentId(null); }}
                 className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors"
               >
-                キャンセル
+                {t('cancel')}
               </button>
               <button
                 onClick={del}
@@ -366,9 +376,9 @@ export default function AnnouncementsPage() {
                 className="flex items-center gap-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
               >
                 {isDeleting ? (
-                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> 削除中...</>
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> {t('deleting')}</>
                 ) : (
-                  <><i className="bi bi-trash3-fill"></i> 削除する</>
+                  <><i className="bi bi-trash3-fill"></i> {t('btn_delete')}</>
                 )}
               </button>
             </div>

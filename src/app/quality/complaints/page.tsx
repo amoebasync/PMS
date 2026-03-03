@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 // ===== Types =====
 interface ComplaintTask {
@@ -83,32 +84,47 @@ interface BranchOption {
 }
 
 // ===== Constants =====
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  UNRESOLVED: { label: '\u672a\u5bfe\u5fdc', bg: 'bg-red-100', text: 'text-red-700' },
-  IN_PROGRESS: { label: '\u5bfe\u5fdc\u4e2d', bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  RESOLVED: { label: '\u89e3\u6c7a\u6e08\u307f', bg: 'bg-green-100', text: 'text-green-700' },
+const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+  UNRESOLVED: { bg: 'bg-red-100', text: 'text-red-700' },
+  IN_PROGRESS: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  RESOLVED: { bg: 'bg-green-100', text: 'text-green-700' },
+};
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+  ALL: 'status_all',
+  UNRESOLVED: 'status_unresolved',
+  IN_PROGRESS: 'status_in_progress',
+  RESOLVED: 'status_resolved',
 };
 
 const STATUS_KEYS = ['ALL', 'UNRESOLVED', 'IN_PROGRESS', 'RESOLVED'] as const;
-const STATUS_TAB_LABELS: Record<string, string> = {
-  ALL: '\u5168\u3066',
-  UNRESOLVED: '\u672a\u5bfe\u5fdc',
-  IN_PROGRESS: '\u5bfe\u5fdc\u4e2d',
-  RESOLVED: '\u89e3\u6c7a\u6e08\u307f',
+
+const SOURCE_ICONS: Record<string, string> = {
+  CUSTOMER: 'bi-person-badge',
+  RESIDENT: 'bi-house-door',
+  MANAGER: 'bi-key',
+  PARTNER: 'bi-building-gear',
+  OTHER: 'bi-three-dots',
 };
 
-const SOURCE_CONFIG: Record<string, { label: string; icon: string }> = {
-  CUSTOMER: { label: '顧客', icon: 'bi-person-badge' },
-  RESIDENT: { label: '住人', icon: 'bi-house-door' },
-  MANAGER: { label: '管理人', icon: 'bi-key' },
-  PARTNER: { label: '外注先', icon: 'bi-building-gear' },
-  OTHER: { label: 'その他', icon: 'bi-three-dots' },
+const SOURCE_LABEL_KEYS: Record<string, string> = {
+  CUSTOMER: 'source_customer',
+  RESIDENT: 'source_resident',
+  MANAGER: 'source_manager',
+  PARTNER: 'source_partner',
+  OTHER: 'source_other',
 };
 
-const TASK_STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  PENDING: { label: '未着手', bg: 'bg-slate-100', text: 'text-slate-600' },
-  IN_PROGRESS: { label: '進行中', bg: 'bg-blue-100', text: 'text-blue-700' },
-  DONE: { label: '完了', bg: 'bg-green-100', text: 'text-green-700' },
+const TASK_STATUS_STYLE: Record<string, { bg: string; text: string }> = {
+  PENDING: { bg: 'bg-slate-100', text: 'text-slate-600' },
+  IN_PROGRESS: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  DONE: { bg: 'bg-green-100', text: 'text-green-700' },
+};
+
+const TASK_STATUS_LABEL_KEYS: Record<string, string> = {
+  PENDING: 'task_status_pending',
+  IN_PROGRESS: 'task_status_in_progress',
+  DONE: 'task_status_done',
 };
 
 const PAGE_SIZE = 20;
@@ -264,12 +280,14 @@ function AutocompleteInput({
 }
 
 // ===== Status Badge =====
-function StatusBadge({ status }: { status: string }) {
-  const conf = STATUS_CONFIG[status];
-  if (!conf) return <span className="text-xs text-slate-400">{status}</span>;
+function StatusBadge({ status, t }: { status: string; t?: (key: string) => string }) {
+  const style = STATUS_STYLE[status];
+  if (!style) return <span className="text-xs text-slate-400">{status}</span>;
+  const labelKey = STATUS_LABEL_KEYS[status] || status;
+  const label = t ? t(labelKey) : labelKey;
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${conf.bg} ${conf.text}`}>
-      {conf.label}
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${style.bg} ${style.text}`}>
+      {label}
     </span>
   );
 }
@@ -279,6 +297,7 @@ function StatusBadge({ status }: { status: string }) {
 // ================================================================
 export default function ComplaintsPage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('complaints');
 
   // ----- List state -----
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -357,7 +376,7 @@ export default function ComplaintsPage() {
       setComplaints(json.data || []);
       setTotal(json.total || 0);
     } catch {
-      showToast('クレーム一覧の取得に失敗しました', 'error');
+      showToast(t('fetch_list_error'), 'error');
     } finally {
       setLoading(false);
     }
@@ -418,7 +437,7 @@ export default function ComplaintsPage() {
       const data: Complaint = await res.json();
       setSelectedComplaint(data);
     } catch {
-      showToast('クレーム詳細の取得に失敗しました', 'error');
+      showToast(t('fetch_detail_error'), 'error');
       setShowDetailModal(false);
     } finally {
       setDetailLoading(false);
@@ -466,7 +485,7 @@ export default function ComplaintsPage() {
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition-colors"
         >
           <i className="bi bi-plus-lg"></i>
-          新規登録
+          {t('create')}
         </button>
       </div>
 
@@ -484,7 +503,7 @@ export default function ComplaintsPage() {
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {STATUS_TAB_LABELS[key]}
+              {t(STATUS_LABEL_KEYS[key])}
               <span className={`ml-1.5 text-xs font-normal ${
                 statusFilter === key ? 'text-indigo-200' : 'text-slate-400'
               }`}>
@@ -497,20 +516,20 @@ export default function ComplaintsPage() {
         {/* Filter Row */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">支店</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_branch')}</label>
             <select
               value={branchFilter}
               onChange={e => { setBranchFilter(e.target.value); setPage(1); }}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
-              <option value="">全支店</option>
+              <option value="">{t('filter_all_branches')}</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>{b.nameJa}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">期間（開始）</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_date_from')}</label>
             <input
               type="date"
               value={dateFrom}
@@ -519,7 +538,7 @@ export default function ComplaintsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">期間（終了）</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_date_to')}</label>
             <input
               type="date"
               value={dateTo}
@@ -528,14 +547,14 @@ export default function ComplaintsPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
             <div className="relative">
               <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
               <input
                 type="text"
                 value={searchKeyword}
                 onChange={e => setSearchKeyword(e.target.value)}
-                placeholder="タイトル・住所・内容..."
+                placeholder={t('filter_keyword_placeholder')}
                 className="w-full border border-slate-300 pl-9 pr-3 py-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -548,12 +567,12 @@ export default function ComplaintsPage() {
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            <span className="ml-3 text-sm text-slate-500">読み込み中...</span>
+            <span className="ml-3 text-sm text-slate-500">{t('loading')}</span>
           </div>
         ) : complaints.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <i className="bi bi-inbox text-4xl mb-3"></i>
-            <p className="text-sm">クレームが見つかりません</p>
+            <p className="text-sm">{t('no_complaints')}</p>
           </div>
         ) : (
           <>
@@ -561,16 +580,16 @@ export default function ComplaintsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">受付日</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">種別</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">タイトル</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">物件住所</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">顧客</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">配布員</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">ステータス</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">担当</th>
-                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">対応数</th>
-                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">操作</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_received_date')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_type')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_title')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_address')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_customer')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_distributor')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_status')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_assignee')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_response_count')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -599,7 +618,7 @@ export default function ComplaintsPage() {
                         {c.distributor ? c.distributor.name : <span className="text-slate-300">-</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <StatusBadge status={c.status} />
+                        <StatusBadge status={c.status} t={t} />
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-slate-600">
                         {c.assignee ? employeeName(c.assignee) : <span className="text-slate-300">-</span>}
@@ -618,7 +637,7 @@ export default function ComplaintsPage() {
                           onClick={(e) => { e.stopPropagation(); openDetail(c.id); }}
                           className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
                         >
-                          詳細
+                          {t('details')}
                         </button>
                       </td>
                     </tr>
@@ -630,7 +649,7 @@ export default function ComplaintsPage() {
             {/* Pagination */}
             <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-slate-100 gap-3">
               <p className="text-xs text-slate-500">
-                {total}件中 {startItem}-{endItem}件表示
+                {t('pagination_showing', { total: String(total), start: String(startItem), end: String(endItem) })}
               </p>
               <div className="flex items-center gap-1">
                 <button
@@ -680,7 +699,7 @@ export default function ComplaintsPage() {
             setShowCreateModal(false);
             fetchComplaints();
             fetchStatusCounts();
-            showToast('クレームを登録しました', 'success');
+            showToast(t('created_success'), 'success');
           }}
         />
       )}
@@ -718,6 +737,7 @@ function CreateComplaintModal({
   onCreated: () => void;
 }) {
   const { showToast } = useNotification();
+  const { t } = useTranslation('complaints');
   const [submitting, setSubmitting] = useState(false);
 
   // Form fields
@@ -771,17 +791,17 @@ function CreateComplaintModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!occurredAt || !address.trim() || !title.trim() || !description.trim()) {
-      showToast('必須項目を入力してください', 'warning');
+      showToast(t('form_required_error'), 'warning');
       return;
     }
 
     // タスク必須チェック
     if (needsResponse && (!responseTaskContent.trim() || !responseTaskAssigneeId)) {
-      showToast('クレーム対応タスクの内容と担当者を入力してください', 'warning');
+      showToast(t('task_response_validation'), 'warning');
       return;
     }
     if (needsCustomerReport && (!customerReportContent.trim() || !customerReportAssigneeId)) {
-      showToast('顧客報告タスクの内容と担当者を入力してください', 'warning');
+      showToast(t('task_report_validation'), 'warning');
       return;
     }
 
@@ -828,12 +848,12 @@ function CreateComplaintModal({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || '登録に失敗しました');
+        throw new Error(err.error || t('form_register_error'));
       }
 
       onCreated();
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : '登録に失敗しました', 'error');
+      showToast(err instanceof Error ? err.message : t('form_register_error'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -846,7 +866,7 @@ function CreateComplaintModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-black text-slate-800">
             <i className="bi bi-plus-circle-fill text-indigo-500 mr-2"></i>
-            クレーム新規登録
+            {t('create_modal_title')}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <i className="bi bi-x-lg text-lg"></i>
@@ -858,7 +878,7 @@ function CreateComplaintModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-calendar-event mr-1"></i>発生日 <span className="text-red-500">*</span>
+                <i className="bi bi-calendar-event mr-1"></i>{t('form_occurred_date')} <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
@@ -870,14 +890,14 @@ function CreateComplaintModal({
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-tag mr-1"></i>クレーム種別
+                <i className="bi bi-tag mr-1"></i>{t('form_complaint_type')}
               </label>
               <select
                 value={complaintTypeId}
                 onChange={e => setComplaintTypeId(e.target.value)}
                 className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
-                <option value="">選択してください</option>
+                <option value="">{t('form_select_placeholder')}</option>
                 {complaintTypes.filter(t => t.isActive).map(t => (
                   <option key={t.id} value={t.id}>{t.name}</option>
                 ))}
@@ -887,28 +907,28 @@ function CreateComplaintModal({
 
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1">
-              <i className="bi bi-chat-text mr-1"></i>タイトル <span className="text-red-500">*</span>
+              <i className="bi bi-chat-text mr-1"></i>{t('form_title')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={title}
               onChange={e => setTitle(e.target.value)}
               required
-              placeholder="クレームの概要を入力"
+              placeholder={t('form_title_placeholder')}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1">
-              <i className="bi bi-geo-alt mr-1"></i>住所 <span className="text-red-500">*</span>
+              <i className="bi bi-geo-alt mr-1"></i>{t('form_address')} <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={address}
               onChange={e => setAddress(e.target.value)}
               required
-              placeholder="物件住所を入力"
+              placeholder={t('form_address_placeholder')}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
@@ -916,25 +936,25 @@ function CreateComplaintModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-building mr-1"></i>建物名
+                <i className="bi bi-building mr-1"></i>{t('form_building_name')}
               </label>
               <input
                 type="text"
                 value={buildingName}
                 onChange={e => setBuildingName(e.target.value)}
-                placeholder="建物名"
+                placeholder={t('form_building_name')}
                 className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-door-open mr-1"></i>部屋番号
+                <i className="bi bi-door-open mr-1"></i>{t('form_room_number')}
               </label>
               <input
                 type="text"
                 value={roomNumber}
                 onChange={e => setRoomNumber(e.target.value)}
-                placeholder="部屋番号"
+                placeholder={t('form_room_number')}
                 className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -942,14 +962,14 @@ function CreateComplaintModal({
 
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1">
-              <i className="bi bi-body-text mr-1"></i>詳細内容 <span className="text-red-500">*</span>
+              <i className="bi bi-body-text mr-1"></i>{t('form_detail')} <span className="text-red-500">*</span>
             </label>
             <textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
               required
               rows={4}
-              placeholder="クレームの詳細を入力"
+              placeholder={t('form_detail_placeholder')}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
@@ -958,9 +978,9 @@ function CreateComplaintModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <AutocompleteInput
               value={customerId}
-              label="顧客"
+              label={t('form_customer')}
               icon="bi-person-badge"
-              placeholder="顧客名で検索..."
+              placeholder={t('form_customer_placeholder')}
               fetchUrl={(q) => `/api/customers?search=${encodeURIComponent(q)}`}
               onSelect={(id, name) => { setCustomerId(id); setCustomerName(name); }}
               onClear={() => { setCustomerId(''); setCustomerName(''); }}
@@ -974,9 +994,9 @@ function CreateComplaintModal({
             />
             <AutocompleteInput
               value={distributorId}
-              label="配布員"
+              label={t('form_distributor')}
               icon="bi-person-walking"
-              placeholder="配布員名で検索..."
+              placeholder={t('form_distributor_placeholder')}
               fetchUrl={(q) => `/api/distributors?search=${encodeURIComponent(q)}`}
               onSelect={(id, name) => { setDistributorId(id); setDistributorName(name); }}
               onClear={() => { setDistributorId(''); setDistributorName(''); }}
@@ -993,14 +1013,14 @@ function CreateComplaintModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-building mr-1"></i>関連支店
+                <i className="bi bi-building mr-1"></i>{t('form_related_branch')}
               </label>
               <select
                 value={branchId}
                 onChange={e => setBranchId(e.target.value)}
                 className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
-                <option value="">選択してください</option>
+                <option value="">{t('form_select_placeholder')}</option>
                 {branches.map(b => (
                   <option key={b.id} value={b.id}>{b.nameJa}</option>
                 ))}
@@ -1008,9 +1028,9 @@ function CreateComplaintModal({
             </div>
             <AutocompleteInput
               value={assigneeId}
-              label="担当者"
+              label={t('form_assignee')}
               icon="bi-person-gear"
-              placeholder="社員名で検索..."
+              placeholder={t('form_assignee_placeholder')}
               fetchUrl={(q) => `/api/employees?search=${encodeURIComponent(q)}`}
               onSelect={(id, name) => { setAssigneeId(id); setAssigneeName(name); }}
               onClear={() => { setAssigneeId(''); setAssigneeName(''); }}
@@ -1026,7 +1046,7 @@ function CreateComplaintModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-geo mr-1"></i>緯度
+                <i className="bi bi-geo mr-1"></i>{t('form_latitude')}
               </label>
               <input
                 type="number"
@@ -1039,7 +1059,7 @@ function CreateComplaintModal({
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
-                <i className="bi bi-geo mr-1"></i>経度
+                <i className="bi bi-geo mr-1"></i>{t('form_longitude')}
               </label>
               <input
                 type="number"
@@ -1056,10 +1076,10 @@ function CreateComplaintModal({
           <div className="border-t border-slate-200 pt-5">
             <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
               <i className="bi bi-person-lines-fill text-orange-500"></i>
-              クレーム元
+              {t('section_source')}
             </h3>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">クレーム元種別</label>
+              <label className="block text-xs font-bold text-slate-600 mb-1">{t('source_type')}</label>
               <select
                 value={source}
                 onChange={e => {
@@ -1071,9 +1091,9 @@ function CreateComplaintModal({
                 }}
                 className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
-                <option value="">選択してください</option>
-                {Object.entries(SOURCE_CONFIG).map(([key, cfg]) => (
-                  <option key={key} value={key}>{cfg.label}</option>
+                <option value="">{t('form_select_placeholder')}</option>
+                {Object.entries(SOURCE_LABEL_KEYS).map(([key, labelKey]) => (
+                  <option key={key} value={key}>{t(labelKey)}</option>
                 ))}
               </select>
             </div>
@@ -1083,19 +1103,19 @@ function CreateComplaintModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">
-                    <i className="bi bi-person mr-1"></i>氏名
+                    <i className="bi bi-person mr-1"></i>{t('source_contact_name')}
                   </label>
                   <input
                     type="text"
                     value={sourceContactName}
                     onChange={e => setSourceContactName(e.target.value)}
-                    placeholder="氏名を入力"
+                    placeholder={t('source_contact_name_placeholder')}
                     className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">
-                    <i className="bi bi-telephone mr-1"></i>電話番号
+                    <i className="bi bi-telephone mr-1"></i>{t('source_contact_phone')}
                   </label>
                   <input
                     type="tel"
@@ -1112,8 +1132,8 @@ function CreateComplaintModal({
             {source === 'CUSTOMER' && (
               <p className="text-xs text-slate-500 mt-2">
                 <i className="bi bi-info-circle mr-1"></i>
-                上部の「顧客」フィールドで選択してください
-                {customerName && <span className="ml-1 font-bold text-indigo-600">（選択済み: {customerName}）</span>}
+                {t('source_customer_hint')}
+                {customerName && <span className="ml-1 font-bold text-indigo-600">({t('source_customer_selected', { name: customerName })})</span>}
               </p>
             )}
 
@@ -1122,9 +1142,9 @@ function CreateComplaintModal({
               <div className="mt-3">
                 <AutocompleteInput
                   value={sourcePartnerId}
-                  label="外注先"
+                  label={t('source_partner_label')}
                   icon="bi-building-gear"
-                  placeholder="外注先名で検索..."
+                  placeholder={t('source_partner_placeholder')}
                   fetchUrl={(q) => `/api/partners?search=${encodeURIComponent(q)}`}
                   onSelect={(id, name) => { setSourcePartnerId(id); setSourcePartnerName(name); }}
                   onClear={() => { setSourcePartnerId(''); setSourcePartnerName(''); }}
@@ -1141,7 +1161,7 @@ function CreateComplaintModal({
           <div className="border-t border-slate-200 pt-5">
             <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
               <i className="bi bi-list-task text-blue-500"></i>
-              タスク連携
+              {t('section_task')}
             </h3>
 
             {/* クレーム対応が必要 */}
@@ -1153,25 +1173,25 @@ function CreateComplaintModal({
                   onChange={e => setNeedsResponse(e.target.checked)}
                   className="w-4 h-4 accent-indigo-600 rounded"
                 />
-                <span className="text-sm font-bold text-slate-700">クレーム対応が必要</span>
+                <span className="text-sm font-bold text-slate-700">{t('task_needs_response')}</span>
               </label>
               {needsResponse && (
                 <div className="mt-3 ml-6 space-y-3 bg-blue-50 border border-blue-200 rounded-xl p-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">対応内容</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('task_response_content')}</label>
                     <textarea
                       value={responseTaskContent}
                       onChange={e => setResponseTaskContent(e.target.value)}
                       rows={2}
-                      placeholder="対応内容を入力..."
+                      placeholder={t('task_response_content_placeholder')}
                       className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
                   </div>
                   <AutocompleteInput
                     value={responseTaskAssigneeId}
-                    label="対応担当者"
+                    label={t('task_response_assignee')}
                     icon="bi-person-gear"
-                    placeholder="担当者名で検索..."
+                    placeholder={t('task_response_assignee_placeholder')}
                     fetchUrl={(q) => `/api/employees?search=${encodeURIComponent(q)}`}
                     onSelect={(id, name) => { setResponseTaskAssigneeId(id); setResponseTaskAssigneeName(name); }}
                     onClear={() => { setResponseTaskAssigneeId(''); setResponseTaskAssigneeName(''); }}
@@ -1195,15 +1215,15 @@ function CreateComplaintModal({
                   onChange={e => setNeedsCustomerReport(e.target.checked)}
                   className="w-4 h-4 accent-indigo-600 rounded"
                 />
-                <span className="text-sm font-bold text-slate-700">顧客報告が必要</span>
+                <span className="text-sm font-bold text-slate-700">{t('task_needs_customer_report')}</span>
               </label>
               {needsCustomerReport && (
                 <div className="mt-3 ml-6 space-y-3 bg-amber-50 border border-amber-200 rounded-xl p-4">
                   <AutocompleteInput
                     value={customerReportCustomerId}
-                    label="報告先顧客"
+                    label={t('task_report_customer')}
                     icon="bi-person-badge"
-                    placeholder="顧客名で検索..."
+                    placeholder={t('form_customer_placeholder')}
                     fetchUrl={(q) => `/api/customers?search=${encodeURIComponent(q)}`}
                     onSelect={(id, name) => { setCustomerReportCustomerId(id); setCustomerReportCustomerName(name); }}
                     onClear={() => { setCustomerReportCustomerId(''); setCustomerReportCustomerName(''); }}
@@ -1216,20 +1236,20 @@ function CreateComplaintModal({
                     )}
                   />
                   <div>
-                    <label className="block text-xs font-bold text-slate-600 mb-1">報告内容</label>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('task_report_content')}</label>
                     <textarea
                       value={customerReportContent}
                       onChange={e => setCustomerReportContent(e.target.value)}
                       rows={2}
-                      placeholder="顧客への報告内容を入力..."
+                      placeholder={t('task_report_content_placeholder')}
                       className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
                   </div>
                   <AutocompleteInput
                     value={customerReportAssigneeId}
-                    label="報告担当者"
+                    label={t('task_report_assignee')}
                     icon="bi-person-gear"
-                    placeholder="担当者名で検索..."
+                    placeholder={t('task_response_assignee_placeholder')}
                     fetchUrl={(q) => `/api/employees?search=${encodeURIComponent(q)}`}
                     onSelect={(id, name) => { setCustomerReportAssigneeId(id); setCustomerReportAssigneeName(name); }}
                     onClear={() => { setCustomerReportAssigneeId(''); setCustomerReportAssigneeName(''); }}
@@ -1252,7 +1272,7 @@ function CreateComplaintModal({
               onClick={onClose}
               className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
             >
-              キャンセル
+              {t('cancel')}
             </button>
             <button
               type="submit"
@@ -1262,9 +1282,9 @@ function CreateComplaintModal({
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  登録中...
+                  {t('form_registering')}
                 </span>
-              ) : '登録する'}
+              ) : t('form_register')}
             </button>
           </div>
         </form>
@@ -1297,6 +1317,8 @@ function DetailModal({
   showToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   showConfirm: (msg: string, options?: { title?: string; variant?: 'danger' | 'primary'; confirmLabel?: string }) => Promise<boolean>;
 }) {
+  const { t } = useTranslation('complaints');
+
   // Response form
   const [responseContent, setResponseContent] = useState('');
   const [sendingResponse, setSendingResponse] = useState(false);
@@ -1334,14 +1356,14 @@ function DetailModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || '送信に失敗しました');
+        throw new Error(err.error || t('detail_send_error'));
       }
       setResponseContent('');
       await onRefresh();
       onListRefresh();
-      showToast('対応履歴を追加しました', 'success');
+      showToast(t('detail_response_added'), 'success');
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : '送信に失敗しました', 'error');
+      showToast(err instanceof Error ? err.message : t('detail_send_error'), 'error');
     } finally {
       setSendingResponse(false);
     }
@@ -1361,12 +1383,12 @@ function DetailModal({
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'アップロードに失敗しました');
+        throw new Error(err.error || t('detail_image_upload_error'));
       }
       await onRefresh();
-      showToast('画像をアップロードしました', 'success');
+      showToast(t('detail_image_uploaded'), 'success');
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : 'アップロードに失敗しました', 'error');
+      showToast(err instanceof Error ? err.message : t('detail_image_upload_error'), 'error');
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -1376,7 +1398,7 @@ function DetailModal({
   // ----- Delete Image -----
   const handleDeleteImage = async (url: string) => {
     if (!complaint) return;
-    const ok = await showConfirm('この画像を削除しますか?', { title: '画像の削除', variant: 'danger', confirmLabel: '削除する' });
+    const ok = await showConfirm(t('detail_delete_image_confirm'), { title: t('detail_delete_image_title'), variant: 'danger', confirmLabel: t('detail_delete_image_btn') });
     if (!ok) return;
     try {
       const res = await fetch(`/api/complaints/${complaint.id}/images`, {
@@ -1386,9 +1408,9 @@ function DetailModal({
       });
       if (!res.ok) throw new Error();
       await onRefresh();
-      showToast('画像を削除しました', 'success');
+      showToast(t('detail_image_deleted'), 'success');
     } catch {
-      showToast('画像の削除に失敗しました', 'error');
+      showToast(t('detail_image_delete_error'), 'error');
     }
   };
 
@@ -1405,9 +1427,9 @@ function DetailModal({
       if (!res.ok) throw new Error();
       await onRefresh();
       onListRefresh();
-      showToast('ステータスを変更しました', 'success');
+      showToast(t('sidebar_status_changed'), 'success');
     } catch {
-      showToast('ステータスの変更に失敗しました', 'error');
+      showToast(t('sidebar_status_change_error'), 'error');
     } finally {
       setChangingStatus(false);
     }
@@ -1427,9 +1449,9 @@ function DetailModal({
       if (!res.ok) throw new Error();
       await onRefresh();
       onListRefresh();
-      showToast('減点スコアを保存しました', 'success');
+      showToast(t('sidebar_penalty_saved'), 'success');
     } catch {
-      showToast('減点スコアの保存に失敗しました', 'error');
+      showToast(t('sidebar_penalty_save_error'), 'error');
     } finally {
       setSavingPenalty(false);
     }
@@ -1445,7 +1467,7 @@ function DetailModal({
         {loading || !complaint ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            <span className="ml-3 text-sm text-slate-500">読み込み中...</span>
+            <span className="ml-3 text-sm text-slate-500">{t('loading')}</span>
           </div>
         ) : (
           <>
@@ -1453,9 +1475,9 @@ function DetailModal({
             <div className="flex items-start justify-between px-6 py-4 border-b border-slate-200">
               <div className="flex-1 min-w-0 mr-4">
                 <div className="flex items-center gap-3 flex-wrap">
-                  <StatusBadge status={complaint.status} />
+                  <StatusBadge status={complaint.status} t={t} />
                   <span className="text-xs text-slate-400">
-                    ID: {complaint.id} | 発生日: {formatDate(complaint.occurredAt)}
+                    {t('detail_id_date', { id: String(complaint.id), date: formatDate(complaint.occurredAt) })}
                   </span>
                 </div>
                 <h2 className="text-lg font-black text-slate-800 mt-1 truncate">{complaint.title}</h2>
@@ -1473,20 +1495,20 @@ function DetailModal({
                 <section>
                   <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
                     <i className="bi bi-chat-left-text text-indigo-500"></i>
-                    クレーム内容
+                    {t('detail_complaint_content')}
                   </h3>
                   <div className="bg-slate-50 rounded-xl p-4 space-y-2">
                     <div>
-                      <span className="text-xs font-bold text-slate-500">タイトル</span>
+                      <span className="text-xs font-bold text-slate-500">{t('detail_title_label')}</span>
                       <p className="text-sm text-slate-800 font-medium">{complaint.title}</p>
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-500">詳細</span>
+                      <span className="text-xs font-bold text-slate-500">{t('detail_description_label')}</span>
                       <p className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{complaint.description}</p>
                     </div>
                     {complaint.complaintType && (
                       <div>
-                        <span className="text-xs font-bold text-slate-500">種別</span>
+                        <span className="text-xs font-bold text-slate-500">{t('detail_type_label')}</span>
                         <p className="text-sm text-slate-700">{complaint.complaintType.name}</p>
                       </div>
                     )}
@@ -1497,27 +1519,27 @@ function DetailModal({
                 {complaint.source && (
                   <section>
                     <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
-                      <i className={`${SOURCE_CONFIG[complaint.source]?.icon || 'bi-person'} text-orange-500`}></i>
-                      クレーム元
+                      <i className={`${SOURCE_ICONS[complaint.source] || 'bi-person'} text-orange-500`}></i>
+                      {t('detail_source')}
                     </h3>
                     <div className="bg-orange-50 rounded-xl p-4 space-y-2">
                       <div className="flex items-center gap-2">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
-                          <i className={SOURCE_CONFIG[complaint.source]?.icon || 'bi-person'}></i>
-                          {SOURCE_CONFIG[complaint.source]?.label || complaint.source}
+                          <i className={SOURCE_ICONS[complaint.source] || 'bi-person'}></i>
+                          {t(SOURCE_LABEL_KEYS[complaint.source] || complaint.source)}
                         </span>
                       </div>
                       {(complaint.source === 'RESIDENT' || complaint.source === 'MANAGER') && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                           {complaint.sourceContactName && (
                             <div>
-                              <span className="text-xs font-bold text-slate-500">氏名</span>
+                              <span className="text-xs font-bold text-slate-500">{t('source_contact_name')}</span>
                               <p className="text-sm text-slate-800">{complaint.sourceContactName}</p>
                             </div>
                           )}
                           {complaint.sourceContactPhone && (
                             <div>
-                              <span className="text-xs font-bold text-slate-500">電話番号</span>
+                              <span className="text-xs font-bold text-slate-500">{t('source_contact_phone')}</span>
                               <p className="text-sm text-slate-800">{complaint.sourceContactPhone}</p>
                             </div>
                           )}
@@ -1525,7 +1547,7 @@ function DetailModal({
                       )}
                       {complaint.source === 'CUSTOMER' && complaint.customer && (
                         <div>
-                          <span className="text-xs font-bold text-slate-500">顧客</span>
+                          <span className="text-xs font-bold text-slate-500">{t('sidebar_customer')}</span>
                           <p className="text-sm text-slate-800">
                             {complaint.customer.name}
                             <span className="text-xs text-slate-400 ml-1">({complaint.customer.customerCode})</span>
@@ -1534,7 +1556,7 @@ function DetailModal({
                       )}
                       {complaint.source === 'PARTNER' && complaint.sourcePartner && (
                         <div>
-                          <span className="text-xs font-bold text-slate-500">外注先</span>
+                          <span className="text-xs font-bold text-slate-500">{t('source_partner_label')}</span>
                           <p className="text-sm text-slate-800">{complaint.sourcePartner.name}</p>
                         </div>
                       )}
@@ -1546,29 +1568,29 @@ function DetailModal({
                 <section>
                   <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
                     <i className="bi bi-geo-alt text-rose-500"></i>
-                    物件情報
+                    {t('detail_property_info')}
                   </h3>
                   <div className="bg-slate-50 rounded-xl p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <span className="text-xs font-bold text-slate-500">住所</span>
+                        <span className="text-xs font-bold text-slate-500">{t('detail_address_label')}</span>
                         <p className="text-sm text-slate-800">{complaint.address}</p>
                       </div>
                       {complaint.buildingName && (
                         <div>
-                          <span className="text-xs font-bold text-slate-500">建物名</span>
+                          <span className="text-xs font-bold text-slate-500">{t('detail_building_label')}</span>
                           <p className="text-sm text-slate-800">{complaint.buildingName}</p>
                         </div>
                       )}
                       {complaint.roomNumber && (
                         <div>
-                          <span className="text-xs font-bold text-slate-500">部屋番号</span>
+                          <span className="text-xs font-bold text-slate-500">{t('detail_room_label')}</span>
                           <p className="text-sm text-slate-800">{complaint.roomNumber}</p>
                         </div>
                       )}
                       {(complaint.latitude != null || complaint.longitude != null) && (
                         <div>
-                          <span className="text-xs font-bold text-slate-500">座標</span>
+                          <span className="text-xs font-bold text-slate-500">{t('detail_coordinates')}</span>
                           <p className="text-sm text-slate-800">
                             {complaint.latitude ?? '-'}, {complaint.longitude ?? '-'}
                           </p>
@@ -1582,8 +1604,8 @@ function DetailModal({
                 <section>
                   <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
                     <i className="bi bi-images text-amber-500"></i>
-                    画像
-                    <span className="text-xs font-normal text-slate-400">({images.length}件)</span>
+                    {t('detail_images')}
+                    <span className="text-xs font-normal text-slate-400">({t('detail_images_count', { count: String(images.length) })})</span>
                   </h3>
                   {images.length > 0 ? (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-3">
@@ -1599,7 +1621,7 @@ function DetailModal({
                           <button
                             onClick={() => handleDeleteImage(url)}
                             className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-red-700"
-                            title="削除"
+                            title={t('detail_delete_tooltip')}
                           >
                             <i className="bi bi-x text-xs"></i>
                           </button>
@@ -1607,7 +1629,7 @@ function DetailModal({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400 mb-3">画像なし</p>
+                    <p className="text-sm text-slate-400 mb-3">{t('detail_no_images')}</p>
                   )}
                   <div>
                     <input
@@ -1625,12 +1647,12 @@ function DetailModal({
                       {uploadingImage ? (
                         <>
                           <span className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></span>
-                          アップロード中...
+                          {t('detail_uploading')}
                         </>
                       ) : (
                         <>
                           <i className="bi bi-cloud-arrow-up"></i>
-                          画像を追加
+                          {t('detail_add_image')}
                         </>
                       )}
                     </button>
@@ -1641,8 +1663,8 @@ function DetailModal({
                 <section>
                   <h3 className="text-sm font-black text-slate-700 mb-3 flex items-center gap-2">
                     <i className="bi bi-chat-dots text-emerald-500"></i>
-                    対応履歴
-                    <span className="text-xs font-normal text-slate-400">({responses.length}件)</span>
+                    {t('detail_response_timeline')}
+                    <span className="text-xs font-normal text-slate-400">({t('detail_images_count', { count: String(responses.length) })})</span>
                   </h3>
 
                   {responses.length > 0 ? (
@@ -1655,7 +1677,7 @@ function DetailModal({
                                 {r.responder ? r.responder.lastNameJa.charAt(0) : '?'}
                               </div>
                               <span className="text-sm font-bold text-slate-700">
-                                {r.responder ? employeeName(r.responder) : '不明'}
+                                {r.responder ? employeeName(r.responder) : t('detail_unknown_responder')}
                               </span>
                             </div>
                             <span className="text-xs text-slate-400">{formatDateTime(r.createdAt)}</span>
@@ -1665,7 +1687,7 @@ function DetailModal({
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400 mb-4">対応履歴なし</p>
+                    <p className="text-sm text-slate-400 mb-4">{t('detail_no_responses')}</p>
                   )}
 
                   {/* Response Input */}
@@ -1673,7 +1695,7 @@ function DetailModal({
                     <textarea
                       value={responseContent}
                       onChange={e => setResponseContent(e.target.value)}
-                      placeholder="対応内容を入力..."
+                      placeholder={t('detail_response_placeholder')}
                       rows={3}
                       className="w-full text-sm outline-none resize-none bg-transparent placeholder:text-slate-400"
                     />
@@ -1686,12 +1708,12 @@ function DetailModal({
                         {sendingResponse ? (
                           <>
                             <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                            送信中...
+                            {t('detail_sending')}
                           </>
                         ) : (
                           <>
                             <i className="bi bi-send"></i>
-                            送信
+                            {t('detail_send')}
                           </>
                         )}
                       </button>
@@ -1704,10 +1726,10 @@ function DetailModal({
               <div className="w-full lg:w-80 shrink-0 overflow-y-auto p-6 space-y-6 bg-slate-50/50">
                 {/* Status Control */}
                 <section>
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">ステータス</h3>
+                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_status')}</h3>
                   <div className="space-y-2">
                     <div className="flex items-center gap-2 mb-2">
-                      <StatusBadge status={complaint.status} />
+                      <StatusBadge status={complaint.status} t={t} />
                     </div>
                     <select
                       value={complaint.status}
@@ -1715,42 +1737,42 @@ function DetailModal({
                       disabled={changingStatus}
                       className="w-full border border-slate-300 p-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-50"
                     >
-                      <option value="UNRESOLVED">未対応</option>
-                      <option value="IN_PROGRESS">対応中</option>
-                      <option value="RESOLVED">解決済み</option>
+                      <option value="UNRESOLVED">{t('status_unresolved')}</option>
+                      <option value="IN_PROGRESS">{t('status_in_progress')}</option>
+                      <option value="RESOLVED">{t('status_resolved')}</option>
                     </select>
                   </div>
                 </section>
 
                 {/* Penalty Score */}
                 <section>
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">減点スコア</h3>
+                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_penalty_score')}</h3>
                   <div className="space-y-2">
                     <input
                       type="number"
                       min={0}
                       value={penaltyScoreInput}
                       onChange={e => setPenaltyScoreInput(e.target.value)}
-                      placeholder={`種別デフォルト: ${complaint.complaintType?.penaltyScore ?? 10}`}
+                      placeholder={t('sidebar_penalty_type_default', { score: String(complaint.complaintType?.penaltyScore ?? 10) })}
                       className="w-full border border-slate-300 p-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     />
-                    <p className="text-[10px] text-slate-400">空欄の場合はクレーム種別のデフォルト値を使用</p>
+                    <p className="text-[10px] text-slate-400">{t('sidebar_penalty_empty_hint')}</p>
                     <button
                       onClick={handleSavePenalty}
                       disabled={savingPenalty}
                       className="w-full text-center px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-colors disabled:opacity-50"
                     >
-                      {savingPenalty ? '保存中...' : '減点スコアを保存'}
+                      {savingPenalty ? t('sidebar_penalty_saving') : t('sidebar_penalty_save')}
                     </button>
                   </div>
                 </section>
 
                 {/* Related People */}
                 <section>
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">関係者</h3>
+                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_related_people')}</h3>
                   <div className="space-y-3">
                     <div>
-                      <span className="text-xs font-bold text-slate-500">顧客</span>
+                      <span className="text-xs font-bold text-slate-500">{t('sidebar_customer')}</span>
                       <p className="text-sm text-slate-800">
                         {complaint.customer ? (
                           <span className="flex items-center gap-1.5">
@@ -1759,12 +1781,12 @@ function DetailModal({
                             <span className="text-xs text-slate-400">({complaint.customer.customerCode})</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">なし</span>
+                          <span className="text-slate-400">{t('sidebar_none')}</span>
                         )}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-500">配布員</span>
+                      <span className="text-xs font-bold text-slate-500">{t('sidebar_distributor')}</span>
                       <p className="text-sm text-slate-800">
                         {complaint.distributor ? (
                           <span className="flex items-center gap-1.5">
@@ -1773,12 +1795,12 @@ function DetailModal({
                             <span className="text-xs text-slate-400">({complaint.distributor.staffId})</span>
                           </span>
                         ) : (
-                          <span className="text-slate-400">なし</span>
+                          <span className="text-slate-400">{t('sidebar_none')}</span>
                         )}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-500">関連スケジュール</span>
+                      <span className="text-xs font-bold text-slate-500">{t('sidebar_schedule')}</span>
                       <p className="text-sm text-slate-800">
                         {complaint.schedule ? (
                           <span className="flex items-center gap-1.5">
@@ -1789,12 +1811,12 @@ function DetailModal({
                             )}
                           </span>
                         ) : (
-                          <span className="text-slate-400">なし</span>
+                          <span className="text-slate-400">{t('sidebar_none')}</span>
                         )}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-500">支店</span>
+                      <span className="text-xs font-bold text-slate-500">{t('sidebar_branch')}</span>
                       <p className="text-sm text-slate-800">
                         {complaint.branch ? (
                           <span className="flex items-center gap-1.5">
@@ -1802,12 +1824,12 @@ function DetailModal({
                             {complaint.branch.nameJa}
                           </span>
                         ) : (
-                          <span className="text-slate-400">なし</span>
+                          <span className="text-slate-400">{t('sidebar_none')}</span>
                         )}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs font-bold text-slate-500">担当者</span>
+                      <span className="text-xs font-bold text-slate-500">{t('sidebar_assignee')}</span>
                       <p className="text-sm text-slate-800">
                         {complaint.assignee ? (
                           <span className="flex items-center gap-1.5">
@@ -1815,7 +1837,7 @@ function DetailModal({
                             {employeeName(complaint.assignee)}
                           </span>
                         ) : (
-                          <span className="text-slate-400">なし</span>
+                          <span className="text-slate-400">{t('sidebar_none')}</span>
                         )}
                       </p>
                     </div>
@@ -1825,7 +1847,7 @@ function DetailModal({
                 {/* Prohibited Properties */}
                 {complaint.prohibitedProperties && complaint.prohibitedProperties.length > 0 && (
                   <section>
-                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">登録済み禁止物件</h3>
+                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_prohibited')}</h3>
                     <div className="space-y-2">
                       {complaint.prohibitedProperties.map(pp => (
                         <div key={pp.id} className="flex items-center gap-2 text-sm">
@@ -1842,10 +1864,11 @@ function DetailModal({
                 {/* Linked Tasks */}
                 {complaint.tasks && complaint.tasks.length > 0 && (
                   <section>
-                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">紐付きタスク</h3>
+                    <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_linked_tasks')}</h3>
                     <div className="space-y-2">
                       {complaint.tasks.map(task => {
-                        const tConf = TASK_STATUS_CONFIG[task.status] || { label: task.status, bg: 'bg-slate-100', text: 'text-slate-600' };
+                        const tStyle = TASK_STATUS_STYLE[task.status] || { bg: 'bg-slate-100', text: 'text-slate-600' };
+                        const tLabelKey = TASK_STATUS_LABEL_KEYS[task.status] || task.status;
                         return (
                           <div key={task.id} className="bg-white border border-slate-200 rounded-xl p-3 space-y-1.5">
                             <div className="flex items-start justify-between gap-2">
@@ -1853,8 +1876,8 @@ function DetailModal({
                                 {task.taskCategory?.icon && <i className={`${task.taskCategory.icon} mr-1 text-xs`}></i>}
                                 {task.title}
                               </p>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${tConf.bg} ${tConf.text}`}>
-                                {tConf.label}
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${tStyle.bg} ${tStyle.text}`}>
+                                {t(tLabelKey)}
                               </span>
                             </div>
                             <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -1878,22 +1901,22 @@ function DetailModal({
 
                 {/* Actions */}
                 <section>
-                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">アクション</h3>
+                  <h3 className="text-xs font-black text-slate-600 uppercase tracking-wider mb-3">{t('sidebar_actions')}</h3>
                   <button
                     onClick={() => setShowProhibitedModal(true)}
                     className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-50 hover:bg-red-100 text-red-700 rounded-xl text-sm font-bold transition-colors border border-red-200"
                   >
                     <i className="bi bi-shield-exclamation"></i>
-                    禁止物件として登録
+                    {t('sidebar_register_prohibited')}
                   </button>
                 </section>
 
                 {/* Timestamps */}
                 <section className="pt-3 border-t border-slate-200">
                   <div className="space-y-1 text-xs text-slate-400">
-                    <p>受付日: {formatDateTime(complaint.receivedAt)}</p>
-                    <p>作成日: {formatDateTime(complaint.createdAt)}</p>
-                    <p>更新日: {formatDateTime(complaint.updatedAt)}</p>
+                    <p>{t('sidebar_received_date', { date: formatDateTime(complaint.receivedAt) })}</p>
+                    <p>{t('sidebar_created_date', { date: formatDateTime(complaint.createdAt) })}</p>
+                    <p>{t('sidebar_updated_date', { date: formatDateTime(complaint.updatedAt) })}</p>
                   </div>
                 </section>
               </div>
@@ -1912,7 +1935,7 @@ function DetailModal({
             setShowProhibitedModal(false);
             await onRefresh();
             onListRefresh();
-            showToast('禁止物件を登録しました', 'success');
+            showToast(t('prohibited_registered'), 'success');
           }}
           showToast={showToast}
         />
@@ -1937,6 +1960,7 @@ function ProhibitedPropertyModal({
   onCreated: () => void;
   showToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }) {
+  const { t } = useTranslation('complaints');
   const [submitting, setSubmitting] = useState(false);
   const [prohibitedReasonId, setProhibitedReasonId] = useState('');
   const [customerScope, setCustomerScope] = useState<'all' | 'specific'>('all');
@@ -1961,12 +1985,12 @@ function ProhibitedPropertyModal({
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || '登録に失敗しました');
+        throw new Error(err.error || t('form_register_error'));
       }
 
       onCreated();
     } catch (err: unknown) {
-      showToast(err instanceof Error ? err.message : '登録に失敗しました', 'error');
+      showToast(err instanceof Error ? err.message : t('form_register_error'), 'error');
     } finally {
       setSubmitting(false);
     }
@@ -1978,7 +2002,7 @@ function ProhibitedPropertyModal({
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-base font-black text-slate-800">
             <i className="bi bi-shield-exclamation text-red-500 mr-2"></i>
-            禁止物件として登録
+            {t('prohibited_modal_title')}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
             <i className="bi bi-x-lg"></i>
@@ -1989,24 +2013,24 @@ function ProhibitedPropertyModal({
           {/* Pre-filled address info */}
           <div className="bg-slate-50 rounded-xl p-4 text-sm space-y-1">
             <p>
-              <span className="font-bold text-slate-600">住所: </span>
+              <span className="font-bold text-slate-600">{t('prohibited_address')}</span>
               <span className="text-slate-800">{complaint.address}</span>
             </p>
             {complaint.buildingName && (
               <p>
-                <span className="font-bold text-slate-600">建物名: </span>
+                <span className="font-bold text-slate-600">{t('prohibited_building')}</span>
                 <span className="text-slate-800">{complaint.buildingName}</span>
               </p>
             )}
             {complaint.roomNumber && (
               <p>
-                <span className="font-bold text-slate-600">部屋番号: </span>
+                <span className="font-bold text-slate-600">{t('prohibited_room')}</span>
                 <span className="text-slate-800">{complaint.roomNumber}</span>
               </p>
             )}
             {(complaint.latitude != null || complaint.longitude != null) && (
               <p>
-                <span className="font-bold text-slate-600">座標: </span>
+                <span className="font-bold text-slate-600">{t('prohibited_coordinates')}</span>
                 <span className="text-slate-800">{complaint.latitude}, {complaint.longitude}</span>
               </p>
             )}
@@ -2014,13 +2038,13 @@ function ProhibitedPropertyModal({
 
           {/* Prohibited Reason */}
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">禁止理由</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t('prohibited_reason')}</label>
             <select
               value={prohibitedReasonId}
               onChange={e => setProhibitedReasonId(e.target.value)}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
-              <option value="">選択してください</option>
+              <option value="">{t('form_select_placeholder')}</option>
               {prohibitedReasons.filter(r => r.isActive).map(r => (
                 <option key={r.id} value={r.id}>{r.name}</option>
               ))}
@@ -2029,7 +2053,7 @@ function ProhibitedPropertyModal({
 
           {/* Customer Scope */}
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-2">顧客限定</label>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('prohibited_customer_scope')}</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -2039,7 +2063,7 @@ function ProhibitedPropertyModal({
                   onChange={() => setCustomerScope('all')}
                   className="accent-indigo-600"
                 />
-                <span className="text-sm text-slate-700">全顧客禁止</span>
+                <span className="text-sm text-slate-700">{t('prohibited_scope_all')}</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -2049,26 +2073,26 @@ function ProhibitedPropertyModal({
                   onChange={() => setCustomerScope('specific')}
                   className="accent-indigo-600"
                 />
-                <span className="text-sm text-slate-700">特定顧客のみ</span>
+                <span className="text-sm text-slate-700">{t('prohibited_scope_specific')}</span>
               </label>
             </div>
             {customerScope === 'specific' && (
               <p className="text-xs text-slate-500 mt-1">
                 {complaint.customer
-                  ? `対象: ${complaint.customer.name} (${complaint.customer.customerCode})`
-                  : '* このクレームに顧客が紐付いていません'}
+                  ? t('prohibited_scope_target', { name: complaint.customer.name, code: complaint.customer.customerCode })
+                  : t('prohibited_scope_no_customer')}
               </p>
             )}
           </div>
 
           {/* Reason Detail */}
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">理由詳細</label>
+            <label className="block text-xs font-bold text-slate-600 mb-1">{t('prohibited_reason_detail')}</label>
             <textarea
               value={reasonDetail}
               onChange={e => setReasonDetail(e.target.value)}
               rows={3}
-              placeholder="禁止の理由の詳細を入力..."
+              placeholder={t('prohibited_reason_placeholder')}
               className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
@@ -2080,7 +2104,7 @@ function ProhibitedPropertyModal({
               onClick={onClose}
               className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
             >
-              キャンセル
+              {t('cancel')}
             </button>
             <button
               type="submit"
@@ -2090,9 +2114,9 @@ function ProhibitedPropertyModal({
               {submitting ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                  登録中...
+                  {t('prohibited_registering')}
                 </span>
-              ) : '禁止物件に登録'}
+              ) : t('prohibited_register')}
             </button>
           </div>
         </form>

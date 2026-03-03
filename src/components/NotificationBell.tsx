@@ -9,6 +9,8 @@ interface Notification {
   message: string | null;
   scheduleId: number | null;
   distributorName: string | null;
+  alertDefinitionId: number | null;
+  alertId: number | null;
   isRead: boolean;
   createdAt: string;
 }
@@ -74,7 +76,7 @@ export default function NotificationBell() {
           // New notification(s) arrived
           const newOnes = data.notifications.filter((n: Notification) => n.id > lastNotifIdRef.current);
           for (const n of newOnes) {
-            showBrowserNotification('PMS 配布通知', n.title);
+            showBrowserNotification(n.type === 'ALERT' ? 'PMS アラート' : 'PMS 配布通知', n.title);
           }
         }
         lastNotifIdRef.current = latestId;
@@ -182,18 +184,31 @@ export default function NotificationBell() {
               notifications.map((n) => (
                 <div
                   key={n.id}
-                  onClick={() => !n.isRead && markRead(n.id)}
+                  onClick={() => {
+                    if (!n.isRead) markRead(n.id);
+                    if (n.type === 'ALERT') {
+                      window.location.href = '/alerts';
+                    }
+                  }}
                   className={`px-4 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${
                     !n.isRead ? 'bg-indigo-50/50' : ''
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <span className={`mt-0.5 shrink-0 ${
-                      n.type === 'DISTRIBUTION_START'
-                        ? 'text-emerald-500'
-                        : 'text-blue-500'
+                      n.type === 'ALERT'
+                        ? 'text-orange-500'
+                        : n.type === 'DISTRIBUTION_START'
+                          ? 'text-emerald-500'
+                          : 'text-blue-500'
                     }`}>
-                      <i className={`bi ${n.type === 'DISTRIBUTION_START' ? 'bi-play-circle-fill' : 'bi-check-circle-fill'}`}></i>
+                      <i className={`bi ${
+                        n.type === 'ALERT'
+                          ? 'bi-exclamation-triangle-fill'
+                          : n.type === 'DISTRIBUTION_START'
+                            ? 'bi-play-circle-fill'
+                            : 'bi-check-circle-fill'
+                      }`}></i>
                     </span>
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs ${!n.isRead ? 'font-bold text-slate-800' : 'text-slate-600'}`}>

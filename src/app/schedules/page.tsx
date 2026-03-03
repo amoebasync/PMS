@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
 
@@ -31,6 +32,7 @@ const formatAreaName = (town?: string | null, chome?: string | null) => {
 };
 
 export default function ScheduleListPage() {
+  const { t } = useTranslation('schedules');
   const { showToast } = useNotification();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -77,10 +79,10 @@ export default function ScheduleListPage() {
         ));
         setEditingSchedule(null);
       } else {
-        showToast('備考の保存に失敗しました', 'error');
+        showToast(t('save_remarks_error'), 'error');
       }
     } catch (e) {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('communication_error'), 'error');
     }
   };
 
@@ -118,7 +120,7 @@ export default function ScheduleListPage() {
       <div className="flex-none space-y-4">
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">対象日</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_date')}</label>
             <input 
               type="date" 
               value={filterDate} 
@@ -127,26 +129,26 @@ export default function ScheduleListPage() {
             />
           </div>
           <div>
-            <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
-            <select 
-              value={filterStatus} 
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
+            <select
+              value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px]"
             >
-              <option value="ALL">すべて</option>
-              <option value="UNSTARTED">未開始</option>
-              <option value="IN_PROGRESS">進行中</option>
-              <option value="DISTRIBUTING">配布中</option>
-              <option value="COMPLETED">完了</option>
+              <option value="ALL">{t('status_all')}</option>
+              <option value="UNSTARTED">{t('status_unstarted')}</option>
+              <option value="IN_PROGRESS">{t('status_in_progress')}</option>
+              <option value="DISTRIBUTING">{t('status_distributing')}</option>
+              <option value="COMPLETED">{t('status_completed')}</option>
             </select>
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
             <div className="relative">
               <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
               <input 
                 type="text" 
-                placeholder="チラシ名、配布員、エリア名で検索..." 
+                placeholder={t('search_placeholder')} 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -167,35 +169,35 @@ export default function ScheduleListPage() {
           <table className="w-full text-left text-xs whitespace-nowrap border-collapse">
             <thead className="bg-slate-100 text-slate-600 sticky top-0 z-20 shadow-sm">
               <tr>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 z-30 sticky left-0 text-center">ステータス</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">支店名</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">配布員コード</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[150px]">配布員名</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">都道府県</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">市区町村</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[150px]">エリア名</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 whitespace-normal min-w-[80px]">配布可能枚数</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 z-30 sticky left-0 text-center">{t('th_status')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">{t('th_branch')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">{t('th_staff_code')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[150px]">{t('th_staff_name')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">{t('th_prefecture')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">{t('th_city')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[150px]">{t('th_area')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 whitespace-normal min-w-[80px]">{t('th_capacity')}</th>
                 
                 {[1, 2, 3, 4, 5, 6].map(num => (
                   <th key={num} colSpan={5} className="border border-slate-200 px-3 py-1 bg-indigo-50 text-indigo-800 text-center font-bold">
-                    チラシ {num}
+                    {t('th_flyer')} {num}
                   </th>
                 ))}
                 
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">開始時間</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">現在の完了枚数</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">完了時間</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 text-center">GPS</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 text-center">備考</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">{t('th_start_time')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">{t('th_current_count')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100">{t('th_finish_time')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 text-center">{t('th_gps')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 text-center">{t('th_remarks')}</th>
               </tr>
               <tr>
                 {[1, 2, 3, 4, 5, 6].map(num => (
                   <React.Fragment key={`sub-${num}`}>
-                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium min-w-[150px]">チラシ名</th>
-                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium">配布期限</th>
-                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium">配布方法</th>
-                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium text-right">予定枚数</th>
-                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium text-right">配布枚数</th>
+                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium min-w-[150px]">{t('th_flyer_name')}</th>
+                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium">{t('th_deadline')}</th>
+                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium">{t('th_method')}</th>
+                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium text-right">{t('th_planned')}</th>
+                    <th className="border border-slate-200 px-2 py-1 bg-slate-50 font-medium text-right">{t('th_actual')}</th>
                   </React.Fragment>
                 ))}
               </tr>
@@ -204,7 +206,7 @@ export default function ScheduleListPage() {
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
                   <td colSpan={43} className="px-6 py-10 text-center text-slate-500">
-                    指定された条件のスケジュールは見つかりませんでした。
+                    {t('no_results')}
                   </td>
                 </tr>
               )}
@@ -218,10 +220,10 @@ export default function ScheduleListPage() {
                 return (
                   <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors border-b border-slate-100">
                     <td className="border border-slate-200 px-3 py-2 text-center sticky left-0 bg-white shadow-[1px_0_0_0_#e2e8f0]">
-                      {s.status === 'COMPLETED' ? <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">完了</span> :
-                       s.status === 'DISTRIBUTING' ? <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>配布中</span> :
-                       s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">進行中</span> :
-                       <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">未開始</span>}
+                      {s.status === 'COMPLETED' ? <span className="inline-block px-2 py-1 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">{t('status_completed')}</span> :
+                       s.status === 'DISTRIBUTING' ? <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{t('status_distributing')}</span> :
+                       s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">{t('status_in_progress')}</span> :
+                       <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{t('status_unstarted')}</span>}
                     </td>
                     
                     <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700">{s.branch?.nameJa || '-'}</td>
@@ -260,7 +262,7 @@ export default function ScheduleListPage() {
                             ? 'text-blue-500 hover:text-blue-600'
                             : 'text-slate-300 cursor-not-allowed'
                         }`}
-                        title={s.status === 'DISTRIBUTING' ? 'リアルタイム軌跡を表示' : s.status === 'COMPLETED' ? '配布軌跡を表示' : 'セッション未開始'}
+                        title={s.status === 'DISTRIBUTING' ? t('gps_realtime') : s.status === 'COMPLETED' ? t('gps_trajectory') : t('gps_not_started')}
                       >
                         <i className="bi bi-geo-alt-fill text-lg"></i>
                       </button>
@@ -270,7 +272,7 @@ export default function ScheduleListPage() {
                       <button 
                         onClick={() => { setEditingSchedule(s); setRemarksInput(s.remarks || ''); }}
                         className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${s.remarks ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}
-                        title={s.remarks || "備考を追加"}
+                        title={s.remarks || t('remarks_add')}
                       >
                         <i className={`bi ${s.remarks ? 'bi-chat-text-fill' : 'bi-chat-text'}`}></i>
                       </button>
@@ -287,7 +289,7 @@ export default function ScheduleListPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-slate-800">備考の編集</h3>
+              <h3 className="font-bold text-lg text-slate-800">{t('remarks_edit_title')}</h3>
               <button onClick={() => setEditingSchedule(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             <div className="p-6">
@@ -301,12 +303,12 @@ export default function ScheduleListPage() {
                 value={remarksInput}
                 onChange={(e) => setRemarksInput(e.target.value)}
                 className="w-full h-32 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                placeholder="現場への指示や、特別な注意事項を記入してください..."
+                placeholder={t('remarks_placeholder')}
               ></textarea>
             </div>
             <div className="px-6 py-4 bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => setEditingSchedule(null)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">キャンセル</button>
-              <button onClick={saveRemarks} className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">保存する</button>
+              <button onClick={() => setEditingSchedule(null)} className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">{t('cancel')}</button>
+              <button onClick={saveRemarks} className="px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors">{t('btn_save')}</button>
             </div>
           </div>
         </div>
@@ -317,7 +319,7 @@ export default function ScheduleListPage() {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-xl p-8 text-center">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-              <p className="text-slate-600 text-sm">読み込み中...</p>
+              <p className="text-slate-600 text-sm">{t('loading')}</p>
             </div>
           </div>
         }>

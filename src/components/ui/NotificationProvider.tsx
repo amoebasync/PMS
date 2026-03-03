@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import { useTranslation } from '@/i18n';
 
 // ─── 型定義 ───────────────────────────────────────────────
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -52,6 +53,7 @@ const NotificationContext = createContext<NotificationContextValue | null>(null)
 
 // ─── Provider ─────────────────────────────────────────────
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const idRef = useRef(0);
@@ -121,14 +123,14 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                     onClick={() => respond(false)}
                     className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                   >
-                    {options.cancelLabel ?? 'キャンセル'}
+                    {options.cancelLabel ?? t('confirm_dialog.cancel')}
                   </button>
                 )}
                 <button
                   onClick={() => respond(true)}
                   className={`px-5 py-2.5 ${s.btn} text-white rounded-xl font-bold text-sm shadow-md transition-colors`}
                 >
-                  {options.confirmLabel ?? (options.infoOnly ? '閉じる' : '確認')}
+                  {options.confirmLabel ?? (options.infoOnly ? t('confirm_dialog.close') : t('confirm_dialog.confirm'))}
                 </button>
               </div>
             </div>

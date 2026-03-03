@@ -4,13 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from '@/i18n';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
 /* ------------------------------------------------------------------ */
 
 interface MenuItem {
-  name: string;
+  nameKey: string;
   href: string;
   icon: string;
   badge?: 'orders' | 'approvals' | 'alerts';
@@ -34,64 +35,64 @@ interface SidebarProps {
 /* ------------------------------------------------------------------ */
 
 const PINNED_ITEMS: MenuItem[] = [
-  { name: 'ダッシュボード', href: '/', icon: 'bi-grid-1x2-fill' },
-  { name: 'マイ勤怠・経費', href: '/attendance', icon: 'bi-clock-history' },
-  { name: 'タスク', href: '/crm/tasks', icon: 'bi-list-task' },
+  { nameKey: 'dashboard', href: '/', icon: 'bi-grid-1x2-fill' },
+  { nameKey: 'my_attendance', href: '/attendance', icon: 'bi-clock-history' },
+  { nameKey: 'tasks', href: '/crm/tasks', icon: 'bi-list-task' },
 ];
 
 const MENU_GROUPS: MenuGroup[] = [
   {
     title: 'SALES',
     items: [
-      { name: '受注管理', href: '/orders', icon: 'bi-briefcase-fill', badge: 'orders' },
-      { name: '顧客管理', href: '/customers', icon: 'bi-buildings-fill' },
-      { name: '見込み客管理', href: '/crm/leads', icon: 'bi-person-plus-fill' },
-      { name: 'キャンペーン', href: '/campaigns', icon: 'bi-megaphone-fill' },
+      { nameKey: 'order_management', href: '/orders', icon: 'bi-briefcase-fill', badge: 'orders' },
+      { nameKey: 'customer_management', href: '/customers', icon: 'bi-buildings-fill' },
+      { nameKey: 'lead_management', href: '/crm/leads', icon: 'bi-person-plus-fill' },
+      { nameKey: 'campaigns', href: '/campaigns', icon: 'bi-megaphone-fill' },
     ],
   },
   {
     title: 'OPERATIONS',
     items: [
-      { name: 'ディスパッチ', href: '/dispatch', icon: 'bi-diagram-3-fill' },
-      { name: 'スケジュール照会', href: '/schedules', icon: 'bi-calendar-check' },
-      { name: 'エリア管理', href: '/areas', icon: 'bi-geo-alt-fill' },
-      { name: 'チラシ管理', href: '/flyers', icon: 'bi-file-earmark-richtext' },
-      { name: '入出庫・納品管理', href: '/transactions', icon: 'bi-box-seam' },
-      { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
-      { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' },
-      { name: 'シフト管理', href: '/distributor-shifts', icon: 'bi-calendar-week' },
+      { nameKey: 'dispatch', href: '/dispatch', icon: 'bi-diagram-3-fill' },
+      { nameKey: 'schedule_inquiry', href: '/schedules', icon: 'bi-calendar-check' },
+      { nameKey: 'area_management', href: '/areas', icon: 'bi-geo-alt-fill' },
+      { nameKey: 'flyer_management', href: '/flyers', icon: 'bi-file-earmark-richtext' },
+      { nameKey: 'inventory_management', href: '/transactions', icon: 'bi-box-seam' },
+      { nameKey: 'partner_management', href: '/partners', icon: 'bi-truck' },
+      { nameKey: 'distributor_management', href: '/distributors', icon: 'bi-bicycle' },
+      { nameKey: 'shift_management', href: '/distributor-shifts', icon: 'bi-calendar-week' },
     ],
   },
   {
     title: 'QUALITY',
     items: [
-      { name: 'アラート', href: '/alerts', icon: 'bi-bell-fill', badge: 'alerts' },
-      { name: 'クレーム管理', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
-      { name: '配布禁止物件', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
+      { nameKey: 'alerts', href: '/alerts', icon: 'bi-bell-fill', badge: 'alerts' },
+      { nameKey: 'complaint_management', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
+      { nameKey: 'prohibited_properties', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
     ],
   },
   {
     title: 'HUMAN RESOURCES',
     items: [
-      { name: '社員管理', href: '/employees', icon: 'bi-person-badge-fill' },
-      { name: '応募者管理', href: '/applicants', icon: 'bi-person-lines-fill' },
-      { name: '支店管理', href: '/branches', icon: 'bi-shop' },
-      { name: '人事・経費承認', href: '/approvals', icon: 'bi-check2-square', badge: 'approvals' },
+      { nameKey: 'employee_management', href: '/employees', icon: 'bi-person-badge-fill' },
+      { nameKey: 'applicant_management', href: '/applicants', icon: 'bi-person-lines-fill' },
+      { nameKey: 'branch_management', href: '/branches', icon: 'bi-shop' },
+      { nameKey: 'hr_expense_approval', href: '/approvals', icon: 'bi-check2-square', badge: 'approvals' },
     ],
   },
   {
     title: 'ACCOUNTING',
     items: [
-      { name: '請求管理', href: '/billing', icon: 'bi-receipt-cutoff' },
-      { name: '給与計算', href: '/payroll', icon: 'bi-cash-stack' },
-      { name: '配布員給与', href: '/distributors/payroll', icon: 'bi-wallet2' },
+      { nameKey: 'billing_management', href: '/billing', icon: 'bi-receipt-cutoff' },
+      { nameKey: 'payroll', href: '/payroll', icon: 'bi-cash-stack' },
+      { nameKey: 'distributor_payroll', href: '/distributors/payroll', icon: 'bi-wallet2' },
     ],
   },
   {
     title: 'SYSTEM',
     items: [
-      { name: 'システム設定', href: '/settings', icon: 'bi-gear-fill' },
-      { name: '監査ログ', href: '/audit-logs', icon: 'bi-shield-check', superAdminOnly: true },
+      { nameKey: 'system_settings', href: '/settings', icon: 'bi-gear-fill' },
+      { nameKey: 'audit_logs', href: '/audit-logs', icon: 'bi-shield-check', superAdminOnly: true },
     ],
   },
 ];
@@ -114,6 +115,7 @@ function isHrefActive(href: string, pathname: string): boolean {
 
 export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const { t } = useTranslation('sidebar');
 
   // Badge counts
   const [orderPendingCount, setOrderPendingCount] = useState(0);
@@ -161,8 +163,8 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   /* ---- Close flyout on outside click ---- */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (flyoutRef.current?.contains(t) || sidebarRef.current?.contains(t)) return;
+      const target = e.target as Node;
+      if (flyoutRef.current?.contains(target) || sidebarRef.current?.contains(target)) return;
       setFlyoutGroup(null);
     };
     document.addEventListener('mousedown', handler);
@@ -226,7 +228,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
         {/* ── Collapse toggle (desktop) ── */}
         <button
           onClick={toggleCollapse}
-          aria-label={isCollapsed ? 'サイドバーを展開' : 'サイドバーを折りたたむ'}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           className="absolute -right-3 top-[28px] w-6 h-6 bg-white border border-gray-200 rounded-full
                      flex items-center justify-center text-gray-400 shadow-sm
                      hover:bg-gray-50 hover:text-gray-700 transition-colors z-[1010] hidden md:flex"
@@ -243,11 +245,12 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
               {PINNED_ITEMS.map(item => {
                 const active = isHrefActive(item.href, pathname);
                 const badgeCount = getBadge(item.badge);
+                const label = t(item.nameKey);
                 return isCollapsed ? (
                   <Link
                     key={item.href}
                     href={item.href}
-                    title={item.name}
+                    title={label}
                     onClick={onMobileClose}
                     className={`
                       flex items-center justify-center py-2.5 rounded-xl transition-all duration-150 group relative
@@ -271,7 +274,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                   >
                     {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
                     <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500 transition-colors'}`} />
-                    <span className="text-[13px] flex-1">{item.name}</span>
+                    <span className="text-[13px] flex-1">{label}</span>
                     {badgeCount > 0 && (
                       <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                         {badgeCount}
@@ -336,7 +339,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                           >
                             {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
                             <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500 transition-colors'}`} />
-                            <span className="text-[13px] flex-1">{item.name}</span>
+                            <span className="text-[13px] flex-1">{t(item.nameKey)}</span>
                             {badgeCount > 0 && (
                               <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                                 {badgeCount}
@@ -385,7 +388,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                   `}
                 >
                   <i className={`${item.icon} text-[13px] w-4 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
-                  <span className="flex-1">{item.name}</span>
+                  <span className="flex-1">{t(item.nameKey)}</span>
                   {badgeCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                       {badgeCount}
@@ -400,4 +403,3 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
     </>
   );
 }
-

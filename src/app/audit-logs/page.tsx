@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Pagination from '@/components/ui/Pagination';
 import SkeletonRow from '@/components/ui/SkeletonRow';
 import EmptyState from '@/components/ui/EmptyState';
+import { useTranslation } from '@/i18n';
 
 type AuditLog = {
   id: number;
@@ -24,23 +25,16 @@ type AuditLogDetail = AuditLog & {
   userAgent: string | null;
 };
 
-const ACTION_LABELS: Record<string, { label: string; color: string }> = {
-  LOGIN_SUCCESS: { label: 'ログイン成功', color: 'bg-emerald-100 text-emerald-700' },
-  LOGIN_FAILURE: { label: 'ログイン失敗', color: 'bg-red-100 text-red-700' },
-  LOGOUT:        { label: 'ログアウト',   color: 'bg-slate-100 text-slate-600' },
-  CREATE:        { label: '作成',         color: 'bg-blue-100 text-blue-700' },
-  UPDATE:        { label: '更新',         color: 'bg-amber-100 text-amber-700' },
-  DELETE:        { label: '削除',         color: 'bg-rose-100 text-rose-700' },
-  APPROVE:       { label: '承認',         color: 'bg-indigo-100 text-indigo-700' },
-  REJECT:        { label: '却下',         color: 'bg-orange-100 text-orange-700' },
-  STATUS_CHANGE: { label: 'ステータス変更', color: 'bg-violet-100 text-violet-700' },
-};
-
-const ACTOR_TYPE_LABELS: Record<string, string> = {
-  EMPLOYEE: '管理者',
-  PORTAL_USER: 'ポータル顧客',
-  STAFF: '配布スタッフ',
-  SYSTEM: 'システム',
+const ACTION_COLORS: Record<string, string> = {
+  LOGIN_SUCCESS: 'bg-emerald-100 text-emerald-700',
+  LOGIN_FAILURE: 'bg-red-100 text-red-700',
+  LOGOUT:        'bg-slate-100 text-slate-600',
+  CREATE:        'bg-blue-100 text-blue-700',
+  UPDATE:        'bg-amber-100 text-amber-700',
+  DELETE:        'bg-rose-100 text-rose-700',
+  APPROVE:       'bg-indigo-100 text-indigo-700',
+  REJECT:        'bg-orange-100 text-orange-700',
+  STATUS_CHANGE: 'bg-violet-100 text-violet-700',
 };
 
 const TARGET_MODEL_OPTIONS = [
@@ -54,6 +48,27 @@ const TARGET_MODEL_OPTIONS = [
 const LIMIT = 50;
 
 export default function AuditLogsPage() {
+  const { t } = useTranslation('audit-logs');
+
+  const ACTION_LABELS: Record<string, { label: string; color: string }> = useMemo(() => ({
+    LOGIN_SUCCESS: { label: t('action_login_success'), color: ACTION_COLORS.LOGIN_SUCCESS },
+    LOGIN_FAILURE: { label: t('action_login_failure'), color: ACTION_COLORS.LOGIN_FAILURE },
+    LOGOUT:        { label: t('action_logout'),        color: ACTION_COLORS.LOGOUT },
+    CREATE:        { label: t('action_create'),        color: ACTION_COLORS.CREATE },
+    UPDATE:        { label: t('action_update'),        color: ACTION_COLORS.UPDATE },
+    DELETE:        { label: t('action_delete'),        color: ACTION_COLORS.DELETE },
+    APPROVE:       { label: t('action_approve'),       color: ACTION_COLORS.APPROVE },
+    REJECT:        { label: t('action_reject'),        color: ACTION_COLORS.REJECT },
+    STATUS_CHANGE: { label: t('action_status_change'), color: ACTION_COLORS.STATUS_CHANGE },
+  }), [t]);
+
+  const ACTOR_TYPE_LABELS: Record<string, string> = useMemo(() => ({
+    EMPLOYEE: t('actor_employee'),
+    PORTAL_USER: t('actor_portal_user'),
+    STAFF: t('actor_staff'),
+    SYSTEM: t('actor_system'),
+  }), [t]);
+
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -128,8 +143,8 @@ export default function AuditLogsPage() {
           <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
             <i className="bi bi-shield-lock-fill text-3xl"></i>
           </div>
-          <h3 className="font-bold text-rose-800 text-lg mb-2">アクセス権限がありません</h3>
-          <p className="text-rose-600 text-sm">このページはスーパー管理者（SUPER_ADMIN）のみ閲覧できます。</p>
+          <h3 className="font-bold text-rose-800 text-lg mb-2">{t('access_denied_title')}</h3>
+          <p className="text-rose-600 text-sm">{t('access_denied_message')}</p>
         </div>
       </div>
     );
@@ -145,7 +160,7 @@ export default function AuditLogsPage() {
             onChange={e => setFilterAction(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
-            <option value="">全アクション</option>
+            <option value="">{t('filter_all_actions')}</option>
             {Object.entries(ACTION_LABELS).map(([key, { label }]) => (
               <option key={key} value={key}>{label}</option>
             ))}
@@ -156,7 +171,7 @@ export default function AuditLogsPage() {
             onChange={e => setFilterActorType(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
-            <option value="">全ユーザー種別</option>
+            <option value="">{t('filter_all_actor_types')}</option>
             {Object.entries(ACTOR_TYPE_LABELS).map(([key, label]) => (
               <option key={key} value={key}>{label}</option>
             ))}
@@ -167,7 +182,7 @@ export default function AuditLogsPage() {
             onChange={e => setFilterTargetModel(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-300"
           >
-            <option value="">全対象エンティティ</option>
+            <option value="">{t('filter_all_entities')}</option>
             {TARGET_MODEL_OPTIONS.map(m => (
               <option key={m} value={m}>{m}</option>
             ))}
@@ -175,7 +190,7 @@ export default function AuditLogsPage() {
 
           <input
             type="text"
-            placeholder="操作者名で検索"
+            placeholder={t('filter_actor_name')}
             value={filterActorName}
             onChange={e => setFilterActorName(e.target.value)}
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
@@ -202,17 +217,17 @@ export default function AuditLogsPage() {
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center gap-1.5"
           >
             <i className="bi bi-search" />
-            検索
+            {t('search')}
           </button>
           <button
             onClick={handleReset}
             className="px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm hover:bg-slate-50 transition-colors"
           >
-            リセット
+            {t('reset')}
           </button>
           {!loading && (
             <span className="ml-auto text-xs text-slate-400">
-              {total.toLocaleString()} 件
+              {total.toLocaleString()} {t('items_count')}
             </span>
           )}
         </div>
@@ -224,13 +239,13 @@ export default function AuditLogsPage() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">日時</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">種別</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">操作者</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">アクション</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">対象</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">説明</th>
-                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">IPアドレス</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_datetime')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_type')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_actor')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_action')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_target')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">{t('col_description')}</th>
+                <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 whitespace-nowrap">{t('col_ip_address')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -238,7 +253,7 @@ export default function AuditLogsPage() {
                 ? Array.from({ length: 10 }).map((_, i) => <SkeletonRow key={i} cols={7} />)
                 : logs.length === 0
                 ? (
-                  <EmptyState title="条件に一致するログが見つかりません" />
+                  <EmptyState title={t('empty_message')} />
                 )
                 : logs.map(log => (
                   <tr
@@ -307,7 +322,7 @@ export default function AuditLogsPage() {
               <>
                 <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200">
                   <h2 className="text-lg font-bold text-slate-800">
-                    監査ログ詳細
+                    {t('detail_title')}
                     <span className="ml-2 text-sm font-normal text-slate-400">#{selectedLog.id}</span>
                   </h2>
                   <button
@@ -321,11 +336,11 @@ export default function AuditLogsPage() {
                 <div className="px-6 py-4">
                   <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-sm mb-6">
                     <div>
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">日時</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_datetime')}</span>
                       <span className="text-slate-700">{new Date(selectedLog.createdAt).toLocaleString('ja-JP')}</span>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">操作者</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_actor')}</span>
                       <span className="text-slate-700 font-medium">
                         {selectedLog.actorName || '—'}
                         <span className="ml-1.5 text-xs font-normal text-slate-400">
@@ -334,24 +349,24 @@ export default function AuditLogsPage() {
                       </span>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">アクション</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_action')}</span>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_LABELS[selectedLog.action]?.color || 'bg-gray-100 text-gray-600'}`}>
                         {ACTION_LABELS[selectedLog.action]?.label || selectedLog.action}
                       </span>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">対象</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_target')}</span>
                       <span className="text-slate-700">
                         {selectedLog.targetModel || '—'}
                         {selectedLog.targetId && <span className="text-slate-400"> #{selectedLog.targetId}</span>}
                       </span>
                     </div>
                     <div className="col-span-2">
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">説明</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_description')}</span>
                       <span className="text-slate-700">{selectedLog.description || '—'}</span>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-slate-500 block mb-0.5">IPアドレス</span>
+                      <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_ip')}</span>
                       <code className="text-slate-600 text-xs bg-slate-100 px-1.5 py-0.5 rounded">
                         {selectedLog.ipAddress || '—'}
                       </code>
@@ -366,10 +381,10 @@ export default function AuditLogsPage() {
 
                   {(selectedLog.beforeData !== null || selectedLog.afterData !== null) && (
                     <div>
-                      <h3 className="text-sm font-bold text-slate-700 mb-3">変更内容</h3>
+                      <h3 className="text-sm font-bold text-slate-700 mb-3">{t('changes_title')}</h3>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <p className="text-xs font-medium text-slate-500 mb-1.5">変更前</p>
+                          <p className="text-xs font-medium text-slate-500 mb-1.5">{t('changes_before')}</p>
                           <pre className="bg-slate-50 rounded-lg p-3 text-xs overflow-auto max-h-72 border border-slate-200 text-slate-600">
                             {selectedLog.beforeData != null
                               ? JSON.stringify(selectedLog.beforeData, null, 2)
@@ -378,7 +393,7 @@ export default function AuditLogsPage() {
                           </pre>
                         </div>
                         <div>
-                          <p className="text-xs font-medium text-slate-500 mb-1.5">変更後</p>
+                          <p className="text-xs font-medium text-slate-500 mb-1.5">{t('changes_after')}</p>
                           <pre className="bg-slate-50 rounded-lg p-3 text-xs overflow-auto max-h-72 border border-slate-200 text-slate-600">
                             {selectedLog.afterData != null
                               ? JSON.stringify(selectedLog.afterData, null, 2)

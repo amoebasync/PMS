@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 // --- 型定義 ---
 type Employee = { id: number; lastNameJa: string; firstNameJa: string; isActive: boolean; };
@@ -55,7 +56,8 @@ function CustomerCombobox({
   onClear,
   customers,
   excludeId,
-  placeholder = '会社名・コードで検索...',
+  placeholder,
+  noMatchText,
 }: {
   value: string;
   onSelect: (id: string) => void;
@@ -63,6 +65,7 @@ function CustomerCombobox({
   customers: Customer[];
   excludeId?: number | null;
   placeholder?: string;
+  noMatchText?: string;
 }) {
   const [inputText, setInputText] = useState('');
   const [open, setOpen] = useState(false);
@@ -145,7 +148,7 @@ function CustomerCombobox({
               </li>
             ))
           ) : (
-            <li className="px-4 py-3 text-sm text-slate-400">該当する顧客が見つかりません</li>
+            <li className="px-4 py-3 text-sm text-slate-400">{noMatchText || 'No matching customers'}</li>
           )}
         </ul>
       )}
@@ -184,6 +187,7 @@ const initialContactForm = {
 export default function CustomerPage() {
   const router = useRouter();
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('customers');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -340,7 +344,7 @@ export default function CustomerPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        setSaveError(data.error || '保存に失敗しました');
+        setSaveError(data.error || t('save_error'));
         return;
       }
 
@@ -361,7 +365,7 @@ export default function CustomerPage() {
     if (!currentId) return;
     const res = await fetch(`/api/customers/${currentId}`, { method: 'DELETE' });
     if (res.ok) { setIsDeleteModalOpen(false); fetchData(); }
-    else showToast('削除に失敗しました', 'error');
+    else showToast(t('delete_error'), 'error');
   };
 
   // ─── レンダリング ───
@@ -374,19 +378,19 @@ export default function CustomerPage() {
           onClick={() => openFormModal()}
           className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-md transition-all"
         >
-          <i className="bi bi-plus-lg"></i> 新規顧客登録
+          <i className="bi bi-plus-lg"></i> {t('btn_new')}
         </button>
       </div>
 
       {/* フィルタパネル */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[220px]">
-          <label className={labelCls}>キーワード検索</label>
+          <label className={labelCls}>{t('search_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
             <input
               type="text"
-              placeholder="会社名・カナ・顧客コード..."
+              placeholder={t('search_placeholder')}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -394,35 +398,35 @@ export default function CustomerPage() {
           </div>
         </div>
         <div>
-          <label className={labelCls}>担当営業</label>
+          <label className={labelCls}>{t('filter_sales_rep')}</label>
           <select value={filterSalesRepId} onChange={e => setFilterSalesRepId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[120px]">
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
           </select>
         </div>
         <div>
-          <label className={labelCls}>流入経路</label>
+          <label className={labelCls}>{t('filter_channel')}</label>
           <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
-            <option value="">すべて</option>
-            <option value="EC">EC</option>
-            <option value="SALES">営業</option>
-            <option value="REFERRAL">紹介</option>
-            <option value="INQUIRY">問い合わせ</option>
+            <option value="">{t('filter_all')}</option>
+            <option value="EC">{t('channel_ec')}</option>
+            <option value="SALES">{t('channel_sales')}</option>
+            <option value="REFERRAL">{t('channel_referral')}</option>
+            <option value="INQUIRY">{t('channel_inquiry')}</option>
           </select>
         </div>
         <div>
-          <label className={labelCls}>キャンペーン</label>
+          <label className={labelCls}>{t('filter_campaign')}</label>
           <select value={filterCampaignId} onChange={e => setFilterCampaignId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[130px]">
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
         <div>
-          <label className={labelCls}>ステータス</label>
+          <label className={labelCls}>{t('table_status')}</label>
           <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
-            <option value="">すべて</option>
-            <option value="VALID">有効</option>
-            <option value="INVALID">無効</option>
+            <option value="">{t('filter_all')}</option>
+            <option value="VALID">{t('status_valid')}</option>
+            <option value="INVALID">{t('status_invalid')}</option>
           </select>
         </div>
         {(searchTerm || filterSalesRepId || filterChannel || filterCampaignId || filterStatus) && (
@@ -430,7 +434,7 @@ export default function CustomerPage() {
             onClick={() => { setSearchTerm(''); setFilterSalesRepId(''); setFilterChannel(''); setFilterCampaignId(''); setFilterStatus(''); }}
             className="text-xs text-slate-400 hover:text-slate-600 flex items-center gap-1 pb-0.5"
           >
-            <i className="bi bi-x-circle"></i> クリア
+            <i className="bi bi-x-circle"></i> {t('filter_clear')}
           </button>
         )}
       </div>
@@ -441,13 +445,13 @@ export default function CustomerPage() {
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">顧客コード / 会社名</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">電話 / 住所</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">担当営業</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">流入</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">キャンペーン</th>
-              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">状態</th>
-              <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">操作</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_code_name')}</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_phone_address')}</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_sales_rep')}</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_channel')}</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_campaign')}</th>
+              <th className="px-5 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('table_status')}</th>
+              <th className="px-5 py-3 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -458,7 +462,7 @@ export default function CustomerPage() {
             ) : filteredCustomers.length === 0 ? (
               <tr><td colSpan={7} className="py-16 text-center">
                 <i className="bi bi-buildings text-3xl text-slate-200 block mb-2"></i>
-                <p className="text-slate-400 text-sm">該当する顧客が見つかりません</p>
+                <p className="text-slate-400 text-sm">{t('no_match')}</p>
               </td></tr>
             ) : (
               filteredCustomers.map(cust => (
@@ -491,7 +495,7 @@ export default function CustomerPage() {
                   <td className="px-5 py-3.5">
                     {cust.acquisitionChannel ? (
                       <span className={`inline-flex items-center px-2 py-1 rounded text-[10px] font-bold ${CHANNEL_COLORS[cust.acquisitionChannel]}`}>
-                        {CHANNEL_LABELS[cust.acquisitionChannel]}
+                        {t(`channel_${cust.acquisitionChannel.toLowerCase()}`)}
                       </span>
                     ) : <span className="text-slate-300 text-xs">-</span>}
                   </td>
@@ -501,20 +505,20 @@ export default function CustomerPage() {
                   <td className="px-5 py-3.5">
                     {cust.status === 'VALID' ? (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>有効
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>{t('status_valid')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>無効
+                        <span className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-1.5"></span>{t('status_invalid')}
                       </span>
                     )}
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={e => { e.stopPropagation(); openFormModal(cust); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編集">
+                      <button onClick={e => { e.stopPropagation(); openFormModal(cust); }} className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title={t('edit')}>
                         <i className="bi bi-pencil-square"></i>
                       </button>
-                      <button onClick={e => confirmDelete(e, cust.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="削除">
+                      <button onClick={e => confirmDelete(e, cust.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title={t('delete')}>
                         <i className="bi bi-trash"></i>
                       </button>
                     </div>
@@ -539,8 +543,8 @@ export default function CustomerPage() {
                   <i className={`bi ${currentId ? 'bi-pencil-square text-blue-600' : 'bi-building-add text-emerald-600'}`}></i>
                 </div>
                 <div>
-                  <h3 className="font-bold text-slate-800 text-base">{currentId ? '顧客情報を編集' : '新規顧客登録'}</h3>
-                  {!currentId && <p className="text-[11px] text-slate-400 mt-0.5">会社情報と主担当者を登録します</p>}
+                  <h3 className="font-bold text-slate-800 text-base">{currentId ? t('modal_title_edit') : t('modal_title_new')}</h3>
+                  {!currentId && <p className="text-[11px] text-slate-400 mt-0.5">{t('modal_subtitle_new')}</p>}
                 </div>
               </div>
               <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 hover:bg-slate-100 rounded-lg transition-colors">
@@ -559,11 +563,11 @@ export default function CustomerPage() {
 
               {/* ── Section 1: 基本情報 ── */}
               <section>
-                <SectionHeader icon="bi-building" label="基本情報" />
+                <SectionHeader icon="bi-building" label={t('section_basic')} />
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-4">
                     <label className={labelCls}>
-                      顧客コード <span className="text-red-500">*</span>
+                      {t('form_customer_code')} <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <input
@@ -572,7 +576,7 @@ export default function CustomerPage() {
                         value={formData.customerCode}
                         onChange={handleInput}
                         className={inputCls + (isLoadingCode ? ' text-slate-400' : '')}
-                        placeholder={isLoadingCode ? '生成中...' : 'TS00000001'}
+                        placeholder={isLoadingCode ? t('form_customer_code_generating') : t('form_customer_code_placeholder')}
                         readOnly={!currentId && isLoadingCode}
                       />
                       {!currentId && isLoadingCode && (
@@ -583,41 +587,41 @@ export default function CustomerPage() {
                     </div>
                   </div>
                   <div className="col-span-8">
-                    <label className={labelCls}>会社名・屋号 <span className="text-red-500">*</span></label>
-                    <input name="name" required value={formData.name} onChange={handleInput} className={inputCls} placeholder="例: 株式会社サンプル" />
+                    <label className={labelCls}>{t('form_company_name')} <span className="text-red-500">*</span></label>
+                    <input name="name" required value={formData.name} onChange={handleInput} className={inputCls} placeholder={t('form_company_placeholder')} />
                   </div>
                   <div className="col-span-8">
-                    <label className={labelCls}>会社名（カナ）</label>
-                    <input name="nameKana" value={formData.nameKana} onChange={handleInput} className={inputCls} placeholder="カブシキガイシャサンプル" />
+                    <label className={labelCls}>{t('form_company_kana')}</label>
+                    <input name="nameKana" value={formData.nameKana} onChange={handleInput} className={inputCls} placeholder={t('form_company_kana_placeholder')} />
                   </div>
                   <div className="col-span-4">
-                    <label className={labelCls}>ステータス</label>
+                    <label className={labelCls}>{t('table_status')}</label>
                     <select name="status" value={formData.status} onChange={handleInput} className={inputCls}>
-                      <option value="VALID">有効</option>
-                      <option value="INVALID">無効</option>
+                      <option value="VALID">{t('status_valid')}</option>
+                      <option value="INVALID">{t('status_invalid')}</option>
                     </select>
                   </div>
                   <div className="col-span-4">
-                    <label className={labelCls}>担当営業</label>
+                    <label className={labelCls}>{t('form_sales_rep')}</label>
                     <select name="salesRepId" value={formData.salesRepId} onChange={handleInput} className={inputCls}>
-                      <option value="">未設定</option>
+                      <option value="">{t('unset')}</option>
                       {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
                     </select>
                   </div>
                   <div className="col-span-4">
-                    <label className={labelCls}>流入経路</label>
+                    <label className={labelCls}>{t('form_channel')}</label>
                     <select name="acquisitionChannel" value={formData.acquisitionChannel} onChange={handleInput} className={inputCls}>
-                      <option value="">未設定</option>
-                      <option value="EC">EC</option>
-                      <option value="SALES">営業</option>
-                      <option value="REFERRAL">紹介</option>
-                      <option value="INQUIRY">問い合わせ</option>
+                      <option value="">{t('unset')}</option>
+                      <option value="EC">{t('channel_ec')}</option>
+                      <option value="SALES">{t('channel_sales')}</option>
+                      <option value="REFERRAL">{t('channel_referral')}</option>
+                      <option value="INQUIRY">{t('channel_inquiry')}</option>
                     </select>
                   </div>
                   <div className="col-span-4">
-                    <label className={labelCls}>キャンペーン</label>
+                    <label className={labelCls}>{t('form_campaign')}</label>
                     <select name="campaignId" value={formData.campaignId} onChange={handleInput} className={inputCls}>
-                      <option value="">なし</option>
+                      <option value="">{t('none_selected')}</option>
                       {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </div>
@@ -626,10 +630,10 @@ export default function CustomerPage() {
 
               {/* ── Section 2: 所在地・連絡先 ── */}
               <section>
-                <SectionHeader icon="bi-geo-alt" label="所在地・連絡先" />
+                <SectionHeader icon="bi-geo-alt" label={t('section_location')} />
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-3">
-                    <label className={labelCls}>郵便番号</label>
+                    <label className={labelCls}>{t('form_postal_code')}</label>
                     <input
                       name="postalCode"
                       value={formData.postalCode}
@@ -640,21 +644,21 @@ export default function CustomerPage() {
                     />
                   </div>
                   <div className="col-span-9">
-                    <label className={labelCls}>住所（都道府県〜番地）</label>
+                    <label className={labelCls}>{t('form_address')}</label>
                     <input
                       name="address"
                       value={formData.address}
                       onChange={handleInput}
                       className={inputCls}
-                      placeholder="郵便番号入力で自動補完"
+                      placeholder={t('form_address_auto')}
                     />
                   </div>
                   <div className="col-span-12">
-                    <label className={labelCls}>建物名・階数</label>
-                    <input name="addressBuilding" value={formData.addressBuilding} onChange={handleInput} className={inputCls} placeholder="〇〇ビル 3F" />
+                    <label className={labelCls}>{t('form_building')}</label>
+                    <input name="addressBuilding" value={formData.addressBuilding} onChange={handleInput} className={inputCls} placeholder={t('form_building_placeholder')} />
                   </div>
                   <div className="col-span-6">
-                    <label className={labelCls}>電話番号</label>
+                    <label className={labelCls}>{t('form_phone')}</label>
                     <input
                       name="phone"
                       value={formData.phone}
@@ -665,7 +669,7 @@ export default function CustomerPage() {
                     />
                   </div>
                   <div className="col-span-6">
-                    <label className={labelCls}>FAX</label>
+                    <label className={labelCls}>{t('form_fax')}</label>
                     <input
                       name="fax"
                       value={formData.fax}
@@ -680,22 +684,22 @@ export default function CustomerPage() {
 
               {/* ── Section 3: 取引条件 ── */}
               <section>
-                <SectionHeader icon="bi-currency-yen" label="取引条件・インボイス" />
+                <SectionHeader icon="bi-currency-yen" label={t('section_terms')} />
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-5">
-                    <label className={labelCls}>インボイス登録番号</label>
+                    <label className={labelCls}>{t('form_invoice_number')}</label>
                     <input name="invoiceRegistrationNumber" value={formData.invoiceRegistrationNumber} onChange={handleInput} className={inputCls} placeholder="T1234567890123" />
                   </div>
                   <div className="col-span-2">
-                    <label className={labelCls}>締日 <span className="text-slate-400 font-normal text-[10px]">(99=末)</span></label>
+                    <label className={labelCls}>{t('form_cutoff_day')} <span className="text-slate-400 font-normal text-[10px]">{t('form_cutoff_hint')}</span></label>
                     <input type="number" name="billingCutoffDay" value={formData.billingCutoffDay} onChange={handleInput} className={inputCls} min={1} max={99} />
                   </div>
                   <div className="col-span-3">
-                    <label className={labelCls}>支払サイト <span className="text-slate-400 font-normal text-[10px]">(月数)</span></label>
+                    <label className={labelCls}>{t('form_payment_site')} <span className="text-slate-400 font-normal text-[10px]">{t('form_payment_site_hint')}</span></label>
                     <input type="number" name="paymentMonthDelay" value={formData.paymentMonthDelay} onChange={handleInput} className={inputCls} min={0} />
                   </div>
                   <div className="col-span-2">
-                    <label className={labelCls}>支払日 <span className="text-slate-400 font-normal text-[10px]">(99=末)</span></label>
+                    <label className={labelCls}>{t('form_payment_day')} <span className="text-slate-400 font-normal text-[10px]">{t('form_payment_day_hint')}</span></label>
                     <input type="number" name="paymentDay" value={formData.paymentDay} onChange={handleInput} className={inputCls} min={1} max={99} />
                   </div>
                 </div>
@@ -703,33 +707,35 @@ export default function CustomerPage() {
 
               {/* ── Section 4: 関係・備考 ── */}
               <section>
-                <SectionHeader icon="bi-diagram-3" label="関係・備考" />
+                <SectionHeader icon="bi-diagram-3" label={t('section_relations')} />
                 <div className="grid grid-cols-12 gap-3">
                   <div className="col-span-6">
-                    <label className={labelCls}>親顧客 <span className="text-slate-400 font-normal text-[10px]">(チェーン本部など)</span></label>
+                    <label className={labelCls}>{t('form_parent_customer')} <span className="text-slate-400 font-normal text-[10px]">{t('form_parent_hint')}</span></label>
                     <CustomerCombobox
                       value={formData.parentCustomerId}
                       onSelect={id => setFormData(prev => ({ ...prev, parentCustomerId: id }))}
                       onClear={() => setFormData(prev => ({ ...prev, parentCustomerId: '' }))}
                       customers={customers}
                       excludeId={currentId}
-                      placeholder="会社名・コードで検索..."
+                      placeholder={t('form_customer_search_placeholder')}
+                      noMatchText={t('form_no_customer_match')}
                     />
                   </div>
                   <div className="col-span-6">
-                    <label className={labelCls}>請求先 <span className="text-slate-400 font-normal text-[10px]">(他社に請求する場合)</span></label>
+                    <label className={labelCls}>{t('form_billing_customer')} <span className="text-slate-400 font-normal text-[10px]">{t('form_billing_hint')}</span></label>
                     <CustomerCombobox
                       value={formData.billingCustomerId}
                       onSelect={id => setFormData(prev => ({ ...prev, billingCustomerId: id }))}
                       onClear={() => setFormData(prev => ({ ...prev, billingCustomerId: '' }))}
                       customers={customers}
                       excludeId={currentId}
-                      placeholder="会社名・コードで検索..."
+                      placeholder={t('form_customer_search_placeholder')}
+                      noMatchText={t('form_no_customer_match')}
                     />
                   </div>
                   <div className="col-span-12">
-                    <label className={labelCls}>備考</label>
-                    <textarea name="note" value={formData.note} onChange={handleInput} rows={2} className={inputCls + ' resize-none'} placeholder="特記事項など..." />
+                    <label className={labelCls}>{t('notes')}</label>
+                    <textarea name="note" value={formData.note} onChange={handleInput} rows={2} className={inputCls + ' resize-none'} />
                   </div>
                 </div>
               </section>
@@ -740,12 +746,12 @@ export default function CustomerPage() {
                   <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-5">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-2">
-                        <SectionHeader icon="bi-person-fill" label="主担当者" color="indigo" />
-                        <span className="text-[10px] bg-indigo-100 text-indigo-600 border border-indigo-200 px-1.5 py-0.5 rounded font-bold -mt-4">必須</span>
+                        <SectionHeader icon="bi-person-fill" label={t('section_contact')} color="indigo" />
+                        <span className="text-[10px] bg-indigo-100 text-indigo-600 border border-indigo-200 px-1.5 py-0.5 rounded font-bold -mt-4">{t('contact_required')}</span>
                       </div>
                       {contactForm.email && (
                         <span className="text-[11px] text-indigo-500 flex items-center gap-1 -mt-4">
-                          <i className="bi bi-envelope-check"></i> 登録後にログイン情報をメール送信
+                          <i className="bi bi-envelope-check"></i> {t('contact_email_note')}
                         </span>
                       )}
                     </div>
@@ -753,34 +759,34 @@ export default function CustomerPage() {
                     <div className="grid grid-cols-12 gap-3">
                       {/* 氏名 */}
                       <div className="col-span-3">
-                        <label className={labelCls + ' !text-indigo-600'}>姓 <span className="text-red-500">*</span></label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_last_name')} <span className="text-red-500">*</span></label>
                         <input type="text" name="lastName" required value={contactForm.lastName} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="山田" />
                       </div>
                       <div className="col-span-3">
-                        <label className={labelCls + ' !text-indigo-600'}>名 <span className="text-red-500">*</span></label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_first_name')} <span className="text-red-500">*</span></label>
                         <input type="text" name="firstName" required value={contactForm.firstName} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="太郎" />
                       </div>
                       <div className="col-span-3">
-                        <label className={labelCls + ' !text-indigo-600'}>姓（カナ）</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_last_name_kana')}</label>
                         <input type="text" name="lastNameKana" value={contactForm.lastNameKana} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="ヤマダ" />
                       </div>
                       <div className="col-span-3">
-                        <label className={labelCls + ' !text-indigo-600'}>名（カナ）</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_first_name_kana')}</label>
                         <input type="text" name="firstNameKana" value={contactForm.firstNameKana} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="タロウ" />
                       </div>
 
                       {/* 部署・役職 */}
                       <div className="col-span-6">
-                        <label className={labelCls + ' !text-indigo-600'}>部署</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_department')}</label>
                         <input type="text" name="department" value={contactForm.department} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="営業部" />
                       </div>
                       <div className="col-span-6">
-                        <label className={labelCls + ' !text-indigo-600'}>役職</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_position')}</label>
                         <input type="text" name="position" value={contactForm.position} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="課長" />
                       </div>
@@ -788,8 +794,8 @@ export default function CustomerPage() {
                       {/* メール（必須） */}
                       <div className="col-span-12">
                         <label className={labelCls + ' !text-indigo-600'}>
-                          メールアドレス <span className="text-red-500">*</span>
-                          <span className="text-[10px] font-normal text-indigo-400 ml-1">（ポータルログインIDになります）</span>
+                          {t('contact_email')} <span className="text-red-500">*</span>
+                          <span className="text-[10px] font-normal text-indigo-400 ml-1">{t('contact_email_note_portal')}</span>
                         </label>
                         <input type="email" name="email" required value={contactForm.email} onChange={handleContactInput}
                           className={inputCls + ' border-indigo-200 focus:ring-indigo-400'} placeholder="taro@example.com" />
@@ -797,7 +803,7 @@ export default function CustomerPage() {
 
                       {/* 電話番号 */}
                       <div className="col-span-6">
-                        <label className={labelCls + ' !text-indigo-600'}>携帯電話</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_mobile')}</label>
                         <input
                           type="tel"
                           name="mobilePhone"
@@ -809,7 +815,7 @@ export default function CustomerPage() {
                         />
                       </div>
                       <div className="col-span-6">
-                        <label className={labelCls + ' !text-indigo-600'}>直通電話</label>
+                        <label className={labelCls + ' !text-indigo-600'}>{t('contact_direct_line')}</label>
                         <input
                           type="tel"
                           name="directLine"
@@ -829,14 +835,14 @@ export default function CustomerPage() {
               <div className="pt-2 flex justify-end gap-3 border-t border-slate-100">
                 <button type="button" onClick={() => setIsFormModalOpen(false)}
                   className="px-5 py-2.5 text-slate-600 font-bold text-sm hover:bg-slate-100 rounded-lg transition-colors">
-                  キャンセル
+                  {t('cancel')}
                 </button>
                 <button type="submit" disabled={isSaving}
                   className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-md transition-all disabled:opacity-60 flex items-center gap-2">
                   {isSaving ? (
-                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>保存中...</>
+                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>{t('saving')}</>
                   ) : (
-                    <><i className="bi bi-check-lg"></i>{currentId ? '変更を保存' : '顧客を登録'}</>
+                    <><i className="bi bi-check-lg"></i>{currentId ? t('btn_save_changes') : t('btn_register_customer')}</>
                   )}
                 </button>
               </div>
@@ -852,11 +858,11 @@ export default function CustomerPage() {
             <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
             </div>
-            <h3 className="font-bold text-slate-800 text-lg mb-2">顧客を削除しますか？</h3>
-            <p className="text-slate-500 text-sm mb-6">ステータスが「無効」に変更されます。<br />物理削除は行われません。</p>
+            <h3 className="font-bold text-slate-800 text-lg mb-2">{t('delete_title')}</h3>
+            <p className="text-slate-500 text-sm mb-6">{t('delete_description')}<br />{t('delete_description2')}</p>
             <div className="flex gap-3">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm transition-colors">キャンセル</button>
-              <button onClick={executeDelete} className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-sm shadow-md transition-colors">削除する</button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-sm transition-colors">{t('cancel')}</button>
+              <button onClick={executeDelete} className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-sm shadow-md transition-colors">{t('delete_btn')}</button>
             </div>
           </div>
         </div>

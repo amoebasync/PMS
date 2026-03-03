@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 
 export default function AttendancePage() {
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('attendance');
   const [activeTab, setActiveTab] = useState<'ATTENDANCE' | 'EXPENSE'>('ATTENDANCE');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -112,37 +114,38 @@ export default function AttendancePage() {
         body: JSON.stringify(body)
       });
       if (res.ok) {
-        const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '自分';
-        showToast(`${selectedEmployeeId ? `${targetName}の` : ''}勤怠を記録しました`, 'success');
+        const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '';
+        showToast(selectedEmployeeId ? `${targetName}${t('attendance_recorded_other')}` : t('attendance_recorded'), 'success');
         const workType = attendanceTypes.find((t: any) => t.code === 'WORK');
         setAttendanceForm(prev => ({ ...prev, note: '', saveAsDefault: false, attendanceTypeId: workType?.id?.toString() || '' }));
         fetchData();
       } else {
         const data = await res.json();
-        showToast(`打刻エラー: ${data.error || '失敗しました'}`, 'error');
+        showToast(`${t('attendance_error')}${data.error || ''}`, 'error');
       }
-    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
+    } catch (err) { showToast(t('communication_error'), 'error'); }
     setIsSubmitting(false);
   };
 
   const handleDeleteAttendance = async (dateStr: string) => {
     const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '';
+    const dateFormatted = new Date(dateStr).toLocaleDateString();
     const confirmMsg = selectedEmployeeId
-      ? `${targetName} の ${new Date(dateStr).toLocaleDateString()} の勤怠を削除しますか？（※有給休暇の場合は残日数が返還されます）`
-      : `${new Date(dateStr).toLocaleDateString()} の申請を取り下げますか？（※有給休暇の場合は残日数が返還されます）`;
-    if (!await showConfirm(confirmMsg, { variant: 'danger', confirmLabel: '削除する' })) return;
+      ? `${targetName}${t('delete_confirm_other', { date: dateFormatted })}`
+      : t('delete_confirm_self', { date: dateFormatted });
+    if (!await showConfirm(confirmMsg, { variant: 'danger', confirmLabel: t('delete') })) return;
     try {
       const url = selectedEmployeeId
         ? `/api/attendance?date=${dateStr.split('T')[0]}&employeeId=${selectedEmployeeId}`
         : `/api/attendance?date=${dateStr.split('T')[0]}`;
       const res = await fetch(url, { method: 'DELETE' });
       if (res.ok) {
-        showToast(selectedEmployeeId ? '勤怠を削除しました' : '申請を取り下げました', 'success');
+        showToast(selectedEmployeeId ? t('attendance_deleted') : t('attendance_withdrawn'), 'success');
         fetchData();
       } else {
-        showToast('削除に失敗しました', 'error');
+        showToast(t('error_occurred'), 'error');
       }
-    } catch (e) { showToast('エラーが発生しました', 'error'); }
+    } catch (e) { showToast(t('error_occurred'), 'error'); }
   };
 
   const handleEditAttendance = (att: any) => {
@@ -166,18 +169,20 @@ export default function AttendancePage() {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(expenseForm)
       });
       if (res.ok) {
-        showToast('経費を申請しました', 'success');
+        showToast(t('expense_submitted'), 'success');
         setExpenseForm(prev => ({ ...prev, amount: '', description: '' }));
         fetchData();
-      } else { showToast('申請に失敗しました', 'error'); }
-    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
+      } else { showToast(t('expense_submit_error'), 'error'); }
+    } catch (err) { showToast(t('communication_error'), 'error'); }
     setIsSubmitting(false);
   };
 
   const getSummaryTitle = () => {
-    if (!summary) return '給与見込み';
-    const period = summary.salaryType === 'MONTHLY' ? '月給' : '週給';
-    return summary.isPast ? `${period} 支給額` : `今${period === '月給' ? '月' : '週'}の${period}見込み`;
+    if (!summary) return t('summary_default');
+    if (summary.salaryType === 'MONTHLY') {
+      return summary.isPast ? `${t('summary_monthly')} ${t('summary_paid')}` : t('summary_estimate_monthly');
+    }
+    return summary.isPast ? `${t('summary_weekly')} ${t('summary_paid')}` : t('summary_estimate_weekly');
   };
 
   const selectedType = attendanceTypes.find(t => t.id.toString() === attendanceForm.attendanceTypeId);
@@ -195,7 +200,7 @@ export default function AttendancePage() {
   // HR管理者が他社員を表示中かどうか
   const isViewingOther = isHrAdmin && !!selectedEmployeeId;
 
-  if (isLoading && !summary) return <div className="p-10 text-center text-slate-500">読み込み中...</div>;
+  if (isLoading && !summary) return <div className="p-10 text-center text-slate-500">{t('loading')}</div>;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-10">
@@ -206,14 +211,14 @@ export default function AttendancePage() {
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 text-amber-800">
             <i className="bi bi-person-gear text-lg"></i>
-            <span className="text-sm font-bold">管理者モード：対象社員</span>
+            <span className="text-sm font-bold">{t('admin_mode')}</span>
           </div>
           <select
             value={selectedEmployeeId}
             onChange={e => handleEmployeeChange(e.target.value)}
             className="border border-amber-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none font-medium min-w-[200px]"
           >
-            <option value="">自分の勤怠を表示</option>
+            <option value="">{t('view_own')}</option>
             {employees.map(emp => (
               <option key={emp.id} value={emp.id}>
                 {emp.lastNameJa} {emp.firstNameJa}（{emp.employeeCode || emp.id}）
@@ -223,17 +228,17 @@ export default function AttendancePage() {
           {isViewingOther && (
             <span className="text-sm font-bold text-amber-700 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full">
               <i className="bi bi-eye-fill mr-1"></i>
-              {selectedEmployee?.lastNameJa} {selectedEmployee?.firstNameJa} の勤怠を表示中
+              {selectedEmployee?.lastNameJa} {selectedEmployee?.firstNameJa}{t('viewing_other')}
             </span>
           )}
         </div>
       )}
 
       <div className="flex border-b border-slate-200">
-        <button onClick={() => setActiveTab('ATTENDANCE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-calendar-check mr-2"></i> 勤怠・給与確認</button>
+        <button onClick={() => setActiveTab('ATTENDANCE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-calendar-check mr-2"></i> {t('tab_attendance')}</button>
         {/* 他社員表示中は経費タブを非表示 */}
         {!isViewingOther && (
-          <button onClick={() => setActiveTab('EXPENSE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-receipt mr-2"></i> 経費申請</button>
+          <button onClick={() => setActiveTab('EXPENSE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-receipt mr-2"></i> {t('tab_expense')}</button>
         )}
       </div>
 
@@ -261,22 +266,22 @@ export default function AttendancePage() {
 
             <div className="w-full md:w-auto flex flex-wrap md:flex-nowrap items-center gap-4">
               <div className="pr-4 md:border-r border-white/20">
-                <div className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">合計金額</div>
+                <div className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">{t('summary_total')}</div>
                 <div className="text-3xl font-black font-mono mt-1 drop-shadow-sm">¥{summary?.totalWage?.toLocaleString() || 0}</div>
               </div>
               <div className="flex gap-3 text-sm">
                 <div className="bg-black/20 px-4 py-2 rounded-xl shadow-inner text-center min-w-[70px]">
-                  <div className="text-indigo-200 text-[10px]">実労働</div>
+                  <div className="text-indigo-200 text-[10px]">{t('summary_work_hours')}</div>
                   <div className="font-bold mt-0.5">{summary?.totalHours || 0} h</div>
                 </div>
                 <div className="bg-black/20 px-4 py-2 rounded-xl shadow-inner text-center min-w-[70px]">
-                  <div className="text-indigo-200 text-[10px]">出勤</div>
-                  <div className="font-bold mt-0.5">{summary?.records?.length || 0} 日</div>
+                  <div className="text-indigo-200 text-[10px]">{t('summary_attendance_days')}</div>
+                  <div className="font-bold mt-0.5">{summary?.records?.length || 0} {t('summary_days')}</div>
                 </div>
                 {summary?.employmentType === 'FULL_TIME' && (
                   <div className="bg-white/20 px-4 py-2 rounded-xl shadow-sm border border-white/10 backdrop-blur-sm text-center min-w-[70px]">
-                    <div className="text-indigo-50 text-[10px] whitespace-nowrap"><i className="bi bi-cup-hot-fill mr-1"></i>有給残</div>
-                    <div className="font-bold mt-0.5">{summary?.paidLeaveBalance || 0} 日</div>
+                    <div className="text-indigo-50 text-[10px] whitespace-nowrap"><i className="bi bi-cup-hot-fill mr-1"></i>{t('summary_paid_leave')}</div>
+                    <div className="font-bold mt-0.5">{summary?.paidLeaveBalance || 0} {t('summary_days')}</div>
                   </div>
                 )}
               </div>
@@ -292,52 +297,52 @@ export default function AttendancePage() {
                 <h3 className="font-bold text-slate-800 border-b pb-2 flex items-center gap-2">
                   <i className="bi bi-pencil-square text-indigo-600"></i>
                   {isViewingOther
-                    ? `${selectedEmployee?.lastNameJa} ${selectedEmployee?.firstNameJa} の勤怠入力`
-                    : '打刻・勤怠入力'
+                    ? `${selectedEmployee?.lastNameJa} ${selectedEmployee?.firstNameJa}${t('form_title_other')}`
+                    : t('form_title')
                   }
                 </h3>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">勤務日</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_work_date')}</label>
                   <input type="date" required value={attendanceForm.date} onChange={e => setAttendanceForm({...attendanceForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">勤怠の種類</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_attendance_type')}</label>
                   <select required value={attendanceForm.attendanceTypeId} onChange={e => setAttendanceForm({...attendanceForm, attendanceTypeId: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none font-bold">
-                    <option value="">選択してください</option>
+                    <option value="">{t('select_placeholder')}</option>
                     {availableTypes.map(t => (
                       <option key={t.id} value={t.id}>{t.name}</option>
                     ))}
                   </select>
-                  {selectedType?.isDeducting && <p className="text-[10px] text-emerald-600 mt-1 font-bold">※ 有給休暇を1日分消化します。</p>}
+                  {selectedType?.isDeducting && <p className="text-[10px] text-emerald-600 mt-1 font-bold">{t('paid_leave_note')}</p>}
                 </div>
 
                 {isWorking ? (
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">出勤時間</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_start_time')}</label>
                         <input type="time" required value={attendanceForm.startTime} onChange={e => setAttendanceForm({...attendanceForm, startTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
                       </div>
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 mb-1">退勤時間</label>
+                        <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_end_time')}</label>
                         <input type="time" required value={attendanceForm.endTime} onChange={e => setAttendanceForm({...attendanceForm, endTime: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-600 mb-1">休憩時間 (分)</label>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_break_minutes')}</label>
                       <input type="number" required min="0" value={attendanceForm.breakMinutes} onChange={e => setAttendanceForm({...attendanceForm, breakMinutes: Number(e.target.value)})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" />
                     </div>
                   </>
                 ) : (
                   <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-500 text-center border border-dashed border-slate-200">
-                    <i className="bi bi-info-circle mr-1"></i> 休暇のため時間の入力は不要です
+                    <i className="bi bi-info-circle mr-1"></i> {t('leave_no_time')}
                   </div>
                 )}
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">備考 (遅刻・早退・休暇理由など)</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">{t('label_note')}</label>
                   <textarea rows={2} value={attendanceForm.note} onChange={e => setAttendanceForm({...attendanceForm, note: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
                 </div>
 
@@ -345,12 +350,12 @@ export default function AttendancePage() {
                 {isWorking && !isViewingOther && (
                   <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2 rounded-lg border border-slate-100">
                     <input type="checkbox" checked={attendanceForm.saveAsDefault} onChange={e => setAttendanceForm({...attendanceForm, saveAsDefault: e.target.checked})} className="w-4 h-4 text-indigo-600 rounded" />
-                    <span className="text-[11px] font-bold text-slate-600">この時間をデフォルトとして保存</span>
+                    <span className="text-[11px] font-bold text-slate-600">{t('save_as_default')}</span>
                   </label>
                 )}
 
                 <button type="submit" disabled={isSubmitting || !attendanceForm.attendanceTypeId} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50 mt-2">
-                  {isSubmitting ? '保存中...' : isViewingOther ? '代理登録する' : '記録を送信する'}
+                  {isSubmitting ? t('btn_submitting') : isViewingOther ? t('btn_proxy_register') : t('btn_submit_record')}
                 </button>
               </form>
             </div>
@@ -361,8 +366,8 @@ export default function AttendancePage() {
                 <h3 className="font-bold text-slate-800">
                   <i className="bi bi-list-ul mr-2"></i>
                   {isViewingOther
-                    ? `${selectedEmployee?.lastNameJa} ${selectedEmployee?.firstNameJa} の勤怠履歴`
-                    : '直近の勤怠履歴'
+                    ? `${selectedEmployee?.lastNameJa} ${selectedEmployee?.firstNameJa}${t('history_title_other')}`
+                    : t('history_title')
                   }
                 </h3>
               </div>
@@ -370,17 +375,17 @@ export default function AttendancePage() {
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead>
                     <tr className="text-slate-500 border-b border-slate-200">
-                      <th className="pb-3 font-bold">日付</th>
-                      <th className="pb-3 font-bold">内容</th>
-                      <th className="pb-3 font-bold text-center">実働</th>
-                      <th className="pb-3 font-bold text-right">日給(計算)</th>
-                      <th className="pb-3 font-bold text-center">状態</th>
-                      <th className="pb-3 font-bold text-center">操作</th>
+                      <th className="pb-3 font-bold">{t('th_date')}</th>
+                      <th className="pb-3 font-bold">{t('th_content')}</th>
+                      <th className="pb-3 font-bold text-center">{t('th_work_hours')}</th>
+                      <th className="pb-3 font-bold text-right">{t('th_daily_wage')}</th>
+                      <th className="pb-3 font-bold text-center">{t('th_status')}</th>
+                      <th className="pb-3 font-bold text-center">{t('th_actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {attendances.length === 0 && (
-                      <tr><td colSpan={6} className="py-8 text-center text-slate-400">履歴がありません</td></tr>
+                      <tr><td colSpan={6} className="py-8 text-center text-slate-400">{t('no_history')}</td></tr>
                     )}
                     {attendances.map((att: any) => (
                       <tr key={att.id} className="hover:bg-slate-50 transition-colors">
@@ -389,9 +394,9 @@ export default function AttendancePage() {
                         </td>
                         <td className="py-3">
                           {att.attendanceType?.isWorking ? (
-                            <span className="text-[11px] sm:text-sm font-medium">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}分休)</span></span>
+                            <span className="text-[11px] sm:text-sm font-medium">{att.startTime} ~ {att.endTime} <span className="text-slate-400 ml-1">({att.breakMinutes}{t('break_minutes')})</span></span>
                           ) : (
-                            <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || '休暇'}</span>
+                            <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || t('leave_default')}</span>
                           )}
                         </td>
                         <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${att.workHours}h` : '-'}</td>
@@ -427,26 +432,26 @@ export default function AttendancePage() {
       {activeTab === 'EXPENSE' && !isViewingOther && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <form onSubmit={handleExpenseSubmit} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <h3 className="font-bold text-slate-800 border-b pb-2"><i className="bi bi-cash-coin mr-2 text-indigo-600"></i> 新規経費の申請</h3>
-            <div><label className="block text-xs font-bold text-slate-600 mb-1">発生日</label><input type="date" required value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
-            <div><label className="block text-xs font-bold text-slate-600 mb-1">経費種別</label><select required value={expenseForm.type} onChange={e => setExpenseForm({...expenseForm, type: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"><option value="TRANSPORTATION">交通費 (電車・バス等)</option><option value="OTHER">その他経費 (備品・接待交際費等)</option></select></div>
-            <div><label className="block text-xs font-bold text-slate-600 mb-1">金額 (円)</label><input type="number" required min="1" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} className="w-full border p-2 rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="例: 1500" /></div>
-            <div><label className="block text-xs font-bold text-slate-600 mb-1">目的・経路 (詳細)</label><textarea required rows={3} value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="例: 新宿駅〜東京駅 往復（〇〇社訪問のため）"></textarea></div>
-            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-800 hover:bg-black text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50">{isSubmitting ? '処理中...' : '承認フローへ申請する'}</button>
-            <p className="text-[10px] text-slate-400 text-center">※申請後、管理者の承認を経て給与に合算または別途振り込まれます。</p>
+            <h3 className="font-bold text-slate-800 border-b pb-2"><i className="bi bi-cash-coin mr-2 text-indigo-600"></i> {t('expense_title')}</h3>
+            <div><label className="block text-xs font-bold text-slate-600 mb-1">{t('expense_date')}</label><input type="date" required value={expenseForm.date} onChange={e => setExpenseForm({...expenseForm, date: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+            <div><label className="block text-xs font-bold text-slate-600 mb-1">{t('expense_type')}</label><select required value={expenseForm.type} onChange={e => setExpenseForm({...expenseForm, type: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"><option value="TRANSPORTATION">{t('expense_type_transportation')}</option><option value="OTHER">{t('expense_type_other')}</option></select></div>
+            <div><label className="block text-xs font-bold text-slate-600 mb-1">{t('expense_amount')}</label><input type="number" required min="1" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} className="w-full border p-2 rounded-lg text-sm font-mono bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="例: 1500" /></div>
+            <div><label className="block text-xs font-bold text-slate-600 mb-1">{t('expense_description')}</label><textarea required rows={3} value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} className="w-full border p-2 rounded-lg text-sm bg-slate-50 focus:ring-2 focus:ring-indigo-500 outline-none"></textarea></div>
+            <button type="submit" disabled={isSubmitting} className="w-full bg-slate-800 hover:bg-black text-white font-bold py-3 rounded-xl shadow-md transition-all disabled:opacity-50">{isSubmitting ? t('expense_submitting') : t('expense_submit')}</button>
+            <p className="text-[10px] text-slate-400 text-center">{t('expense_note')}</p>
           </form>
 
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
-            <div className="p-5 border-b border-slate-200 bg-slate-50"><h3 className="font-bold text-slate-800"><i className="bi bi-list-ul mr-2"></i> 経費申請の履歴</h3></div>
+            <div className="p-5 border-b border-slate-200 bg-slate-50"><h3 className="font-bold text-slate-800"><i className="bi bi-list-ul mr-2"></i> {t('expense_history_title')}</h3></div>
             <div className="overflow-x-auto flex-1 p-5">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead><tr className="text-slate-500 border-b border-slate-200"><th className="pb-3 font-bold">発生日</th><th className="pb-3 font-bold">種別</th><th className="pb-3 font-bold">内容</th><th className="pb-3 font-bold text-right">金額</th><th className="pb-3 font-bold text-center">ステータス</th></tr></thead>
+                <thead><tr className="text-slate-500 border-b border-slate-200"><th className="pb-3 font-bold">{t('expense_th_date')}</th><th className="pb-3 font-bold">{t('expense_th_type')}</th><th className="pb-3 font-bold">{t('expense_th_description')}</th><th className="pb-3 font-bold text-right">{t('expense_th_amount')}</th><th className="pb-3 font-bold text-center">{t('expense_th_status')}</th></tr></thead>
                 <tbody className="divide-y divide-slate-100">
-                  {expenses.length === 0 && (<tr><td colSpan={5} className="py-8 text-center text-slate-400">申請履歴がありません</td></tr>)}
+                  {expenses.length === 0 && (<tr><td colSpan={5} className="py-8 text-center text-slate-400">{t('expense_no_history')}</td></tr>)}
                   {expenses.map((exp: any) => (
                     <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
                       <td className="py-3 font-mono text-slate-700">{new Date(exp.date).toLocaleDateString('ja-JP')}</td>
-                      <td className="py-3"><span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded font-bold">{exp.type === 'TRANSPORTATION' ? '交通費' : 'その他'}</span></td>
+                      <td className="py-3"><span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded font-bold">{exp.type === 'TRANSPORTATION' ? t('expense_transportation') : t('expense_other')}</span></td>
                       <td className="py-3 max-w-[200px] truncate text-slate-600" title={exp.description}>{exp.description}</td>
                       <td className="py-3 text-right font-mono font-bold text-slate-800">¥{exp.amount.toLocaleString()}</td>
                       <td className="py-3 text-center"><span className={`px-2 py-1 text-[10px] font-bold rounded-full ${exp.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : exp.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>{exp.status}</span></td>

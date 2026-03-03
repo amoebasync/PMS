@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n';
 import SkeletonRow from '@/components/ui/SkeletonRow';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
@@ -44,20 +45,26 @@ type Employee = {
   financial?: any; 
 };
 
-const EMP_TYPE_MAP: Record<string, string> = { FULL_TIME: '正社員', PART_TIME: 'アルバイト・パート', OUTSOURCE: '業務委託' };
-const SALARY_TYPE_MAP: Record<string, string> = { MONTHLY: '月給', DAILY: '日給', HOURLY: '時給' };
-const PAY_METHOD_MAP: Record<string, string> = { BANK_TRANSFER: '銀行振込', CASH: '現金手渡し' };
-const PAY_CYCLE_MAP: Record<string, string> = { MONTHLY: '月払い', WEEKLY: '週払い', DAILY: '日払い' };
+const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
+const SALARY_TYPE_LABEL_KEYS: Record<string, string> = { MONTHLY: 'salary_type_monthly', DAILY: 'salary_type_daily', HOURLY: 'salary_type_hourly' };
+const PAY_METHOD_LABEL_KEYS: Record<string, string> = { BANK_TRANSFER: 'payment_bank', CASH: 'payment_cash' };
+const PAY_CYCLE_LABEL_KEYS: Record<string, string> = { MONTHLY: 'payment_monthly', WEEKLY: 'payment_weekly', DAILY: 'payment_daily' };
 
-const RANK_MAP: Record<string, string> = {
-  EXECUTIVE: '役員', DIRECTOR: '本部長・事業部長', MANAGER: 'マネージャー', LEADER: 'リーダー', ASSOCIATE: 'アソシエイト(一般)',
+const RANK_LABEL_KEYS: Record<string, string> = {
+  EXECUTIVE: 'rank_executive', DIRECTOR: 'rank_director', MANAGER: 'rank_manager', LEADER: 'rank_leader', ASSOCIATE: 'rank_associate',
 };
 
-const LEAVE_TYPE_MAP: Record<string, { label: string, color: string }> = {
-  GRANTED: { label: '付与', color: 'bg-emerald-100 text-emerald-700' },
-  USED: { label: '消化', color: 'bg-blue-100 text-blue-700' },
-  EXPIRED: { label: '消滅', color: 'bg-slate-100 text-slate-600' },
-  ADJUSTED: { label: '調整', color: 'bg-amber-100 text-amber-700' },
+const LEAVE_TYPE_STYLE: Record<string, string> = {
+  GRANTED: 'bg-emerald-100 text-emerald-700',
+  USED: 'bg-blue-100 text-blue-700',
+  EXPIRED: 'bg-slate-100 text-slate-600',
+  ADJUSTED: 'bg-amber-100 text-amber-700',
+};
+const LEAVE_TYPE_LABEL_KEYS: Record<string, string> = {
+  GRANTED: 'leave_type_granted',
+  USED: 'leave_type_used',
+  EXPIRED: 'leave_type_expired',
+  ADJUSTED: 'leave_type_adjusted',
 };
 
 const Avatar = ({ name, url, size = 'md' }: { name: string, url?: string | null, size?: 'sm' | 'md' | 'lg' | 'xl' }) => {
@@ -140,6 +147,7 @@ export default function EmployeePage() {
   const [formData, setFormData] = useState(initialForm);
 
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('employees');
 
   const buildEmpQuery = (overrides: Record<string, unknown> = {}) => {
     const params = new URLSearchParams();
@@ -330,7 +338,7 @@ export default function EmployeePage() {
     // Workspace アカウント作成時のバリデーション
     if (formData.createWorkspaceAccount && !currentId) {
       if (!formData.firstNameEn || !formData.lastNameEn) {
-        showToast('Google Workspaceアカウント作成には英語名（First Name / Last Name）が必須です', 'error');
+        showToast(t('form_workspace_en_required'), 'error');
         return;
       }
     }
@@ -358,13 +366,13 @@ export default function EmployeePage() {
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(submitData) });
       if (!res.ok) {
         const data = await res.json();
-        showToast(data.error || '保存に失敗しました', 'error');
+        showToast(data.error || t('save_error'), 'error');
         return;
       }
 
       setIsFormModalOpen(false);
       fetchEmployees(buildEmpQuery());
-    } catch (error) { showToast('保存に失敗しました', 'error'); }
+    } catch (error) { showToast(t('save_error'), 'error'); }
   };
 
   const handleLeaveSubmit = async (e: React.FormEvent) => {
@@ -377,33 +385,33 @@ export default function EmployeePage() {
       });
       if (res.ok) {
         const data = await res.json();
-        showToast('有給休暇を登録しました', 'success');
+        showToast(t('leave_registered'), 'success');
         setSelectedEmployee(prev => prev ? { ...prev, financial: { ...prev.financial, paidLeaveBalance: data.newBalance } } : prev);
         const ledgersRes = await fetch(`/api/employees/${selectedEmployee.id}/leave`);
         if (ledgersRes.ok) setLeaveLedgers(await ledgersRes.json());
         setIsLeaveFormOpen(false);
       } else {
         const data = await res.json();
-        showToast(`登録エラー: ${data.error}`, 'error');
+        showToast(t('leave_register_error', { error: data.error }), 'error');
       }
-    } catch (error) { showToast('通信エラーが発生しました', 'error'); }
+    } catch (error) { showToast(t('comm_error'), 'error'); }
     setIsLeaveSubmitting(false);
   };
 
   const handlePasswordReset = async () => {
     if (!currentId) return;
-    if (!await showConfirm('この社員のパスワードをリセットしますか？\n新しいパスワードが自動生成されます。', { variant: 'warning', confirmLabel: 'リセットする' })) return;
+    if (!await showConfirm(t('password_reset_confirm'), { variant: 'warning', confirmLabel: t('password_reset_btn') })) return;
     try {
       const res = await fetch(`/api/employees/${currentId}/reset`, { method: 'POST' });
       if (!res.ok) throw new Error('Reset failed');
       const data = await res.json();
-      await showConfirm(`新しいパスワード: ${data.newPassword}\n\nこのパスワードを社員に伝えてください。`, {
-        title: 'パスワードをリセットしました',
+      await showConfirm(t('password_reset_new', { password: data.newPassword }), {
+        title: t('password_reset_success'),
         infoOnly: true,
-        confirmLabel: '閉じる',
+        confirmLabel: t('btn_close'),
         variant: 'success',
       });
-    } catch (error) { showToast('パスワードリセットに失敗しました', 'error'); }
+    } catch (error) { showToast(t('password_reset_error'), 'error'); }
   };
 
   const confirmDelete = (e: React.MouseEvent, id: number) => { e.stopPropagation(); setCurrentId(id); setIsDeleteModalOpen(true); };
@@ -434,10 +442,10 @@ export default function EmployeePage() {
         setTimeout(() => dismissWelcomeToast(), 4000);
       } else {
         const data = await res.json();
-        showToast(data.error || 'メールの送信に失敗しました', 'error');
+        showToast(data.error || t('mail_send_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
     setSendingWelcomeId(null);
   };
@@ -445,13 +453,13 @@ export default function EmployeePage() {
   const handleCreateWorkspace = async () => {
     if (!selectedEmployee) return;
     if (!selectedEmployee.lastNameEn || !selectedEmployee.firstNameEn) {
-      showToast('英語名（First Name / Last Name）が未設定です。先に社員情報を編集してください', 'error');
+      showToast(t('workspace_en_required'), 'error');
       return;
     }
     const preview = `${selectedEmployee.firstNameEn.toLowerCase()}.${selectedEmployee.lastNameEn.toLowerCase()}@tiramis.co.jp`;
     const confirmed = await showConfirm(
-      `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa} さんのGoogle Workspaceアカウントを作成しますか？\n\n作成されるメール: ${preview}\n現在のメール（${selectedEmployee.email}）は私用メールとして保存されます。`,
-      { variant: 'primary', confirmLabel: '作成する' },
+      t('workspace_create_confirm', { name: `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}`, email: preview, currentEmail: selectedEmployee.email }),
+      { variant: 'primary', confirmLabel: t('workspace_create_btn') },
     );
     if (!confirmed) return;
     setCreatingWorkspace(true);
@@ -459,14 +467,14 @@ export default function EmployeePage() {
       const res = await fetch(`/api/employees/${selectedEmployee.id}/create-workspace`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast(`Workspaceアカウントを作成しました: ${data.email}`, 'success');
+        showToast(t('workspace_created', { email: data.email }), 'success');
         setSelectedEmployee(prev => prev ? { ...prev, email: data.email, personalEmail: data.personalEmail } : prev);
         fetchEmployees(buildEmpQuery());
       } else {
-        showToast(data.error || '作成に失敗しました', 'error');
+        showToast(data.error || t('workspace_create_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
     setCreatingWorkspace(false);
   };
@@ -475,7 +483,7 @@ export default function EmployeePage() {
     if (!selectedEmployee) return;
     const isAlreadyNotified = !!selectedEmployee.workspaceNotifiedAt;
     if (isAlreadyNotified) {
-      const confirmed = await showConfirm('既に通知済みですが、再度通知しますか？', { variant: 'warning', confirmLabel: '再送信する' });
+      const confirmed = await showConfirm(t('workspace_notify_resend_confirm'), { variant: 'warning', confirmLabel: t('workspace_notify_resend_btn') });
       if (!confirmed) return;
     }
     setSendingWorkspaceNotify(true);
@@ -483,13 +491,13 @@ export default function EmployeePage() {
       const res = await fetch(`/api/employees/${selectedEmployee.id}/notify-workspace`, { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast('Workspace通知メールを送信しました', 'success');
+        showToast(t('workspace_notify_success'), 'success');
         setSelectedEmployee(prev => prev ? { ...prev, workspaceNotifiedAt: data.notifiedAt } : prev);
       } else {
-        showToast(data.error || '通知に失敗しました', 'error');
+        showToast(data.error || t('workspace_notify_error'), 'error');
       }
     } catch {
-      showToast('通信エラーが発生しました', 'error');
+      showToast(t('comm_error'), 'error');
     }
     setSendingWorkspaceNotify(false);
   };
@@ -501,7 +509,7 @@ export default function EmployeePage() {
       if (!res.ok) throw new Error('Failed to delete');
       setIsDeleteModalOpen(false);
       fetchEmployees(buildEmpQuery());
-    } catch (error) { showToast('削除に失敗しました', 'error'); }
+    } catch (error) { showToast(t('delete_error'), 'error'); }
   };
 
 
@@ -516,19 +524,19 @@ export default function EmployeePage() {
       {canEdit && (
         <div className="flex justify-end">
           <button onClick={() => openFormModal()} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
-            <i className="bi bi-plus-lg"></i> 新規社員登録
+            <i className="bi bi-plus-lg"></i> {t('btn_new_employee')}
           </button>
         </div>
       )}
 
       <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
         <div className="flex-1 min-w-[250px]">
-          <label className="block text-xs font-bold text-slate-500 mb-1">キーワード検索</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
             <input
               type="text"
-              placeholder="氏名、社員コード、メールアドレス等で検索..."
+              placeholder={t('filter_keyword_placeholder')}
               value={searchTerm}
               onChange={(e) => handleEmpSearchChange(e.target.value)}
               className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
@@ -536,38 +544,38 @@ export default function EmployeePage() {
           </div>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">ステータス</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
           <select
             value={filterStatus}
             onChange={(e) => handleEmpFilterChange({ filterStatus: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="ACTIVE">在職中</option>
-            <option value="INACTIVE">退職済</option>
-            <option value="ALL">すべて</option>
+            <option value="ACTIVE">{t('filter_status_active')}</option>
+            <option value="INACTIVE">{t('filter_status_inactive')}</option>
+            <option value="ALL">{t('filter_all')}</option>
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">支店</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_branch')}</label>
           <select
             value={filterBranchId}
             onChange={(e) => handleEmpFilterChange({ filterBranchId: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {branches.map(b => (
               <option key={b.id} value={b.id}>{b.nameJa}</option>
             ))}
           </select>
         </div>
         <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">部署</label>
+          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_department')}</label>
           <select
             value={filterDepartmentId}
             onChange={(e) => handleEmpFilterChange({ filterDepartmentId: e.target.value })}
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
           >
-            <option value="">すべて</option>
+            <option value="">{t('filter_all')}</option>
             {departments.map(d => (
               <option key={d.id} value={d.id}>{d.name}</option>
             ))}
@@ -581,19 +589,19 @@ export default function EmployeePage() {
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
               <th className="px-6 py-4 font-semibold cursor-pointer select-none hover:bg-slate-100" onClick={() => handleEmpSort('name')}>
-                社員番号 / 氏名 <EmpSortIcon col="name" />
+                {t('table_id_name')} <EmpSortIcon col="name" />
               </th>
-              <th className="px-6 py-4 font-semibold">雇用形態 / 役職・権限</th>
-              <th className="px-6 py-4 font-semibold">所属 / 国籍</th>
-              <th className="px-6 py-4 font-semibold">ステータス</th>
-              <th className="px-6 py-4 font-semibold text-right">操作</th>
+              <th className="px-6 py-4 font-semibold">{t('table_emp_type_role')}</th>
+              <th className="px-6 py-4 font-semibold">{t('table_affiliation')}</th>
+              <th className="px-6 py-4 font-semibold">{t('filter_status')}</th>
+              <th className="px-6 py-4 font-semibold text-right">{t('table_actions')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <SkeletonRow rows={8} cols={5} />
             ) : employees.length === 0 ? (
-              <EmptyState icon="bi-person-x" title="該当するデータが見つかりません" description="検索条件を変更するか、新規社員を登録してください" />
+              <EmptyState icon="bi-person-x" title={t('no_match_title')} description={t('no_match_description')} />
             ) : (
               sortedEmployees.map((emp) => (
                 <tr key={emp.id} onClick={() => openDetailModal(emp)} className="hover:bg-blue-50/50 transition-colors cursor-pointer">
@@ -613,9 +621,9 @@ export default function EmployeePage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-blue-700 font-bold text-xs bg-blue-50 border border-blue-100 px-2 py-0.5 rounded inline-block mb-1">
-                      {EMP_TYPE_MAP[emp.employmentType] || '未設定'}
+                      {t(EMP_TYPE_LABEL_KEYS[emp.employmentType] || 'emp_type_not_set')}
                     </div>
-                    <div className="text-xs text-slate-500 font-bold mb-1">{emp.jobTitle || '役職未設定'}</div>
+                    <div className="text-xs text-slate-500 font-bold mb-1">{emp.jobTitle || t('job_title_not_set')}</div>
                     
                     <div className="flex flex-wrap gap-1 mt-1">
                       {emp.roles && emp.roles.length > 0 ? (
@@ -626,27 +634,27 @@ export default function EmployeePage() {
                         ))
                       ) : (
                         <span className="px-1.5 py-0.5 bg-slate-100 text-slate-500 border border-slate-200 text-[9px] font-bold rounded">
-                          一般ユーザー
+                          {t('role_default')}
                         </span>
                       )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-slate-800 font-medium">
-                      {emp.branch?.nameJa ? `${emp.branch.nameJa}支店` : ''} 
+                      {emp.branch?.nameJa ? `${emp.branch.nameJa}${t('branch_suffix')}` : ''}
                       {emp.department?.name ? ` ${emp.department.name}` : ''}
-                      {!emp.branch && !emp.department && '未所属'}
+                      {!emp.branch && !emp.department && t('not_assigned')}
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">{emp.country ? `${emp.country.name} (${emp.country.code})` : '-'}</div>
                   </td>
                   <td className="px-6 py-4">
                     {emp.isActive ? (
                       <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>在職中
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>{t('status_active')}
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold bg-slate-100 text-slate-500 border border-slate-200">
-                        退職済
+                        {t('status_inactive')}
                       </span>
                     )}
                   </td>
@@ -658,7 +666,7 @@ export default function EmployeePage() {
                           onClick={(e) => handleSendWelcome(e, emp)}
                           disabled={sendingWelcomeId === emp.id}
                           className="p-2 text-slate-400 hover:text-indigo-600 transition-colors disabled:opacity-50"
-                          title="ログイン案内メールを送信"
+                          title={t('send_welcome_tooltip')}
                         >
                           {sendingWelcomeId === emp.id
                             ? <span className="inline-block w-4 h-4 border-2 border-indigo-400/30 border-t-indigo-500 rounded-full animate-spin"></span>
@@ -703,29 +711,29 @@ export default function EmployeePage() {
               <div className="space-y-1 mb-6">
                 <div className="text-xs font-mono opacity-70 tracking-tighter uppercase">{selectedEmployee.employeeCode || 'No Employee ID'}</div>
                 <h2 className="text-2xl font-black">{selectedEmployee.lastNameJa} {selectedEmployee.firstNameJa}</h2>
-                <div className="text-sm font-bold text-blue-200 mt-1">{EMP_TYPE_MAP[selectedEmployee.employmentType] || '未設定'}</div>
+                <div className="text-sm font-bold text-blue-200 mt-1">{t(EMP_TYPE_LABEL_KEYS[selectedEmployee.employmentType] || 'emp_type_not_set')}</div>
               </div>
 
               <div className="w-full space-y-3 pt-6 border-t border-white/10 text-left">
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-person-up text-blue-200"></i>
-                  <span className="font-semibold">上司: {selectedEmployee.manager ? `${selectedEmployee.manager.lastNameJa} ${selectedEmployee.manager.firstNameJa}` : '未設定'}</span>
+                  <span className="font-semibold">{t('detail_supervisor')}{selectedEmployee.manager ? `${selectedEmployee.manager.lastNameJa} ${selectedEmployee.manager.firstNameJa}` : t('detail_supervisor_not_set')}</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-shop text-blue-200"></i>
-                  <span className="font-semibold">{selectedEmployee.branch?.nameJa ? `${selectedEmployee.branch.nameJa}支店` : '支店未設定'}</span>
+                  <span className="font-semibold">{selectedEmployee.branch?.nameJa ? `${selectedEmployee.branch.nameJa}${t('branch_suffix')}` : t('detail_branch_not_set')}</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-building text-blue-200"></i>
-                  <span className="font-semibold">{selectedEmployee.department?.name || '部署未設定'}</span>
+                  <span className="font-semibold">{selectedEmployee.department?.name || t('detail_dept_not_set')}</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-briefcase text-blue-200"></i>
-                  <span className="font-semibold">{selectedEmployee.jobTitle || '職種未設定'}</span>
+                  <span className="font-semibold">{selectedEmployee.jobTitle || t('detail_job_not_set')}</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-star text-blue-200"></i>
-                  <span className="font-semibold">{RANK_MAP[selectedEmployee.rank || 'ASSOCIATE']}</span>
+                  <span className="font-semibold">{t(RANK_LABEL_KEYS[selectedEmployee.rank || 'ASSOCIATE'])}</span>
                 </div>
                 <div className="flex items-center gap-3 bg-white/10 p-3 rounded-xl text-sm">
                   <i className="bi bi-envelope text-blue-200"></i>
@@ -745,11 +753,11 @@ export default function EmployeePage() {
                     className="w-full mt-2 flex items-center justify-center gap-2 bg-emerald-500/80 hover:bg-emerald-500 border border-emerald-400/50 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {sendingWorkspaceNotify ? (
-                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 送信中...</>
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> {t('workspace_sending')}</>
                     ) : selectedEmployee.workspaceNotifiedAt ? (
-                      <><i className="bi bi-check-circle-fill text-emerald-200"></i> Workspace 通知済み<span className="text-[10px] opacity-80 ml-1">（再送信可）</span></>
+                      <><i className="bi bi-check-circle-fill text-emerald-200"></i> {t('workspace_notified')}<span className="text-[10px] opacity-80 ml-1">{t('workspace_resend')}</span></>
                     ) : (
-                      <><i className="bi bi-envelope-arrow-up"></i> Workspace ログイン情報を通知</>
+                      <><i className="bi bi-envelope-arrow-up"></i> {t('workspace_notify_btn')}</>
                     )}
                   </button>
                 )}
@@ -760,9 +768,9 @@ export default function EmployeePage() {
                     className="w-full mt-2 flex items-center justify-center gap-2 bg-amber-500/80 hover:bg-amber-500 border border-amber-400/50 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {creatingWorkspace ? (
-                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 作成中...</>
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> {t('workspace_creating')}</>
                     ) : (
-                      <><i className="bi bi-google"></i> Workspace アカウントを作成</>
+                      <><i className="bi bi-google"></i> {t('workspace_create_account')}</>
                     )}
                   </button>
                 )}
@@ -772,30 +780,30 @@ export default function EmployeePage() {
             <div className="flex-1 bg-slate-50 p-8 overflow-y-auto custom-scrollbar relative">
               <div className="flex justify-between items-center mb-6 hidden md:flex">
                 <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <span className="w-2 h-6 bg-blue-600 rounded-full"></span>社員詳細データ
+                  <span className="w-2 h-6 bg-blue-600 rounded-full"></span>{t('detail_title')}
                 </h3>
                 <button onClick={() => setIsDetailModalOpen(false)} className="text-slate-400 hover:text-slate-800 transition-colors"><i className="bi bi-x-lg text-xl"></i></button>
               </div>
 
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-person-lines-fill mr-1 text-blue-500"></i> 個人情報</h4>
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-person-lines-fill mr-1 text-blue-500"></i> {t('detail_personal_info')}</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HIRE DATE</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-calendar-event text-blue-500"></i>{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString('ja-JP') : '-'}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BIRTHDAY</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-cake text-rose-400"></i>{selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString('ja-JP') : '-'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GENDER</div><div className="text-sm font-bold text-slate-700 capitalize">{selectedEmployee.gender === 'male' ? 'Male (男性)' : selectedEmployee.gender === 'female' ? 'Female (女性)' : 'Other / Unknown'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PHONE NUMBER</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-telephone text-emerald-500"></i>{selectedEmployee.phone || '未設定'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-2"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : '未設定'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GENDER</div><div className="text-sm font-bold text-slate-700 capitalize">{selectedEmployee.gender === 'male' ? t('detail_gender_male') : selectedEmployee.gender === 'female' ? t('detail_gender_female') : t('detail_gender_other')}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PHONE NUMBER</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-telephone text-emerald-500"></i>{selectedEmployee.phone || t('detail_phone_not_set')}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-2"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : t('detail_country_not_set')}</div></div>
               </div>
 
               {canViewSensitiveInfo ? (
                 <>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-cash-stack mr-1 text-indigo-500"></i> 契約・給与情報 (機密)</h4>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-cash-stack mr-1 text-indigo-500"></i> {t('detail_salary_info')}</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">給与形態</div>
-                      <div className="text-sm font-bold text-slate-700 mt-1">{SALARY_TYPE_MAP[selectedEmployee.financial?.salaryType] || '-'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">{t('salary_type')}</div>
+                      <div className="text-sm font-bold text-slate-700 mt-1">{t(SALARY_TYPE_LABEL_KEYS[selectedEmployee.financial?.salaryType] || '') || '-'}</div>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">給与単価</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">{t('salary_amount')}</div>
                       <div className="text-lg font-mono font-black text-indigo-600 mt-1">
                         ¥{selectedEmployee.financial?.salaryType === 'MONTHLY' ? (selectedEmployee.financial?.baseSalary?.toLocaleString() || 0) : 
                           selectedEmployee.financial?.salaryType === 'DAILY' ? (selectedEmployee.financial?.dailyRate?.toLocaleString() || 0) : 
@@ -803,8 +811,8 @@ export default function EmployeePage() {
                       </div>
                     </div>
                     <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-                      <div className="text-[10px] font-bold text-slate-400 uppercase">支払方法・サイクル</div>
-                      <div className="text-sm font-bold text-slate-700 mt-1">{PAY_METHOD_MAP[selectedEmployee.financial?.paymentMethod] || '-'} / {PAY_CYCLE_MAP[selectedEmployee.financial?.paymentCycle] || '-'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase">{t('payment_method_cycle')}</div>
+                      <div className="text-sm font-bold text-slate-700 mt-1">{t(PAY_METHOD_LABEL_KEYS[selectedEmployee.financial?.paymentMethod] || '') || '-'} / {t(PAY_CYCLE_LABEL_KEYS[selectedEmployee.financial?.paymentCycle] || '') || '-'}</div>
                     </div>
                   </div>
 
@@ -813,58 +821,58 @@ export default function EmployeePage() {
                       <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
                           <span className="w-2 h-6 bg-emerald-500 rounded-full"></span>
-                          有給休暇の管理
+                          {t('leave_management')}
                         </h3>
                         <div className="text-sm font-bold text-slate-700 bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-2">
-                          現在の残日数: <span className="text-2xl text-emerald-600 font-black">{selectedEmployee.financial?.paidLeaveBalance || 0}</span> 日
+                          {t('leave_balance')}<span className="text-2xl text-emerald-600 font-black">{selectedEmployee.financial?.paidLeaveBalance || 0}</span> {t('leave_days_unit')}
                         </div>
                       </div>
 
                       {canEdit ? (
                         isLeaveFormOpen ? (
                           <form onSubmit={handleLeaveSubmit} className="bg-emerald-50 p-5 rounded-xl border border-emerald-100 mb-6 space-y-4 animate-in fade-in slide-in-from-top-2">
-                            <h4 className="font-bold text-emerald-800 text-sm border-b border-emerald-200 pb-2 flex items-center gap-2"><i className="bi bi-plus-circle-fill"></i> 有給日数の付与・手動調整</h4>
+                            <h4 className="font-bold text-emerald-800 text-sm border-b border-emerald-200 pb-2 flex items-center gap-2"><i className="bi bi-plus-circle-fill"></i> {t('leave_form_title')}</h4>
                             
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                               <div>
-                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">発生日</label>
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">{t('leave_form_date')}</label>
                                 <input type="date" required value={leaveForm.date} onChange={e => setLeaveForm({...leaveForm, date: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">処理種別</label>
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">{t('leave_form_type')}</label>
                                 <select required value={leaveForm.type} onChange={e => setLeaveForm({...leaveForm, type: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white">
-                                  <option value="GRANTED">付与する (+)</option>
-                                  <option value="ADJUSTED">手動で調整する (+/-)</option>
+                                  <option value="GRANTED">{t('leave_form_type_granted')}</option>
+                                  <option value="ADJUSTED">{t('leave_form_type_adjusted')}</option>
                                 </select>
                               </div>
                               <div>
-                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">日数 (半休は0.5) <span className="text-rose-500">*</span></label>
-                                <input type="number" step="0.5" required value={leaveForm.days} onChange={e => setLeaveForm({...leaveForm, days: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold" placeholder="例: 10" />
+                                <label className="block text-[10px] font-bold text-emerald-700 mb-1">{t('leave_form_days')} <span className="text-rose-500">*</span></label>
+                                <input type="number" step="0.5" required value={leaveForm.days} onChange={e => setLeaveForm({...leaveForm, days: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500 font-bold" placeholder={t('leave_form_days_placeholder')} />
                               </div>
                               {leaveForm.type === 'GRANTED' && (
                                 <div>
-                                  <label className="block text-[10px] font-bold text-emerald-700 mb-1">有効期限 (原則2年後)</label>
+                                  <label className="block text-[10px] font-bold text-emerald-700 mb-1">{t('leave_form_valid_until')}</label>
                                   <input type="date" required value={leaveForm.validUntil} onChange={e => setLeaveForm({...leaveForm, validUntil: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" />
                                 </div>
                               )}
                             </div>
                             
                             <div>
-                              <label className="block text-[10px] font-bold text-emerald-700 mb-1">備考</label>
-                              <input type="text" value={leaveForm.note} onChange={e => setLeaveForm({...leaveForm, note: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder="例: 入社半年経過による法定付与" />
+                              <label className="block text-[10px] font-bold text-emerald-700 mb-1">{t('leave_form_note_label')}</label>
+                              <input type="text" value={leaveForm.note} onChange={e => setLeaveForm({...leaveForm, note: e.target.value})} className="w-full border border-emerald-200 p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500" placeholder={t('leave_form_note_placeholder')} />
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
-                              <button type="button" onClick={() => setIsLeaveFormOpen(false)} className="px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors">キャンセル</button>
+                              <button type="button" onClick={() => setIsLeaveFormOpen(false)} className="px-4 py-2 text-xs font-bold text-emerald-700 hover:bg-emerald-100 rounded-lg transition-colors">{t('btn_cancel')}</button>
                               <button type="submit" disabled={isLeaveSubmitting} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-md transition-colors disabled:opacity-50">
-                                {isLeaveSubmitting ? '登録中...' : '登録を確定する'}
+                                {isLeaveSubmitting ? t('leave_form_registering') : t('leave_form_register')}
                               </button>
                             </div>
                           </form>
                         ) : (
                           <div className="mb-4">
                             <button onClick={() => setIsLeaveFormOpen(true)} className="px-4 py-2.5 bg-white border border-emerald-200 text-emerald-600 font-bold text-xs rounded-xl hover:bg-emerald-50 transition-colors shadow-sm flex items-center gap-1.5">
-                              <i className="bi bi-plus-lg"></i> 新しく有給を付与・調整する
+                              <i className="bi bi-plus-lg"></i> {t('leave_add_btn')}
                             </button>
                           </div>
                         )
@@ -875,35 +883,35 @@ export default function EmployeePage() {
                         <table className="w-full text-left text-sm">
                           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
                             <tr>
-                              <th className="px-4 py-3 font-semibold">発生日</th>
-                              <th className="px-4 py-3 font-semibold text-center">処理内容</th>
-                              <th className="px-4 py-3 font-semibold text-right">増減日数</th>
-                              <th className="px-4 py-3 font-semibold">備考 / 有効期限</th>
+                              <th className="px-4 py-3 font-semibold">{t('leave_table_date')}</th>
+                              <th className="px-4 py-3 font-semibold text-center">{t('leave_table_type')}</th>
+                              <th className="px-4 py-3 font-semibold text-right">{t('leave_table_days')}</th>
+                              <th className="px-4 py-3 font-semibold">{t('leave_table_note')}</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-100">
                             {leaveLedgers.length === 0 ? (
-                              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">有給休暇の履歴がありません</td></tr>
+                              <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-400">{t('leave_table_empty')}</td></tr>
                             ) : (
                               leaveLedgers.map((l: any) => (
                                 <tr key={l.id} className="hover:bg-slate-50 transition-colors">
                                   <td className="px-4 py-3 font-mono font-bold text-slate-600">{new Date(l.date).toLocaleDateString('ja-JP')}</td>
                                   <td className="px-4 py-3 text-center">
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${LEAVE_TYPE_MAP[l.type]?.color || 'bg-slate-100 border-slate-200'}`}>
-                                      {LEAVE_TYPE_MAP[l.type]?.label || l.type}
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${LEAVE_TYPE_STYLE[l.type] || 'bg-slate-100 border-slate-200'}`}>
+                                      {t(LEAVE_TYPE_LABEL_KEYS[l.type] || '') || l.type}
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 text-right">
                                     <span className={`font-black text-base ${l.days > 0 ? 'text-emerald-600' : 'text-blue-600'}`}>
                                       {l.days > 0 ? `+${l.days}` : l.days}
                                     </span> 
-                                    <span className="text-[10px] text-slate-400 ml-1">日</span>
+                                    <span className="text-[10px] text-slate-400 ml-1">{t('leave_days_unit')}</span>
                                   </td>
                                   <td className="px-4 py-3 text-xs text-slate-500">
                                     <div className="truncate max-w-[250px] font-medium text-slate-700" title={l.note}>{l.note || '-'}</div>
                                     {l.type === 'GRANTED' && l.validUntil && (
                                       <div className="text-[10px] text-emerald-600 font-mono mt-1 font-bold">
-                                        <i className="bi bi-clock-history"></i> 有効期限: {new Date(l.validUntil).toLocaleDateString('ja-JP')}
+                                        <i className="bi bi-clock-history"></i> {t('leave_valid_until')}{new Date(l.validUntil).toLocaleDateString('ja-JP')}
                                       </div>
                                     )}
                                   </td>
@@ -920,7 +928,7 @@ export default function EmployeePage() {
               ) : (
                 <div className="mt-8 p-6 bg-slate-100 border border-slate-200 rounded-xl text-center text-sm font-bold text-slate-500">
                   <i className="bi bi-lock-fill text-2xl block mb-2 opacity-50"></i>
-                  この社員の契約・給与情報を閲覧する権限がありません。<br/>（人事閲覧者以上の権限が必要です）
+                  {t('detail_no_permission')}<br/>{t('detail_no_permission_sub')}
                 </div>
               )}
 
@@ -930,7 +938,7 @@ export default function EmployeePage() {
                     onClick={() => { setIsDetailModalOpen(false); openFormModal(selectedEmployee); }}
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
                   >
-                    <i className="bi bi-pencil-square"></i> 編集する
+                    <i className="bi bi-pencil-square"></i> {t('detail_btn_edit')}
                   </button>
                 </div>
               )}
@@ -947,7 +955,7 @@ export default function EmployeePage() {
             <div className="px-6 py-5 border-b border-slate-200 bg-white flex justify-between items-center shrink-0 z-10 shadow-sm">
               <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
                 <i className="bi bi-person-vcard text-blue-600"></i>
-                {currentId ? '社員情報の編集' : '新規社員登録'}
+                {currentId ? t('form_title_edit') : t('form_title_new')}
               </h3>
               <button onClick={() => setIsFormModalOpen(false)} className="text-slate-400 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 w-8 h-8 rounded-full flex items-center justify-center transition-colors">
                 <i className="bi bi-x-lg"></i>
@@ -957,21 +965,21 @@ export default function EmployeePage() {
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
               
               <div className={sectionClass}>
-                <h4 className={sectionHeaderClass}><i className="bi bi-shield-lock text-blue-600"></i> アカウント＆ステータス</h4>
+                <h4 className={sectionHeaderClass}><i className="bi bi-shield-lock text-blue-600"></i> {t('form_section_account')}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className={labelClass}>社員コード</label>
-                    <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder="(空欄で自動採番)" />
+                    <label className={labelClass}>{t('form_employee_code')}</label>
+                    <input name="employeeCode" value={formData.employeeCode} onChange={handleInputChange} className={`${inputClass} font-mono`} placeholder={t('form_employee_code_placeholder')} />
                   </div>
                   <div>
-                    <label className={labelClass}>ステータス</label>
+                    <label className={labelClass}>{t('filter_status')}</label>
                     <select name="status" value={formData.status} onChange={handleInputChange} className={`${inputClass} font-bold ${formData.status === 'ACTIVE' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-500'}`}>
-                      <option value="ACTIVE">在職中 (Active)</option>
-                      <option value="INACTIVE">退職済 (Inactive)</option>
+                      <option value="ACTIVE">{t('form_status_active')}</option>
+                      <option value="INACTIVE">{t('form_status_inactive')}</option>
                     </select>
                   </div>
                   <div className="lg:col-span-2">
-                    <label className={labelClass}>私用メールアドレス</label>
+                    <label className={labelClass}>{t('form_personal_email')}</label>
                     <input type="email" name="personalEmail" value={formData.personalEmail} onChange={handleInputChange} className={inputClass} placeholder="private@example.com" />
                   </div>
 
@@ -985,7 +993,7 @@ export default function EmployeePage() {
                           className="w-4 h-4 text-indigo-600 rounded focus:ring-indigo-500 accent-indigo-600"
                         />
                         <div>
-                          <span className="text-sm font-bold text-indigo-900">Google Workspace アカウントを作成する</span>
+                          <span className="text-sm font-bold text-indigo-900">{t('form_create_workspace')}</span>
                           <span className="text-[10px] text-indigo-500 ml-2">(@tiramis.co.jp)</span>
                         </div>
                       </label>
@@ -994,13 +1002,13 @@ export default function EmployeePage() {
                           {(!formData.firstNameEn || !formData.lastNameEn) && (
                             <p className="text-xs text-amber-600 font-bold flex items-center gap-1">
                               <i className="bi bi-exclamation-triangle-fill"></i>
-                              英語名（First Name / Last Name）の入力が必要です
+                              {t('form_workspace_en_required')}
                             </p>
                           )}
                           {formData.firstNameEn && formData.lastNameEn && (
                             <p className="text-xs text-indigo-600 font-bold flex items-center gap-1">
                               <i className="bi bi-google"></i>
-                              {formData.firstNameEn.toLowerCase()}.{formData.lastNameEn.toLowerCase()}@tiramis.co.jp が作成されます
+                              {t('form_workspace_preview', { email: `${formData.firstNameEn.toLowerCase()}.${formData.lastNameEn.toLowerCase()}@tiramis.co.jp` })}
                             </p>
                           )}
                         </div>
@@ -1009,11 +1017,11 @@ export default function EmployeePage() {
                   )}
 
                   <div className={`${currentId ? 'lg:col-span-4' : 'lg:col-span-4'}`}>
-                    <label className={labelClass}>ログイン用メールアドレス {!(formData.createWorkspaceAccount && !currentId) && <span className="text-rose-500">*</span>}</label>
+                    <label className={labelClass}>{t('form_login_email')} {!(formData.createWorkspaceAccount && !currentId) && <span className="text-rose-500">*</span>}</label>
                     {formData.createWorkspaceAccount && !currentId ? (
                       <div className={`${inputClass} bg-slate-100 text-slate-500 cursor-not-allowed`}>
                         <i className="bi bi-robot text-indigo-500 mr-1"></i>
-                        Workspace アカウント作成時に自動生成されます
+                        {t('form_workspace_auto_generate')}
                       </div>
                     ) : (
                       <input type="email" name="email" value={formData.email} onChange={handleInputChange} required className={inputClass} placeholder="mail@example.com" />
@@ -1023,31 +1031,31 @@ export default function EmployeePage() {
               </div>
 
               <div className={sectionClass}>
-                <h4 className={sectionHeaderClass}><i className="bi bi-person text-blue-600"></i> プロフィール情報</h4>
+                <h4 className={sectionHeaderClass}><i className="bi bi-person text-blue-600"></i> {t('form_section_profile')}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-5">
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className={labelClass}>姓 (漢字) <span className="text-rose-500">*</span></label><input required name="lastNameJa" value={formData.lastNameJa} onChange={handleInputChange} className={inputClass} placeholder="山田" /></div>
-                    <div><label className={labelClass}>名 (漢字) <span className="text-rose-500">*</span></label><input required name="firstNameJa" value={formData.firstNameJa} onChange={handleInputChange} className={inputClass} placeholder="太郎" /></div>
+                    <div><label className={labelClass}>{t('form_last_name_kanji')} <span className="text-rose-500">*</span></label><input required name="lastNameJa" value={formData.lastNameJa} onChange={handleInputChange} className={inputClass} placeholder="山田" /></div>
+                    <div><label className={labelClass}>{t('form_first_name_kanji')} <span className="text-rose-500">*</span></label><input required name="firstNameJa" value={formData.firstNameJa} onChange={handleInputChange} className={inputClass} placeholder="太郎" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className={labelClass}>セイ (カナ)</label><input name="lastNameKana" value={formData.lastNameKana} onChange={handleInputChange} className={inputClass} placeholder="ヤマダ" /></div>
-                    <div><label className={labelClass}>メイ (カナ)</label><input name="firstNameKana" value={formData.firstNameKana} onChange={handleInputChange} className={inputClass} placeholder="タロウ" /></div>
+                    <div><label className={labelClass}>{t('form_last_name_kana_label')}</label><input name="lastNameKana" value={formData.lastNameKana} onChange={handleInputChange} className={inputClass} placeholder="ヤマダ" /></div>
+                    <div><label className={labelClass}>{t('form_first_name_kana_label')}</label><input name="firstNameKana" value={formData.firstNameKana} onChange={handleInputChange} className={inputClass} placeholder="タロウ" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div><label className={labelClass}>Last Name (En)</label><input name="lastNameEn" value={formData.lastNameEn} onChange={handleInputChange} className={inputClass} placeholder="Yamada" /></div>
                     <div><label className={labelClass}>First Name (En)</label><input name="firstNameEn" value={formData.firstNameEn} onChange={handleInputChange} className={inputClass} placeholder="Taro" /></div>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div><label className={labelClass}>誕生日</label><input type="date" name="birthday" value={formData.birthday} onChange={handleInputChange} className={inputClass} /></div>
+                    <div><label className={labelClass}>{t('form_birthday')}</label><input type="date" name="birthday" value={formData.birthday} onChange={handleInputChange} className={inputClass} /></div>
                     <div>
-                      <label className={labelClass}>性別</label>
+                      <label className={labelClass}>{t('form_gender')}</label>
                       <select name="gender" value={formData.gender} onChange={handleInputChange} className={inputClass}>
-                        <option value="unknown">未設定</option><option value="male">男性</option><option value="female">女性</option><option value="other">その他</option>
+                        <option value="unknown">{t('form_gender_unknown')}</option><option value="male">{t('form_gender_male')}</option><option value="female">{t('form_gender_female')}</option><option value="other">{t('form_gender_other')}</option>
                       </select>
                     </div>
                   </div>
                   <div className="md:col-span-2">
-                    <label className={labelClass}>電話番号</label>
+                    <label className={labelClass}>{t('form_phone')}</label>
                     <div className="relative">
                       <i className="bi bi-telephone absolute left-3 top-3 text-slate-400"></i>
                       <input type="tel" name="phone" value={formData.phone} onChange={e => handlePhoneChange(e.target.value, v => setFormData(prev => ({ ...prev, phone: v })))} className={`${inputClass} pl-9`} placeholder="090-1234-5678" maxLength={13} />
@@ -1057,53 +1065,53 @@ export default function EmployeePage() {
               </div>
 
               <div className={sectionClass}>
-                <h4 className={sectionHeaderClass}><i className="bi bi-diagram-3 text-blue-600"></i> 組織・権限情報</h4>
+                <h4 className={sectionHeaderClass}><i className="bi bi-diagram-3 text-blue-600"></i> {t('form_section_org_roles')}</h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div><label className={labelClass}>入社日 <span className="text-rose-500">*</span></label><input type="date" required name="hireDate" value={formData.hireDate} onChange={handleInputChange} className={inputClass} /></div>
+                  <div><label className={labelClass}>{t('form_hire_date')} <span className="text-rose-500">*</span></label><input type="date" required name="hireDate" value={formData.hireDate} onChange={handleInputChange} className={inputClass} /></div>
                   
                   <div className="md:col-span-2">
-                    <label className={labelClass}>直属の上司 (マネージャー)</label>
+                    <label className={labelClass}>{t('form_manager_label')}</label>
                     <select name="managerId" value={formData.managerId} onChange={handleInputChange} className={inputClass}>
-                      <option value="">未設定</option>
+                      <option value="">{t('form_not_set')}</option>
                       {employees.filter(e => e.id !== currentId && e.isActive).map(e => (
-                        <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa} ({e.jobTitle || '役職なし'})</option>
+                        <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa} ({e.jobTitle || t('form_no_job_title')})</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className={labelClass}>所属支店</label>
+                    <label className={labelClass}>{t('form_branch')}</label>
                     <select name="branchId" value={formData.branchId} onChange={handleInputChange} className={inputClass}>
-                      <option value="">未設定</option>
+                      <option value="">{t('form_not_set')}</option>
                       {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>所属部署</label>
+                    <label className={labelClass}>{t('form_department')}</label>
                     <select name="departmentId" value={formData.departmentId} onChange={handleInputChange} className={inputClass}>
-                      <option value="">未設定</option>
+                      <option value="">{t('form_not_set')}</option>
                       {departments.map(dept => <option key={dept.id} value={dept.id}>{dept.name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>階級 (等級)</label>
+                    <label className={labelClass}>{t('form_rank_label')}</label>
                     <select name="rank" value={formData.rank} onChange={handleInputChange} className={inputClass}>
-                      {Object.entries(RANK_MAP).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+                      {Object.entries(RANK_LABEL_KEYS).map(([key, labelKey]) => <option key={key} value={key}>{t(labelKey)}</option>)}
                     </select>
                   </div>
                   
-                  <div><label className={labelClass}>職種</label><input name="jobTitle" value={formData.jobTitle} onChange={handleInputChange} className={inputClass} placeholder="例: セールス" /></div>
+                  <div><label className={labelClass}>{t('form_job_title_label')}</label><input name="jobTitle" value={formData.jobTitle} onChange={handleInputChange} className={inputClass} placeholder={t('form_job_title_placeholder')} /></div>
                   
                   <div>
-                    <label className={labelClass}>国籍</label>
+                    <label className={labelClass}>{t('form_country')}</label>
                     <select name="countryId" value={formData.countryId} onChange={handleInputChange} className={inputClass}>
-                      <option value="">未設定</option>
+                      <option value="">{t('form_not_set')}</option>
                       {countries.map(country => <option key={country.id} value={country.id}>{country.name} ({country.code})</option>)}
                     </select>
                   </div>
                   
                   <div className="md:col-span-3 pt-4 border-t border-slate-100">
-                    <label className={labelClass}>システム権限（複数付与可）</label>
+                    <label className={labelClass}>{t('form_roles_label')}</label>
                     <div className="flex flex-wrap gap-3 mt-2">
                       {roles.map(role => (
                         <label key={role.id} className={`flex items-center gap-2 cursor-pointer border px-4 py-2.5 rounded-xl transition-all ${formData.roleIds.includes(role.id.toString()) ? 'bg-indigo-50 border-indigo-400 shadow-sm' : 'bg-white border-slate-200 hover:border-indigo-300'}`}>
@@ -1120,61 +1128,61 @@ export default function EmployeePage() {
                         </label>
                       ))}
                     </div>
-                    <p className="text-[10px] text-slate-500 mt-2">※ 1つも選択しない場合は「一般ユーザー（閲覧のみ）」の権限になります。</p>
+                    <p className="text-[10px] text-slate-500 mt-2">{t('form_roles_hint')}</p>
                   </div>
                 </div>
               </div>
 
               <div className="bg-indigo-50/40 p-6 rounded-2xl border border-indigo-100 shadow-sm space-y-4">
                 <h4 className="text-sm font-black text-indigo-900 border-b border-indigo-100 pb-3 mb-4 flex items-center gap-2">
-                  <i className="bi bi-cash-stack text-indigo-600"></i> 契約・給与情報 <span className="text-[10px] text-indigo-500/70 font-medium ml-2">(管理者のみ閲覧・編集可)</span>
+                  <i className="bi bi-cash-stack text-indigo-600"></i> {t('form_salary_info')} <span className="text-[10px] text-indigo-500/70 font-medium ml-2">{t('form_salary_info_admin_only')}</span>
                 </h4>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className={labelClass}>雇用形態</label>
+                    <label className={labelClass}>{t('form_emp_type')}</label>
                     <select name="employmentType" value={formData.employmentType} onChange={handleInputChange} className={inputClass}>
-                      <option value="FULL_TIME">正社員</option>
-                      <option value="PART_TIME">アルバイト・パート</option>
-                      <option value="OUTSOURCE">業務委託</option>
+                      <option value="FULL_TIME">{t('emp_type_full_time')}</option>
+                      <option value="PART_TIME">{t('emp_type_part_time')}</option>
+                      <option value="OUTSOURCE">{t('emp_type_outsource')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>給与形態</label>
+                    <label className={labelClass}>{t('form_salary_type')}</label>
                     <select name="salaryType" value={formData.salaryType} onChange={handleInputChange} className={inputClass}>
-                      <option value="MONTHLY">月給</option>
-                      <option value="DAILY">日給</option>
-                      <option value="HOURLY">時給</option>
+                      <option value="MONTHLY">{t('salary_type_monthly')}</option>
+                      <option value="DAILY">{t('salary_type_daily')}</option>
+                      <option value="HOURLY">{t('salary_type_hourly')}</option>
                     </select>
                   </div>
 
                   {formData.salaryType === 'MONTHLY' && (
-                    <div><label className={labelClass}>基本給 (月額)</label><input type="number" name="baseSalary" value={formData.baseSalary} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder="例: 300000" /></div>
+                    <div><label className={labelClass}>{t('form_base_salary')}</label><input type="number" name="baseSalary" value={formData.baseSalary} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder={t('form_base_salary_placeholder')} /></div>
                   )}
                   {formData.salaryType === 'DAILY' && (
-                    <div><label className={labelClass}>日給単価</label><input type="number" name="dailyRate" value={formData.dailyRate} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder="例: 10000" /></div>
+                    <div><label className={labelClass}>{t('form_daily_rate_label')}</label><input type="number" name="dailyRate" value={formData.dailyRate} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder={t('form_daily_rate_placeholder')} /></div>
                   )}
                   {formData.salaryType === 'HOURLY' && (
-                    <div><label className={labelClass}>時給単価</label><input type="number" name="hourlyRate" value={formData.hourlyRate} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder="例: 1200" /></div>
+                    <div><label className={labelClass}>{t('form_hourly_rate_label')}</label><input type="number" name="hourlyRate" value={formData.hourlyRate} onChange={handleInputChange} className={`${inputClass} font-mono font-bold text-indigo-700`} placeholder={t('form_hourly_rate_placeholder')} /></div>
                   )}
 
                   <div>
-                    <label className={labelClass}>支払サイクル</label>
+                    <label className={labelClass}>{t('form_payment_cycle')}</label>
                     <select name="paymentCycle" value={formData.paymentCycle} onChange={handleInputChange} className={inputClass}>
-                      <option value="MONTHLY">月払い</option><option value="WEEKLY">週払い</option><option value="DAILY">日払い</option>
+                      <option value="MONTHLY">{t('payment_monthly')}</option><option value="WEEKLY">{t('payment_weekly')}</option><option value="DAILY">{t('payment_daily')}</option>
                     </select>
                   </div>
                   <div>
-                    <label className={labelClass}>支払方法</label>
+                    <label className={labelClass}>{t('form_payment_method')}</label>
                     <select name="paymentMethod" value={formData.paymentMethod} onChange={handleInputChange} className={inputClass}>
-                      <option value="BANK_TRANSFER">銀行振込</option><option value="CASH">現金手渡し</option>
+                      <option value="BANK_TRANSFER">{t('payment_bank')}</option><option value="CASH">{t('payment_cash')}</option>
                     </select>
                   </div>
                   {formData.employmentType === 'FULL_TIME' && (
                     <div className="col-span-2">
-                      <label className={labelClass}>通常出勤曜日</label>
+                      <label className={labelClass}>{t('form_working_weekdays_label')}</label>
                       <div className="flex flex-wrap gap-2 mt-1">
-                        {[{d:1,l:'月'},{d:2,l:'火'},{d:3,l:'水'},{d:4,l:'木'},{d:5,l:'金'},{d:6,l:'土'},{d:7,l:'日'}].map(({d,l}) => {
+                        {[{d:1,l:t('form_weekday_mon')},{d:2,l:t('form_weekday_tue')},{d:3,l:t('form_weekday_wed')},{d:4,l:t('form_weekday_thu')},{d:5,l:t('form_weekday_fri')},{d:6,l:t('form_weekday_sat')},{d:7,l:t('form_weekday_sun')}].map(({d,l}) => {
                           const days = (formData.workingWeekdays || '').split(',').filter(Boolean);
                           const checked = days.includes(String(d));
                           return (
@@ -1203,24 +1211,24 @@ export default function EmployeePage() {
               {currentId ? (
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 text-center shadow-sm">
                   <button type="button" onClick={handlePasswordReset} className="text-sm font-bold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors flex items-center justify-center gap-2 mx-auto">
-                    <i className="bi bi-key-fill"></i> パスワードをリセット（再発行）する
+                    <i className="bi bi-key-fill"></i> {t('password_reset_link')}
                   </button>
-                  <p className="text-[10px] text-slate-400 mt-2">※クリックすると新しいパスワードが即座に発行され、画面に表示されます。</p>
+                  <p className="text-[10px] text-slate-400 mt-2">{t('password_reset_hint')}</p>
                 </div>
               ) : (
                 <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-start gap-2 text-xs text-blue-800">
                   <i className="bi bi-info-circle-fill mt-0.5 shrink-0"></i>
-                  <p>初期パスワードは <strong>生年月日（YYYYMMDD形式）</strong> に自動設定されます。例：1990年4月1日 → <code>19900401</code>。初回ログイン時にパスワード変更が強制されます。</p>
+                  <p dangerouslySetInnerHTML={{ __html: t('initial_password_info') }} />
                 </div>
               )}
 
             </form>
 
             <div className="px-6 py-4 bg-white border-t border-slate-200 flex justify-end gap-3 shrink-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-              <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">キャンセル</button>
+              <button type="button" onClick={() => setIsFormModalOpen(false)} className="px-6 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">{t('btn_cancel')}</button>
               <button onClick={handleSave} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-blue-200 transition-all flex items-center gap-2">
                 <i className="bi bi-cloud-arrow-up-fill"></i>
-                {currentId ? '更新を保存する' : '社員を登録する'}
+                {currentId ? t('btn_save_update') : t('btn_register_employee')}
               </button>
             </div>
           </div>
@@ -1233,11 +1241,11 @@ export default function EmployeePage() {
             <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
             </div>
-            <h3 className="font-black text-slate-800 text-lg mb-2">本当に削除しますか？</h3>
-            <p className="text-slate-500 text-sm mb-6 leading-relaxed">この操作は取り消せません。<br/>（論理削除としてステータスが更新されます）</p>
+            <h3 className="font-black text-slate-800 text-lg mb-2">{t('delete_confirm_title')}</h3>
+            <p className="text-slate-500 text-sm mb-6 leading-relaxed" dangerouslySetInnerHTML={{ __html: t('delete_confirm_message') }} />
             <div className="flex justify-center gap-3">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">キャンセル</button>
-              <button onClick={executeDelete} className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors">削除実行</button>
+              <button onClick={() => setIsDeleteModalOpen(false)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors">{t('btn_cancel')}</button>
+              <button onClick={executeDelete} className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors">{t('delete_execute')}</button>
             </div>
           </div>
         </div>
@@ -1252,9 +1260,9 @@ export default function EmployeePage() {
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4">
                 <i className="bi bi-envelope-arrow-up-fill text-white text-3xl"></i>
               </div>
-              <h3 className="text-white font-black text-lg">ログイン案内メールを送信</h3>
+              <h3 className="text-white font-black text-lg">{t('welcome_mail_title')}</h3>
               <p className="text-indigo-200 text-sm mt-1">
-                {pendingWelcomeEmp.lastNameJa} {pendingWelcomeEmp.firstNameJa} さん
+                {t('welcome_mail_to', { name: `${pendingWelcomeEmp.lastNameJa} ${pendingWelcomeEmp.firstNameJa}` })}
               </p>
             </div>
 
@@ -1263,7 +1271,7 @@ export default function EmployeePage() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 space-y-2 text-sm">
                 <div className="flex items-center gap-2 text-slate-600">
                   <i className="bi bi-person text-slate-400 w-4 text-center"></i>
-                  <span>社員コード：<span className="font-bold text-slate-800">{pendingWelcomeEmp.employeeCode}</span></span>
+                  <span>{t('welcome_mail_emp_code')}<span className="font-bold text-slate-800">{pendingWelcomeEmp.employeeCode}</span></span>
                 </div>
                 <div className="flex items-center gap-2 text-slate-600">
                   <i className="bi bi-envelope text-slate-400 w-4 text-center"></i>
@@ -1275,7 +1283,7 @@ export default function EmployeePage() {
               <div className="flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
                 <i className="bi bi-exclamation-triangle-fill text-amber-500 text-sm mt-0.5 shrink-0"></i>
                 <p className="text-amber-700 text-xs leading-relaxed">
-                  パスワードが<strong>生年月日（YYYYMMDD）にリセット</strong>され、次回ログイン時にパスワード変更が求められます。
+                  <span dangerouslySetInnerHTML={{ __html: t('welcome_mail_warning') }} />
                 </p>
               </div>
 
@@ -1284,13 +1292,13 @@ export default function EmployeePage() {
                   onClick={() => setPendingWelcomeEmp(null)}
                   className="flex-1 px-4 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                 >
-                  キャンセル
+                  {t('btn_cancel')}
                 </button>
                 <button
                   onClick={executeSendWelcome}
                   className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors flex items-center justify-center gap-2"
                 >
-                  <i className="bi bi-send-fill text-xs"></i> 送信する
+                  <i className="bi bi-send-fill text-xs"></i> {t('welcome_mail_send')}
                 </button>
               </div>
             </div>
@@ -1311,8 +1319,8 @@ export default function EmployeePage() {
             <i className="bi bi-envelope-check-fill text-sm"></i>
           </div>
           <div>
-            <p className="font-bold text-sm">{welcomeToast.name} さんへ送信完了</p>
-            <p className="text-indigo-200 text-xs mt-0.5">ログイン案内メールを送信しました</p>
+            <p className="font-bold text-sm">{t('welcome_toast_sent', { name: welcomeToast.name })}</p>
+            <p className="text-indigo-200 text-xs mt-0.5">{t('welcome_toast_message')}</p>
           </div>
           <button onClick={dismissWelcomeToast} className="ml-2 text-white/60 hover:text-white transition-colors">
             <i className="bi bi-x-lg text-sm"></i>

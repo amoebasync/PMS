@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import Cropper from 'react-easy-crop';
 import { useNotification } from '@/components/ui/NotificationProvider';
+import { useTranslation } from '@/i18n/useTranslation';
 
 // --- 定数・ヘルパー関数 ---
-const RANK_MAP: Record<string, string> = {
-  EXECUTIVE: '役員', DIRECTOR: '本部長・事業部長', MANAGER: 'マネージャー', LEADER: 'リーダー', ASSOCIATE: 'アソシエイト(一般)',
+const RANK_KEYS: Record<string, string> = {
+  EXECUTIVE: 'rank_executive', DIRECTOR: 'rank_director', MANAGER: 'rank_manager', LEADER: 'rank_leader', ASSOCIATE: 'rank_associate',
 };
 
 const KANA_MAP: Record<string, string> = {
@@ -105,6 +106,13 @@ export default function ProfilePage() {
   });
 
   const { showToast, showConfirm } = useNotification();
+  const { t } = useTranslation('profile');
+
+  const RANK_MAP = useMemo<Record<string, string>>(() => {
+    const map: Record<string, string> = {};
+    for (const [k, v] of Object.entries(RANK_KEYS)) { map[k] = t(v); }
+    return map;
+  }, [t]);
 
   // ★ パスワードのバリデーションチェック
   const hasUpper = /[A-Z]/.test(formData.password);
@@ -192,9 +200,9 @@ export default function ProfilePage() {
         fetchData();
       } else {
         const data = await res.json();
-        showToast(data.error || '上司の変更に失敗しました', 'error');
+        showToast(data.error || t('error_change_manager'), 'error');
       }
-    } catch { showToast('通信エラーが発生しました', 'error'); }
+    } catch { showToast(t('error_communication'), 'error'); }
     setIsSavingManager(false);
   };
 
@@ -269,10 +277,10 @@ export default function ProfilePage() {
         setIsUploadModalOpen(false);
         setTempImageSrc(null);
       } else {
-        showToast(data.error || 'アップロードに失敗しました', 'error');
+        showToast(data.error || t('error_upload'), 'error');
       }
     } catch (e) {
-      showToast('画像の処理中にエラーが発生しました', 'error');
+      showToast(t('error_image_processing'), 'error');
     }
     setIsUploading(false);
   };
@@ -281,11 +289,11 @@ export default function ProfilePage() {
     e.preventDefault();
 
     if (formData.password && !isPasswordValid) {
-      showToast('新しいパスワードが要件を満たしていません。', 'warning'); return;
+      showToast(t('error_password_invalid'), 'warning'); return;
     }
 
     if (formData.password && !passwordsMatch) {
-      showToast('新しいパスワードと確認用パスワードが一致しません。', 'error'); return;
+      showToast(t('error_password_mismatch'), 'error'); return;
     }
 
     setIsSaving(true);
@@ -296,18 +304,18 @@ export default function ProfilePage() {
         body: JSON.stringify(formData)
       });
       if (res.ok) {
-        showToast('プロフィール情報を保存しました', 'success');
+        showToast(t('toast_profile_saved'), 'success');
         setFormData(prev => ({ ...prev, password: '', confirmPassword: '' }));
         fetchData();
       } else {
-        showToast('保存に失敗しました', 'error');
+        showToast(t('save_error'), 'error');
       }
-    } catch (err) { showToast('通信エラーが発生しました', 'error'); }
+    } catch (err) { showToast(t('error_communication'), 'error'); }
     setIsSaving(false);
   };
 
-  if (isLoading) return <div className="p-10 text-center text-slate-500">読み込み中...</div>;
-  if (!profile) return <div className="p-10 text-center text-rose-500">プロフィール情報が見つかりません。</div>;
+  if (isLoading) return <div className="p-10 text-center text-slate-500">{t('loading')}</div>;
+  if (!profile) return <div className="p-10 text-center text-rose-500">{t('not_found')}</div>;
 
   const isAuthorized = profile.roles?.some((r: any) => r.role?.code === 'SUPER_ADMIN' || r.role?.code === 'HR_ADMIN');
 
@@ -326,25 +334,25 @@ export default function ProfilePage() {
                 )}
                 <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <i className="bi bi-camera-fill text-white text-2xl"></i>
-                  <span className="absolute bottom-2 text-xs text-white font-bold">変更</span>
+                  <span className="absolute bottom-2 text-xs text-white font-bold">{t('change_avatar')}</span>
                 </div>
               </div>
               <input type="file" ref={fileInputRef} onChange={onFileChange} accept="image/png, image/jpeg, image/webp" className="hidden" />
             </div>
             <h2 className="text-xl font-black text-slate-800">{profile.lastNameJa} {profile.firstNameJa}</h2>
-            <p className="text-sm font-bold text-indigo-600 mt-1">{profile.jobTitle || '役職未設定'}</p>
+            <p className="text-sm font-bold text-indigo-600 mt-1">{profile.jobTitle || t('job_title_not_set')}</p>
           </div>
 
           <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 space-y-4">
             <h3 className="text-sm font-bold text-slate-700 border-b border-slate-200 pb-2 flex items-center gap-2">
-              <i className="bi bi-building"></i> 組織・権限情報
+              <i className="bi bi-building"></i> {t('section_org')}
             </h3>
-            <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属部署</div><div className="font-bold text-slate-800">{profile.department?.name || '未設定'}</div></div>
-            <div><div className="text-[10px] font-bold text-slate-400 uppercase">所属支店</div><div className="font-bold text-slate-800">{profile.branch?.nameJa || '未設定'}</div></div>
-            <div><div className="text-[10px] font-bold text-slate-400 uppercase">階級 (等級)</div><div className="font-bold text-slate-800">{RANK_MAP[profile.rank] || profile.rank}</div></div>
+            <div><div className="text-[10px] font-bold text-slate-400 uppercase">{t('label_department')}</div><div className="font-bold text-slate-800">{profile.department?.name || t('not_set')}</div></div>
+            <div><div className="text-[10px] font-bold text-slate-400 uppercase">{t('label_branch')}</div><div className="font-bold text-slate-800">{profile.branch?.nameJa || t('not_set')}</div></div>
+            <div><div className="text-[10px] font-bold text-slate-400 uppercase">{t('label_rank')}</div><div className="font-bold text-slate-800">{RANK_MAP[profile.rank] || profile.rank}</div></div>
 
             <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase">システム権限</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase">{t('label_system_roles')}</div>
               <div className="flex flex-wrap gap-1 mt-1">
                 {profile.roles && profile.roles.length > 0 ? (
                   profile.roles.map((r: any) => (
@@ -354,7 +362,7 @@ export default function ProfilePage() {
                   ))
                 ) : (
                   <span className="px-2 py-1 bg-slate-100 text-slate-500 border border-slate-200 text-[10px] font-bold rounded">
-                    一般ユーザー
+                    {t('role_general_user')}
                   </span>
                 )}
               </div>
@@ -364,7 +372,7 @@ export default function ProfilePage() {
           {/* --- 上司・部下 カード --- */}
           <div className="bg-slate-50 rounded-2xl border border-slate-200 p-6 space-y-5">
             <h3 className="text-sm font-bold text-slate-700 border-b border-slate-200 pb-2 flex items-center justify-between gap-2">
-              <span className="flex items-center gap-2"><i className="bi bi-diagram-3"></i> 上司・部下</span>
+              <span className="flex items-center gap-2"><i className="bi bi-diagram-3"></i> {t('section_hierarchy')}</span>
               {isAuthorized && !isEditingManager && (
                 <button
                   type="button"
@@ -375,14 +383,14 @@ export default function ProfilePage() {
                   }}
                   className="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 transition-colors"
                 >
-                  <i className="bi bi-pencil text-[10px]"></i> 変更
+                  <i className="bi bi-pencil text-[10px]"></i> {t('edit')}
                 </button>
               )}
             </h3>
 
             {/* 上司セクション */}
             <div>
-              <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">上司</div>
+              <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">{t('label_manager')}</div>
               {!isEditingManager ? (
                 profile.manager ? (
                   <button
@@ -401,11 +409,11 @@ export default function ProfilePage() {
                       <div className="font-bold text-sm text-indigo-600 group-hover:text-indigo-800 group-hover:underline transition-colors">
                         {profile.manager.lastNameJa} {profile.manager.firstNameJa}
                       </div>
-                      <div className="text-xs text-slate-500">{profile.manager.jobTitle || '役職未設定'}</div>
+                      <div className="text-xs text-slate-500">{profile.manager.jobTitle || t('job_title_not_set')}</div>
                     </div>
                   </button>
                 ) : (
-                  <p className="text-sm text-slate-400">未設定</p>
+                  <p className="text-sm text-slate-400">{t('not_set')}</p>
                 )
               ) : (
                 <div className="space-y-2">
@@ -416,7 +424,7 @@ export default function ProfilePage() {
                       type="text"
                       value={managerSearch}
                       onChange={handleManagerSearchChange}
-                      placeholder="名前で検索..."
+                      placeholder={t('search_by_name')}
                       className="w-full border border-slate-300 bg-white py-2 pl-8 pr-3 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                     />
                     {managerCandidates.length > 0 && (
@@ -443,19 +451,19 @@ export default function ProfilePage() {
                       disabled={isSavingManager}
                       className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-1"
                     >
-                      {isSavingManager ? '保存中...' : <><i className="bi bi-check-lg"></i> 保存</>}
+                      {isSavingManager ? t('saving') : <><i className="bi bi-check-lg"></i> {t('save')}</>}
                     </button>
                     <button
                       type="button"
                       onClick={handleCancelManagerEdit}
                       className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold py-2 rounded-lg transition-colors"
                     >
-                      キャンセル
+                      {t('cancel')}
                     </button>
                     <button
                       type="button"
                       onClick={async () => {
-                        if (!await showConfirm('上司の設定を解除しますか？', { title: '上司の設定を解除', confirmLabel: '解除する', variant: 'danger' })) return;
+                        if (!await showConfirm(t('confirm_remove_manager'), { title: t('confirm_remove_manager_title'), confirmLabel: t('confirm_remove_manager_btn'), variant: 'danger' })) return;
                         setIsSavingManager(true);
                         try {
                           const res = await fetch('/api/profile', {
@@ -464,13 +472,13 @@ export default function ProfilePage() {
                             body: JSON.stringify({ managerId: null })
                           });
                           if (res.ok) { setIsEditingManager(false); setManagerSearch(''); setSelectedNewManager(null); fetchData(); }
-                          else { const d = await res.json(); showToast(d.error || '解除に失敗しました', 'error'); }
-                        } catch { showToast('通信エラー', 'error'); }
+                          else { const d = await res.json(); showToast(d.error || t('error_remove_manager'), 'error'); }
+                        } catch { showToast(t('error_communication_short'), 'error'); }
                         setIsSavingManager(false);
                       }}
                       disabled={isSavingManager}
                       className="text-xs text-rose-400 hover:text-rose-600 font-bold px-2 py-2 rounded-lg hover:bg-rose-50 transition-colors disabled:opacity-50"
-                      title="上司の設定を解除"
+                      title={t('confirm_remove_manager_title')}
                     >
                       <i className="bi bi-x-circle"></i>
                     </button>
@@ -482,7 +490,7 @@ export default function ProfilePage() {
             {/* 部下セクション */}
             <div>
               <div className="text-[10px] font-bold text-slate-400 uppercase mb-2">
-                部下 ({profile.subordinates?.length || 0}名)
+                {t('label_subordinates')} ({t('subordinate_count', { count: String(profile.subordinates?.length || 0) })})
               </div>
               {profile.subordinates && profile.subordinates.length > 0 ? (
                 <div className="space-y-2.5">
@@ -504,13 +512,13 @@ export default function ProfilePage() {
                         <div className="font-bold text-sm text-indigo-600 group-hover:text-indigo-800 group-hover:underline transition-colors">
                           {sub.lastNameJa} {sub.firstNameJa}
                         </div>
-                        <div className="text-xs text-slate-500">{sub.jobTitle || RANK_MAP[sub.rank] || '役職未設定'}</div>
+                        <div className="text-xs text-slate-500">{sub.jobTitle || RANK_MAP[sub.rank] || t('job_title_not_set')}</div>
                       </div>
                     </button>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">なし</p>
+                <p className="text-sm text-slate-400">{t('none')}</p>
               )}
             </div>
           </div>
@@ -520,52 +528,52 @@ export default function ProfilePage() {
           <form onSubmit={handleSave} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 space-y-6">
             
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
-              <i className="bi bi-person-lines-fill text-slate-400"></i> 基本情報の編集
+              <i className="bi bi-person-lines-fill text-slate-400"></i> {t('section_basic_info')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div><label className="block text-xs font-bold text-slate-600 mb-2">姓 (漢字) *</label><input required type="text" name="lastNameJa" value={formData.lastNameJa} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
-              <div><label className="block text-xs font-bold text-slate-600 mb-2">名 (漢字) *</label><input required type="text" name="firstNameJa" value={formData.firstNameJa} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
-              <div><label className="block text-xs font-bold text-slate-600 mb-2">姓 (カナ/英)</label><input type="text" name="lastNameEn" value={formData.lastNameEn} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
-              <div><label className="block text-xs font-bold text-slate-600 mb-2">名 (カナ/英)</label><input type="text" name="firstNameEn" value={formData.firstNameEn} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+              <div><label className="block text-xs font-bold text-slate-600 mb-2">{t('label_last_name_ja')} *</label><input required type="text" name="lastNameJa" value={formData.lastNameJa} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+              <div><label className="block text-xs font-bold text-slate-600 mb-2">{t('label_first_name_ja')} *</label><input required type="text" name="firstNameJa" value={formData.firstNameJa} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+              <div><label className="block text-xs font-bold text-slate-600 mb-2">{t('label_last_name_en')}</label><input type="text" name="lastNameEn" value={formData.lastNameEn} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
+              <div><label className="block text-xs font-bold text-slate-600 mb-2">{t('label_first_name_en')}</label><input type="text" name="firstNameEn" value={formData.firstNameEn} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
               <div className="md:col-span-2 border-t border-slate-100 pt-6">
-                <label className="block text-xs font-bold text-slate-600 mb-2">ログイン用メールアドレス *</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_login_email')} *</label>
                 <div className="relative"><i className="bi bi-envelope absolute left-3 top-2.5 text-slate-400"></i><input required type="email" name="email" value={formData.email} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" /></div>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 mb-2">電話番号</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_phone')}</label>
                 <div className="relative"><i className="bi bi-telephone absolute left-3 top-2.5 text-slate-400"></i><input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="090-1234-5678" /></div>
               </div>
             </div>
 
             {/* --- ★ パスワード変更セクション --- */}
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
-              <i className="bi bi-shield-lock text-slate-400"></i> パスワードの変更
+              <i className="bi bi-shield-lock text-slate-400"></i> {t('section_password')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
               <div className="md:col-span-2">
                 <p className="text-xs text-slate-500 mb-2">
                   <i className="bi bi-info-circle mr-1"></i>
-                  パスワードを変更する場合のみ入力してください。変更しない場合は空欄のままで構いません。
+                  {t('password_hint')}
                 </p>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">新しいパスワード</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_new_password')}</label>
                 <div className="relative">
                   <i className="bi bi-key absolute left-3 top-2.5 text-slate-400"></i>
-                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="新しいパスワード" />
+                  <input type="password" name="password" value={formData.password} onChange={handleInputChange} className="w-full border border-slate-300 py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder={t('placeholder_new_password')} />
                 </div>
                 {/* ★ 条件インジケーター（入力がある時のみ表示） */}
                 {formData.password && (
                   <div className="mt-3 p-3 bg-white rounded-lg border border-slate-200 grid grid-cols-2 gap-2 shadow-sm">
-                    <RuleIndicator isValid={isLongEnough} text="8文字以上" />
-                    <RuleIndicator isValid={hasUpper} text="大文字を含む" />
-                    <RuleIndicator isValid={hasLower} text="小文字を含む" />
-                    <RuleIndicator isValid={hasNumOrSym} text="数字/記号を含む" />
+                    <RuleIndicator isValid={isLongEnough} text={t('rule_min_length')} />
+                    <RuleIndicator isValid={hasUpper} text={t('rule_uppercase')} />
+                    <RuleIndicator isValid={hasLower} text={t('rule_lowercase')} />
+                    <RuleIndicator isValid={hasNumOrSym} text={t('rule_number_symbol')} />
                   </div>
                 )}
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">新しいパスワード (確認用)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_confirm_password')}</label>
                 <div className="relative">
                   <i className="bi bi-key-fill absolute left-3 top-2.5 text-slate-400"></i>
                   <input 
@@ -574,7 +582,7 @@ export default function ProfilePage() {
                     value={formData.confirmPassword} 
                     onChange={handleInputChange} 
                     className={`w-full border py-2.5 pl-9 pr-3 rounded-lg text-sm font-mono outline-none bg-white transition-all ${formData.confirmPassword ? (passwordsMatch ? 'border-emerald-500 focus:ring-2 focus:ring-emerald-500' : 'border-rose-500 focus:ring-2 focus:ring-rose-500') : 'border-slate-300 focus:ring-2 focus:ring-indigo-500'}`} 
-                    placeholder="もう一度入力" 
+                    placeholder={t('placeholder_confirm_password')} 
                   />
                   {formData.confirmPassword && (
                     <i className={`bi absolute right-3 top-2.5 text-lg ${passwordsMatch ? 'bi-check-circle-fill text-emerald-500' : 'bi-x-circle-fill text-rose-500'}`}></i>
@@ -584,13 +592,13 @@ export default function ProfilePage() {
             </div>
 
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
-              <i className="bi bi-bank text-slate-400"></i> 給与振込口座の登録
+              <i className="bi bi-bank text-slate-400"></i> {t('section_bank_account')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
               <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-slate-600 mb-2">銀行名</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_bank_name')}</label>
                 <select name="bankId" value={formData.bankId} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                  <option value="">選択してください</option>
+                  <option value="">{t('please_select')}</option>
                   {banks.map(b => (
                     <option key={b.id} value={b.id}>{b.name} ({b.code})</option>
                   ))}
@@ -599,11 +607,11 @@ export default function ProfilePage() {
               
               <div className="flex gap-4 md:col-span-2">
                 <div className="flex-1">
-                  <label className="block text-xs font-bold text-slate-600 mb-2">支店名</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_bank_branch_name')}</label>
                   <input type="text" name="branchName" value={formData.branchName} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="例: 新宿支店" />
                 </div>
                 <div className="w-32">
-                  <label className="block text-xs font-bold text-slate-600 mb-2">支店コード</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_bank_branch_code')}</label>
                   <input 
                     type="text" 
                     name="branchCode" 
@@ -617,16 +625,16 @@ export default function ProfilePage() {
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">口座種別</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_account_type')}</label>
                 <select name="accountType" value={formData.accountType} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
-                  <option value="ORDINARY">普通 (Ordinary)</option>
-                  <option value="CURRENT">当座 (Current)</option>
-                  <option value="SAVINGS">貯蓄 (Savings)</option>
+                  <option value="ORDINARY">{t('account_type_ordinary')}</option>
+                  <option value="CURRENT">{t('account_type_current')}</option>
+                  <option value="SAVINGS">{t('account_type_savings')}</option>
                 </select>
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">口座番号</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_account_number')}</label>
                 <input 
                   type="text" 
                   name="accountNumber" 
@@ -639,12 +647,12 @@ export default function ProfilePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">口座名義 (漢字)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_account_name')}</label>
                 <input type="text" name="accountName" value={formData.accountName} onChange={handleInputChange} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white" placeholder="山田 太郎" />
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-2">口座名義 (カナ)</label>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('label_account_name_kana')}</label>
                 <input 
                   type="text" 
                   name="accountNameKana" 
@@ -654,7 +662,7 @@ export default function ProfilePage() {
                   className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none bg-white" 
                   placeholder="ﾔﾏﾀﾞ ﾀﾛｳ" 
                 />
-                <p className="text-[10px] text-slate-400 mt-1">※ひらがな等で入力しても自動で半角カナに変換されます。</p>
+                <p className="text-[10px] text-slate-400 mt-1">{t('kana_auto_convert_note')}</p>
               </div>
             </div>
 
@@ -665,7 +673,7 @@ export default function ProfilePage() {
                 disabled={isSaving || (formData.password !== '' && (!isPasswordValid || !passwordsMatch))} 
                 className="bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-indigo-200 transition-all disabled:opacity-50 flex items-center gap-2"
               >
-                {isSaving ? '保存中...' : <><i className="bi bi-cloud-arrow-up-fill"></i> すべての情報を保存する</>}
+                {isSaving ? t('saving') : <><i className="bi bi-cloud-arrow-up-fill"></i> {t('btn_save_all')}</>}
               </button>
             </div>
           </form>
@@ -685,7 +693,7 @@ export default function ProfilePage() {
             {/* ヘッダー */}
             <div className="bg-slate-800 px-6 py-4 flex items-center justify-between">
               <h3 className="text-white font-bold flex items-center gap-2">
-                <i className="bi bi-person-badge text-slate-300"></i> 社員プロフィール
+                <i className="bi bi-person-badge text-slate-300"></i> {t('modal_employee_profile')}
               </h3>
               <button
                 onClick={() => setViewingEmployee(null)}
@@ -698,7 +706,7 @@ export default function ProfilePage() {
             {isViewModalLoading || !viewingEmployee.id ? (
               <div className="flex items-center justify-center py-16 text-slate-400">
                 <div className="w-8 h-8 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mr-3"></div>
-                読み込み中...
+                {t('loading')}
               </div>
             ) : (
               <div className="p-6">
@@ -718,7 +726,7 @@ export default function ProfilePage() {
                     <h4 className="text-xl font-black text-slate-800">
                       {viewingEmployee.lastNameJa} {viewingEmployee.firstNameJa}
                     </h4>
-                    <p className="text-sm text-indigo-600 font-bold">{viewingEmployee.jobTitle || '役職未設定'}</p>
+                    <p className="text-sm text-indigo-600 font-bold">{viewingEmployee.jobTitle || t('job_title_not_set')}</p>
                   </div>
                 </div>
 
@@ -726,19 +734,19 @@ export default function ProfilePage() {
                 <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3 mb-4">
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">所属部署</div>
-                      <div className="font-bold text-slate-700">{viewingEmployee.department?.name || '未設定'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{t('label_department')}</div>
+                      <div className="font-bold text-slate-700">{viewingEmployee.department?.name || t('not_set')}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">所属支店</div>
-                      <div className="font-bold text-slate-700">{viewingEmployee.branch?.nameJa || '未設定'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{t('label_branch')}</div>
+                      <div className="font-bold text-slate-700">{viewingEmployee.branch?.nameJa || t('not_set')}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">階級</div>
-                      <div className="font-bold text-slate-700">{RANK_MAP[viewingEmployee.rank] || viewingEmployee.rank || '未設定'}</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{t('label_rank_modal')}</div>
+                      <div className="font-bold text-slate-700">{RANK_MAP[viewingEmployee.rank] || viewingEmployee.rank || t('not_set')}</div>
                     </div>
                     <div>
-                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">システム権限</div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase mb-0.5">{t('label_system_roles')}</div>
                       <div className="flex flex-wrap gap-1 mt-0.5">
                         {viewingEmployee.roles && viewingEmployee.roles.length > 0 ? (
                           viewingEmployee.roles.map((r: any) => (
@@ -747,7 +755,7 @@ export default function ProfilePage() {
                             </span>
                           ))
                         ) : (
-                          <span className="text-slate-400 text-xs">一般</span>
+                          <span className="text-slate-400 text-xs">{t('role_general')}</span>
                         )}
                       </div>
                     </div>
@@ -758,7 +766,7 @@ export default function ProfilePage() {
                 <div className="space-y-3 text-sm">
                   {viewingEmployee.manager && (
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0">上司</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0">{t('label_manager')}</span>
                       <button
                         type="button"
                         onClick={() => openEmployeeView(viewingEmployee.manager.id)}
@@ -779,7 +787,7 @@ export default function ProfilePage() {
                   )}
                   {viewingEmployee.subordinates && viewingEmployee.subordinates.length > 0 && (
                     <div className="flex items-start gap-2">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0 mt-1">部下</span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase w-12 shrink-0 mt-1">{t('label_subordinates')}</span>
                       <div className="flex flex-wrap gap-2">
                         {viewingEmployee.subordinates.map((sub: any) => (
                           <button
@@ -815,7 +823,7 @@ export default function ProfilePage() {
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-lg md:max-w-2xl m-4">
             <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-              <h3 className="font-bold text-slate-800"><i className="bi bi-crop text-indigo-600 mr-2"></i>写真の切り抜きと調整</h3>
+              <h3 className="font-bold text-slate-800"><i className="bi bi-crop text-indigo-600 mr-2"></i>{t('modal_crop_title')}</h3>
               <button onClick={() => { setIsUploadModalOpen(false); setTempImageSrc(null); }} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
             <div className="p-6">
@@ -827,12 +835,12 @@ export default function ProfilePage() {
                 <input type="range" value={zoom} min={1} max={3} step={0.1} onChange={(e) => setZoom(Number(e.target.value))} className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
                 <i className="bi bi-plus-lg text-slate-600"></i>
               </div>
-              <p className="text-center text-xs text-slate-500 mt-2">ドラッグして移動、スライダーで拡大・縮小できます</p>
+              <p className="text-center text-xs text-slate-500 mt-2">{t('crop_instruction')}</p>
             </div>
             <div className="p-4 border-t bg-slate-50 flex justify-end gap-3">
-              <button onClick={() => { setIsUploadModalOpen(false); setTempImageSrc(null); }} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">キャンセル</button>
+              <button onClick={() => { setIsUploadModalOpen(false); setTempImageSrc(null); }} className="px-5 py-2.5 text-slate-600 font-bold hover:bg-slate-100 rounded-lg">{t('cancel')}</button>
               <button onClick={executeCropAndUpload} disabled={isUploading} className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg shadow-md transition-all disabled:opacity-50 flex items-center gap-2">
-                {isUploading ? '処理中...' : <><i className="bi bi-check-lg"></i> この範囲で適用する</>}
+                {isUploading ? t('processing') : <><i className="bi bi-check-lg"></i> {t('btn_apply_crop')}</>}
               </button>
             </div>
           </div>

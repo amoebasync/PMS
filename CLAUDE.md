@@ -622,3 +622,63 @@ earnedAmount = floor(unitPrice × max(actualCounts))
   - 任意: `staffId`、`gender`
   - 応募者情報（氏名・メール・電話・国籍・ビザ・住所等）を自動継承
 - UI: 評価モーダルのセクション6で入力フォーム表示、登録後は配布員 ID を表示
+
+## 管理画面 i18n（日英対応）機能
+
+2026-03-04 実装済み。
+
+### 概要
+管理画面（admin）全体を日本語/英語の2言語対応にした。外部ライブラリは使わず、カスタム軽量 i18n を実装。
+- 対象: 管理画面のみ（ECポータル・配布員画面・応募フォームは対象外）
+- 言語: 日本語（デフォルト）+ 英語
+- ユーザーごとにDB永続化（`Employee.language`）
+
+### アーキテクチャ
+```
+src/i18n/
+├── locales/
+│   ├── ja/   (31ファイル: common + sidebar + 29ページ)
+│   └── en/   (31ファイル: 同上)
+├── context.tsx      # LanguageProvider + useLanguage hook
+├── useTranslation.ts  # useTranslation hook（動的import + キャッシュ）
+└── index.ts         # 型定義・エクスポート
+```
+
+### 使い方
+```typescript
+import { useTranslation } from '@/i18n';
+
+function MyPage() {
+  const { t } = useTranslation('pageName'); // ページ固有 + common自動マージ
+  return <h1>{t('page_title')}</h1>;
+}
+```
+- `t('key')` でドット記法アクセス可能: `t('status.active')`
+- パラメータ補間: `t('showing_range', { start: 1, end: 10, total: 100 })`
+- ページ名前空間のキーが優先、見つからなければ common にフォールバック
+
+### DB
+- `Employee.language`: `String? @default("ja") @db.VarChar(5)`
+
+### API
+- `PUT /api/profile/language` — body: `{ language: "ja" | "en" }` で言語設定を永続化
+- `POST /api/auth/login` — レスポンスに `language` フィールドを含む
+
+### UI
+- ヘッダー右上に `JA | EN` トグルボタン（クリックで即切替 + DB永続化）
+- サイドバー・ページタイトル・全管理画面ページが翻訳対応済み
+- LanguageProvider が LayoutWrapper の最外層でラップ
+
+### 翻訳ルール
+- チラシ → "Flyer"
+- 配布員 → "Distributor"
+- 受注 → "Order"
+- 応募者 → "Applicant"
+- クレーム → "Complaint"
+
+### 新しいページに i18n を追加する手順
+1. `src/i18n/locales/ja/{page}.json` と `en/{page}.json` を作成
+2. ページファイルに `import { useTranslation } from '@/i18n';` を追加
+3. コンポーネント内で `const { t } = useTranslation('{page}');` を呼ぶ
+4. ハードコードされた日本語を `t('key')` に置換
+5. common.json に既にあるキー（save, cancel, delete等）は重複登録しない

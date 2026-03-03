@@ -1,0 +1,22 @@
+{
+  "btn_new": "New Partner Registration",
+  "search_placeholder": "Search by company name or contact...",
+  "table_name": "Partner Name",
+  "table_type": "Partner Type",
+  "table_contact": "Contact / Notes",
+  "type_unknown": "Unknown",
+  "modal_title_edit": "Edit Partner Information",
+  "modal_title_new": "New Partner Registration",
+  "form_company_name": "Outsourcing Company Name",
+  "form_company_placeholder": "e.g. Print Pack Inc.",
+  "form_type": "Partner Type",
+  "form_select_placeholder": "Please select",
+  "form_contact": "Contact / Person / Notes",
+  "form_contact_placeholder": "Contact name, phone, email, etc.",
+  "btn_update": "Update",
+  "btn_register": "Register",
+  "confirm_delete": "Delete this outsourcing partner?",
+  "confirm_delete_detail": "Cannot delete if linked to order data",
+  "confirm_delete_btn": "Delete",
+  "error_delete": "Failed to delete. Related order data may exist."
+}
