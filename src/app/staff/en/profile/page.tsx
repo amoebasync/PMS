@@ -161,19 +161,23 @@ export default function ProfilePageEn() {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
 
-      if (res.ok) {
-        setProfile((p) => p ? {
-          ...p,
-          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-        } : p);
-        setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
-      } else {
-        setMessage({ type: 'error', text: data.error || 'Upload failed.' });
+      if (!res.ok) {
+        let errMsg = `Server error (${res.status})`;
+        try { const d = await res.json(); errMsg = d.error || errMsg; } catch { /* non-JSON response */ }
+        setMessage({ type: 'error', text: errMsg });
+        return;
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Upload failed. Please try again.' });
+
+      const data = await res.json();
+      setProfile((p) => p ? {
+        ...p,
+        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+      } : p);
+      setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setMessage({ type: 'error', text: `Upload failed: ${detail}` });
     }
     setUploadingCard(null);
     if (side === 'front' && cardFrontInputRef.current) cardFrontInputRef.current.value = '';

@@ -162,19 +162,23 @@ export default function ProfilePage() {
         method: 'POST',
         body: formData,
       });
-      const data = await res.json();
 
-      if (res.ok) {
-        setProfile((p) => p ? {
-          ...p,
-          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-        } : p);
-        setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
-      } else {
-        setMessage({ type: 'error', text: data.error || 'アップロードに失敗しました' });
+      if (!res.ok) {
+        let errMsg = `サーバーエラー (${res.status})`;
+        try { const d = await res.json(); errMsg = d.error || errMsg; } catch { /* non-JSON response */ }
+        setMessage({ type: 'error', text: errMsg });
+        return;
       }
-    } catch {
-      setMessage({ type: 'error', text: 'アップロードに失敗しました。もう一度お試しください。' });
+
+      const data = await res.json();
+      setProfile((p) => p ? {
+        ...p,
+        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+      } : p);
+      setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      setMessage({ type: 'error', text: `アップロード失敗: ${detail}` });
     }
     setUploadingCard(null);
     if (side === 'front' && cardFrontInputRef.current) cardFrontInputRef.current.value = '';
