@@ -1136,27 +1136,6 @@ export default function ApplicantsPage() {
           showToast('応募者情報を保存しました', 'success');
         }
 
-        // 研修スロット予約成功後、配布員登録を提案
-        if (trainingBooked && !registeredDistributorId) {
-          setEvalSaving(false);
-          const wantRegister = await showConfirm(
-            '続けて配布員ユーザを作成しますか？',
-            { variant: 'primary', confirmLabel: 'はい', cancelLabel: 'いいえ', title: '配布員登録' }
-          );
-          if (wantRegister) {
-            if (!evalForm.birthday) {
-              showToast('生年月日を入力してから配布員登録を行ってください', 'warning');
-            } else {
-              setShowDistributorForm(true);
-              if (branches.length === 0) fetchBranches();
-            }
-            // モーダルを開いたまま応募者データを再取得
-            fetchSlots();
-            fetchApplicants(page);
-            openEvalModal(selectedApplicant.id);
-            return;
-          }
-        }
       } else {
         showToast('応募者情報を保存しました', 'success');
       }

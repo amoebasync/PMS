@@ -34,15 +34,27 @@ export async function GET(request: Request) {
         _count: { select: { applicants: true } },
         applicants: {
           select: {
-            id: true, name: true, flowStatus: true, hiringStatus: true, phone: true,
+            id: true, name: true, flowStatus: true, hiringStatus: true, phone: true, email: true,
             trainingAttendance: true, trainingUnderstandingScore: true,
             trainingCommunicationScore: true, trainingSpeedScore: true,
             trainingMotivationScore: true, trainingNotes: true,
+            countryId: true, country: { select: { name: true } },
+            jobCategoryId: true, jobCategory: { select: { nameJa: true } },
           },
           orderBy: { id: 'asc' },
         },
       },
     });
+
+    // 全応募者のemailを集めて、配布員登録済みかを一括チェック
+    const allEmails = slots.flatMap(s => s.applicants.map(a => a.email)).filter(Boolean);
+    const registeredDistributors = allEmails.length > 0
+      ? await prisma.flyerDistributor.findMany({
+          where: { email: { in: allEmails } },
+          select: { id: true, email: true },
+        })
+      : [];
+    const emailToDistributorId = new Map(registeredDistributors.map(d => [d.email, d.id]));
 
     const data = slots.map((slot) => ({
       id: slot.id,
@@ -55,7 +67,14 @@ export async function GET(request: Request) {
       updatedAt: slot.updatedAt,
       bookedCount: slot._count.applicants,
       remainingCapacity: slot.capacity - slot._count.applicants,
-      applicants: slot.applicants,
+      applicants: slot.applicants.map(a => ({
+        ...a,
+        countryName: a.country?.name || null,
+        jobCategoryName: a.jobCategory?.nameJa || null,
+        registeredDistributorId: emailToDistributorId.get(a.email) || null,
+        country: undefined,
+        jobCategory: undefined,
+      })),
     }));
 
     return NextResponse.json({ data, total: slots.length });
