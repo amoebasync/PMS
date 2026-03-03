@@ -184,7 +184,7 @@ export default function DistributorPage() {
       list.sort((a, b) => {
         let cmp = 0;
         if (sortKey === 'id') {
-          cmp = (a.id ?? 0) - (b.id ?? 0);
+          cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         } else if (sortKey === 'branch') {
           const aName = a.branch?.nameJa || '';
           const bName = b.branch?.nameJa || '';
@@ -397,9 +397,23 @@ export default function DistributorPage() {
                     <span className="text-xs text-slate-300">—</span>
                   )}
                 </td>
-                <td className="px-5 py-3 text-center">
-                  <span className="text-sm font-bold text-slate-800">{d.currentScore ?? '—'}</span>
-                  {d.currentScore != null && <span className="text-[10px] text-slate-400 ml-0.5">pt</span>}
+                <td className="px-5 py-3">
+                  {d.currentScore != null ? (() => {
+                    const score = d.currentScore as number;
+                    const pct = Math.min(Math.max(score, 0), 100);
+                    const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-amber-400' : pct >= 40 ? 'bg-orange-400' : 'bg-rose-500';
+                    const textColor = pct >= 80 ? 'text-emerald-700' : pct >= 60 ? 'text-amber-700' : pct >= 40 ? 'text-orange-700' : 'text-rose-700';
+                    return (
+                      <div className="flex items-center gap-2 min-w-[100px]">
+                        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className={`text-xs font-bold ${textColor} tabular-nums w-8 text-right`}>{score}</span>
+                      </div>
+                    );
+                  })() : (
+                    <span className="text-sm text-slate-400 text-center block">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-center">
                   <span className="text-sm font-bold text-slate-700">{monthlyAttendance}</span>

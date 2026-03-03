@@ -44,7 +44,7 @@ export async function GET(request: Request) {
     const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
     const distributors = await prisma.flyerDistributor.findMany({
-      orderBy: { id: 'desc' },
+      orderBy: { createdAt: 'desc' },
       include: {
         branch: true,
         country: true,
