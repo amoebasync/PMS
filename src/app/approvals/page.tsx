@@ -118,8 +118,23 @@ export default function ApprovalsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-24 relative">
-      <div className="flex justify-end gap-2 mb-4">
-        {/* 承認待ち / 履歴 の切り替えトグル */}
+      {/* サブタブ (勤怠 / 経費) と 承認待ち/履歴トグル */}
+      <div className="flex items-center border-b border-slate-200">
+        <div className="flex gap-2">
+          <button onClick={() => { setActiveTab('ATTENDANCE'); setSelectedIds(new Set()); }} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            勤怠・休暇
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${pendingCounts.attendance > 0 ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              {pendingCounts.attendance}
+            </span>
+          </button>
+          <button onClick={() => { setActiveTab('EXPENSE'); setSelectedIds(new Set()); }} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
+            交通費・経費
+            <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${pendingCounts.expense > 0 ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+              {pendingCounts.expense}
+            </span>
+          </button>
+        </div>
+        <div className="flex-1" />
         <div className="flex bg-slate-100 p-1 rounded-xl shadow-inner">
           <button
             onClick={() => setViewMode('PENDING')}
@@ -134,22 +149,6 @@ export default function ApprovalsPage() {
             <i className="bi bi-clock-history mr-1"></i> 承認履歴
           </button>
         </div>
-      </div>
-
-      {/* サブタブ (勤怠 / 経費) と 件数バッジ */}
-      <div className="flex border-b border-slate-200 gap-2">
-        <button onClick={() => { setActiveTab('ATTENDANCE'); setSelectedIds(new Set()); }} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-          勤怠・休暇 
-          <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${pendingCounts.attendance > 0 ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
-            {pendingCounts.attendance}
-          </span>
-        </button>
-        <button onClick={() => { setActiveTab('EXPENSE'); setSelectedIds(new Set()); }} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 flex items-center gap-1.5 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>
-          交通費・経費
-          <span className={`ml-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${pendingCounts.expense > 0 ? 'bg-rose-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
-            {pendingCounts.expense}
-          </span>
-        </button>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
