@@ -271,6 +271,13 @@ export default function ApplicantsPage() {
   const [selectedNewTrainingSlotId, setSelectedNewTrainingSlotId] = useState<number | null>(null);
   const [trainingRescheduleLoading, setTrainingRescheduleLoading] = useState(false);
 
+  // ── 研修管理モーダル: 参加者アクション ──
+  const [trainingActionMenuId, setTrainingActionMenuId] = useState<number | null>(null); // 開いてる参加者ID
+  const [trainingRescheduleTargetId, setTrainingRescheduleTargetId] = useState<number | null>(null); // 日程変更対象の応募者ID
+  const [trainingRescheduleMode, setTrainingRescheduleMode] = useState<'direct' | null>(null);
+  const [calendarNewTrainingSlotId, setCalendarNewTrainingSlotId] = useState<number | null>(null);
+  const [calendarRescheduleLoading, setCalendarRescheduleLoading] = useState(false);
+
   // ── 配布員登録 ──
   const [branches, setBranches] = useState<{ id: number; nameJa: string; prefix: string | null }[]>([]);
   const [showDistributorForm, setShowDistributorForm] = useState(false);
@@ -1156,6 +1163,58 @@ export default function ApplicantsPage() {
     }
   };
 
+  // ── 研修日程変更（カレンダーモーダルから直接選択） ──
+  const handleCalendarTrainingReschedule = async (applicantId: number) => {
+    if (!calendarNewTrainingSlotId) return;
+    setCalendarRescheduleLoading(true);
+    try {
+      const res = await fetch(`/api/applicants/${applicantId}/reschedule-training`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newTrainingSlotId: calendarNewTrainingSlotId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || '日程変更に失敗しました');
+      }
+      showToast('研修日程を変更しました', 'success');
+      setTrainingRescheduleTargetId(null);
+      setTrainingRescheduleMode(null);
+      setCalendarNewTrainingSlotId(null);
+      fetchTrainingMgmt();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || '研修日程変更に失敗しました', 'error');
+    } finally {
+      setCalendarRescheduleLoading(false);
+    }
+  };
+
+  // ── 研修日程変更メール送信（カレンダーモーダルから） ──
+  const handleSendTrainingRescheduleEmail = async (applicantId: number, applicantName: string) => {
+    const ok = await showConfirm(
+      `「${applicantName}」に研修日程の変更メールを送信しますか？\n本人がリンクから新しい日程を選択できます。`,
+      { variant: 'primary', confirmLabel: 'メール送信', title: '研修日程変更メール' }
+    );
+    if (!ok) return;
+    try {
+      // まず現在の研修をキャンセル（スロット解放）
+      await fetch(`/api/applicants/${applicantId}/cancel-training`, { method: 'POST' });
+      // 研修案内メールを送信（本人が自分で予約し直す）
+      const res = await fetch(`/api/applicants/${applicantId}/send-training-invite`, { method: 'POST' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'メール送信に失敗しました');
+      }
+      showToast('研修日程変更メールを送信しました', 'success');
+      setTrainingActionMenuId(null);
+      fetchTrainingMgmt();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || 'メール送信に失敗しました', 'error');
+    }
+  };
+
   // 職種作成
   const handleCreateJobCategory = async () => {
     if (!newJobCat.nameJa.trim()) {
@@ -1870,13 +1929,56 @@ export default function ApplicantsPage() {
                                   )}
                                   研修完了
                                 </button>
-                                <button
-                                  onClick={() => handleCancelTrainingFromModal(app.id, app.name)}
-                                  className="w-7 h-7 flex items-center justify-center text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
-                                  title="研修キャンセル"
-                                >
-                                  <i className="bi bi-x-circle text-sm"></i>
-                                </button>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id)}
+                                    className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                    title="アクション"
+                                  >
+                                    <i className="bi bi-three-dots-vertical text-sm"></i>
+                                  </button>
+                                  {trainingActionMenuId === app.id && (
+                                    <>
+                                      <div className="fixed inset-0 z-[2999]" onClick={() => setTrainingActionMenuId(null)} />
+                                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[3000] py-1 overflow-hidden">
+                                        <button
+                                          onClick={() => {
+                                            setTrainingActionMenuId(null);
+                                            setTrainingRescheduleTargetId(app.id);
+                                            setTrainingRescheduleMode('direct');
+                                            setCalendarNewTrainingSlotId(null);
+                                            fetchTrainingSlots();
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                                        >
+                                          <i className="bi bi-calendar2-event text-indigo-500"></i>
+                                          日程を変更する
+                                        </button>
+                                        <button
+                                          onClick={() => {
+                                            setTrainingActionMenuId(null);
+                                            handleSendTrainingRescheduleEmail(app.id, app.name);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left"
+                                        >
+                                          <i className="bi bi-envelope text-amber-500"></i>
+                                          日程変更メールを送信
+                                        </button>
+                                        <div className="border-t border-slate-100 my-1"></div>
+                                        <button
+                                          onClick={() => {
+                                            setTrainingActionMenuId(null);
+                                            handleCancelTrainingFromModal(app.id, app.name);
+                                          }}
+                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left"
+                                        >
+                                          <i className="bi bi-x-circle text-rose-500"></i>
+                                          研修をキャンセル
+                                        </button>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1886,6 +1988,71 @@ export default function ApplicantsPage() {
                   )}
                 </div>
               </div>
+
+              {/* 日程変更パネル */}
+              {trainingRescheduleTargetId && trainingRescheduleMode === 'direct' && (() => {
+                const targetApp = slot.applicants.find((a: any) => a.id === trainingRescheduleTargetId);
+                if (!targetApp) return null;
+                const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+                return (
+                  <div className="px-6 py-4 border-t border-indigo-200 bg-indigo-50/50">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-xs font-black text-indigo-700">
+                        <i className="bi bi-calendar2-event mr-1"></i>
+                        {targetApp.name} の研修日程を変更
+                      </div>
+                      <button
+                        onClick={() => { setTrainingRescheduleTargetId(null); setTrainingRescheduleMode(null); }}
+                        className="text-slate-400 hover:text-slate-600 text-xs"
+                      >
+                        <i className="bi bi-x-lg"></i>
+                      </button>
+                    </div>
+                    {trainingSlots.length === 0 ? (
+                      <p className="text-xs text-slate-500 italic">空き研修スロットがありません</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                        {trainingSlots.map(ts => {
+                          const s = new Date(ts.startTime);
+                          const e = new Date(ts.endTime);
+                          const dateLabel = `${s.getMonth() + 1}/${s.getDate()}(${WEEKDAYS[s.getDay()]})`;
+                          const timeLabel = `${String(s.getHours()).padStart(2, '0')}:${String(s.getMinutes()).padStart(2, '0')} - ${String(e.getHours()).padStart(2, '0')}:${String(e.getMinutes()).padStart(2, '0')}`;
+                          const isCurrent = slot.id === ts.id;
+                          return (
+                            <button
+                              key={ts.id}
+                              onClick={() => setCalendarNewTrainingSlotId(ts.id)}
+                              disabled={isCurrent}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs border transition-colors ${
+                                calendarNewTrainingSlotId === ts.id
+                                  ? 'bg-indigo-100 border-indigo-400 text-indigo-800 font-bold'
+                                  : isCurrent
+                                    ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                                    : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50'
+                              }`}
+                            >
+                              <span>{dateLabel} {timeLabel} {ts.location ? `@ ${ts.location}` : ''}</span>
+                              <span className="text-[10px] text-slate-400">残{ts.remainingCapacity}/{ts.capacity}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleCalendarTrainingReschedule(trainingRescheduleTargetId)}
+                      disabled={!calendarNewTrainingSlotId || calendarRescheduleLoading}
+                      className="mt-3 w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {calendarRescheduleLoading ? (
+                        <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                      ) : (
+                        <i className="bi bi-check2"></i>
+                      )}
+                      この日程に変更する
+                    </button>
+                  </div>
+                );
+              })()}
 
               {/* フッター */}
               <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/50">
