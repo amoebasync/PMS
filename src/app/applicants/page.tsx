@@ -281,7 +281,7 @@ export default function ApplicantsPage() {
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
-  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '' });
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '' });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
@@ -510,13 +510,15 @@ export default function ApplicantsPage() {
           jobCategoryId: Number(manualRegForm.jobCategoryId),
           language: manualRegForm.language,
           recruitingMediaId: manualRegForm.recruitingMediaId ? Number(manualRegForm.recruitingMediaId) : undefined,
+          birthday: manualRegForm.birthday || undefined,
+          gender: manualRegForm.gender || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
       showToast('応募者を登録しました。面接案内メールを送信中...', 'success');
       setShowManualRegisterModal(false);
-      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '' });
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '' });
       fetchApplicants(1);
       fetchSlots();
       // 面接案内メール自動送信
@@ -2993,6 +2995,35 @@ export default function ApplicantsPage() {
                   placeholder="090-1234-5678"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    生年月日 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={manualRegForm.birthday}
+                    onChange={e => setManualRegForm(f => ({ ...f, birthday: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    性別 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <select
+                    value={manualRegForm.gender}
+                    onChange={e => setManualRegForm(f => ({ ...f, gender: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  >
+                    <option value="">未選択</option>
+                    <option value="male">男性</option>
+                    <option value="female">女性</option>
+                    <option value="other">その他</option>
+                  </select>
+                </div>
               </div>
 
               <div>
