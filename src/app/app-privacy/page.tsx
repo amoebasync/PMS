@@ -139,7 +139,7 @@ export default function AppPrivacyPage() {
             </section>
 
             <div className="pt-4 text-right text-slate-500 font-bold text-xs">
-              <p>制定日：2024年1月1日</p>
+              <p>制定日：2026年3月1日</p>
               <p className="mt-1">株式会社ティラミス</p>
             </div>
           </div>
