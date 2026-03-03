@@ -266,8 +266,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     try {
       const res = await fetch(`/api/complaints?distributorId=${id}`);
       if (res.ok) {
-        const data = await res.json();
-        setComplaints(data.complaints || data);
+        const json = await res.json();
+        setComplaints(json.data || []);
       }
     } catch { /* ignore */ }
     setComplaintsLoading(false);
@@ -513,6 +513,38 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setIsResetPasswordOpen(false);
   };
 
+  const deleteResidenceCard = async (side: 'front' | 'back') => {
+    const label = side === 'front' ? '表面' : '裏面';
+    const confirmed = await showConfirm(`在留カード画像（${label}）を削除しますか？`, {
+      variant: 'warning',
+      title: '在留カード画像削除',
+      confirmLabel: '削除する',
+    });
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/distributors/${id}/residence-card`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ side }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        showToast(data.error || '削除に失敗しました', 'error');
+        return;
+      }
+      const data = await res.json();
+      setDistributor((prev: any) => ({
+        ...prev,
+        residenceCardFrontUrl: data.residenceCardFrontUrl,
+        residenceCardBackUrl: data.residenceCardBackUrl,
+        hasResidenceCard: data.hasResidenceCard,
+      }));
+      showToast(`在留カード画像（${label}）を削除しました`, 'success');
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
   const del = async () => {
     try {
       await fetch(`/api/distributors/${id}`, { method: 'DELETE' });
@@ -706,21 +738,39 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                   <p className="text-xs font-bold text-slate-500 mb-2">在留カード画像</p>
                   <div className="grid grid-cols-2 gap-3">
                     {d.residenceCardFrontUrl && (
-                      <div>
+                      <div className="relative">
                         <p className="text-[10px] text-slate-400 mb-1">表面</p>
-                        <a href={d.residenceCardFrontUrl} target="_blank" rel="noopener noreferrer" className="block">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={d.residenceCardFrontUrl} alt="在留カード表面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
-                        </a>
+                        <div className="relative group">
+                          <a href={d.residenceCardFrontUrl} target="_blank" rel="noopener noreferrer" className="block">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={d.residenceCardFrontUrl} alt="在留カード表面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
+                          </a>
+                          <button
+                            onClick={() => deleteResidenceCard('front')}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            title="表面を削除"
+                          >
+                            <i className="bi bi-trash text-xs"></i>
+                          </button>
+                        </div>
                       </div>
                     )}
                     {d.residenceCardBackUrl && (
-                      <div>
+                      <div className="relative">
                         <p className="text-[10px] text-slate-400 mb-1">裏面</p>
-                        <a href={d.residenceCardBackUrl} target="_blank" rel="noopener noreferrer" className="block">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={d.residenceCardBackUrl} alt="在留カード裏面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
-                        </a>
+                        <div className="relative group">
+                          <a href={d.residenceCardBackUrl} target="_blank" rel="noopener noreferrer" className="block">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={d.residenceCardBackUrl} alt="在留カード裏面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
+                          </a>
+                          <button
+                            onClick={() => deleteResidenceCard('back')}
+                            className="absolute top-1 right-1 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                            title="裏面を削除"
+                          >
+                            <i className="bi bi-trash text-xs"></i>
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
