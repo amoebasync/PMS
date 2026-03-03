@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 // ─────────────────────────────────────────────────────────
 // 共通 HTML ラッパー（ロゴヘッダー ＋ 署名フッター）
 // ─────────────────────────────────────────────────────────
-function htmlWrapper(contentHtml: string): string {
+function htmlWrapper(contentHtml: string, contactEmail = 'info@tiramis.co.jp'): string {
   const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
   const logoUrl = `${siteUrl}/logo/logo_dark_transparent.png`;
 
@@ -54,7 +54,7 @@ function htmlWrapper(contentHtml: string): string {
                       Web: <a href="${siteUrl}" style="color:#6366f1;text-decoration:none;">${siteUrl}</a>
                     </p>
                     <p style="margin:0;font-size:13px;color:#64748b;">
-                      Email: <a href="mailto:info@tiramis.co.jp" style="color:#6366f1;text-decoration:none;">info@tiramis.co.jp</a>
+                      Email: <a href="mailto:${contactEmail}" style="color:#6366f1;text-decoration:none;">${contactEmail}</a>
                     </p>
                   </td>
                 </tr>
@@ -513,7 +513,7 @@ export const sendApplicantConfirmationEmail = async (
     ${manageSection}
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      Please be on time for your interview. If you have any questions, please contact us at info@tiramis.co.jp.
+      Please be on time for your interview. If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -557,7 +557,7 @@ export const sendApplicantConfirmationEmail = async (
 
     <p style="margin:0;color:#64748b;font-size:13px;">
       面接当日はお時間に余裕を持ってご参加ください。<br>
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -572,14 +572,14 @@ export const sendApplicantConfirmationEmail = async (
     : '';
 
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
     : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\n面接当日はお時間に余裕を持ってご参加ください。`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 };
@@ -626,7 +626,7 @@ export const sendHiringNotificationEmail = async (
     </p>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      If you have any questions, please contact us at info@tiramis.co.jp.
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -660,7 +660,7 @@ export const sendHiringNotificationEmail = async (
     </p>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -669,14 +669,14 @@ export const sendHiringNotificationEmail = async (
     : '【Tiramis】採用のお知らせ';
 
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nCongratulations! You have been selected for the position of ${jobCategoryName}.\n\nWe will contact you shortly with further details.\nWelcome to the team!\n\nContact: info@tiramis.co.jp`
-    : `${applicantName} 様\n\nこの度は弊社の選考にご参加いただき、ありがとうございました。\n選考の結果、採用とさせていただくことになりました。\n\n応募職種: ${jobCategoryName}\n\n今後の入社手続きにつきましては、追ってご連絡いたします。\nお問い合わせ: info@tiramis.co.jp`;
+    ? `Dear ${applicantName},\n\nCongratulations! You have been selected for the position of ${jobCategoryName}.\n\nWe will contact you shortly with further details.\nWelcome to the team!\n\nContact: recruit@tiramis.co.jp`
+    : `${applicantName} 様\n\nこの度は弊社の選考にご参加いただき、ありがとうございました。\n選考の結果、採用とさせていただくことになりました。\n\n応募職種: ${jobCategoryName}\n\n今後の入社手続きにつきましては、追ってご連絡いたします。\nお問い合わせ: recruit@tiramis.co.jp`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 };
@@ -789,7 +789,7 @@ export const sendInterviewChangeEmail = async (
     </div>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      Please be on time for your interview. If you have any questions, please contact us at info@tiramis.co.jp.
+      Please be on time for your interview. If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -835,7 +835,7 @@ export const sendInterviewChangeEmail = async (
 
     <p style="margin:0;color:#64748b;font-size:13px;">
       面接当日はお時間に余裕を持ってご参加ください。<br>
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -844,14 +844,14 @@ export const sendInterviewChangeEmail = async (
     : '【Tiramis】面接日時が変更されました';
 
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nYour interview has been rescheduled.\n\nPosition: ${jobCategoryName}\nNew Date: ${newDate}\nNew Time: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nManage your interview: ${manageUrl}\n\nPlease be on time. Contact info@tiramis.co.jp for questions.`
+    ? `Dear ${applicantName},\n\nYour interview has been rescheduled.\n\nPosition: ${jobCategoryName}\nNew Date: ${newDate}\nNew Time: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nManage your interview: ${manageUrl}\n\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
     : `${applicantName} 様\n\n面接日時の変更が完了しました。\n\n応募職種: ${jobCategoryName}\n新しい面接日: ${newDate}\n新しい面接時間: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\n面接の変更・キャンセル: ${manageUrl}\n\n面接当日はお時間に余裕を持ってご参加ください。`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 };
@@ -900,7 +900,7 @@ export const sendInterviewCancelEmail = async (
     </p>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      If you have any questions, please contact us at info@tiramis.co.jp.
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -935,7 +935,7 @@ export const sendInterviewCancelEmail = async (
     </p>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -944,14 +944,14 @@ export const sendInterviewCancelEmail = async (
     : '【Tiramis】面接キャンセルのお知らせ';
 
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nYour interview for the position of ${jobCategoryName} has been cancelled as requested.\n\nIf you'd like to reapply in the future, please visit our application page.\n\nContact: info@tiramis.co.jp`
-    : `${applicantName} 様\n\n面接のキャンセルが完了しました。\n\n応募職種: ${jobCategoryName}\n\n今後改めてご応募いただける場合は、応募ページよりお手続きをお願いいたします。\nお問い合わせ: info@tiramis.co.jp`;
+    ? `Dear ${applicantName},\n\nYour interview for the position of ${jobCategoryName} has been cancelled as requested.\n\nIf you'd like to reapply in the future, please visit our application page.\n\nContact: recruit@tiramis.co.jp`
+    : `${applicantName} 様\n\n面接のキャンセルが完了しました。\n\n応募職種: ${jobCategoryName}\n\n今後改めてご応募いただける場合は、応募ページよりお手続きをお願いいたします。\nお問い合わせ: recruit@tiramis.co.jp`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 };
@@ -1167,7 +1167,7 @@ export async function sendTrainingConfirmationEmail(
     ${preparationSection}
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      Please be on time. If you have any questions, please contact us at info@tiramis.co.jp.
+      Please be on time. If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -1201,7 +1201,7 @@ export async function sendTrainingConfirmationEmail(
 
     <p style="margin:0;color:#64748b;font-size:13px;">
       研修当日はお時間に余裕を持ってご参加ください。<br>
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -1210,14 +1210,14 @@ export async function sendTrainingConfirmationEmail(
     : '【Tiramis】研修日程のご案内';
 
   const textContent = isEn
-    ? `Dear ${name},\n\nYour training session has been confirmed.\n\n${jobCategoryName ? `Position: ${jobCategoryName}\n` : ''}Date: ${trainingDate}\nTime: ${trainingTime}\n${location ? `Location: ${location}\n` : ''}${selfBookingLink ? `\nBook your slot: ${selfBookingLink}\n` : ''}\n---\nVenue: K&Partners Takadanobaba Branch\n〒169-0075 Tokyo, Shinjuku-ku, Takadanobaba 4-39-6 K&P Bldg.\nGoogle Maps: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\nWhen you arrive, please come up to the 2nd floor by stairs or elevator.\n\nWhat to Bring:\n- Residence card (在留カード)\n- Bank cash card (if you have one)\n\nDress Code: Please wear comfortable clothing and shoes suitable for walking.\n---\nPlease be on time. Contact info@tiramis.co.jp for questions.`
-    : `${name} 様\n\n研修日程が確定しましたのでご連絡いたします。\n\n${jobCategoryName ? `応募職種: ${jobCategoryName}\n` : ''}研修日: ${trainingDate}\n研修時間: ${trainingTime}\n${location ? `研修場所: ${location}\n` : ''}${selfBookingLink ? `\n研修日程の選択: ${selfBookingLink}\n` : ''}\n---\n研修場所: K&Partners 高田馬場支店\n〒169-0075 東京都新宿区高田馬場4-39-6 K&Pビル\nGoogleマップ: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\n到着されましたら、階段またはエレベーターで2階にお越しください。\n\n持ち物:\n- 在留カード（Residence card）\n- 銀行のキャッシュカード（お持ちの方）\n\n服装: 動きやすい服装・歩きやすい靴でお越しください。\n---\n研修当日はお時間に余裕を持ってご参加ください。\nお問い合わせ: info@tiramis.co.jp`;
+    ? `Dear ${name},\n\nYour training session has been confirmed.\n\n${jobCategoryName ? `Position: ${jobCategoryName}\n` : ''}Date: ${trainingDate}\nTime: ${trainingTime}\n${location ? `Location: ${location}\n` : ''}${selfBookingLink ? `\nBook your slot: ${selfBookingLink}\n` : ''}\n---\nVenue: K&Partners Takadanobaba Branch\n〒169-0075 Tokyo, Shinjuku-ku, Takadanobaba 4-39-6 K&P Bldg.\nGoogle Maps: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\nWhen you arrive, please come up to the 2nd floor by stairs or elevator.\n\nWhat to Bring:\n- Residence card (在留カード)\n- Bank cash card (if you have one)\n\nDress Code: Please wear comfortable clothing and shoes suitable for walking.\n---\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
+    : `${name} 様\n\n研修日程が確定しましたのでご連絡いたします。\n\n${jobCategoryName ? `応募職種: ${jobCategoryName}\n` : ''}研修日: ${trainingDate}\n研修時間: ${trainingTime}\n${location ? `研修場所: ${location}\n` : ''}${selfBookingLink ? `\n研修日程の選択: ${selfBookingLink}\n` : ''}\n---\n研修場所: K&Partners 高田馬場支店\n〒169-0075 東京都新宿区高田馬場4-39-6 K&Pビル\nGoogleマップ: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\n到着されましたら、階段またはエレベーターで2階にお越しください。\n\n持ち物:\n- 在留カード（Residence card）\n- 銀行のキャッシュカード（お持ちの方）\n\n服装: 動きやすい服装・歩きやすい靴でお越しください。\n---\n研修当日はお時間に余裕を持ってご参加ください。\nお問い合わせ: recruit@tiramis.co.jp`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 }
@@ -1265,7 +1265,7 @@ export async function sendTrainingInviteEmail(
     </div>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      If you have any questions, please contact us at info@tiramis.co.jp.
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -1295,7 +1295,7 @@ export async function sendTrainingInviteEmail(
     </div>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -1304,14 +1304,14 @@ export async function sendTrainingInviteEmail(
     : '【Tiramis】研修日程のご選択をお願いします';
 
   const textContent = isEn
-    ? `Dear ${name},\n\nCongratulations on your acceptance! Please select your preferred training session.\n\nBook your training: ${bookingUrl}\n\nThis link is for your use only. Contact info@tiramis.co.jp for questions.`
-    : `${name} 様\n\nこの度は採用となりましたことをお祝い申し上げます。\n以下のリンクから研修日程をご選択ください。\n\n研修日程の選択: ${bookingUrl}\n\nこのリンクはご本人専用です。\nお問い合わせ: info@tiramis.co.jp`;
+    ? `Dear ${name},\n\nCongratulations on your acceptance! Please select your preferred training session.\n\nBook your training: ${bookingUrl}\n\nThis link is for your use only. Contact recruit@tiramis.co.jp for questions.`
+    : `${name} 様\n\nこの度は採用となりましたことをお祝い申し上げます。\n以下のリンクから研修日程をご選択ください。\n\n研修日程の選択: ${bookingUrl}\n\nこのリンクはご本人専用です。\nお問い合わせ: recruit@tiramis.co.jp`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 }
@@ -1383,7 +1383,7 @@ export async function sendInterviewInvitationEmail(
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 }
@@ -1476,7 +1476,7 @@ export async function sendTrainingCancellationEmail(
     </table>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      If you have any questions, please contact us at info@tiramis.co.jp.
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
     </p>
   `
     : `
@@ -1504,7 +1504,7 @@ export async function sendTrainingCancellationEmail(
     </table>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
-      ご不明な点がございましたら、info@tiramis.co.jp までお問い合わせください。
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
     </p>
   `;
 
@@ -1513,14 +1513,14 @@ export async function sendTrainingCancellationEmail(
     : '【Tiramis】研修日程キャンセルのお知らせ';
 
   const textContent = isEn
-    ? `Dear ${name},\n\nYour training session has been cancelled.\n\n${jobCategoryName ? `Position: ${jobCategoryName}\n` : ''}Date: ${trainingDate}\nTime: ${trainingTime}\n\nContact info@tiramis.co.jp for questions.`
-    : `${name} 様\n\nご予約の研修日程をキャンセルいたしました。\n\n${jobCategoryName ? `応募職種: ${jobCategoryName}\n` : ''}研修日: ${trainingDate}\n研修時間: ${trainingTime}\n\nお問い合わせ: info@tiramis.co.jp`;
+    ? `Dear ${name},\n\nYour training session has been cancelled.\n\n${jobCategoryName ? `Position: ${jobCategoryName}\n` : ''}Date: ${trainingDate}\nTime: ${trainingTime}\n\nContact recruit@tiramis.co.jp for questions.`
+    : `${name} 様\n\nご予約の研修日程をキャンセルいたしました。\n\n${jobCategoryName ? `応募職種: ${jobCategoryName}\n` : ''}研修日: ${trainingDate}\n研修時間: ${trainingTime}\n\nお問い合わせ: recruit@tiramis.co.jp`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
     subject,
-    html: htmlWrapper(contentHtml),
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
   });
 }
