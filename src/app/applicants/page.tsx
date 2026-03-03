@@ -879,6 +879,7 @@ export default function ApplicantsPage() {
 
       // 研修スロット処理
       if (evalForm.hiringStatus === 'HIRED') {
+        let trainingBooked = false;
         if (trainingBookingMode === 'now' && selectedTrainingSlotId) {
           const bookRes = await fetch(`/api/applicants/${selectedApplicant.id}/book-training`, {
             method: 'POST',
@@ -890,6 +891,7 @@ export default function ApplicantsPage() {
             showToast(`研修スロットの予約に失敗しました: ${err.error || ''}`, 'error');
           } else {
             showToast('応募者情報を保存し、研修スロットを予約しました', 'success');
+            trainingBooked = true;
           }
         } else if (trainingBookingMode === 'later') {
           const inviteRes = await fetch(`/api/applicants/${selectedApplicant.id}/book-training`, {
@@ -904,6 +906,28 @@ export default function ApplicantsPage() {
           }
         } else {
           showToast('応募者情報を保存しました', 'success');
+        }
+
+        // 研修スロット予約成功後、配布員登録を提案
+        if (trainingBooked && !registeredDistributorId) {
+          setEvalSaving(false);
+          const wantRegister = await showConfirm(
+            '続けて配布員ユーザを作成しますか？',
+            { variant: 'primary', confirmLabel: 'はい', cancelLabel: 'いいえ', title: '配布員登録' }
+          );
+          if (wantRegister) {
+            if (!evalForm.birthday) {
+              showToast('生年月日を入力してから配布員登録を行ってください', 'warning');
+            } else {
+              setShowDistributorForm(true);
+              if (branches.length === 0) fetchBranches();
+            }
+            // モーダルを開いたまま応募者データを再取得
+            fetchSlots();
+            fetchApplicants(page);
+            openEvalModal(selectedApplicant.id);
+            return;
+          }
         }
       } else {
         showToast('応募者情報を保存しました', 'success');
@@ -2012,20 +2036,24 @@ export default function ApplicantsPage() {
                           />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">生年月日</p>
+                          <p className={`text-xs font-bold mb-0.5 ${!evalForm.birthday ? 'text-red-500' : 'text-slate-400'}`}>
+                            生年月日{!evalForm.birthday && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                          </p>
                           <input
                             type="date"
                             value={evalForm.birthday}
                             onChange={e => setEvalForm(f => ({ ...f, birthday: e.target.value }))}
-                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                            className={`w-full text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white border ${!evalForm.birthday ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                           />
                         </div>
                         <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">性別</p>
+                          <p className={`text-xs font-bold mb-0.5 ${!evalForm.gender ? 'text-red-500' : 'text-slate-400'}`}>
+                            性別{!evalForm.gender && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                          </p>
                           <select
                             value={evalForm.gender}
                             onChange={e => setEvalForm(f => ({ ...f, gender: e.target.value }))}
-                            className="w-full text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white"
+                            className={`w-full text-sm rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white border ${!evalForm.gender ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                           >
                             <option value="">未設定</option>
                             <option value="male">男性</option>
@@ -2260,11 +2288,13 @@ export default function ApplicantsPage() {
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-bold text-slate-500 mb-1.5">国籍</label>
+                        <label className={`block text-xs font-bold mb-1.5 ${!evalForm.countryId ? 'text-red-500' : 'text-slate-500'}`}>
+                          国籍{!evalForm.countryId && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                        </label>
                         <select
                           value={evalForm.countryId}
                           onChange={e => setEvalForm(f => ({ ...f, countryId: e.target.value }))}
-                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                          className={`w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white border ${!evalForm.countryId ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                         >
                           <option value="">選択してください</option>
                           {countries.map(c => (
@@ -2275,11 +2305,13 @@ export default function ApplicantsPage() {
 
                       {!isJapanese(evalForm.countryId) && (
                         <div>
-                          <label className="block text-xs font-bold text-slate-500 mb-1.5">在留資格</label>
+                          <label className={`block text-xs font-bold mb-1.5 ${!evalForm.visaTypeId ? 'text-red-500' : 'text-slate-500'}`}>
+                            在留資格{!evalForm.visaTypeId && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
+                          </label>
                           <select
                             value={evalForm.visaTypeId}
                             onChange={e => setEvalForm(f => ({ ...f, visaTypeId: e.target.value }))}
-                            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                            className={`w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white border ${!evalForm.visaTypeId ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
                           >
                             <option value="">選択してください</option>
                             {visaTypes.map(v => (
@@ -2766,8 +2798,8 @@ export default function ApplicantsPage() {
                     </div>
                   )}
 
-                  {/* セクション 6: 配布員登録（採用 + 研修日確定後） */}
-                  {selectedApplicant.hiringStatus === 'HIRED' && selectedApplicant.trainingSlot && (
+                  {/* セクション 6: 配布員登録（採用済み） */}
+                  {selectedApplicant.hiringStatus === 'HIRED' && (
                     <div>
                       <div className="flex items-center gap-2 mb-3">
                         <i className="bi bi-person-badge text-emerald-600"></i>
@@ -2781,18 +2813,7 @@ export default function ApplicantsPage() {
                             配布員として登録済み（スタッフID: {registeredDistributorId}）
                           </p>
                         </div>
-                      ) : !showDistributorForm ? (
-                        <button
-                          onClick={() => {
-                            setShowDistributorForm(true);
-                            if (branches.length === 0) fetchBranches();
-                          }}
-                          className="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 transition-colors"
-                        >
-                          <i className="bi bi-person-plus"></i>
-                          配布員として登録する
-                        </button>
-                      ) : (
+                      ) : showDistributorForm ? (
                         <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                           <div>
                             <label className="block text-xs font-bold text-slate-500 mb-1.5">所属支店 <span className="text-rose-500">*</span></label>
@@ -2842,7 +2863,7 @@ export default function ApplicantsPage() {
                             </button>
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   )}
                 </>
@@ -2860,6 +2881,32 @@ export default function ApplicantsPage() {
                   削除
                 </button>
                 <div className="flex gap-3">
+                  {selectedApplicant.hiringStatus === 'HIRED' && !showDistributorForm && (
+                    registeredDistributorId ? (
+                      <button
+                        disabled
+                        className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
+                      >
+                        <i className="bi bi-check-circle-fill"></i>
+                        配布員登録済み
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          if (!evalForm.birthday) {
+                            showToast('生年月日を入力してから配布員登録を行ってください', 'warning');
+                            return;
+                          }
+                          setShowDistributorForm(true);
+                          if (branches.length === 0) fetchBranches();
+                        }}
+                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
+                      >
+                        <i className="bi bi-person-plus"></i>
+                        配布員登録
+                      </button>
+                    )
+                  )}
                   <button
                     onClick={() => {
                       setShowEvalModal(false);

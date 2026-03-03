@@ -1524,3 +1524,68 @@ export async function sendTrainingCancellationEmail(
     text: textContent,
   });
 }
+
+// ─────────────────────────────────────────────────────────
+// Workspace アカウント通知メール
+// ─────────────────────────────────────────────────────────
+export const sendWorkspaceNotificationEmail = async (
+  toEmail: string,
+  lastName: string,
+  firstName: string,
+  workspaceEmail: string,
+  initialPassword: string,
+) => {
+  const wsContentHtml = `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${lastName} ${firstName} さん</p>
+    <p style="margin:0 0 16px;">
+      Google Workspace（@tiramis.co.jp）のアカウントが作成されました。<br>
+      以下の情報でGmail、Googleカレンダー等のGoogleサービスにログインできます。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">Google Workspace ログイン情報</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:160px;">メールアドレス</td>
+            <td style="padding:8px 0;font-weight:bold;">${workspaceEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">初期パスワード</td>
+            <td style="padding:8px 0;font-weight:bold;font-family:monospace;font-size:15px;">${initialPassword}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 16px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>⚠ 初回ログイン時に必ずパスワードを変更してください。</strong><br>
+        初期パスワードは生年月日（YYYYMMDD形式）です。Googleにログイン後、新しいパスワードへの変更が求められます。
+      </p>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#1e40af;">
+        <strong>ℹ PMS Pro（社内管理システム）のログインメールアドレスも変更されました。</strong><br>
+        今後は <strong>${workspaceEmail}</strong> でPMS Proにログインしてください。以前のメールアドレスではログインできなくなります。
+      </p>
+    </div>
+
+    <div style="text-align:center;margin:32px 0 24px;">
+      <a href="https://accounts.google.com" style="display:inline-block;background:#4285f4;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google にログインする</a>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点は担当者または管理者までお問い合わせください。
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    subject: '【Tiramis】Google Workspace アカウントが作成されました',
+    html: htmlWrapper(wsContentHtml),
+    text: `${lastName} ${firstName} さん\n\nGoogle Workspace（@tiramis.co.jp）のアカウントが作成されました。\n\nメールアドレス: ${workspaceEmail}\n初期パスワード: ${initialPassword}\n\n初回ログイン時に必ずパスワードを変更してください。\nGoogleログイン: https://accounts.google.com\n\n【重要】PMS Pro（社内管理システム）のログインメールアドレスも変更されました。今後は ${workspaceEmail} でPMS Proにログインしてください。以前のメールアドレスではログインできなくなります。\n\nご不明な点は管理者までお問い合わせください。`,
+  });
+};

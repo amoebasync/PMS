@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 import { sendEmployeeWelcomeEmail } from '@/lib/mailer';
 import { hashPassword } from '@/lib/password';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { isGoogleWorkspaceConfigured, generateUniqueEmail, createWorkspaceUser } from '@/lib/google-workspace';
 
 
 // 一覧取得
@@ -143,6 +144,43 @@ export async function POST(request: Request) {
     const generatedCode = `EMP${new Date().toISOString().slice(0,10).replace(/-/g, '')}${Math.floor(1000 + Math.random() * 9000)}`;
     const empCode = body.employeeCode || generatedCode;
 
+    // Google Workspace アカウント自動作成
+    let workspaceEmail: string | null = null;
+    if (body.createWorkspaceAccount) {
+      if (!body.firstNameEn || !body.lastNameEn) {
+        return NextResponse.json(
+          { error: 'Google Workspaceアカウント作成には英語名（名・姓）が必須です' },
+          { status: 400 },
+        );
+      }
+      if (!isGoogleWorkspaceConfigured()) {
+        return NextResponse.json(
+          { error: 'Google Workspace APIが設定されていません。環境変数を確認してください' },
+          { status: 500 },
+        );
+      }
+
+      // メールアドレス生成
+      workspaceEmail = await generateUniqueEmail(body.firstNameEn, body.lastNameEn);
+
+      // Workspace ユーザー作成（初期パスワード = 生年月日 YYYYMMDD）
+      const wsResult = await createWorkspaceUser(
+        workspaceEmail,
+        body.firstNameEn,
+        body.lastNameEn,
+        birthdayStr,
+      );
+      if (!wsResult.success) {
+        return NextResponse.json(
+          { error: `Google Workspaceアカウントの作成に失敗しました: ${wsResult.error}` },
+          { status: 500 },
+        );
+      }
+    }
+
+    // Workspace作成成功時はそのメールを使用、それ以外はフォームの値を使用
+    const employeeEmail = workspaceEmail || body.email;
+
     const newEmployee = await prisma.$transaction(async (tx) => {
       const emp = await tx.employee.create({
         data: {
@@ -153,21 +191,22 @@ export async function POST(request: Request) {
           firstNameKana: body.firstNameKana,
           lastNameEn: body.lastNameEn || null,
           firstNameEn: body.firstNameEn || null,
-          email: body.email,
-          phone: body.phone || null, // 電話番号
+          email: employeeEmail,
+          personalEmail: body.personalEmail || null,
+          phone: body.phone || null,
           passwordHash: hash,
-          hireDate: body.hireDate ? new Date(body.hireDate) : null, 
+          hireDate: body.hireDate ? new Date(body.hireDate) : null,
           birthday: body.birthday ? new Date(body.birthday) : null,
           gender: body.gender || 'unknown',
           isActive: true,
           mustChangePassword: true,
           employmentType: body.employmentType || 'FULL_TIME',
           departmentId: body.departmentId ? parseInt(body.departmentId) : null,
-          branchId: body.branchId ? parseInt(body.branchId) : null, 
+          branchId: body.branchId ? parseInt(body.branchId) : null,
           countryId: body.countryId ? parseInt(body.countryId) : null,
-          managerId: body.managerId ? parseInt(body.managerId) : null, // ★ 追加: 上司IDの保存
-          rank: body.rank || 'ASSOCIATE', 
-          jobTitle: body.jobTitle || null, 
+          managerId: body.managerId ? parseInt(body.managerId) : null,
+          rank: body.rank || 'ASSOCIATE',
+          jobTitle: body.jobTitle || null,
         },
       });
 
@@ -207,17 +246,18 @@ export async function POST(request: Request) {
         targetId: emp.id,
         afterData: emp as unknown as Record<string, unknown>,
         ipAddress: ip,
-        description: `社員「${emp.lastNameJa} ${emp.firstNameJa}」(${emp.employeeCode})を作成`,
+        description: `社員「${emp.lastNameJa} ${emp.firstNameJa}」(${emp.employeeCode})を作成${workspaceEmail ? ` / Workspace: ${workspaceEmail}` : ''}`,
         tx,
       });
 
       return emp;
     });
 
-    // ウェルカムメール送信（失敗しても登録自体は成功扱い）
+    // ウェルカムメール送信（私用メールがあればそちらに、なければ社用メールに送信）
+    const welcomeEmailTo = body.personalEmail || employeeEmail;
     const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
     sendEmployeeWelcomeEmail(
-      body.email,
+      welcomeEmailTo,
       body.lastNameJa,
       body.firstNameJa,
       newEmployee.employeeCode,

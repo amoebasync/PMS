@@ -59,6 +59,7 @@ export default function AuditLogsPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [accessDenied, setAccessDenied] = useState(false);
 
   const [filterAction, setFilterAction] = useState('');
   const [filterActorType, setFilterActorType] = useState('');
@@ -82,6 +83,7 @@ export default function AuditLogsPage() {
       if (filterDateTo) params.set('dateTo', filterDateTo);
 
       const res = await fetch(`/api/audit-logs?${params}`);
+      if (res.status === 403) { setAccessDenied(true); setLoading(false); return; }
       if (!res.ok) throw new Error('fetch failed');
       const data = await res.json();
       setLogs(data.data || []);
@@ -118,6 +120,20 @@ export default function AuditLogsPage() {
     setFilterDateFrom('');
     setFilterDateTo('');
   };
+
+  if (accessDenied) {
+    return (
+      <div className="max-w-screen-xl mx-auto px-4 py-6">
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-12 text-center">
+          <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <i className="bi bi-shield-lock-fill text-3xl"></i>
+          </div>
+          <h3 className="font-bold text-rose-800 text-lg mb-2">アクセス権限がありません</h3>
+          <p className="text-rose-600 text-sm">このページはスーパー管理者（SUPER_ADMIN）のみ閲覧できます。</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6">
