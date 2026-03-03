@@ -479,7 +479,7 @@ export default function ApplicantsPage() {
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
-  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'en', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
@@ -739,7 +739,7 @@ export default function ApplicantsPage() {
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
       setShowManualRegisterModal(false);
       const shouldSendEmail = manualRegForm.sendInterviewEmail;
-      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'en', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
       fetchApplicants(1);
       fetchSlots();
       if (shouldSendEmail) {
@@ -3592,9 +3592,9 @@ export default function ApplicantsPage() {
          ════════════════════════════════════════════ */}
       {showManualRegisterModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]">
             {/* ヘッダー */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <i className="bi bi-person-plus-fill text-emerald-600"></i>
@@ -3609,50 +3609,50 @@ export default function ApplicantsPage() {
               </button>
             </div>
 
-            {/* ボディ */}
-            <div className="p-6 space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  氏名 <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={manualRegForm.name}
-                  onChange={e => setManualRegForm(f => ({ ...f, name: e.target.value }))}
-                  placeholder="山田 太郎"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                />
+            {/* ボディ（スクロール可能） */}
+            <div className="p-6 space-y-3 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    氏名 <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={manualRegForm.name}
+                    onChange={e => setManualRegForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="山田 太郎"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    メールアドレス <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={manualRegForm.email}
+                    onChange={e => setManualRegForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="example@email.com"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  メールアドレス <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={manualRegForm.email}
-                  onChange={e => setManualRegForm(f => ({ ...f, email: e.target.value }))}
-                  placeholder="example@email.com"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  電話番号 <span className="text-slate-400 font-normal">（任意）</span>
-                </label>
-                <input
-                  type="tel"
-                  value={manualRegForm.phone}
-                  onChange={e => handlePhoneChange(e.target.value, v => setManualRegForm(f => ({ ...f, phone: v })))}
-                  placeholder="090-1234-5678"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    電話番号 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={manualRegForm.phone}
+                    onChange={e => handlePhoneChange(e.target.value, v => setManualRegForm(f => ({ ...f, phone: v })))}
+                    placeholder="090-1234-5678"
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
                     生年月日 <span className="text-slate-400 font-normal">（任意）</span>
                   </label>
                   <input
@@ -3663,7 +3663,7 @@ export default function ApplicantsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
                     性別 <span className="text-slate-400 font-normal">（任意）</span>
                   </label>
                   <select
@@ -3679,41 +3679,42 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  職種 <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  value={manualRegForm.jobCategoryId}
-                  onChange={e => setManualRegForm(f => ({ ...f, jobCategoryId: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                >
-                  <option value="">選択してください</option>
-                  {jobCategories.map(cat => (
-                    <option key={cat.id} value={cat.id}>{cat.nameJa}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">
-                  求人媒体 <span className="text-slate-400 font-normal">（任意）</span>
-                </label>
-                <select
-                  value={manualRegForm.recruitingMediaId}
-                  onChange={e => setManualRegForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
-                >
-                  <option value="">選択なし</option>
-                  {recruitingMediaList.filter(m => m.isActive).map(m => (
-                    <option key={m.id} value={m.id}>{m.nameJa}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    職種 <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    value={manualRegForm.jobCategoryId}
+                    onChange={e => setManualRegForm(f => ({ ...f, jobCategoryId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  >
+                    <option value="">選択してください</option>
+                    {jobCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.nameJa}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
+                    求人媒体 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <select
+                    value={manualRegForm.recruitingMediaId}
+                    onChange={e => setManualRegForm(f => ({ ...f, recruitingMediaId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  >
+                    <option value="">選択なし</option>
+                    {recruitingMediaList.filter(m => m.isActive).map(m => (
+                      <option key={m.id} value={m.id}>{m.nameJa}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
                     国籍 <span className="text-slate-400 font-normal">（任意）</span>
                   </label>
                   <select
@@ -3728,7 +3729,7 @@ export default function ApplicantsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">
                     在留資格 <span className="text-slate-400 font-normal">（任意）</span>
                   </label>
                   <select
@@ -3744,43 +3745,44 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-500 mb-1.5">メール言語</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="manualRegLang"
-                      value="ja"
-                      checked={manualRegForm.language === 'ja'}
-                      onChange={() => setManualRegForm(f => ({ ...f, language: 'ja' }))}
-                      className="text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">日本語</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="manualRegLang"
-                      value="en"
-                      checked={manualRegForm.language === 'en'}
-                      onChange={() => setManualRegForm(f => ({ ...f, language: 'en' }))}
-                      className="text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span className="text-sm font-medium text-slate-700">English</span>
-                  </label>
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1">メール言語</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualRegLang"
+                        value="ja"
+                        checked={manualRegForm.language === 'ja'}
+                        onChange={() => setManualRegForm(f => ({ ...f, language: 'ja' }))}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">日本語</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="manualRegLang"
+                        value="en"
+                        checked={manualRegForm.language === 'en'}
+                        onChange={() => setManualRegForm(f => ({ ...f, language: 'en' }))}
+                        className="text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">English</span>
+                    </label>
+                  </div>
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={manualRegForm.sendInterviewEmail}
+                    onChange={e => setManualRegForm(f => ({ ...f, sendInterviewEmail: e.target.checked }))}
+                    className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">面接案内メール送信</span>
+                </label>
               </div>
-
-              <label className="flex items-center gap-2.5 cursor-pointer pt-2 border-t border-slate-100">
-                <input
-                  type="checkbox"
-                  checked={manualRegForm.sendInterviewEmail}
-                  onChange={e => setManualRegForm(f => ({ ...f, sendInterviewEmail: e.target.checked }))}
-                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <span className="text-sm font-medium text-slate-700">面接日程調整メールを送信する</span>
-              </label>
             </div>
 
             {/* フッター */}
