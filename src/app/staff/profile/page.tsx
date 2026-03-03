@@ -103,31 +103,37 @@ export default function ProfilePage() {
 
   const compressImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
       const img = new window.Image();
       img.onload = () => {
-        const maxW = 1920;
-        const maxH = 1920;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW || h > maxH) {
-          const ratio = Math.min(maxW / w, maxH / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
+        URL.revokeObjectURL(url);
+        try {
+          const maxW = 1920;
+          const maxH = 1920;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxW || h > maxH) {
+            const ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { reject(new Error('Canvas not supported')); return; }
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(
+            (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
+            'image/jpeg',
+            0.85,
+          );
+        } catch (err) {
+          reject(err);
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('Canvas not supported')); return; }
-        ctx.drawImage(img, 0, 0, w, h);
-        canvas.toBlob(
-          (blob) => blob ? resolve(blob) : reject(new Error('Compression failed')),
-          'image/jpeg',
-          0.85,
-        );
       };
-      img.onerror = () => reject(new Error('画像の読み込みに失敗しました'));
-      img.src = URL.createObjectURL(file);
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+      img.src = url;
     });
   };
 
@@ -139,9 +145,18 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      const compressed = await compressImage(file);
+      let uploadFile: Blob = file;
+      let uploadName = file.name || 'photo.jpg';
+      try {
+        uploadFile = await compressImage(file);
+        uploadName = uploadName.replace(/\.[^.]+$/, '') + '.jpg';
+        if (!uploadName.includes('.')) uploadName += '.jpg';
+      } catch {
+        // 圧縮失敗時は元ファイルをそのまま送信
+      }
+
       const formData = new FormData();
-      formData.append('file', compressed, file.name.replace(/\.[^.]+$/, '.jpg'));
+      formData.append('file', uploadFile, uploadName);
 
       const res = await fetch(`/api/staff/residence-card?side=${side}`, {
         method: 'POST',
