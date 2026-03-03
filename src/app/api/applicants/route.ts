@@ -96,7 +96,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { name, email, phone, language, jobCategoryId, recruitingMediaId, birthday, gender } = body;
+    const { name, email, phone, language, jobCategoryId, recruitingMediaId, birthday, gender, countryId, visaTypeId } = body;
 
     if (!name || !email || !language || !jobCategoryId) {
       return NextResponse.json({ error: '氏名・メールアドレス・言語・職種は必須です' }, { status: 400 });
@@ -118,6 +118,8 @@ export async function POST(request: Request) {
         language: language || 'ja',
         jobCategoryId: Number(jobCategoryId),
         recruitingMediaId: recruitingMediaId ? Number(recruitingMediaId) : null,
+        countryId: countryId ? Number(countryId) : null,
+        visaTypeId: visaTypeId ? Number(visaTypeId) : null,
         birthday: birthday ? new Date(birthday) : null,
         gender: gender || 'unknown',
         managementToken,

@@ -295,10 +295,12 @@ export default function ApplicantsPage() {
 
   // ── 研修管理 ──
   type TrainingApplicant = {
-    id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null;
+    id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null; email: string;
     trainingAttendance: string | null; trainingUnderstandingScore: number | null;
     trainingCommunicationScore: number | null; trainingSpeedScore: number | null;
     trainingMotivationScore: number | null; trainingNotes: string | null;
+    countryName: string | null; jobCategoryName: string | null;
+    registeredDistributorId: number | null;
   };
   type TrainingSlotManagement = {
     id: number; startTime: string; endTime: string; capacity: number;
@@ -312,6 +314,7 @@ export default function ApplicantsPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [selectedTrainingSlot, setSelectedTrainingSlot] = useState<TrainingSlotManagement | null>(null);
+  const [expandedTrainingApplicantId, setExpandedTrainingApplicantId] = useState<number | null>(null);
   const [editCapacity, setEditCapacity] = useState<number>(10);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [deletingSlot, setDeletingSlot] = useState(false);
@@ -476,7 +479,7 @@ export default function ApplicantsPage() {
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
-  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', sendInterviewEmail: true });
+  const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
@@ -726,6 +729,8 @@ export default function ApplicantsPage() {
           jobCategoryId: Number(manualRegForm.jobCategoryId),
           language: manualRegForm.language,
           recruitingMediaId: manualRegForm.recruitingMediaId ? Number(manualRegForm.recruitingMediaId) : undefined,
+          countryId: manualRegForm.countryId ? Number(manualRegForm.countryId) : undefined,
+          visaTypeId: manualRegForm.visaTypeId ? Number(manualRegForm.visaTypeId) : undefined,
           birthday: manualRegForm.birthday || undefined,
           gender: manualRegForm.gender || undefined,
         }),
@@ -734,7 +739,7 @@ export default function ApplicantsPage() {
       if (!res.ok) throw new Error(data.error || '登録に失敗しました');
       setShowManualRegisterModal(false);
       const shouldSendEmail = manualRegForm.sendInterviewEmail;
-      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', sendInterviewEmail: true });
+      setManualRegForm({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
       fetchApplicants(1);
       fetchSlots();
       if (shouldSendEmail) {
@@ -890,6 +895,7 @@ export default function ApplicantsPage() {
   // 研修スロット詳細モーダルを閉じる
   const closeTrainingSlotPanel = () => {
     setSelectedTrainingSlot(null);
+    setExpandedTrainingApplicantId(null);
   };
 
   // 研修スロット: 削除
@@ -2021,7 +2027,7 @@ export default function ApplicantsPage() {
         const canDelete = slot.bookedCount === 0;
         return (
           <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[80vh]">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden max-h-[85vh]">
               {/* ヘッダー */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                 <div className="flex items-center gap-3">
@@ -2109,33 +2115,46 @@ export default function ApplicantsPage() {
                     <div className="space-y-2">
                       {slot.applicants.map(app => {
                         const flow = FLOW_STATUS_MAP[app.flowStatus];
+                        const hiring = HIRING_STATUS_MAP[app.hiringStatus];
                         const isCompleted = app.flowStatus === 'TRAINING_COMPLETED';
                         const isEvalOpen = trainingEvalTargetId === app.id;
                         const isNoShow = app.trainingAttendance === 'NO_SHOW';
+                        const isExpanded = expandedTrainingApplicantId === app.id;
                         return (
                           <div key={app.id}>
                             <div
-                              className={`flex items-center justify-between px-3 py-2 rounded-lg ${isNoShow ? 'bg-rose-50' : isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer ${isNoShow ? 'bg-rose-50 hover:bg-rose-100/60' : isCompleted ? 'bg-emerald-50 hover:bg-emerald-100/60' : 'bg-slate-50 hover:bg-slate-100'}`}
+                              onClick={() => setExpandedTrainingApplicantId(isExpanded ? null : app.id)}
                             >
-                              <div className="flex items-center gap-2 min-w-0">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isNoShow ? 'bg-rose-100 text-rose-600' : isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
                                   <i className={`bi ${isNoShow ? 'bi-x-lg' : isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
                                 </div>
-                                <div className="min-w-0">
-                                  <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-sm font-bold text-slate-800 truncate">{app.name}</span>
+                                    <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-slate-400`}></i>
+                                  </div>
                                   {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
                                 </div>
-                                {isNoShow ? (
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-rose-100 text-rose-700">NO SHOW</span>
-                                ) : flow && (
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
-                                    {flow.label}
-                                  </span>
-                                )}
+                                <div className="flex items-center gap-1 shrink-0 flex-wrap justify-end">
+                                  {app.registeredDistributorId ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                                      <i className="bi bi-person-badge mr-0.5"></i>配布員登録済
+                                    </span>
+                                  ) : null}
+                                  {isNoShow ? (
+                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700">NO SHOW</span>
+                                  ) : flow && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${flow.color}`}>
+                                      {flow.label}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                               {isCompleted ? (
                                 <button
-                                  onClick={() => isEvalOpen ? setTrainingEvalTargetId(null) : handleOpenTrainingEval(app)}
+                                  onClick={(e) => { e.stopPropagation(); isEvalOpen ? setTrainingEvalTargetId(null) : handleOpenTrainingEval(app); }}
                                   className="text-xs font-bold text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors shrink-0 ml-2"
                                   title="評価を編集"
                                 >
@@ -2144,7 +2163,7 @@ export default function ApplicantsPage() {
                               ) : (
                                 <div className="flex items-center gap-1 shrink-0 ml-2">
                                   <button
-                                    onClick={() => handleOpenTrainingEval(app)}
+                                    onClick={(e) => { e.stopPropagation(); handleOpenTrainingEval(app); }}
                                     className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
                                   >
                                     <i className="bi bi-clipboard-check"></i>
@@ -2152,7 +2171,7 @@ export default function ApplicantsPage() {
                                   </button>
                                   <div className="relative">
                                     <button
-                                      onClick={() => setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id)}
+                                      onClick={(e) => { e.stopPropagation(); setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id); }}
                                       className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
                                       title="アクション"
                                     >
@@ -2203,6 +2222,53 @@ export default function ApplicantsPage() {
                                 </div>
                               )}
                             </div>
+
+                            {/* 展開: 応募者詳細情報 */}
+                            {isExpanded && (
+                              <div className="mt-1 px-3 py-3 rounded-lg border border-slate-200 bg-white space-y-2">
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                  <div>
+                                    <span className="text-slate-400">メール</span>
+                                    <p className="text-slate-700 font-medium truncate">{app.email || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">電話</span>
+                                    <p className="text-slate-700 font-medium">{app.phone || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">国籍</span>
+                                    <p className="text-slate-700 font-medium">{app.countryName || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">職種</span>
+                                    <p className="text-slate-700 font-medium">{app.jobCategoryName || '—'}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">採用ステータス</span>
+                                    {hiring && <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${hiring.color}`}>{hiring.label}</span>}
+                                  </div>
+                                  <div>
+                                    <span className="text-slate-400">配布員登録</span>
+                                    <p className="text-slate-700 font-medium">
+                                      {app.registeredDistributorId
+                                        ? <span className="text-indigo-600 font-bold">ID: {app.registeredDistributorId}</span>
+                                        : <span className="text-slate-400">未登録</span>}
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    closeTrainingSlotPanel();
+                                    openEvalModal(app.id);
+                                  }}
+                                  className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors mt-1"
+                                >
+                                  <i className="bi bi-box-arrow-up-right"></i>
+                                  応募者詳細を開く
+                                </button>
+                              </div>
+                            )}
 
                             {/* 研修評価フォーム（インライン展開） */}
                             {isEvalOpen && (
@@ -3643,6 +3709,39 @@ export default function ApplicantsPage() {
                     <option key={m.id} value={m.id}>{m.nameJa}</option>
                   ))}
                 </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    国籍 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <select
+                    value={manualRegForm.countryId}
+                    onChange={e => setManualRegForm(f => ({ ...f, countryId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  >
+                    <option value="">未選択</option>
+                    {countries.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 mb-1.5">
+                    在留資格 <span className="text-slate-400 font-normal">（任意）</span>
+                  </label>
+                  <select
+                    value={manualRegForm.visaTypeId}
+                    onChange={e => setManualRegForm(f => ({ ...f, visaTypeId: e.target.value }))}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                  >
+                    <option value="">未選択</option>
+                    {visaTypes.map(v => (
+                      <option key={v.id} value={v.id}>{v.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
