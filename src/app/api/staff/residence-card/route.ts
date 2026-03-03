@@ -89,6 +89,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ url, side });
   } catch (error) {
     console.error('Residence Card Upload Error:', error);
-    return NextResponse.json({ error: 'アップロードに失敗しました' }, { status: 500 });
+    const detail = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ error: `アップロードに失敗しました: ${detail}` }, { status: 500 });
   }
 }

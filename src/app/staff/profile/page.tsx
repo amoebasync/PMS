@@ -163,19 +163,16 @@ export default function ProfilePage() {
         body: formData,
       });
 
-      if (!res.ok) {
-        let errMsg = `サーバーエラー (${res.status})`;
-        try { const d = await res.json(); errMsg = d.error || errMsg; } catch { /* non-JSON response */ }
-        setMessage({ type: 'error', text: errMsg });
-        return;
-      }
-
       const data = await res.json();
-      setProfile((p) => p ? {
-        ...p,
-        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-      } : p);
-      setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || `サーバーエラー (${res.status})` });
+      } else {
+        setProfile((p) => p ? {
+          ...p,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+        } : p);
+        setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
+      }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       setMessage({ type: 'error', text: `アップロード失敗: ${detail}` });

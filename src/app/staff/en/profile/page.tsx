@@ -162,19 +162,16 @@ export default function ProfilePageEn() {
         body: formData,
       });
 
-      if (!res.ok) {
-        let errMsg = `Server error (${res.status})`;
-        try { const d = await res.json(); errMsg = d.error || errMsg; } catch { /* non-JSON response */ }
-        setMessage({ type: 'error', text: errMsg });
-        return;
-      }
-
       const data = await res.json();
-      setProfile((p) => p ? {
-        ...p,
-        ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-      } : p);
-      setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
+      if (!res.ok) {
+        setMessage({ type: 'error', text: data.error || `Server error (${res.status})` });
+      } else {
+        setProfile((p) => p ? {
+          ...p,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+        } : p);
+        setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
+      }
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       setMessage({ type: 'error', text: `Upload failed: ${detail}` });
