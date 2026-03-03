@@ -29,6 +29,7 @@ const PAGE_TITLES: Record<string, { title: string; icon: string }> = {
   '/quality/prohibited-properties': { title: '配布禁止物件',      icon: 'bi-house-x-fill' },
   '/employees':                     { title: '社員管理',          icon: 'bi-person-badge-fill' },
   '/distributors':                  { title: '配布員管理',        icon: 'bi-bicycle' },
+  '/distributor-shifts':            { title: 'シフト管理',        icon: 'bi-calendar-week' },
   '/distributors/payroll':          { title: '配布員給与',        icon: 'bi-wallet2' },
   '/applicants':                    { title: '応募者管理',        icon: 'bi-person-lines-fill' },
   '/branches':                      { title: '支店管理',          icon: 'bi-shop' },

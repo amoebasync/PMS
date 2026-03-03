@@ -1558,10 +1558,17 @@ export const sendWorkspaceNotificationEmail = async (
       </td></tr>
     </table>
 
-    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 16px;">
       <p style="margin:0;font-size:13px;color:#854d0e;">
         <strong>⚠ 初回ログイン時に必ずパスワードを変更してください。</strong><br>
         初期パスワードは生年月日（YYYYMMDD形式）です。Googleにログイン後、新しいパスワードへの変更が求められます。
+      </p>
+    </div>
+
+    <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#1e40af;">
+        <strong>ℹ PMS Pro（社内管理システム）のログインメールアドレスも変更されました。</strong><br>
+        今後は <strong>${workspaceEmail}</strong> でPMS Proにログインしてください。以前のメールアドレスではログインできなくなります。
       </p>
     </div>
 
@@ -1579,6 +1586,6 @@ export const sendWorkspaceNotificationEmail = async (
     to: toEmail,
     subject: '【Tiramis】Google Workspace アカウントが作成されました',
     html: htmlWrapper(wsContentHtml),
-    text: `${lastName} ${firstName} さん\n\nGoogle Workspace（@tiramis.co.jp）のアカウントが作成されました。\n\nメールアドレス: ${workspaceEmail}\n初期パスワード: ${initialPassword}\n\n初回ログイン時に必ずパスワードを変更してください。\nGoogleログイン: https://accounts.google.com\n\nご不明な点は管理者までお問い合わせください。`,
+    text: `${lastName} ${firstName} さん\n\nGoogle Workspace（@tiramis.co.jp）のアカウントが作成されました。\n\nメールアドレス: ${workspaceEmail}\n初期パスワード: ${initialPassword}\n\n初回ログイン時に必ずパスワードを変更してください。\nGoogleログイン: https://accounts.google.com\n\n【重要】PMS Pro（社内管理システム）のログインメールアドレスも変更されました。今後は ${workspaceEmail} でPMS Proにログインしてください。以前のメールアドレスではログインできなくなります。\n\nご不明な点は管理者までお問い合わせください。`,
   });
 };

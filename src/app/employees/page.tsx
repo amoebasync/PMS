@@ -118,6 +118,7 @@ export default function EmployeePage() {
   const [isToastExiting, setIsToastExiting] = useState(false);
   const [pendingWelcomeEmp, setPendingWelcomeEmp] = useState<Employee | null>(null);
   const [sendingWorkspaceNotify, setSendingWorkspaceNotify] = useState(false);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     date: new Date().toISOString().split('T')[0], type: 'GRANTED', days: '', validUntil: '', note: ''
   });
@@ -441,6 +442,35 @@ export default function EmployeePage() {
     setSendingWelcomeId(null);
   };
 
+  const handleCreateWorkspace = async () => {
+    if (!selectedEmployee) return;
+    if (!selectedEmployee.lastNameEn || !selectedEmployee.firstNameEn) {
+      showToast('英語名（First Name / Last Name）が未設定です。先に社員情報を編集してください', 'error');
+      return;
+    }
+    const preview = `${selectedEmployee.firstNameEn.toLowerCase()}.${selectedEmployee.lastNameEn.toLowerCase()}@tiramis.co.jp`;
+    const confirmed = await showConfirm(
+      `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa} さんのGoogle Workspaceアカウントを作成しますか？\n\n作成されるメール: ${preview}\n現在のメール（${selectedEmployee.email}）は私用メールとして保存されます。`,
+      { variant: 'primary', confirmLabel: '作成する' },
+    );
+    if (!confirmed) return;
+    setCreatingWorkspace(true);
+    try {
+      const res = await fetch(`/api/employees/${selectedEmployee.id}/create-workspace`, { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`Workspaceアカウントを作成しました: ${data.email}`, 'success');
+        setSelectedEmployee(prev => prev ? { ...prev, email: data.email, personalEmail: data.personalEmail } : prev);
+        fetchEmployees(buildEmpQuery());
+      } else {
+        showToast(data.error || '作成に失敗しました', 'error');
+      }
+    } catch {
+      showToast('通信エラーが発生しました', 'error');
+    }
+    setCreatingWorkspace(false);
+  };
+
   const handleWorkspaceNotify = async () => {
     if (!selectedEmployee) return;
     const isAlreadyNotified = !!selectedEmployee.workspaceNotifiedAt;
@@ -720,6 +750,19 @@ export default function EmployeePage() {
                       <><i className="bi bi-check-circle-fill text-emerald-300"></i> Workspace 通知済み<span className="text-[10px] opacity-70 ml-1">（再送信可）</span></>
                     ) : (
                       <><i className="bi bi-google"></i> Workspace ログイン情報を通知</>
+                    )}
+                  </button>
+                )}
+                {canEdit && !selectedEmployee.email.endsWith('@tiramis.co.jp') && (
+                  <button
+                    onClick={handleCreateWorkspace}
+                    disabled={creatingWorkspace}
+                    className="w-full mt-2 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                  >
+                    {creatingWorkspace ? (
+                      <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 作成中...</>
+                    ) : (
+                      <><i className="bi bi-google"></i> Workspace アカウントを作成</>
                     )}
                   </button>
                 )}

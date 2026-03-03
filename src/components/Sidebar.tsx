@@ -59,6 +59,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { name: '入出庫・納品管理', href: '/transactions', icon: 'bi-box-seam' },
       { name: '外注先マスタ', href: '/partners', icon: 'bi-truck' },
       { name: '配布員管理', href: '/distributors', icon: 'bi-bicycle' },
+      { name: 'シフト管理', href: '/distributor-shifts', icon: 'bi-calendar-week' },
     ],
   },
   {
