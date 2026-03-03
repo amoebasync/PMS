@@ -95,6 +95,12 @@ type Applicant = {
   communicationScore: number | null;
   impressionScore: number | null;
   interviewNotes: string | null;
+  trainingAttendance: string | null;
+  trainingUnderstandingScore: number | null;
+  trainingCommunicationScore: number | null;
+  trainingSpeedScore: number | null;
+  trainingMotivationScore: number | null;
+  trainingNotes: string | null;
   gender: string | null;
   createdAt: string;
   updatedAt: string;
@@ -161,7 +167,12 @@ export default function ApplicantsPage() {
   const [activeTab, setActiveTab] = useState<'calendar' | 'list' | 'training'>('calendar');
 
   // ── 研修管理 ──
-  type TrainingApplicant = { id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null };
+  type TrainingApplicant = {
+    id: number; name: string; flowStatus: string; hiringStatus: string; phone: string | null;
+    trainingAttendance: string | null; trainingUnderstandingScore: number | null;
+    trainingCommunicationScore: number | null; trainingSpeedScore: number | null;
+    trainingMotivationScore: number | null; trainingNotes: string | null;
+  };
   type TrainingSlotManagement = {
     id: number; startTime: string; endTime: string; capacity: number;
     location: string | null; note: string | null; bookedCount: number;
@@ -173,7 +184,6 @@ export default function ApplicantsPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [markingComplete, setMarkingComplete] = useState<number | null>(null);
   const [selectedTrainingSlot, setSelectedTrainingSlot] = useState<TrainingSlotManagement | null>(null);
   const [editCapacity, setEditCapacity] = useState<number>(10);
   const [savingCapacity, setSavingCapacity] = useState(false);
@@ -204,22 +214,56 @@ export default function ApplicantsPage() {
     setTrainingMgmtLoading(false);
   };
 
-  const handleMarkTrainingComplete = async (applicantId: number) => {
-    setMarkingComplete(applicantId);
+  const handleOpenTrainingEval = (app: TrainingApplicant) => {
+    setTrainingEvalTargetId(app.id);
+    setTrainingEvalForm({
+      attendance: app.trainingAttendance || '',
+      understandingScore: app.trainingUnderstandingScore,
+      communicationScore: app.trainingCommunicationScore,
+      speedScore: app.trainingSpeedScore,
+      motivationScore: app.trainingMotivationScore,
+      notes: app.trainingNotes || '',
+    });
+  };
+
+  const handleSaveTrainingEval = async () => {
+    if (!trainingEvalTargetId) return;
+    if (!trainingEvalForm.attendance) {
+      showToast('出欠を選択してください', 'error');
+      return;
+    }
+    setTrainingEvalSaving(true);
     try {
-      const res = await fetch(`/api/applicants/${applicantId}`, {
+      const payload: any = {
+        flowStatus: 'TRAINING_COMPLETED',
+        trainingAttendance: trainingEvalForm.attendance,
+        trainingNotes: trainingEvalForm.notes || null,
+      };
+      if (trainingEvalForm.attendance === 'ATTENDED') {
+        payload.trainingUnderstandingScore = trainingEvalForm.understandingScore;
+        payload.trainingCommunicationScore = trainingEvalForm.communicationScore;
+        payload.trainingSpeedScore = trainingEvalForm.speedScore;
+        payload.trainingMotivationScore = trainingEvalForm.motivationScore;
+      } else {
+        payload.trainingUnderstandingScore = null;
+        payload.trainingCommunicationScore = null;
+        payload.trainingSpeedScore = null;
+        payload.trainingMotivationScore = null;
+      }
+      const res = await fetch(`/api/applicants/${trainingEvalTargetId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ flowStatus: 'TRAINING_COMPLETED' }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
-        showToast('研修完了としてマークしました', 'success');
+        showToast('研修評価を保存しました', 'success');
+        setTrainingEvalTargetId(null);
         await fetchTrainingMgmt();
       } else {
         showToast('更新に失敗しました', 'error');
       }
     } catch { showToast('エラーが発生しました', 'error'); }
-    setMarkingComplete(null);
+    setTrainingEvalSaving(false);
   };
 
   // ── カレンダー ──
@@ -272,11 +316,23 @@ export default function ApplicantsPage() {
   const [trainingRescheduleLoading, setTrainingRescheduleLoading] = useState(false);
 
   // ── 研修管理モーダル: 参加者アクション ──
-  const [trainingActionMenuId, setTrainingActionMenuId] = useState<number | null>(null); // 開いてる参加者ID
-  const [trainingRescheduleTargetId, setTrainingRescheduleTargetId] = useState<number | null>(null); // 日程変更対象の応募者ID
+  const [trainingActionMenuId, setTrainingActionMenuId] = useState<number | null>(null);
+  const [trainingRescheduleTargetId, setTrainingRescheduleTargetId] = useState<number | null>(null);
   const [trainingRescheduleMode, setTrainingRescheduleMode] = useState<'direct' | null>(null);
   const [calendarNewTrainingSlotId, setCalendarNewTrainingSlotId] = useState<number | null>(null);
   const [calendarRescheduleLoading, setCalendarRescheduleLoading] = useState(false);
+
+  // ── 研修評価フォーム ──
+  const [trainingEvalTargetId, setTrainingEvalTargetId] = useState<number | null>(null);
+  const [trainingEvalForm, setTrainingEvalForm] = useState({
+    attendance: '' as string,
+    understandingScore: null as number | null,
+    communicationScore: null as number | null,
+    speedScore: null as number | null,
+    motivationScore: null as number | null,
+    notes: '',
+  });
+  const [trainingEvalSaving, setTrainingEvalSaving] = useState(false);
 
   // ── 配布員登録 ──
   const [branches, setBranches] = useState<{ id: number; nameJa: string; prefix: string | null }[]>([]);
@@ -1896,89 +1952,194 @@ export default function ApplicantsPage() {
                       {slot.applicants.map(app => {
                         const flow = FLOW_STATUS_MAP[app.flowStatus];
                         const isCompleted = app.flowStatus === 'TRAINING_COMPLETED';
+                        const isEvalOpen = trainingEvalTargetId === app.id;
+                        const isNoShow = app.trainingAttendance === 'NO_SHOW';
                         return (
-                          <div
-                            key={app.id}
-                            className={`flex items-center justify-between px-3 py-2 rounded-lg ${isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
-                                <i className={`bi ${isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
+                          <div key={app.id}>
+                            <div
+                              className={`flex items-center justify-between px-3 py-2 rounded-lg ${isNoShow ? 'bg-rose-50' : isCompleted ? 'bg-emerald-50' : 'bg-slate-50'}`}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${isNoShow ? 'bg-rose-100 text-rose-600' : isCompleted ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-600'}`}>
+                                  <i className={`bi ${isNoShow ? 'bi-x-lg' : isCompleted ? 'bi-check-lg' : 'bi-person'}`}></i>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
+                                  {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
+                                </div>
+                                {isNoShow ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 bg-rose-100 text-rose-700">NO SHOW</span>
+                                ) : flow && (
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
+                                    {flow.label}
+                                  </span>
+                                )}
                               </div>
-                              <div className="min-w-0">
-                                <div className="text-sm font-bold text-slate-800 truncate">{app.name}</div>
-                                {app.phone && <div className="text-xs text-slate-400">{app.phone}</div>}
-                              </div>
-                              {flow && (
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${flow.color}`}>
-                                  {flow.label}
-                                </span>
+                              {isCompleted ? (
+                                <button
+                                  onClick={() => isEvalOpen ? setTrainingEvalTargetId(null) : handleOpenTrainingEval(app)}
+                                  className="text-xs font-bold text-slate-500 hover:text-indigo-600 px-2 py-1 rounded-lg hover:bg-indigo-50 transition-colors shrink-0 ml-2"
+                                  title="評価を編集"
+                                >
+                                  <i className={`bi ${isEvalOpen ? 'bi-chevron-up' : 'bi-pencil-square'}`}></i>
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-1 shrink-0 ml-2">
+                                  <button
+                                    onClick={() => handleOpenTrainingEval(app)}
+                                    className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
+                                  >
+                                    <i className="bi bi-clipboard-check"></i>
+                                    評価・完了
+                                  </button>
+                                  <div className="relative">
+                                    <button
+                                      onClick={() => setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id)}
+                                      className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                                      title="アクション"
+                                    >
+                                      <i className="bi bi-three-dots-vertical text-sm"></i>
+                                    </button>
+                                    {trainingActionMenuId === app.id && (
+                                      <>
+                                        <div className="fixed inset-0 z-[2999]" onClick={() => setTrainingActionMenuId(null)} />
+                                        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[3000] py-1 overflow-hidden">
+                                          <button
+                                            onClick={() => {
+                                              setTrainingActionMenuId(null);
+                                              setTrainingRescheduleTargetId(app.id);
+                                              setTrainingRescheduleMode('direct');
+                                              setCalendarNewTrainingSlotId(null);
+                                              fetchTrainingSlots();
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
+                                          >
+                                            <i className="bi bi-calendar2-event text-indigo-500"></i>
+                                            日程を変更する
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              setTrainingActionMenuId(null);
+                                              handleSendTrainingRescheduleEmail(app.id, app.name);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left"
+                                          >
+                                            <i className="bi bi-envelope text-amber-500"></i>
+                                            日程変更メールを送信
+                                          </button>
+                                          <div className="border-t border-slate-100 my-1"></div>
+                                          <button
+                                            onClick={() => {
+                                              setTrainingActionMenuId(null);
+                                              handleCancelTrainingFromModal(app.id, app.name);
+                                            }}
+                                            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left"
+                                          >
+                                            <i className="bi bi-x-circle text-rose-500"></i>
+                                            研修をキャンセル
+                                          </button>
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
                               )}
                             </div>
-                            {!isCompleted && (
-                              <div className="flex items-center gap-1 shrink-0 ml-2">
-                                <button
-                                  onClick={() => handleMarkTrainingComplete(app.id)}
-                                  disabled={markingComplete === app.id}
-                                  className="flex items-center gap-1.5 text-xs font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50"
-                                >
-                                  {markingComplete === app.id ? (
-                                    <span className="w-3 h-3 border border-emerald-600 border-t-transparent rounded-full animate-spin inline-block"></span>
-                                  ) : (
-                                    <i className="bi bi-check2-circle"></i>
-                                  )}
-                                  研修完了
-                                </button>
-                                <div className="relative">
-                                  <button
-                                    onClick={() => setTrainingActionMenuId(trainingActionMenuId === app.id ? null : app.id)}
-                                    className="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                                    title="アクション"
-                                  >
-                                    <i className="bi bi-three-dots-vertical text-sm"></i>
-                                  </button>
-                                  {trainingActionMenuId === app.id && (
-                                    <>
-                                      <div className="fixed inset-0 z-[2999]" onClick={() => setTrainingActionMenuId(null)} />
-                                      <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[3000] py-1 overflow-hidden">
-                                        <button
-                                          onClick={() => {
-                                            setTrainingActionMenuId(null);
-                                            setTrainingRescheduleTargetId(app.id);
-                                            setTrainingRescheduleMode('direct');
-                                            setCalendarNewTrainingSlotId(null);
-                                            fetchTrainingSlots();
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left"
-                                        >
-                                          <i className="bi bi-calendar2-event text-indigo-500"></i>
-                                          日程を変更する
-                                        </button>
-                                        <button
-                                          onClick={() => {
-                                            setTrainingActionMenuId(null);
-                                            handleSendTrainingRescheduleEmail(app.id, app.name);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 transition-colors text-left"
-                                        >
-                                          <i className="bi bi-envelope text-amber-500"></i>
-                                          日程変更メールを送信
-                                        </button>
-                                        <div className="border-t border-slate-100 my-1"></div>
-                                        <button
-                                          onClick={() => {
-                                            setTrainingActionMenuId(null);
-                                            handleCancelTrainingFromModal(app.id, app.name);
-                                          }}
-                                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors text-left"
-                                        >
-                                          <i className="bi bi-x-circle text-rose-500"></i>
-                                          研修をキャンセル
-                                        </button>
-                                      </div>
-                                    </>
-                                  )}
+
+                            {/* 研修評価フォーム（インライン展開） */}
+                            {isEvalOpen && (
+                              <div className="mt-1 p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-4">
+                                {/* 出欠 */}
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">出欠</label>
+                                  <div className="flex gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setTrainingEvalForm(f => ({ ...f, attendance: 'ATTENDED' }))}
+                                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold border transition-all ${
+                                        trainingEvalForm.attendance === 'ATTENDED'
+                                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+                                          : 'bg-white text-slate-600 border-slate-200 hover:border-emerald-300'
+                                      }`}
+                                    >
+                                      <i className="bi bi-check-circle"></i>
+                                      出席
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setTrainingEvalForm(f => ({ ...f, attendance: 'NO_SHOW' }))}
+                                      className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-bold border transition-all ${
+                                        trainingEvalForm.attendance === 'NO_SHOW'
+                                          ? 'bg-rose-500 text-white border-rose-500 shadow-md'
+                                          : 'bg-white text-slate-600 border-slate-200 hover:border-rose-300'
+                                      }`}
+                                    >
+                                      <i className="bi bi-x-circle"></i>
+                                      NO SHOW
+                                    </button>
+                                  </div>
                                 </div>
+
+                                {/* 評価項目（出席時のみ） */}
+                                {trainingEvalForm.attendance === 'ATTENDED' && (
+                                  <div className="space-y-3">
+                                    <ScoreSelector label="理解度" value={trainingEvalForm.understandingScore} onChange={v => setTrainingEvalForm(f => ({ ...f, understandingScore: v }))} />
+                                    <ScoreSelector label="コミュニケーション" value={trainingEvalForm.communicationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, communicationScore: v }))} />
+                                    <ScoreSelector label="スピード" value={trainingEvalForm.speedScore} onChange={v => setTrainingEvalForm(f => ({ ...f, speedScore: v }))} />
+                                    <ScoreSelector label="やる気" value={trainingEvalForm.motivationScore} onChange={v => setTrainingEvalForm(f => ({ ...f, motivationScore: v }))} />
+                                  </div>
+                                )}
+
+                                {/* メモ */}
+                                <div>
+                                  <label className="block text-xs font-bold text-slate-500 mb-1.5">メモ</label>
+                                  <textarea
+                                    value={trainingEvalForm.notes}
+                                    onChange={e => setTrainingEvalForm(f => ({ ...f, notes: e.target.value }))}
+                                    rows={2}
+                                    className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white resize-none"
+                                    placeholder="研修メモ..."
+                                  />
+                                </div>
+
+                                {/* 保存 */}
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={() => setTrainingEvalTargetId(null)}
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-100 transition-colors"
+                                  >
+                                    キャンセル
+                                  </button>
+                                  <button
+                                    onClick={handleSaveTrainingEval}
+                                    disabled={trainingEvalSaving || !trainingEvalForm.attendance}
+                                    className="flex items-center gap-1.5 text-xs font-bold bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors disabled:opacity-50"
+                                  >
+                                    {trainingEvalSaving ? (
+                                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                                    ) : (
+                                      <i className="bi bi-check2"></i>
+                                    )}
+                                    {isCompleted ? '評価を更新' : '研修完了として保存'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 完了済みの評価サマリー（フォームが閉じている時） */}
+                            {isCompleted && !isEvalOpen && (app.trainingUnderstandingScore || app.trainingAttendance === 'NO_SHOW') && (
+                              <div className={`mt-1 px-3 py-2 rounded-lg text-xs ${isNoShow ? 'bg-rose-50/50' : 'bg-emerald-50/50'}`}>
+                                {isNoShow ? (
+                                  <span className="text-rose-600 font-bold">NO SHOW</span>
+                                ) : (
+                                  <div className="flex items-center gap-3 text-slate-500">
+                                    <span>理解: <b className="text-slate-700">{app.trainingUnderstandingScore}</b></span>
+                                    <span>コミュ: <b className="text-slate-700">{app.trainingCommunicationScore}</b></span>
+                                    <span>速度: <b className="text-slate-700">{app.trainingSpeedScore}</b></span>
+                                    <span>意欲: <b className="text-slate-700">{app.trainingMotivationScore}</b></span>
+                                  </div>
+                                )}
+                                {app.trainingNotes && <div className="text-slate-400 mt-0.5 truncate">{app.trainingNotes}</div>}
                               </div>
                             )}
                           </div>

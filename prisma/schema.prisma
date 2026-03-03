@@ -2132,6 +2132,14 @@ model Applicant {
   impressionScore    Int?     @map("impression_score")
   interviewNotes     String?  @map("interview_notes") @db.Text
 
+  // 研修評価項目
+  trainingAttendance       String?  @map("training_attendance") @db.VarChar(20) // ATTENDED / NO_SHOW
+  trainingUnderstandingScore Int?   @map("training_understanding_score") // 理解度 1-5
+  trainingCommunicationScore Int?   @map("training_communication_score") // コミュニケーション 1-5
+  trainingSpeedScore         Int?   @map("training_speed_score") // スピード 1-5
+  trainingMotivationScore    Int?   @map("training_motivation_score") // やる気 1-5
+  trainingNotes              String? @map("training_notes") @db.Text
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

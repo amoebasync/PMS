@@ -168,6 +168,14 @@ export async function PUT(
     if (body.interviewNotes !== undefined) updateData.interviewNotes = body.interviewNotes || null;
     if (body.recruitingMediaId !== undefined) updateData.recruitingMediaId = body.recruitingMediaId ? Number(body.recruitingMediaId) : null;
 
+    // 研修評価項目
+    if (body.trainingAttendance !== undefined) updateData.trainingAttendance = body.trainingAttendance || null;
+    if (body.trainingUnderstandingScore !== undefined) updateData.trainingUnderstandingScore = body.trainingUnderstandingScore != null ? Number(body.trainingUnderstandingScore) : null;
+    if (body.trainingCommunicationScore !== undefined) updateData.trainingCommunicationScore = body.trainingCommunicationScore != null ? Number(body.trainingCommunicationScore) : null;
+    if (body.trainingSpeedScore !== undefined) updateData.trainingSpeedScore = body.trainingSpeedScore != null ? Number(body.trainingSpeedScore) : null;
+    if (body.trainingMotivationScore !== undefined) updateData.trainingMotivationScore = body.trainingMotivationScore != null ? Number(body.trainingMotivationScore) : null;
+    if (body.trainingNotes !== undefined) updateData.trainingNotes = body.trainingNotes || null;
+
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.applicant.update({
         where: { id: applicantId },
