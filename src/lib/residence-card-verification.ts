@@ -177,7 +177,7 @@ export async function verifyResidenceCard(distributorId: number): Promise<Verifi
     },
     overallMatch,
     processedAt: new Date().toISOString(),
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
   };
 }
 
