@@ -145,34 +145,50 @@ export default function ProfilePage() {
     setMessage(null);
 
     try {
-      let uploadFile: Blob = file;
-      let uploadName = file.name || 'photo.jpg';
+      // 1. 画像圧縮
+      let uploadBlob: Blob = file;
       try {
-        uploadFile = await compressImage(file);
-        uploadName = uploadName.replace(/\.[^.]+$/, '') + '.jpg';
-        if (!uploadName.includes('.')) uploadName += '.jpg';
+        uploadBlob = await compressImage(file);
       } catch {
-        // 圧縮失敗時は元ファイルをそのまま送信
+        // 圧縮失敗時は元ファイルをそのまま使用
       }
 
-      const formData = new FormData();
-      formData.append('file', uploadFile, uploadName);
+      // 2. プリサインドURL取得
+      const presignRes = await fetch(`/api/staff/residence-card?side=${side}`);
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        setMessage({ type: 'error', text: presignData.error || 'URL取得に失敗しました' });
+        return;
+      }
 
-      const res = await fetch(`/api/staff/residence-card?side=${side}`, {
-        method: 'POST',
-        body: formData,
+      // 3. S3に直接アップロード（WAFをバイパス）
+      const s3Res = await fetch(presignData.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: uploadBlob,
       });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: 'error', text: data.error || `サーバーエラー (${res.status})` });
-      } else {
-        setProfile((p) => p ? {
-          ...p,
-          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-        } : p);
-        setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
+      if (!s3Res.ok) {
+        setMessage({ type: 'error', text: `S3アップロード失敗 (${s3Res.status})` });
+        return;
       }
+
+      // 4. DB更新
+      const saveRes = await fetch('/api/staff/residence-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key: presignData.s3Key, side }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        setMessage({ type: 'error', text: saveData.error || 'DB更新に失敗しました' });
+        return;
+      }
+
+      setProfile((p) => p ? {
+        ...p,
+        ...(side === 'front' ? { residenceCardFrontUrl: saveData.url } : { residenceCardBackUrl: saveData.url }),
+      } : p);
+      setMessage({ type: 'success', text: `在留カード（${side === 'front' ? '表面' : '裏面'}）をアップロードしました` });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       setMessage({ type: 'error', text: `アップロード失敗: ${detail}` });

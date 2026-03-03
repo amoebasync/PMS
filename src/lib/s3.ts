@@ -44,6 +44,15 @@ export async function getPresignedUrl(key: string, expiresIn = 3600): Promise<st
   );
 }
 
+/** アップロード用署名付きURLを生成する */
+export async function getPresignedPutUrl(key: string, contentType: string, expiresIn = 600): Promise<string> {
+  return getSignedUrl(
+    s3,
+    new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: contentType }),
+    { expiresIn }
+  );
+}
+
 export async function uploadToS3(
   buffer: Buffer,
   key: string,

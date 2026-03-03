@@ -144,34 +144,50 @@ export default function ProfilePageEn() {
     setMessage(null);
 
     try {
-      let uploadFile: Blob = file;
-      let uploadName = file.name || 'photo.jpg';
+      // 1. Image compression
+      let uploadBlob: Blob = file;
       try {
-        uploadFile = await compressImage(file);
-        uploadName = uploadName.replace(/\.[^.]+$/, '') + '.jpg';
-        if (!uploadName.includes('.')) uploadName += '.jpg';
+        uploadBlob = await compressImage(file);
       } catch {
         // Compression failed, send original file
       }
 
-      const formData = new FormData();
-      formData.append('file', uploadFile, uploadName);
-
-      const res = await fetch(`/api/staff/residence-card?side=${side}`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage({ type: 'error', text: data.error || `Server error (${res.status})` });
-      } else {
-        setProfile((p) => p ? {
-          ...p,
-          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
-        } : p);
-        setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
+      // 2. Get presigned URL
+      const presignRes = await fetch(`/api/staff/residence-card?side=${side}`);
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        setMessage({ type: 'error', text: presignData.error || 'Failed to get upload URL' });
+        return;
       }
+
+      // 3. Upload directly to S3 (bypass WAF)
+      const s3Res = await fetch(presignData.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: uploadBlob,
+      });
+      if (!s3Res.ok) {
+        setMessage({ type: 'error', text: `S3 upload failed (${s3Res.status})` });
+        return;
+      }
+
+      // 4. Update DB
+      const saveRes = await fetch('/api/staff/residence-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key: presignData.s3Key, side }),
+      });
+      const saveData = await saveRes.json();
+      if (!saveRes.ok) {
+        setMessage({ type: 'error', text: saveData.error || 'Failed to update database' });
+        return;
+      }
+
+      setProfile((p) => p ? {
+        ...p,
+        ...(side === 'front' ? { residenceCardFrontUrl: saveData.url } : { residenceCardBackUrl: saveData.url }),
+      } : p);
+      setMessage({ type: 'success', text: `Residence card (${side}) uploaded successfully.` });
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       setMessage({ type: 'error', text: `Upload failed: ${detail}` });
