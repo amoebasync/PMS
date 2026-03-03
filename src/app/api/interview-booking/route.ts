@@ -7,16 +7,24 @@ import {
 } from '@/lib/mailer';
 
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
+const TZ = 'Asia/Tokyo';
+
+function toJST(date: Date): Date {
+  return new Date(date.toLocaleString('en-US', { timeZone: TZ }));
+}
 
 function formatInterviewDate(date: Date, lang: string): string {
+  const jst = toJST(date);
   return lang === 'en'
-    ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-    : `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${WEEKDAYS_JA[date.getDay()]}）`;
+    ? date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: TZ })
+    : `${jst.getFullYear()}年${jst.getMonth() + 1}月${jst.getDate()}日（${WEEKDAYS_JA[jst.getDay()]}）`;
 }
 
 function formatTime(start: Date, end: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
-  return `${pad(start.getHours())}:${pad(start.getMinutes())} - ${pad(end.getHours())}:${pad(end.getMinutes())}`;
+  const jstStart = toJST(start);
+  const jstEnd = toJST(end);
+  return `${pad(jstStart.getHours())}:${pad(jstStart.getMinutes())} - ${pad(jstEnd.getHours())}:${pad(jstEnd.getMinutes())}`;
 }
 
 // GET /api/interview-booking?token=xxx

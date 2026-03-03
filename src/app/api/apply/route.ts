@@ -141,14 +141,14 @@ export async function POST(request: Request) {
 
     const interviewDate = new Date(result.slot.startTime).toLocaleDateString(
       isEn ? 'en-US' : 'ja-JP',
-      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
+      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }
     );
     const interviewTime = `${new Date(result.slot.startTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
-      { hour: '2-digit', minute: '2-digit' }
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
     )} - ${new Date(result.slot.endTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
-      { hour: '2-digit', minute: '2-digit' }
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
     )}`;
 
     // メール送信（非同期、エラーでもレスポンスは成功とする）

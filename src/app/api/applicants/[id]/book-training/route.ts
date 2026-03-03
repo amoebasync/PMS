@@ -106,14 +106,16 @@ export async function POST(
       const slotStart = new Date(trainingSlot.startTime);
       const slotEnd = new Date(trainingSlot.endTime);
 
+      const TZ = 'Asia/Tokyo';
+      const jstStart = new Date(slotStart.toLocaleString('en-US', { timeZone: TZ }));
+      const jstEnd = new Date(slotEnd.toLocaleString('en-US', { timeZone: TZ }));
       const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
-      const WEEKDAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
       const trainingDate = lang === 'en'
-        ? slotStart.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })
-        : `${slotStart.getFullYear()}年${slotStart.getMonth() + 1}月${slotStart.getDate()}日（${WEEKDAYS_JA[slotStart.getDay()]}）`;
+        ? slotStart.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: TZ })
+        : `${jstStart.getFullYear()}年${jstStart.getMonth() + 1}月${jstStart.getDate()}日（${WEEKDAYS_JA[jstStart.getDay()]}）`;
 
-      const trainingTime = `${String(slotStart.getHours()).padStart(2, '0')}:${String(slotStart.getMinutes()).padStart(2, '0')} - ${String(slotEnd.getHours()).padStart(2, '0')}:${String(slotEnd.getMinutes()).padStart(2, '0')}`;
+      const trainingTime = `${String(jstStart.getHours()).padStart(2, '0')}:${String(jstStart.getMinutes()).padStart(2, '0')} - ${String(jstEnd.getHours()).padStart(2, '0')}:${String(jstEnd.getMinutes()).padStart(2, '0')}`;
 
       const jobName = updated.jobCategory?.nameJa || updated.jobCategory?.nameEn || '';
 
