@@ -279,6 +279,11 @@ export default function ApplicantsPage() {
   const [registering, setRegistering] = useState(false);
   const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
 
+  // ── 応募ページリンク生成 ──
+  const [showLinkPopover, setShowLinkPopover] = useState(false);
+  const [linkLang, setLinkLang] = useState('ja');
+  const [linkMediaId, setLinkMediaId] = useState('');
+
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
   const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'ja', recruitingMediaId: '', birthday: '', gender: '' });
@@ -489,6 +494,27 @@ export default function ApplicantsPage() {
       showToast('登録に失敗しました', 'error');
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // 応募ページリンク生成＆コピー
+  const buildApplyUrl = () => {
+    const base = `${window.location.origin}/apply`;
+    const params = new URLSearchParams();
+    if (linkLang === 'en') params.set('lang', 'en');
+    const media = recruitingMediaList.find(m => m.id === Number(linkMediaId));
+    if (media) params.set('source', media.code);
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
+  const handleCopyApplyLink = async () => {
+    const url = buildApplyUrl();
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('リンクをコピーしました', 'success');
+    } catch {
+      showToast('コピーに失敗しました', 'error');
     }
   };
 
@@ -1305,15 +1331,75 @@ export default function ApplicantsPage() {
             {/* スペーサー + アクションボタン */}
             <div className="flex-1" />
             <div className="flex items-center gap-2 px-4">
-              <a
-                href="/apply"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
-              >
-                <i className="bi bi-box-arrow-up-right text-indigo-500"></i>
-                応募ページ
-              </a>
+              <div className="relative">
+                <button
+                  onClick={() => setShowLinkPopover(v => !v)}
+                  className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                >
+                  <i className="bi bi-link-45deg text-indigo-500"></i>
+                  応募ページ
+                  <i className="bi bi-chevron-down text-[10px] text-slate-400"></i>
+                </button>
+                {showLinkPopover && (
+                  <>
+                    <div className="fixed inset-0 z-[999]" onClick={() => setShowLinkPopover(false)} />
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[1000] p-4 space-y-3">
+                      <div className="text-xs font-black text-slate-700 mb-1">応募ページリンク生成</div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">言語</label>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setLinkLang('ja')}
+                            className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${linkLang === 'ja' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            日本語
+                          </button>
+                          <button
+                            onClick={() => setLinkLang('en')}
+                            className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${linkLang === 'en' ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                          >
+                            English
+                          </button>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">求人媒体</label>
+                        <select
+                          value={linkMediaId}
+                          onChange={e => setLinkMediaId(e.target.value)}
+                          className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                        >
+                          <option value="">なし</option>
+                          {recruitingMediaList.filter(m => m.isActive).map(m => (
+                            <option key={m.id} value={m.id}>{m.nameJa}{m.code ? ` (${m.code})` : ''}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="bg-slate-50 rounded-lg px-3 py-2 text-[11px] text-slate-600 font-mono break-all">
+                        {buildApplyUrl()}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCopyApplyLink}
+                          className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <i className="bi bi-clipboard"></i>
+                          コピー
+                        </button>
+                        <a
+                          href={buildApplyUrl()}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                        >
+                          <i className="bi bi-box-arrow-up-right"></i>
+                          開く
+                        </a>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
               <button
                 onClick={() => {
                   fetchJobCategories();
