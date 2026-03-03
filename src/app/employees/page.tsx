@@ -738,26 +738,26 @@ export default function EmployeePage() {
                   </div>
                 )}
 
-                {canEdit && selectedEmployee.email.endsWith('@tiramis.co.jp') && (
+                {isHrAdmin && selectedEmployee.email.endsWith('@tiramis.co.jp') && (
                   <button
                     onClick={handleWorkspaceNotify}
                     disabled={sendingWorkspaceNotify}
-                    className="w-full mt-2 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                    className="w-full mt-2 flex items-center justify-center gap-2 bg-emerald-500/80 hover:bg-emerald-500 border border-emerald-400/50 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {sendingWorkspaceNotify ? (
                       <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 送信中...</>
                     ) : selectedEmployee.workspaceNotifiedAt ? (
-                      <><i className="bi bi-check-circle-fill text-emerald-300"></i> Workspace 通知済み<span className="text-[10px] opacity-70 ml-1">（再送信可）</span></>
+                      <><i className="bi bi-check-circle-fill text-emerald-200"></i> Workspace 通知済み<span className="text-[10px] opacity-80 ml-1">（再送信可）</span></>
                     ) : (
-                      <><i className="bi bi-google"></i> Workspace ログイン情報を通知</>
+                      <><i className="bi bi-envelope-arrow-up"></i> Workspace ログイン情報を通知</>
                     )}
                   </button>
                 )}
-                {canEdit && !selectedEmployee.email.endsWith('@tiramis.co.jp') && (
+                {isHrAdmin && !selectedEmployee.email.endsWith('@tiramis.co.jp') && (
                   <button
                     onClick={handleCreateWorkspace}
                     disabled={creatingWorkspace}
-                    className="w-full mt-2 flex items-center justify-center gap-2 bg-white/15 hover:bg-white/25 border border-white/20 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50"
+                    className="w-full mt-2 flex items-center justify-center gap-2 bg-amber-500/80 hover:bg-amber-500 border border-amber-400/50 text-white p-3 rounded-xl text-sm font-bold transition-colors disabled:opacity-50 shadow-sm"
                   >
                     {creatingWorkspace ? (
                       <><span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span> 作成中...</>
