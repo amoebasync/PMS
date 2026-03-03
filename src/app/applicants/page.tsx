@@ -315,6 +315,7 @@ export default function ApplicantsPage() {
   });
   const [selectedTrainingSlot, setSelectedTrainingSlot] = useState<TrainingSlotManagement | null>(null);
   const [expandedTrainingApplicantId, setExpandedTrainingApplicantId] = useState<number | null>(null);
+  const [returnToTrainingSlotId, setReturnToTrainingSlotId] = useState<number | null>(null);
   const [editCapacity, setEditCapacity] = useState<number>(10);
   const [savingCapacity, setSavingCapacity] = useState(false);
   const [deletingSlot, setDeletingSlot] = useState(false);
@@ -898,6 +899,33 @@ export default function ApplicantsPage() {
     setExpandedTrainingApplicantId(null);
   };
 
+  // 評価モーダルを閉じる（研修詳細から遷移していた場合はそちらに戻る）
+  const closeEvalModal = () => {
+    setShowEvalModal(false);
+    setSelectedApplicant(null);
+    if (returnToTrainingSlotId) {
+      const slotId = returnToTrainingSlotId;
+      setReturnToTrainingSlotId(null);
+      // 研修データを最新化してスロット詳細モーダルを再表示
+      const f = trainingDateRangeRef.current?.from;
+      const t = trainingDateRangeRef.current?.to;
+      let url = '/api/training-slots';
+      if (f && t) {
+        url += `?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}`;
+      }
+      fetch(url).then(res => res.ok ? res.json() : null).then(json => {
+        if (!json) return;
+        const slots = json.data || [];
+        setTrainingMgmtSlots(slots);
+        const found = slots.find((s: TrainingSlotManagement) => s.id === slotId);
+        if (found) {
+          setSelectedTrainingSlot(found);
+          setEditCapacity(found.capacity);
+        }
+      }).catch(() => {});
+    }
+  };
+
   // 研修スロット: 削除
   const handleDeleteTrainingSlot = async () => {
     if (!selectedTrainingSlot) return;
@@ -1012,7 +1040,8 @@ export default function ApplicantsPage() {
   };
 
   // 応募者評価モーダルを開く
-  const openEvalModal = async (applicantId: number) => {
+  const openEvalModal = async (applicantId: number, fromTrainingSlotId?: number) => {
+    setReturnToTrainingSlotId(fromTrainingSlotId ?? null);
     setEvalLoading(true);
     setShowEvalModal(true);
     if (jobCategories.length === 0) fetchJobCategories();
@@ -1060,7 +1089,7 @@ export default function ApplicantsPage() {
       }
     } catch {
       showToast('応募者情報の取得に失敗しました', 'error');
-      setShowEvalModal(false);
+      closeEvalModal();
     } finally {
       setEvalLoading(false);
     }
@@ -1140,8 +1169,7 @@ export default function ApplicantsPage() {
         showToast('応募者情報を保存しました', 'success');
       }
 
-      setShowEvalModal(false);
-      setSelectedApplicant(null);
+      closeEvalModal();
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
@@ -1235,8 +1263,7 @@ export default function ApplicantsPage() {
         throw new Error(err.error || '削除に失敗しました');
       }
       showToast(`「${selectedApplicant.name}」を削除しました`, 'success');
-      setShowEvalModal(false);
-      setSelectedApplicant(null);
+      closeEvalModal();
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
@@ -2239,7 +2266,7 @@ export default function ApplicantsPage() {
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     closeTrainingSlotPanel();
-                                    openEvalModal(app.id);
+                                    openEvalModal(app.id, slot.id);
                                   }}
                                   className="flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors mt-1"
                                 >
@@ -2615,10 +2642,7 @@ export default function ApplicantsPage() {
                 ) : null}
               </div>
               <button
-                onClick={() => {
-                  setShowEvalModal(false);
-                  setSelectedApplicant(null);
-                }}
+                onClick={closeEvalModal}
                 className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <i className="bi bi-x-lg text-lg"></i>
@@ -3542,10 +3566,7 @@ export default function ApplicantsPage() {
                     )
                   )}
                   <button
-                    onClick={() => {
-                      setShowEvalModal(false);
-                      setSelectedApplicant(null);
-                    }}
+                    onClick={closeEvalModal}
                     className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                   >
                     キャンセル
@@ -3571,9 +3592,9 @@ export default function ApplicantsPage() {
          ════════════════════════════════════════════ */}
       {showManualRegisterModal && (
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden max-h-[90vh]">
             {/* ヘッダー */}
-            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
                   <i className="bi bi-person-plus-fill text-emerald-600"></i>
@@ -3589,8 +3610,8 @@ export default function ApplicantsPage() {
             </div>
 
             {/* ボディ（スクロール可能） */}
-            <div className="p-6 space-y-3 overflow-y-auto flex-1">
-              <div className="grid grid-cols-2 gap-3">
+            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-bold text-slate-500 mb-1">
                     氏名 <span className="text-rose-500">*</span>
@@ -3617,7 +3638,7 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
                     電話番号 <span className="text-slate-400 font-normal">（任意）</span>
@@ -3658,7 +3679,7 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
                     職種 <span className="text-rose-500">*</span>
@@ -3691,7 +3712,7 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">
                     国籍 <span className="text-slate-400 font-normal">（任意）</span>
@@ -3724,7 +3745,7 @@ export default function ApplicantsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between pt-3 border-t border-slate-100">
                 <div>
                   <label className="block text-xs font-bold text-slate-500 mb-1">メール言語</label>
                   <div className="flex gap-4">
