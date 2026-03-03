@@ -13,6 +13,7 @@ export async function GET() {
         manager2: true,
         manager3: true,
         manager4: true,
+        alternateBranch: { select: { id: true, nameJa: true } },
       }
     });
     return NextResponse.json(branches);
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
         googleMapUrl: body.googleMapUrl,
         openingTime: body.openingTime,
         closedDays: body.closedDays,
+        alternateBranchId: parseIntSafe(body.alternateBranchId),
         manager1Id: parseIntSafe(body.manager1Id),
         manager2Id: parseIntSafe(body.manager2Id),
         manager3Id: parseIntSafe(body.manager3Id),

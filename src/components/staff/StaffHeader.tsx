@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function StaffHeader({ name }: { name?: string }) {
+export function StaffHeader({ name, missingResidenceCard }: { name?: string; missingResidenceCard?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -14,7 +14,7 @@ export function StaffHeader({ name }: { name?: string }) {
     { name: 'ホーム',     href: '/staff',            icon: 'bi-house-door-fill' },
     { name: 'シフト',     href: '/staff/shifts',      icon: 'bi-calendar3' },
     { name: '交通費',     href: '/staff/expenses',    icon: 'bi-train-front-fill' },
-    { name: '配布報告',   href: '/staff/report',      icon: 'bi-clipboard-check-fill' },
+    { name: '配布履歴',   href: '/staff/report',      icon: 'bi-clock-history' },
     { name: '評価',       href: '/staff/evaluation',  icon: 'bi-award-fill' },
     { name: 'プロフィール', href: '/staff/profile',   icon: 'bi-person-fill' },
   ];
@@ -49,6 +49,18 @@ export function StaffHeader({ name }: { name?: string }) {
           </div>
         </div>
       </header>
+
+      {/* 在留カード未提出警告 */}
+      {missingResidenceCard && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i className="bi bi-exclamation-triangle-fill text-amber-500 shrink-0"></i>
+            <Link href="/staff/profile" className="text-xs font-bold text-amber-700 hover:underline">
+              在留カードの写真をマイページからアップロードしてください
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Bottom navigation bar (mobile-first) */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up">

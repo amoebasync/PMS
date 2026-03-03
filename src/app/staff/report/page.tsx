@@ -29,63 +29,35 @@ const DAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
 
 const statusLabel: Record<string, string> = {
   UNSTARTED: '未開始',
-  IN_PROGRESS: '配布中',
+  IN_PROGRESS: '進行中',
+  DISTRIBUTING: '配布中',
   COMPLETED: '完了',
 };
 const statusColor: Record<string, string> = {
   UNSTARTED: 'bg-slate-100 text-slate-500',
   IN_PROGRESS: 'bg-amber-100 text-amber-700',
+  DISTRIBUTING: 'bg-blue-100 text-blue-700',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
 };
 
-export default function StaffReportPage() {
+export default function StaffHistoryPage() {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [saved, setSaved] = useState<Record<string, boolean>>({});
-  const [inputs, setInputs] = useState<Record<string, string>>({});
 
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/staff/schedules?year=${year}&month=${month}`);
     if (res.ok) {
       const data = await res.json();
-      const list: Schedule[] = data.schedules || [];
-      setSchedules(list);
-      const init: Record<string, string> = {};
-      for (const s of list) {
-        for (const item of s.items) {
-          init[item.id] = item.actualCount !== null ? String(item.actualCount) : '';
-        }
-      }
-      setInputs(init);
+      setSchedules(data.schedules || []);
     }
     setLoading(false);
   }, [year, month]);
 
   useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
-
-  const handleSave = async (itemId: number) => {
-    const val = inputs[itemId];
-    if (val === '' || isNaN(Number(val))) return;
-    setSaving((prev) => ({ ...prev, [itemId]: true }));
-    setSaved((prev) => ({ ...prev, [itemId]: false }));
-
-    const res = await fetch('/api/staff/schedules/report', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId, actualCount: parseInt(val) }),
-    });
-
-    setSaving((prev) => ({ ...prev, [itemId]: false }));
-    if (res.ok) {
-      setSaved((prev) => ({ ...prev, [itemId]: true }));
-      setTimeout(() => setSaved((prev) => ({ ...prev, [itemId]: false })), 2000);
-    }
-  };
 
   const grouped: Record<string, Schedule[]> = {};
   for (const s of schedules) {
@@ -94,6 +66,11 @@ export default function StaffReportPage() {
     grouped[d].push(s);
   }
   const sortedDates = Object.keys(grouped).sort();
+
+  // 月合計
+  const totalPlanned = schedules.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.plannedCount || 0), 0), 0);
+  const totalActual = schedules.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.actualCount || 0), 0), 0);
+  const completedDays = new Set(schedules.filter(s => s.status === 'COMPLETED').map(s => s.date.slice(0, 10))).size;
 
   const prevMonth = () => {
     if (month === 1) { setYear(y => y - 1); setMonth(12); }
@@ -107,11 +84,11 @@ export default function StaffReportPage() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-black text-slate-800">配布報告</h1>
-        <p className="text-xs text-slate-500 mt-1">スケジュールごとに投函したポスト数を入力してください</p>
+        <h1 className="text-2xl font-black text-slate-800">配布履歴</h1>
+        <p className="text-xs text-slate-500 mt-1">月ごとの配布実績を確認できます</p>
       </div>
 
-      {/* Month navigation */}
+      {/* 月ナビ */}
       <div className="flex items-center justify-between bg-white rounded-2xl border border-slate-100 shadow-sm p-3">
         <button onClick={prevMonth} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors">
           <i className="bi bi-chevron-left text-lg"></i>
@@ -122,13 +99,31 @@ export default function StaffReportPage() {
         </button>
       </div>
 
+      {/* サマリー */}
+      {!loading && schedules.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-400 uppercase">配布日数</p>
+            <p className="text-xl font-black text-indigo-600 mt-0.5">{completedDays}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-400 uppercase">予定数</p>
+            <p className="text-xl font-black text-slate-700 mt-0.5">{totalPlanned.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-3 text-center">
+            <p className="text-[10px] font-bold text-slate-400 uppercase">実績数</p>
+            <p className="text-xl font-black text-emerald-600 mt-0.5">{totalActual.toLocaleString()}</p>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center py-12">
           <div className="w-6 h-6 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : sortedDates.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 text-center text-slate-400 text-sm">
-          この月のスケジュールはありません
+          この月の配布履歴はありません
         </div>
       ) : (
         <div className="space-y-4">
@@ -141,15 +136,13 @@ export default function StaffReportPage() {
 
             return (
               <div key={dateStr}>
-                {/* Date header */}
-                <div className={`flex items-center gap-2 mb-2 px-1`}>
+                <div className="flex items-center gap-2 mb-2 px-1">
                   <span className={`text-sm font-black ${isToday ? 'text-indigo-600' : isSat ? 'text-sky-500' : isSun ? 'text-rose-500' : 'text-slate-700'}`}>
                     {month !== date.getMonth() + 1 ? `${date.getMonth() + 1}/` : ''}{date.getDate()}日（{DAY_NAMES[dayOfWeek]}）
                   </span>
                   {isToday && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">今日</span>}
                 </div>
 
-                {/* Schedules for this date */}
                 {grouped[dateStr].map((schedule) => {
                   const areaLabel = schedule.area
                     ? `${schedule.city?.name || ''} ${schedule.area.town_name}${schedule.area.chome_name}`
@@ -159,11 +152,9 @@ export default function StaffReportPage() {
                     <div key={schedule.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-3">
                       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
                         <div>
-                          <p className="text-xs text-slate-500">{areaLabel}</p>
+                          <p className="text-xs font-bold text-slate-600">{areaLabel}</p>
                           <p className="text-[11px] text-slate-400 mt-0.5">
                             {schedule.items.length}種類
-                            {schedule.areaUnitPrice ? `・エリア+¥${schedule.areaUnitPrice}` : ''}
-                            {schedule.sizeUnitPrice ? `・サイズ+¥${schedule.sizeUnitPrice}` : ''}
                           </p>
                         </div>
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor[schedule.status] || 'bg-slate-100 text-slate-500'}`}>
@@ -178,29 +169,15 @@ export default function StaffReportPage() {
                               {item.slotIndex}. {item.flyerName || '（チラシ名未設定）'}
                             </p>
                             <div className="flex items-center justify-between gap-2">
-                              <p className="text-[11px] text-slate-400">
-                                予定: {item.plannedCount?.toLocaleString() ?? '—'} ポスト
-                              </p>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={inputs[item.id] ?? ''}
-                                  onChange={(e) => setInputs((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                                  placeholder="投函数"
-                                  className="w-24 text-right border border-slate-200 rounded-lg px-2 py-1.5 text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                                />
-                                <button
-                                  onClick={() => handleSave(item.id)}
-                                  disabled={saving[item.id] || inputs[item.id] === ''}
-                                  className={`w-16 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 ${
-                                    saved[item.id]
-                                      ? 'bg-emerald-500 text-white'
-                                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
-                                  }`}
-                                >
-                                  {saving[item.id] ? '…' : saved[item.id] ? '保存済' : '保存'}
-                                </button>
+                              <div className="flex items-center gap-3">
+                                <p className="text-[11px] text-slate-400">
+                                  予定: <span className="font-bold text-slate-600">{item.plannedCount?.toLocaleString() ?? '—'}</span>
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  実績: <span className={`font-bold ${item.actualCount ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {item.actualCount?.toLocaleString() ?? '—'}
+                                  </span>
+                                </p>
                               </div>
                             </div>
                           </div>

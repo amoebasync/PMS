@@ -27,20 +27,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'シフトが見つかりません' }, { status: 404 });
     }
 
-    // 翌日のシフトは削除不可
+    // 当日・翌日（9時以降）のシフトはキャンセル不可
     const now = new Date();
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const dayAfterTomorrow = new Date(today);
-    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    const hour = now.getHours();
 
     const shiftDate = new Date(shift.date);
     shiftDate.setHours(0, 0, 0, 0);
 
-    if (shiftDate >= tomorrow && shiftDate < dayAfterTomorrow) {
-      return NextResponse.json({ error: '翌日のシフトは削除できません' }, { status: 400 });
+    // 当日のシフトは常にキャンセル不可
+    if (shiftDate.getTime() === today.getTime()) {
+      return NextResponse.json({ error: '当日のシフトはキャンセルできません。もしもの場合はLINEで会社にご相談ください' }, { status: 400 });
+    }
+
+    // 翌日のシフトは9時以降キャンセル不可
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    if (shiftDate.getTime() === tomorrow.getTime() && hour >= 9) {
+      return NextResponse.json({ error: '午前9時以降は翌日のシフトをキャンセルできません。もしもの場合はLINEで会社にご相談ください' }, { status: 400 });
     }
 
     await prisma.distributorShift.delete({ where: { id: shiftId } });

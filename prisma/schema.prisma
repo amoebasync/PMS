@@ -596,6 +596,8 @@ model FlyerDistributor {
   hasAgreedPersonalInfo Boolean   @default(false) @map("has_agreed_personal_info") // 個人情報同意 (○)
   hasSignedContract     Boolean   @default(false) @map("has_signed_contract") // 業務委託締結 (○)
   hasResidenceCard      Boolean   @default(false) @map("has_residence_card") // 在留カード (○)
+  residenceCardFrontUrl String?   @map("residence_card_front_url") @db.Text // 在留カード表面画像URL
+  residenceCardBackUrl  String?   @map("residence_card_back_url") @db.Text // 在留カード裏面画像URL
 
   // 在籍情報
   joinDate    DateTime? @map("join_date") @db.Date // 入社日
@@ -730,6 +732,11 @@ model Branch {
   googleMapUrl String? @map("google_map_url") @db.Text // GoogleMapリンク
   openingTime  String? @map("opening_time") @db.VarChar(10) // 開店時間 (例: "07:00")
   closedDays   String? @map("closed_days") @db.VarChar(50) // 定休日 (例: "火曜日", "土日祝")
+
+  // 定休日の代替出勤先支店
+  alternateBranchId Int?    @map("alternate_branch_id")
+  alternateBranch   Branch? @relation("AlternateBranch", fields: [alternateBranchId], references: [id])
+  alternateFor      Branch[] @relation("AlternateBranch") // 逆参照
 
   // 店長枠 (1〜4) : Employeeとの紐付け
   manager1Id Int? @map("manager1_id")

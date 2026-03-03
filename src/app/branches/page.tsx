@@ -18,7 +18,7 @@ export default function BranchPage() {
 
   const initialForm = {
     nameJa: '', nameEn: '', prefix: '', staffIdSeq: '0', address: '', googleMapUrl: '',
-    openingTime: '', closedDays: '',
+    openingTime: '', closedDays: '', alternateBranchId: '',
     manager1Id: '', manager2Id: '', manager3Id: '', manager4Id: ''
   };
   const [formData, setFormData] = useState(initialForm);
@@ -62,6 +62,7 @@ export default function BranchPage() {
         googleMapUrl: branch.googleMapUrl || '',
         openingTime: branch.openingTime || '',
         closedDays: branch.closedDays || '',
+        alternateBranchId: branch.alternateBranchId?.toString() || '',
         manager1Id: branch.manager1Id?.toString() || '',
         manager2Id: branch.manager2Id?.toString() || '',
         manager3Id: branch.manager3Id?.toString() || '',
@@ -143,6 +144,9 @@ export default function BranchPage() {
                   <td className="px-6 py-4 text-sm">
                     <div className="text-slate-700"><i className="bi bi-clock mr-1 text-slate-400"></i> {b.openingTime || '-'}</div>
                     <div className="text-slate-500 text-xs mt-1"><i className="bi bi-calendar-x mr-1 text-rose-400"></i> {b.closedDays || '-'}</div>
+                    {b.alternateBranch && (
+                      <div className="text-slate-500 text-xs mt-1"><i className="bi bi-arrow-right-circle mr-1 text-amber-500"></i> 代替: {b.alternateBranch.nameJa}</div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-sm">
                     {managers.length > 0 ? (
@@ -215,6 +219,14 @@ export default function BranchPage() {
                   <div className="col-span-2"><label className="text-xs font-bold text-slate-600">Google Map URL</label><input name="googleMapUrl" value={formData.googleMapUrl} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="https://maps.app.goo.gl/..." /></div>
                   <div><label className="text-xs font-bold text-slate-600">開店時間</label><input type="time" name="openingTime" value={formData.openingTime} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
                   <div><label className="text-xs font-bold text-slate-600">定休日</label><input name="closedDays" value={formData.closedDays} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="例: 火曜日" /></div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">定休日の代替出勤先</label>
+                    <select name="alternateBranchId" value={(formData as any).alternateBranchId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
+                      <option value="">未設定</option>
+                      {branches.filter((br: any) => br.id !== currentId).map((br: any) => <option key={br.id} value={br.id}>{br.nameJa}</option>)}
+                    </select>
+                    <p className="text-[10px] text-slate-400 mt-1">定休日にシフト登録した配布員に表示される出勤先</p>
+                  </div>
                 </div>
               </div>
 

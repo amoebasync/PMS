@@ -699,6 +699,33 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="個人情報同意" value={d.hasAgreedPersonalInfo} />
               <InfoRow label="業務委託契約" value={d.hasSignedContract} />
               <InfoRow label="在留カード確認" value={d.hasResidenceCard} />
+
+              {/* 在留カード画像 */}
+              {(d.residenceCardFrontUrl || d.residenceCardBackUrl) && (
+                <div className="mt-4 pt-3 border-t border-slate-100">
+                  <p className="text-xs font-bold text-slate-500 mb-2">在留カード画像</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {d.residenceCardFrontUrl && (
+                      <div>
+                        <p className="text-[10px] text-slate-400 mb-1">表面</p>
+                        <a href={d.residenceCardFrontUrl} target="_blank" rel="noopener noreferrer" className="block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={d.residenceCardFrontUrl} alt="在留カード表面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
+                        </a>
+                      </div>
+                    )}
+                    {d.residenceCardBackUrl && (
+                      <div>
+                        <p className="text-[10px] text-slate-400 mb-1">裏面</p>
+                        <a href={d.residenceCardBackUrl} target="_blank" rel="noopener noreferrer" className="block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={d.residenceCardBackUrl} alt="在留カード裏面" className="w-full rounded-lg border border-slate-200 hover:opacity-80 transition-opacity" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

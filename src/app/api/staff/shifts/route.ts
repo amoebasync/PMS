@@ -25,7 +25,30 @@ export async function GET(request: Request) {
       orderBy: { date: 'asc' },
     });
 
-    return NextResponse.json({ shifts });
+    // 支店情報（定休日・代替出勤先）を取得
+    let branch = null;
+    if (distributor.branchId) {
+      branch = await prisma.branch.findUnique({
+        where: { id: distributor.branchId },
+        select: {
+          id: true,
+          nameJa: true,
+          nameEn: true,
+          closedDays: true,
+          alternateBranch: {
+            select: {
+              id: true,
+              nameJa: true,
+              nameEn: true,
+              address: true,
+              googleMapUrl: true,
+            },
+          },
+        },
+      });
+    }
+
+    return NextResponse.json({ shifts, branch });
   } catch (error) {
     console.error('Distributor Shifts GET Error:', error);
     return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });

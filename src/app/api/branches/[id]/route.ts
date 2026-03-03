@@ -20,6 +20,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         googleMapUrl: body.googleMapUrl,
         openingTime: body.openingTime,
         closedDays: body.closedDays,
+        alternateBranchId: parseIntSafe(body.alternateBranchId),
         manager1Id: parseIntSafe(body.manager1Id),
         manager2Id: parseIntSafe(body.manager2Id),
         manager3Id: parseIntSafe(body.manager3Id),

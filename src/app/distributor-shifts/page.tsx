@@ -1,9 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import FullCalendar from '@fullcalendar/react';
-import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import Pagination from '@/components/ui/Pagination';
 
@@ -31,11 +28,21 @@ type Shift = {
   distributor: Distributor;
 };
 
+type WeeklyShiftCell = { id: number; count: number; note: string | null } | null;
+
+type WeeklyDistributor = {
+  id: number;
+  name: string;
+  staffId: string;
+  branch: Branch | null;
+  shifts: Record<string, WeeklyShiftCell>;
+};
+
 const LIMIT = 50;
+const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
 const STATUS_OPTIONS = [
   { value: 'WORKING', label: '出勤', color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'REQUESTED', label: '申請中', color: 'bg-amber-100 text-amber-700' },
   { value: 'CANCELED', label: 'キャンセル', color: 'bg-red-100 text-red-700' },
 ];
 
@@ -54,9 +61,21 @@ function formatDate(dateStr: string) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
-  const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
-  const wd = weekdays[d.getDay()];
+  const wd = WEEKDAYS[d.getDay()];
   return `${y}/${m}/${day} (${wd})`;
+}
+
+/** 今日の日付を YYYY-MM-DD で返す */
+function getTodayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** 日付を n 日ずらす */
+function addDays(dateStr: string, days: number) {
+  const d = new Date(dateStr + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ──────────────────────────────────────────
@@ -65,7 +84,6 @@ function formatDate(dateStr: string) {
 
 export default function DistributorShiftsPage() {
   const { showToast, showConfirm } = useNotification();
-  const calendarRef = useRef<FullCalendar>(null);
 
   // タブ
   const [activeTab, setActiveTab] = useState<'calendar' | 'list'>('calendar');
@@ -74,9 +92,11 @@ export default function DistributorShiftsPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [filterBranchId, setFilterBranchId] = useState('');
 
-  // カレンダー
-  const [calendarShifts, setCalendarShifts] = useState<Shift[]>([]);
-  const [calendarLoading, setCalendarLoading] = useState(false);
+  // ────── 週間グリッド ──────
+  const [weekStartDate, setWeekStartDate] = useState(getTodayStr);
+  const [weekDates, setWeekDates] = useState<string[]>([]);
+  const [weekDistributors, setWeekDistributors] = useState<WeeklyDistributor[]>([]);
+  const [weekLoading, setWeekLoading] = useState(false);
 
   // 一覧
   const [listShifts, setListShifts] = useState<Shift[]>([]);
@@ -92,9 +112,6 @@ export default function DistributorShiftsPage() {
   // モーダル
   const [showModal, setShowModal] = useState(false);
   const [editingShift, setEditingShift] = useState<Shift | null>(null);
-  const [showDayModal, setShowDayModal] = useState(false);
-  const [dayModalDate, setDayModalDate] = useState('');
-  const [dayModalShifts, setDayModalShifts] = useState<Shift[]>([]);
 
   // フォーム
   const [formDistributorId, setFormDistributorId] = useState('');
@@ -147,34 +164,27 @@ export default function DistributorShiftsPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // ────── カレンダーデータ取得 ──────
+  // ────── 週間データ取得 ──────
 
-  const fetchCalendarShifts = useCallback(async (dateFrom: string, dateTo: string) => {
-    setCalendarLoading(true);
+  const fetchWeeklyData = useCallback(async () => {
+    setWeekLoading(true);
     try {
-      const params = new URLSearchParams({ dateFrom, dateTo });
+      const params = new URLSearchParams({ startDate: weekStartDate });
       if (filterBranchId) params.set('branchId', filterBranchId);
-      const res = await fetch(`/api/distributor-shifts/calendar?${params}`);
+      const res = await fetch(`/api/distributor-shifts/weekly?${params}`);
       if (!res.ok) throw new Error();
       const json = await res.json();
-      setCalendarShifts(json.data || []);
+      setWeekDates(json.dates || []);
+      setWeekDistributors(json.distributors || []);
     } catch {
-      showToast('カレンダーデータの取得に失敗しました', 'error');
+      showToast('シフトデータの取得に失敗しました', 'error');
     }
-    setCalendarLoading(false);
-  }, [filterBranchId, showToast]);
+    setWeekLoading(false);
+  }, [weekStartDate, filterBranchId, showToast]);
 
-  // 支店フィルタが変わったらカレンダー再取得
   useEffect(() => {
-    if (activeTab === 'calendar') {
-      const api = calendarRef.current?.getApi();
-      if (api) {
-        const start = api.view.activeStart;
-        const end = api.view.activeEnd;
-        fetchCalendarShifts(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
-      }
-    }
-  }, [filterBranchId, activeTab, fetchCalendarShifts]);
+    if (activeTab === 'calendar') fetchWeeklyData();
+  }, [activeTab, fetchWeeklyData]);
 
   // ────── 一覧データ取得 ──────
 
@@ -211,13 +221,13 @@ export default function DistributorShiftsPage() {
 
   // ────── 操作ハンドラ ──────
 
-  const openCreateModal = (date?: string) => {
+  const openCreateModal = (date?: string, distributorId?: number, distributor?: Distributor) => {
     setEditingShift(null);
-    setFormDistributorId('');
-    setFormDate(date || new Date().toISOString().split('T')[0]);
+    setFormDistributorId(distributorId ? String(distributorId) : '');
+    setFormDate(date || getTodayStr());
     setFormStatus('WORKING');
     setFormNote('');
-    setSelectedDistributor(null);
+    setSelectedDistributor(distributor || null);
     setDistributorSearch('');
     setShowModal(true);
   };
@@ -274,74 +284,54 @@ export default function DistributorShiftsPage() {
     setFormSaving(false);
   };
 
-  const handleDelete = async (shift: Shift) => {
+  const handleDeleteShift = async (shiftId: number, distributorName: string, date: string) => {
     const confirmed = await showConfirm(
-      `${shift.distributor.name} の ${formatDate(shift.date)} のシフトを削除しますか？`,
+      `${distributorName} の ${formatDate(date)} のシフトを削除しますか？`,
       { variant: 'danger', confirmLabel: '削除' }
     );
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/distributor-shifts/${shift.id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/distributor-shifts/${shiftId}`, { method: 'DELETE' });
       if (!res.ok) throw new Error();
       showToast('シフトを削除しました', 'success');
       refreshData();
-      // 日付モーダルが開いていれば更新
-      if (showDayModal) {
-        setDayModalShifts(prev => prev.filter(s => s.id !== shift.id));
-      }
     } catch {
       showToast('削除に失敗しました', 'error');
     }
   };
 
+  const handleDelete = async (shift: Shift) => {
+    await handleDeleteShift(shift.id, shift.distributor.name, shift.date);
+  };
+
   const refreshData = () => {
     if (activeTab === 'calendar') {
-      const api = calendarRef.current?.getApi();
-      if (api) {
-        const start = api.view.activeStart;
-        const end = api.view.activeEnd;
-        fetchCalendarShifts(start.toISOString().split('T')[0], end.toISOString().split('T')[0]);
-      }
+      fetchWeeklyData();
     } else {
       fetchListShifts(page);
     }
   };
 
-  // ────── カレンダーイベント生成 ──────
+  // ────── 週間ナビ ──────
+  const goToday = () => setWeekStartDate(getTodayStr());
+  const goPrev = () => setWeekStartDate(prev => addDays(prev, -7));
+  const goNext = () => setWeekStartDate(prev => addDays(prev, 7));
 
-  const calendarEvents = React.useMemo(() => {
-    // 日付ごとにグルーピング
-    const grouped: Record<string, Shift[]> = {};
-    for (const s of calendarShifts) {
-      const dateKey = new Date(s.date).toISOString().split('T')[0];
-      if (!grouped[dateKey]) grouped[dateKey] = [];
-      grouped[dateKey].push(s);
+  // 日付ごとの出勤人数集計
+  const dailyCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const d of weekDates) {
+      counts[d] = weekDistributors.filter(dist => dist.shifts[d] !== null).length;
     }
-
-    return Object.entries(grouped).map(([dateKey, shifts]) => ({
-      id: dateKey,
-      start: dateKey,
-      allDay: true,
-      extendedProps: { shifts, count: shifts.length },
-    }));
-  }, [calendarShifts]);
-
-  // ────── 日付クリック → 日付モーダル ──────
-
-  const handleDateClick = (info: { dateStr: string }) => {
-    const dateKey = info.dateStr;
-    const shiftsForDay = calendarShifts.filter(
-      s => new Date(s.date).toISOString().split('T')[0] === dateKey
-    );
-    setDayModalDate(dateKey);
-    setDayModalShifts(shiftsForDay);
-    setShowDayModal(true);
-  };
+    return counts;
+  }, [weekDates, weekDistributors]);
 
   // ──────────────────────────────────────────
   // レンダリング
   // ──────────────────────────────────────────
+
+  const todayStr = getTodayStr();
 
   return (
     <div className="space-y-4">
@@ -357,8 +347,8 @@ export default function DistributorShiftsPage() {
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <i className={`bi ${tab === 'calendar' ? 'bi-calendar3' : 'bi-list-ul'} mr-1.5`}></i>
-            {tab === 'calendar' ? 'カレンダー' : '一覧'}
+            <i className={`bi ${tab === 'calendar' ? 'bi-calendar-week' : 'bi-list-ul'} mr-1.5`}></i>
+            {tab === 'calendar' ? '週間シフト' : '一覧'}
             {activeTab === tab && (
               <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-t" />
             )}
@@ -382,73 +372,187 @@ export default function DistributorShiftsPage() {
           </select>
         </div>
 
-        {activeTab === 'calendar' && (
-          <button
-            onClick={() => openCreateModal()}
-            className="ml-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold
-                       bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-          >
-            <i className="bi bi-plus-lg text-xs"></i>
-            シフト追加
-          </button>
-        )}
+        <button
+          onClick={() => openCreateModal()}
+          className="ml-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold
+                     bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
+        >
+          <i className="bi bi-plus-lg text-xs"></i>
+          シフト追加
+        </button>
       </div>
 
-      {/* ==================== カレンダータブ ==================== */}
+      {/* ==================== 週間シフトタブ ==================== */}
       {activeTab === 'calendar' && (
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          {calendarLoading && (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full" />
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          {/* ナビゲーション */}
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goPrev}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <i className="bi bi-chevron-left text-sm"></i>
+              </button>
+              <button
+                onClick={goNext}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+              >
+                <i className="bi bi-chevron-right text-sm"></i>
+              </button>
             </div>
-          )}
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, interactionPlugin]}
-            initialView="dayGridMonth"
-            locale="ja"
-            headerToolbar={{
-              left: 'prev,next today',
-              center: 'title',
-              right: '',
-            }}
-            buttonText={{ today: '今日' }}
-            height="auto"
-            events={calendarEvents}
-            dateClick={handleDateClick}
-            datesSet={(dateInfo) => {
-              const start = dateInfo.start.toISOString().split('T')[0];
-              const end = dateInfo.end.toISOString().split('T')[0];
-              fetchCalendarShifts(start, end);
-            }}
-            eventContent={(arg) => {
-              const { count, shifts } = arg.event.extendedProps;
-              const displayShifts = (shifts as Shift[]).slice(0, 3);
-              const more = count - 3;
-              return (
-                <div className="w-full px-1 py-0.5 cursor-pointer">
-                  <div className="flex items-center gap-1 mb-0.5">
-                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
-                      {count}
-                    </span>
-                    <span className="text-[10px] text-slate-500 font-medium">名出勤</span>
-                  </div>
-                  {displayShifts.map((s: Shift) => (
-                    <div key={s.id} className="text-[10px] text-slate-600 truncate leading-tight">
-                      {s.distributor.name}
-                    </div>
-                  ))}
-                  {more > 0 && (
-                    <div className="text-[10px] text-indigo-500 font-medium">+{more}名</div>
-                  )}
-                </div>
-              );
-            }}
-            eventClick={(info) => {
-              const dateKey = info.event.startStr;
-              handleDateClick({ dateStr: dateKey });
-            }}
-          />
+            <button
+              onClick={goToday}
+              className="px-3 py-1 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+            >
+              今日
+            </button>
+            {weekDates.length > 0 && (
+              <h3 className="text-sm font-bold text-slate-800">
+                {(() => {
+                  const s = new Date(weekDates[0] + 'T00:00:00');
+                  const e = new Date(weekDates[weekDates.length - 1] + 'T00:00:00');
+                  return `${s.getFullYear()}年${s.getMonth() + 1}月${s.getDate()}日 〜 ${e.getMonth() + 1}月${e.getDate()}日`;
+                })()}
+              </h3>
+            )}
+            {weekLoading && (
+              <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full ml-2" />
+            )}
+          </div>
+
+          {/* グリッドテーブル */}
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80">
+                  <th className="text-left px-4 py-3 font-semibold text-slate-600 border-b border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10 min-w-[180px]">
+                    配布員
+                  </th>
+                  {weekDates.map(dateStr => {
+                    const d = new Date(dateStr + 'T00:00:00');
+                    const day = d.getDate();
+                    const wd = WEEKDAYS[d.getDay()];
+                    const isToday = dateStr === todayStr;
+                    const isSun = d.getDay() === 0;
+                    const isSat = d.getDay() === 6;
+                    return (
+                      <th
+                        key={dateStr}
+                        className={`text-center px-2 py-2 border-b border-r border-slate-100 min-w-[90px] ${
+                          isToday ? 'bg-indigo-50' : ''
+                        }`}
+                      >
+                        <div className={`text-[11px] font-bold ${
+                          isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-500'
+                        }`}>
+                          {wd}
+                        </div>
+                        <div className={`text-lg font-bold leading-tight ${
+                          isToday ? 'text-indigo-600' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-800'
+                        }`}>
+                          {day}
+                        </div>
+                        <div className={`text-[10px] mt-0.5 ${
+                          isToday ? 'text-indigo-500' : 'text-slate-400'
+                        }`}>
+                          {d.getMonth() + 1}月
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {weekDistributors.length === 0 && !weekLoading ? (
+                  <tr>
+                    <td colSpan={1 + weekDates.length} className="text-center py-12 text-slate-400">
+                      <i className="bi bi-people text-3xl mb-2 block"></i>
+                      <p className="text-sm">有効な配布員がいません</p>
+                    </td>
+                  </tr>
+                ) : (
+                  weekDistributors.map(dist => (
+                    <tr key={dist.id} className="hover:bg-slate-50/30 transition-colors group">
+                      {/* 配布員名 */}
+                      <td className="px-4 py-2.5 border-b border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/30 z-10">
+                        <div className="font-medium text-slate-800 text-[13px] leading-tight">{dist.name}</div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono text-slate-400">{dist.staffId}</span>
+                          {dist.branch && (
+                            <span className="text-[10px] text-slate-400">{dist.branch.nameJa}</span>
+                          )}
+                        </div>
+                      </td>
+                      {/* 日付セル */}
+                      {weekDates.map(dateStr => {
+                        const cell = dist.shifts[dateStr];
+                        const isToday = dateStr === todayStr;
+                        return (
+                          <td
+                            key={dateStr}
+                            className={`text-center border-b border-r border-slate-100 relative cursor-pointer transition-colors ${
+                              isToday ? 'bg-indigo-50/40' : ''
+                            } ${cell ? 'hover:bg-emerald-50' : 'hover:bg-slate-100/50'}`}
+                            onClick={() => {
+                              if (cell) {
+                                // シフトあり → 削除確認
+                                handleDeleteShift(cell.id, dist.name, dateStr);
+                              } else {
+                                // シフトなし → 作成
+                                openCreateModal(dateStr, dist.id, dist as Distributor);
+                              }
+                            }}
+                          >
+                            {cell ? (
+                              <div className="py-2">
+                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white text-sm font-bold shadow-sm">
+                                  {cell.count}
+                                </span>
+                                {cell.note && (
+                                  <div className="text-[9px] text-slate-400 mt-0.5 truncate px-1" title={cell.note}>
+                                    {cell.note}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="py-2 opacity-0 group-hover:opacity-30 hover:!opacity-60 transition-opacity">
+                                <i className="bi bi-plus-circle text-slate-400 text-lg"></i>
+                              </div>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))
+                )}
+              </tbody>
+              {/* フッター: 日付ごとの合計 */}
+              {weekDistributors.length > 0 && (
+                <tfoot>
+                  <tr className="bg-slate-50/80">
+                    <td className="px-4 py-2.5 border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10">
+                      <span className="text-xs font-bold text-slate-500">合計</span>
+                    </td>
+                    {weekDates.map(dateStr => {
+                      const count = dailyCounts[dateStr] || 0;
+                      const isToday = dateStr === todayStr;
+                      return (
+                        <td
+                          key={dateStr}
+                          className={`text-center py-2.5 border-r border-slate-100 ${isToday ? 'bg-indigo-50/60' : ''}`}
+                        >
+                          <span className={`text-sm font-bold ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                            {count}名
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
         </div>
       )}
 
@@ -501,14 +605,6 @@ export default function DistributorShiftsPage() {
                 />
               </div>
             </div>
-            <button
-              onClick={() => openCreateModal()}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-semibold
-                         bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-            >
-              <i className="bi bi-plus-lg text-xs"></i>
-              追加
-            </button>
           </div>
 
           {/* テーブル */}
@@ -583,78 +679,6 @@ export default function DistributorShiftsPage() {
         </div>
       )}
 
-      {/* ==================== 日付モーダル（カレンダー日付クリック） ==================== */}
-      {showDayModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1200] flex items-center justify-center p-4" onClick={() => setShowDayModal(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            {/* ヘッダー */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-800">
-                <i className="bi bi-calendar-event mr-2 text-indigo-600"></i>
-                {formatDate(dayModalDate)}
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => { setShowDayModal(false); openCreateModal(dayModalDate); }}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-                >
-                  <i className="bi bi-plus-lg text-[10px]"></i>
-                  追加
-                </button>
-                <button onClick={() => setShowDayModal(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors">
-                  <i className="bi bi-x-lg text-sm"></i>
-                </button>
-              </div>
-            </div>
-            {/* コンテンツ */}
-            <div className="flex-1 overflow-y-auto p-5">
-              {dayModalShifts.length === 0 ? (
-                <div className="text-center py-8 text-slate-400">
-                  <i className="bi bi-calendar-x text-2xl mb-2 block"></i>
-                  <p className="text-sm">この日のシフトはありません</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {dayModalShifts.map(shift => (
-                    <div key={shift.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm text-slate-800">{shift.distributor.name}</span>
-                          <span className="text-[10px] font-mono text-slate-400">{shift.distributor.staffId}</span>
-                          {getStatusBadge(shift.status)}
-                        </div>
-                        {shift.distributor.branch && (
-                          <div className="text-[11px] text-slate-400 mt-0.5">{shift.distributor.branch.nameJa}</div>
-                        )}
-                        {shift.note && (
-                          <div className="text-[11px] text-slate-500 mt-0.5 truncate">{shift.note}</div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => { setShowDayModal(false); openEditModal(shift); }}
-                          className="p-1.5 rounded-lg hover:bg-white text-slate-400 hover:text-indigo-600 transition-colors"
-                          title="編集"
-                        >
-                          <i className="bi bi-pencil text-xs"></i>
-                        </button>
-                        <button
-                          onClick={() => handleDelete(shift)}
-                          className="p-1.5 rounded-lg hover:bg-white text-slate-400 hover:text-red-600 transition-colors"
-                          title="削除"
-                        >
-                          <i className="bi bi-trash text-xs"></i>
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ==================== 作成・編集モーダル ==================== */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
@@ -675,38 +699,37 @@ export default function DistributorShiftsPage() {
               {/* 配布員 */}
               <div>
                 <label className="block text-xs font-semibold text-slate-600 mb-1.5">配布員 <span className="text-red-500">*</span></label>
-                {editingShift ? (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
-                    <span className="text-sm font-medium">{selectedDistributor?.name}</span>
-                    <span className="text-[10px] font-mono text-slate-400">{selectedDistributor?.staffId}</span>
+                {editingShift || selectedDistributor ? (
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border ${
+                    editingShift ? 'bg-slate-50 border-slate-200' : 'bg-indigo-50 border-indigo-200'
+                  }`}>
+                    <span className={`text-sm font-medium ${editingShift ? '' : 'text-indigo-700'}`}>
+                      {selectedDistributor?.name}
+                    </span>
+                    <span className={`text-[10px] font-mono ${editingShift ? 'text-slate-400' : 'text-indigo-400'}`}>
+                      {selectedDistributor?.staffId}
+                    </span>
+                    {!editingShift && (
+                      <button
+                        onClick={() => { setSelectedDistributor(null); setFormDistributorId(''); setDistributorSearch(''); }}
+                        className="ml-auto text-indigo-400 hover:text-indigo-600"
+                      >
+                        <i className="bi bi-x-lg text-xs"></i>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <div className="relative" ref={distributorSearchRef}>
-                    {selectedDistributor ? (
-                      <div className="flex items-center gap-2 px-3 py-2 bg-indigo-50 rounded-lg border border-indigo-200">
-                        <span className="text-sm font-medium text-indigo-700">{selectedDistributor.name}</span>
-                        <span className="text-[10px] font-mono text-indigo-400">{selectedDistributor.staffId}</span>
-                        <button
-                          onClick={() => { setSelectedDistributor(null); setFormDistributorId(''); setDistributorSearch(''); }}
-                          className="ml-auto text-indigo-400 hover:text-indigo-600"
-                        >
-                          <i className="bi bi-x-lg text-xs"></i>
-                        </button>
-                      </div>
-                    ) : (
-                      <>
-                        <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                        <input
-                          type="text"
-                          value={distributorSearch}
-                          onChange={e => setDistributorSearch(e.target.value)}
-                          onFocus={() => { if (distributorOptions.length > 0) setShowDistributorDropdown(true); }}
-                          placeholder="名前またはStaff IDで検索..."
-                          className="w-full text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      </>
-                    )}
-                    {showDistributorDropdown && distributorOptions.length > 0 && !selectedDistributor && (
+                    <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input
+                      type="text"
+                      value={distributorSearch}
+                      onChange={e => setDistributorSearch(e.target.value)}
+                      onFocus={() => { if (distributorOptions.length > 0) setShowDistributorDropdown(true); }}
+                      placeholder="名前またはStaff IDで検索..."
+                      className="w-full text-sm border border-slate-200 rounded-lg pl-8 pr-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                    {showDistributorDropdown && distributorOptions.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {distributorOptions.map(d => (
                           <button

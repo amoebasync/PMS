@@ -8,6 +8,7 @@ import { useState, useEffect } from 'react';
 export default function DistributorLayoutEn({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [distributorName, setDistributorName] = useState<string | undefined>();
+  const [missingResidenceCard, setMissingResidenceCard] = useState(false);
 
   const isAuthPage = pathname === '/staff/en/change-password';
 
@@ -15,7 +16,12 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
     if (isAuthPage) return;
     fetch('/api/staff/profile')
       .then((r) => r.ok ? r.json() : null)
-      .then((d) => { if (d?.name) setDistributorName(d.name); })
+      .then((d) => {
+        if (d?.name) setDistributorName(d.name);
+        if (d && (!d.residenceCardFrontUrl || !d.residenceCardBackUrl)) {
+          setMissingResidenceCard(true);
+        }
+      })
       .catch(() => {});
   }, [isAuthPage]);
 
@@ -23,7 +29,7 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <StaffHeaderEn name={distributorName} />
+      <StaffHeaderEn name={distributorName} missingResidenceCard={missingResidenceCard} />
       <main className={`flex-1 max-w-lg mx-auto w-full px-4 py-6 ${showNav ? 'pb-24' : ''}`}>
         {children}
       </main>

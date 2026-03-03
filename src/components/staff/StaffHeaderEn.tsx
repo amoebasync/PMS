@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function StaffHeaderEn({ name }: { name?: string }) {
+export function StaffHeaderEn({ name, missingResidenceCard }: { name?: string; missingResidenceCard?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -14,7 +14,7 @@ export function StaffHeaderEn({ name }: { name?: string }) {
     { name: 'Home',     href: '/staff/en',              icon: 'bi-house-door-fill' },
     { name: 'Shifts',   href: '/staff/en/shifts',        icon: 'bi-calendar3' },
     { name: 'Expenses', href: '/staff/en/expenses',      icon: 'bi-train-front-fill' },
-    { name: 'Report',   href: '/staff/en/report',        icon: 'bi-clipboard-check-fill' },
+    { name: 'History',   href: '/staff/en/report',        icon: 'bi-clock-history' },
     { name: 'Rating',   href: '/staff/en/evaluation',    icon: 'bi-award-fill' },
     { name: 'Profile',  href: '/staff/en/profile',       icon: 'bi-person-fill' },
   ];
@@ -49,6 +49,18 @@ export function StaffHeaderEn({ name }: { name?: string }) {
           </div>
         </div>
       </header>
+
+      {/* Residence card warning */}
+      {missingResidenceCard && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i className="bi bi-exclamation-triangle-fill text-amber-500 shrink-0"></i>
+            <Link href="/staff/en/profile" className="text-xs font-bold text-amber-700 hover:underline">
+              Please upload your residence card photos from your profile page
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Bottom navigation bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up">
