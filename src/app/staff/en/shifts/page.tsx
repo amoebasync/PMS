@@ -275,7 +275,7 @@ export default function ShiftsPageEn() {
                 onClick={() => handleDayClick(day)}
                 disabled={isPast && !shift}
                 className={`relative flex flex-col items-center justify-center p-2 min-h-[76px] transition-colors border-r last:border-r-0 border-slate-50
-                  ${isPast && !shift ? 'opacity-30 cursor-default' : 'cursor-pointer active:bg-slate-100'}
+                  ${isPast && !shift ? 'opacity-30 cursor-default' : isCancelBlocked ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer active:bg-slate-100'}
                   ${isSelectedAdd ? 'bg-indigo-50' : ''}
                   ${isSelectedRemove ? 'bg-rose-50' : ''}
                   ${isToday && !isSelectedAdd && !isSelectedRemove ? 'bg-blue-50' : ''}
@@ -315,7 +315,7 @@ export default function ShiftsPageEn() {
                 )}
 
                 {isCancelBlocked && !isSelectedRemove && (
-                  <i className="bi bi-lock-fill text-[8px] text-slate-300 absolute top-1 right-1"></i>
+                  <i className="bi bi-lock-fill text-sm text-slate-400 absolute top-1 right-1"></i>
                 )}
               </button>
             );
@@ -336,6 +336,10 @@ export default function ShiftsPageEn() {
         <div className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-rose-500"></span>
           <span className="text-xs text-slate-500">To cancel</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <i className="bi bi-lock-fill text-xs text-slate-400"></i>
+          <span className="text-xs text-slate-500">Cannot cancel</span>
         </div>
       </div>
 

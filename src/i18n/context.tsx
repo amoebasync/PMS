@@ -11,6 +11,22 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
 
+// 共通名前空間を事前ロードするヘルパー（useTranslation.ts のキャッシュと共有）
+async function preloadCoreNamespaces(lang: Language): Promise<void> {
+  const namespaces = ['common', 'sidebar'];
+  await Promise.all(
+    namespaces.map((ns) =>
+      import(`./locales/${lang}/${ns}.json`)
+        .then((mod) => {
+          // useTranslation.ts のモジュールレベルキャッシュに直接書き込む
+          if (!(globalThis as any).__i18nCache) (globalThis as any).__i18nCache = { ja: {}, en: {} };
+          (globalThis as any).__i18nCache[lang][ns] = mod.default || mod;
+        })
+        .catch(() => {})
+    )
+  );
+}
+
 export function LanguageProvider({
   children,
   initialLang = 'ja',
@@ -19,6 +35,7 @@ export function LanguageProvider({
   initialLang?: Language;
 }) {
   const [lang, setLangState] = useState<Language>(initialLang);
+  const [coreReady, setCoreReady] = useState(false);
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
@@ -30,9 +47,15 @@ export function LanguageProvider({
     }).catch(() => {});
   }, []);
 
+  // 言語が変わったら共通名前空間をプリロード
+  useEffect(() => {
+    setCoreReady(false);
+    preloadCoreNamespaces(lang).then(() => setCoreReady(true));
+  }, [lang]);
+
   return (
     <LanguageContext.Provider value={{ lang, setLang }}>
-      {children}
+      {coreReady ? children : null}
     </LanguageContext.Provider>
   );
 }

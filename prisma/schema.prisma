@@ -597,6 +597,7 @@ model FlyerDistributor {
   passwordHash   String?  @map("password_hash") @db.VarChar(100)
   isPasswordTemp Boolean  @default(true) @map("is_password_temp") // 初回ログイン時に変更必須
   language       String   @default("ja") @db.VarChar(5) // ポータル言語: "ja" or "en"
+  hasSeenOnboarding Boolean @default(false) @map("has_seen_onboarding")
 
   // 在留資格・契約情報
   visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date

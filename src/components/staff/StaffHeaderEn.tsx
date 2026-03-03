@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function StaffHeaderEn({ name, missingResidenceCard }: { name?: string; missingResidenceCard?: boolean }) {
+export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon }: { name?: string; missingResidenceCard?: boolean; visaExpiringSoon?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -50,8 +50,20 @@ export function StaffHeaderEn({ name, missingResidenceCard }: { name?: string; m
         </div>
       </header>
 
+      {/* VISA expiry warning */}
+      {visaExpiringSoon && (
+        <div className="bg-rose-50 border-b border-rose-200">
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i className="bi bi-exclamation-octagon-fill text-rose-500 shrink-0"></i>
+            <Link href="/staff/en/profile" className="text-xs font-bold text-rose-700 hover:underline">
+              Your visa is expiring soon. Please upload photos of your new residence card
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* Residence card warning */}
-      {missingResidenceCard && (
+      {!visaExpiringSoon && missingResidenceCard && (
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
             <i className="bi bi-exclamation-triangle-fill text-amber-500 shrink-0"></i>

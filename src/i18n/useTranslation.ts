@@ -1,17 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLanguage, type Language } from './context';
 
 type TranslationData = Record<string, any>;
 
 // Module-level cache: lang -> namespace -> data
-const cache: Record<string, Record<string, TranslationData>> = { ja: {}, en: {} };
+// context.tsx の preloadCoreNamespaces と共有するためグローバルに配置
+function getCache(): Record<string, Record<string, TranslationData>> {
+  if (!(globalThis as any).__i18nCache) {
+    (globalThis as any).__i18nCache = { ja: {}, en: {} };
+  }
+  return (globalThis as any).__i18nCache;
+}
 
 // Pending promises to avoid duplicate imports
 const pending: Record<string, Promise<TranslationData>> = {};
 
 async function loadNamespace(lang: Language, ns: string): Promise<TranslationData> {
+  const cache = getCache();
   if (cache[lang][ns]) return cache[lang][ns];
 
   const key = `${lang}/${ns}`;
@@ -41,28 +48,58 @@ function getNestedValue(obj: TranslationData, path: string): string {
   return typeof current === 'string' ? current : path;
 }
 
+/** Check if all required namespaces are already cached */
+function isCached(lang: Language, namespaces: string[]): boolean {
+  const cache = getCache();
+  return namespaces.every((ns) => !!cache[lang][ns]);
+}
+
 /**
  * useTranslation hook
  * @param namespace - optional page-specific namespace (e.g. 'distributors')
  *   When provided, the page namespace is loaded and merged with 'common'.
  *   Keys are looked up in the page namespace first, then fall back to 'common'.
+ *
+ * Returns { t, lang, ready }
+ *   ready=false while translation JSON is loading — use this to show a loader
+ *   instead of raw translation keys.
  */
 export function useTranslation(namespace?: string) {
   const { lang } = useLanguage();
-  const [, forceUpdate] = useState(0);
+  const namespaces = namespace ? ['common', namespace] : ['common'];
+  const alreadyCached = isCached(lang, namespaces);
+  const [ready, setReady] = useState(alreadyCached);
+  const prevKey = useRef(`${lang}/${namespace ?? ''}`);
 
   useEffect(() => {
+    const key = `${lang}/${namespace ?? ''}`;
+    // If lang or namespace changed, reset ready unless already cached
+    if (key !== prevKey.current) {
+      prevKey.current = key;
+      if (isCached(lang, namespaces)) {
+        setReady(true);
+        return;
+      }
+      setReady(false);
+    }
+
+    // Already cached (e.g. preloaded by LanguageProvider)
+    if (isCached(lang, namespaces)) {
+      setReady(true);
+      return;
+    }
+
     let cancelled = false;
-    const namespaces = namespace ? ['common', namespace] : ['common'];
 
     Promise.all(namespaces.map((ns) => loadNamespace(lang, ns))).then(() => {
-      if (!cancelled) forceUpdate((n) => n + 1);
+      if (!cancelled) setReady(true);
     });
 
     return () => { cancelled = true; };
   }, [lang, namespace]);
 
   const t = (key: string, params?: Record<string, string | number>): string => {
+    const cache = getCache();
     // Look up in page namespace first, then common
     let value: string | undefined;
     if (namespace && cache[lang][namespace]) {
@@ -73,7 +110,8 @@ export function useTranslation(namespace?: string) {
       const v = getNestedValue(cache[lang]['common'], key);
       if (v !== key) value = v;
     }
-    if (value === undefined) value = key;
+    // 翻訳未ロード時はキー名ではなく空文字を返す（FOUC防止）
+    if (value === undefined) value = ready ? key : '';
 
     // Simple parameter interpolation: {{name}}
     if (params) {
@@ -84,5 +122,5 @@ export function useTranslation(namespace?: string) {
     return value;
   };
 
-  return { t, lang };
+  return { t, lang, ready };
 }

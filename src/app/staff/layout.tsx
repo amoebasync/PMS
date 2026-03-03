@@ -9,6 +9,7 @@ export default function DistributorLayout({ children }: { children: React.ReactN
   const pathname = usePathname();
   const [distributorName, setDistributorName] = useState<string | undefined>();
   const [missingResidenceCard, setMissingResidenceCard] = useState(false);
+  const [visaExpiringSoon, setVisaExpiringSoon] = useState(false);
 
   // 英語ポータル配下は /staff/en/layout.tsx が独自レイアウトを持つため素通りさせる
   const isEnglishPortal = pathname.startsWith('/staff/en');
@@ -25,6 +26,14 @@ export default function DistributorLayout({ children }: { children: React.ReactN
         if (d && (!d.residenceCardFrontUrl || !d.residenceCardBackUrl)) {
           setMissingResidenceCard(true);
         }
+        if (d?.visaExpiryDate) {
+          const expiry = new Date(d.visaExpiryDate);
+          const now = new Date();
+          const oneMonthLater = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+          if (expiry <= oneMonthLater) {
+            setVisaExpiringSoon(true);
+          }
+        }
       })
       .catch(() => {});
   }, [isAuthPage, isEnglishPortal]);
@@ -37,7 +46,7 @@ export default function DistributorLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <StaffHeader name={distributorName} missingResidenceCard={missingResidenceCard} />
+      <StaffHeader name={distributorName} missingResidenceCard={missingResidenceCard} visaExpiringSoon={visaExpiringSoon} />
       <main className={`flex-1 max-w-lg mx-auto w-full px-4 py-6 ${showNav ? 'pb-24' : ''}`}>
         {children}
       </main>

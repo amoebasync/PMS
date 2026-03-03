@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function StaffHeader({ name, missingResidenceCard }: { name?: string; missingResidenceCard?: boolean }) {
+export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon }: { name?: string; missingResidenceCard?: boolean; visaExpiringSoon?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -50,8 +50,20 @@ export function StaffHeader({ name, missingResidenceCard }: { name?: string; mis
         </div>
       </header>
 
+      {/* VISA期限警告 */}
+      {visaExpiringSoon && (
+        <div className="bg-rose-50 border-b border-rose-200">
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i className="bi bi-exclamation-octagon-fill text-rose-500 shrink-0"></i>
+            <Link href="/staff/profile" className="text-xs font-bold text-rose-700 hover:underline">
+              在留資格の有効期限が近づいています。新しい在留カードの写真をアップロードしてください
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* 在留カード未提出警告 */}
-      {missingResidenceCard && (
+      {!visaExpiringSoon && missingResidenceCard && (
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
             <i className="bi bi-exclamation-triangle-fill text-amber-500 shrink-0"></i>

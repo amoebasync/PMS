@@ -9,6 +9,7 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
   const pathname = usePathname();
   const [distributorName, setDistributorName] = useState<string | undefined>();
   const [missingResidenceCard, setMissingResidenceCard] = useState(false);
+  const [visaExpiringSoon, setVisaExpiringSoon] = useState(false);
 
   const isAuthPage = pathname === '/staff/en/change-password';
 
@@ -21,6 +22,14 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
         if (d && (!d.residenceCardFrontUrl || !d.residenceCardBackUrl)) {
           setMissingResidenceCard(true);
         }
+        if (d?.visaExpiryDate) {
+          const expiry = new Date(d.visaExpiryDate);
+          const now = new Date();
+          const oneMonthLater = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
+          if (expiry <= oneMonthLater) {
+            setVisaExpiringSoon(true);
+          }
+        }
       })
       .catch(() => {});
   }, [isAuthPage]);
@@ -29,7 +38,7 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <StaffHeaderEn name={distributorName} missingResidenceCard={missingResidenceCard} />
+      <StaffHeaderEn name={distributorName} missingResidenceCard={missingResidenceCard} visaExpiringSoon={visaExpiringSoon} />
       <main className={`flex-1 max-w-lg mx-auto w-full px-4 py-6 ${showNav ? 'pb-24' : ''}`}>
         {children}
       </main>

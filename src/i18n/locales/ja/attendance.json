@@ -77,5 +77,9 @@
   "expense_th_status": "ステータス",
   "expense_no_history": "申請履歴がありません",
   "expense_transportation": "交通費",
-  "expense_other": "その他"
+  "expense_other": "その他",
+
+  "duplicate_next_day": "翌日に複製",
+  "duplicate_success": "翌日の勤怠をフォームにセットしました",
+  "loading": "読み込み中..."
 }

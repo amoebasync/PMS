@@ -110,6 +110,21 @@ export default function ExpensesPageEn() {
         </button>
       </div>
 
+      {/* Transportation expense rules */}
+      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+        <div className="flex items-start gap-2.5">
+          <i className="bi bi-info-circle-fill text-sky-500 mt-0.5 shrink-0"></i>
+          <div className="space-y-1.5">
+            <p className="text-sm font-bold text-sky-800">Expense Rules</p>
+            <ul className="text-xs text-sky-700 space-y-1 leading-relaxed">
+              <li>- Daily limit: <span className="font-bold">¥1,000</span></li>
+              <li>- Deadline: <span className="font-bold">Next Monday 15:00</span></li>
+              <li>- If you miss the deadline, the company will calculate the amount based on your registered address</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {message && (
         <div className={`p-3 rounded-xl text-sm font-bold ${
           message.type === 'success'

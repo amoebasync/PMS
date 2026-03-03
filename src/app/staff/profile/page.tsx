@@ -15,6 +15,14 @@ type Profile = {
   avatarUrl: string | null;
   residenceCardFrontUrl: string | null;
   residenceCardBackUrl: string | null;
+  paymentMethod: string | null;
+  bankName: string | null;
+  bankBranchCode: string | null;
+  bankAccountType: string | null;
+  bankAccountNumber: string | null;
+  bankAccountName: string | null;
+  bankAccountNameKana: string | null;
+  bankCardImageUrl: string | null;
 };
 
 export default function ProfilePage() {
@@ -27,6 +35,21 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cardFrontInputRef = useRef<HTMLInputElement>(null);
   const cardBackInputRef = useRef<HTMLInputElement>(null);
+  const bankCardInputRef = useRef<HTMLInputElement>(null);
+
+  // 給与受取方法
+  const [paymentMethod, setPaymentMethod] = useState<'現金' | '振込' | ''>('');
+  const [bankCardStep, setBankCardStep] = useState<'idle' | 'uploading' | 'analyzing' | 'form' | 'error'>('idle');
+  const [bankCardError, setBankCardError] = useState('');
+  const [savingBank, setSavingBank] = useState(false);
+  const [bankForm, setBankForm] = useState({
+    bankName: '',
+    bankBranchCode: '',
+    bankAccountType: '普通',
+    bankAccountNumber: '',
+    bankAccountName: '',
+    bankAccountNameKana: '',
+  });
 
   const [form, setForm] = useState({
     phone: '',
@@ -48,6 +71,22 @@ export default function ProfilePage() {
           address: data.address || '',
           buildingName: data.buildingName || '',
         });
+        if (data.paymentMethod) {
+          setPaymentMethod(data.paymentMethod as '現金' | '振込');
+        }
+        if (data.bankName || data.bankBranchCode) {
+          setBankForm({
+            bankName: data.bankName || '',
+            bankBranchCode: data.bankBranchCode || '',
+            bankAccountType: data.bankAccountType || '普通',
+            bankAccountNumber: data.bankAccountNumber || '',
+            bankAccountName: data.bankAccountName || '',
+            bankAccountNameKana: data.bankAccountNameKana || '',
+          });
+          if (data.paymentMethod === '振込' && data.bankAccountNumber) {
+            setBankCardStep('form');
+          }
+        }
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -135,6 +174,134 @@ export default function ProfilePage() {
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
       img.src = url;
     });
+  };
+
+  // 給与受取方法: 現金選択時の保存
+  const handleCashSelect = async () => {
+    setPaymentMethod('現金');
+    setMessage(null);
+    const res = await fetch('/api/staff/bank-card', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paymentMethod: '現金' }),
+    });
+    if (res.ok) {
+      setProfile((p) => p ? { ...p, paymentMethod: '現金' } : p);
+      setMessage({ type: 'success', text: '給与受取方法を「現金」に設定しました' });
+      setBankCardStep('idle');
+    } else {
+      setMessage({ type: 'error', text: '保存に失敗しました' });
+    }
+  };
+
+  // 給与受取方法: 銀行振込選択
+  const handleBankSelect = () => {
+    setPaymentMethod('振込');
+    // 既に口座情報が登録済みならフォーム表示
+    if (profile?.bankAccountNumber) {
+      setBankCardStep('form');
+    } else {
+      setBankCardStep('idle');
+    }
+  };
+
+  // キャッシュカード撮影・アップロード・解析
+  const handleBankCardCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBankCardStep('uploading');
+    setBankCardError('');
+    setMessage(null);
+
+    try {
+      // 1. 画像圧縮
+      let uploadBlob: Blob = file;
+      try {
+        uploadBlob = await compressImage(file);
+      } catch {
+        // 圧縮失敗時は元ファイルを使用
+      }
+
+      // 2. プリサインドURL取得
+      const presignRes = await fetch('/api/staff/bank-card');
+      const presignData = await presignRes.json();
+      if (!presignRes.ok) {
+        setBankCardStep('error');
+        setBankCardError(presignData.error || 'URL取得に失敗しました');
+        return;
+      }
+
+      // 3. S3にアップロード
+      const s3Res = await fetch(presignData.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'image/jpeg' },
+        body: uploadBlob,
+      });
+      if (!s3Res.ok) {
+        setBankCardStep('error');
+        setBankCardError(`S3アップロード失敗 (${s3Res.status})`);
+        return;
+      }
+
+      // 4. AI解析
+      setBankCardStep('analyzing');
+      const analyzeRes = await fetch('/api/staff/bank-card', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ s3Key: presignData.s3Key }),
+      });
+      const analyzeData = await analyzeRes.json();
+
+      if (!analyzeData.success) {
+        if (analyzeData.manualInput) {
+          // Gemini未設定時 → 手動入力フォーム表示
+          setBankCardStep('form');
+          return;
+        }
+        setBankCardStep('error');
+        setBankCardError(analyzeData.error || 'カードの読み取りに失敗しました');
+        return;
+      }
+
+      // 5. 解析成功 → フォームに自動入力
+      setBankForm({
+        bankName: analyzeData.data.bankName || '',
+        bankBranchCode: analyzeData.data.branchCode || '',
+        bankAccountType: analyzeData.data.accountType || '普通',
+        bankAccountNumber: analyzeData.data.accountNumber || '',
+        bankAccountName: analyzeData.data.accountHolder || '',
+        bankAccountNameKana: analyzeData.data.accountHolderKana || '',
+      });
+      setBankCardStep('form');
+    } catch (err) {
+      setBankCardStep('error');
+      setBankCardError(err instanceof Error ? err.message : 'エラーが発生しました');
+    }
+
+    if (bankCardInputRef.current) bankCardInputRef.current.value = '';
+  };
+
+  // 口座情報の保存
+  const handleSaveBankInfo = async () => {
+    setSavingBank(true);
+    setMessage(null);
+    const res = await fetch('/api/staff/bank-card', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        paymentMethod: '振込',
+        ...bankForm,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setProfile((p) => p ? { ...p, ...data } : p);
+      setMessage({ type: 'success', text: '口座情報を保存しました' });
+    } else {
+      setMessage({ type: 'error', text: data.error || '口座情報の保存に失敗しました' });
+    }
+    setSavingBank(false);
   };
 
   const handleCardUpload = async (e: React.ChangeEvent<HTMLInputElement>, side: 'front' | 'back') => {
@@ -355,6 +522,222 @@ export default function ProfilePage() {
             />
           </div>
         </div>
+      </div>
+
+      {/* 給与受取方法 */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 space-y-4">
+        <div className="flex items-center gap-2">
+          <i className="bi bi-cash-stack text-lg text-indigo-600"></i>
+          <h2 className="font-bold text-slate-800">給与受取方法</h2>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleCashSelect}
+            className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all ${
+              paymentMethod === '現金'
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <i className="bi bi-cash mr-1.5"></i>現金
+          </button>
+          <button
+            type="button"
+            onClick={handleBankSelect}
+            className={`flex-1 py-3 rounded-xl border-2 font-bold text-sm transition-all ${
+              paymentMethod === '振込'
+                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <i className="bi bi-bank mr-1.5"></i>銀行振込
+          </button>
+        </div>
+
+        {paymentMethod === '振込' && (
+          <>
+            {/* カード撮影エリア（フォーム未表示時） */}
+            {bankCardStep === 'idle' && (
+              <div>
+                <p className="text-xs text-slate-500 mb-3">キャッシュカードを撮影すると、口座情報を自動で読み取ります</p>
+                <div
+                  onClick={() => bankCardInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors bg-slate-50"
+                >
+                  <i className="bi bi-camera-fill text-3xl text-slate-300"></i>
+                  <p className="text-sm text-slate-500 mt-2 font-bold">タップしてキャッシュカードを撮影</p>
+                  <p className="text-[10px] text-slate-400 mt-1">カードの表面が鮮明に映るように撮影してください</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBankCardStep('form')}
+                  className="w-full mt-2 text-xs text-indigo-600 hover:text-indigo-700 font-bold py-2"
+                >
+                  手動で入力する
+                </button>
+                <input
+                  ref={bankCardInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBankCardCapture}
+                />
+              </div>
+            )}
+
+            {/* アップロード中 */}
+            {bankCardStep === 'uploading' && (
+              <div className="flex flex-col items-center py-8">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm text-slate-500 mt-3 font-bold">アップロード中...</p>
+              </div>
+            )}
+
+            {/* AI解析中 */}
+            {bankCardStep === 'analyzing' && (
+              <div className="flex flex-col items-center py-8">
+                <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-sm text-slate-500 mt-3 font-bold">AI解析中...</p>
+                <p className="text-[10px] text-slate-400 mt-1">カード情報を読み取っています</p>
+              </div>
+            )}
+
+            {/* エラー */}
+            {bankCardStep === 'error' && (
+              <div>
+                <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-center">
+                  <i className="bi bi-exclamation-triangle-fill text-2xl text-rose-400"></i>
+                  <p className="text-sm text-rose-700 mt-2 font-bold">{bankCardError}</p>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBankCardStep('idle');
+                      setBankCardError('');
+                    }}
+                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-colors"
+                  >
+                    <i className="bi bi-camera-fill mr-1.5"></i>もう一度撮影
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBankCardStep('form')}
+                    className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold rounded-xl text-sm hover:bg-slate-50 transition-colors"
+                  >
+                    手動で入力
+                  </button>
+                </div>
+                <input
+                  ref={bankCardInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBankCardCapture}
+                />
+              </div>
+            )}
+
+            {/* 確認フォーム */}
+            {bankCardStep === 'form' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-600">口座情報</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBankCardStep('idle');
+                      if (bankCardInputRef.current) bankCardInputRef.current.value = '';
+                    }}
+                    className="text-[10px] text-indigo-600 font-bold hover:text-indigo-700"
+                  >
+                    <i className="bi bi-camera-fill mr-1"></i>再撮影
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1 ml-1">銀行名</label>
+                  <input
+                    type="text"
+                    value={bankForm.bankName}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankName: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm"
+                    placeholder="例: 三菱UFJ銀行"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1 ml-1">支店番号</label>
+                  <input
+                    type="text"
+                    value={bankForm.bankBranchCode}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankBranchCode: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm"
+                    placeholder="例: 001"
+                    maxLength={10}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1 ml-1">口座種別</label>
+                  <select
+                    value={bankForm.bankAccountType}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountType: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm"
+                  >
+                    <option value="普通">普通</option>
+                    <option value="当座">当座</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1 ml-1">口座番号</label>
+                  <input
+                    type="text"
+                    value={bankForm.bankAccountNumber}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNumber: e.target.value.replace(/\D/g, '') }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm"
+                    placeholder="例: 1234567"
+                    maxLength={8}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 mb-1 ml-1">名義（カナ）</label>
+                  <input
+                    type="text"
+                    value={bankForm.bankAccountNameKana}
+                    onChange={(e) => setBankForm((f) => ({ ...f, bankAccountNameKana: e.target.value }))}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-sm"
+                    placeholder="例: ヤマダ タロウ"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveBankInfo}
+                  disabled={savingBank || !bankForm.bankAccountNumber}
+                  className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-sm transition-colors disabled:opacity-70 text-sm"
+                >
+                  {savingBank ? '保存中...' : '口座情報を保存する'}
+                </button>
+
+                <input
+                  ref={bankCardInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleBankCardCapture}
+                />
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {/* Edit form */}

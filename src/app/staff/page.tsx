@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import OnboardingModal from '@/components/staff/OnboardingModal';
+import SetupPromptModal from '@/components/staff/SetupPromptModal';
 
 type Shift = {
   id: number;
@@ -51,6 +53,9 @@ export default function DistributorDashboard() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [payroll, setPayroll] = useState<PayrollRecord>(null);
   const [loading, setLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+  const [missingSteps, setMissingSteps] = useState<('residence-card' | 'payment-method')[]>([]);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -81,6 +86,23 @@ export default function DistributorDashboard() {
       if (profile.isPasswordTemp) {
         router.push('/staff/change-password');
         return;
+      }
+
+      // Determine missing setup steps
+      const missing: ('residence-card' | 'payment-method')[] = [];
+      if (!profile.residenceCardFrontUrl || !profile.residenceCardBackUrl) {
+        missing.push('residence-card');
+      }
+      if (!profile.paymentMethod) {
+        missing.push('payment-method');
+      }
+      setMissingSteps(missing);
+
+      if (!profile.hasSeenOnboarding) {
+        setShowOnboarding(true);
+      } else if (missing.length > 0) {
+        // If onboarding already done but setup incomplete, show setup prompt directly
+        setShowSetup(true);
       }
 
       // Fetch shifts — may span two months
@@ -135,6 +157,16 @@ export default function DistributorDashboard() {
 
   return (
     <div className="space-y-6">
+      {showOnboarding && (
+        <OnboardingModal lang="ja" onComplete={() => {
+          setShowOnboarding(false);
+          if (missingSteps.length > 0) setShowSetup(true);
+        }} />
+      )}
+      {showSetup && !showOnboarding && (
+        <SetupPromptModal lang="ja" missingSteps={missingSteps} onComplete={() => setShowSetup(false)} />
+      )}
+
       {/* 7-day shift schedule */}
       <div>
         <h2 className="text-sm font-bold text-slate-600 mb-3 px-1">今後7日間のシフト</h2>

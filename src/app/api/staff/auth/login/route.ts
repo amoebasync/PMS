@@ -77,6 +77,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       isPasswordTemp: distributor.isPasswordTemp,
+      hasSeenOnboarding: distributor.hasSeenOnboarding,
       language: distributor.language || 'ja',
       user: { name: distributor.name, staffId: distributor.staffId },
     });

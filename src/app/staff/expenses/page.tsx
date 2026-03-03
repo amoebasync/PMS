@@ -110,6 +110,21 @@ export default function ExpensesPage() {
         </button>
       </div>
 
+      {/* 交通費ルール案内 */}
+      <div className="bg-sky-50 border border-sky-200 rounded-2xl p-4">
+        <div className="flex items-start gap-2.5">
+          <i className="bi bi-info-circle-fill text-sky-500 mt-0.5 shrink-0"></i>
+          <div className="space-y-1.5">
+            <p className="text-sm font-bold text-sky-800">交通費のルール</p>
+            <ul className="text-xs text-sky-700 space-y-1 leading-relaxed">
+              <li>・1日の上限: <span className="font-bold">¥1,000</span></li>
+              <li>・提出期限: <span className="font-bold">翌週月曜日 15:00</span>まで</li>
+              <li>・期限を過ぎた場合は、ご登録の住所を元に会社が計算して支払います</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
       {message && (
         <div
           className={`p-3 rounded-xl text-sm font-bold ${

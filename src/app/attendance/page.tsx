@@ -161,6 +161,23 @@ export default function AttendancePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleDuplicateNextDay = (att: any) => {
+    const currentDate = new Date(att.date.split('T')[0]);
+    currentDate.setDate(currentDate.getDate() + 1);
+    const nextDay = currentDate.toLocaleDateString('sv-SE');
+    setAttendanceForm({
+      date: nextDay,
+      attendanceTypeId: att.attendanceTypeId.toString(),
+      startTime: att.startTime || '09:00',
+      endTime: att.endTime || '18:00',
+      breakMinutes: att.breakMinutes || 60,
+      note: att.note || '',
+      saveAsDefault: false
+    });
+    showToast(t('duplicate_success'), 'info');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleExpenseSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -206,39 +223,31 @@ export default function AttendancePage() {
     <div className="max-w-6xl mx-auto space-y-6 pb-10">
 
 
-      {/* HR管理者向け: 対象社員セレクター */}
-      {isHrAdmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-amber-800">
-            <i className="bi bi-person-gear text-lg"></i>
-            <span className="text-sm font-bold">{t('admin_mode')}</span>
-          </div>
-          <select
-            value={selectedEmployeeId}
-            onChange={e => handleEmployeeChange(e.target.value)}
-            className="border border-amber-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:ring-2 focus:ring-amber-400 outline-none font-medium min-w-[200px]"
-          >
-            <option value="">{t('view_own')}</option>
-            {employees.map(emp => (
-              <option key={emp.id} value={emp.id}>
-                {emp.lastNameJa} {emp.firstNameJa}（{emp.employeeCode || emp.id}）
-              </option>
-            ))}
-          </select>
-          {isViewingOther && (
-            <span className="text-sm font-bold text-amber-700 bg-amber-100 border border-amber-300 px-3 py-1 rounded-full">
-              <i className="bi bi-eye-fill mr-1"></i>
-              {selectedEmployee?.lastNameJa} {selectedEmployee?.firstNameJa}{t('viewing_other')}
-            </span>
+      <div className="flex items-center border-b border-slate-200">
+        <div className="flex">
+          <button onClick={() => setActiveTab('ATTENDANCE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-calendar-check mr-2"></i> {t('tab_attendance')}</button>
+          {/* 他社員表示中は経費タブを非表示 */}
+          {!isViewingOther && (
+            <button onClick={() => setActiveTab('EXPENSE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-receipt mr-2"></i> {t('tab_expense')}</button>
           )}
         </div>
-      )}
-
-      <div className="flex border-b border-slate-200">
-        <button onClick={() => setActiveTab('ATTENDANCE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'ATTENDANCE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-calendar-check mr-2"></i> {t('tab_attendance')}</button>
-        {/* 他社員表示中は経費タブを非表示 */}
-        {!isViewingOther && (
-          <button onClick={() => setActiveTab('EXPENSE')} className={`px-6 py-3 font-bold text-sm transition-colors border-b-2 ${activeTab === 'EXPENSE' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}><i className="bi bi-receipt mr-2"></i> {t('tab_expense')}</button>
+        {/* HR管理者向け: 対象社員セレクター（コンパクト・右寄せ） */}
+        {isHrAdmin && (
+          <div className="ml-auto flex items-center gap-2">
+            <i className="bi bi-person-gear text-amber-600"></i>
+            <select
+              value={selectedEmployeeId}
+              onChange={e => handleEmployeeChange(e.target.value)}
+              className="border border-amber-300 rounded-lg px-2 py-1.5 text-xs bg-amber-50 focus:ring-2 focus:ring-amber-400 outline-none font-bold text-amber-800 min-w-[180px]"
+            >
+              <option value="">{t('view_own')}</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.lastNameJa} {emp.firstNameJa}（{emp.employeeCode || emp.id}）
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
@@ -407,17 +416,19 @@ export default function AttendancePage() {
                           </span>
                         </td>
                         <td className="py-3 text-center">
-                          {/* 自分：PENDINGのみ操作可 / HR管理者が他社員：全ステータス削除可 */}
-                          {(att.status === 'PENDING' || isViewingOther) ? (
-                            <div className="flex justify-center gap-2">
-                              {att.status === 'PENDING' && (
-                                <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center hover:bg-blue-100 shadow-sm" title="編集"><i className="bi bi-pencil"></i></button>
-                              )}
-                              <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-50 text-rose-600 border border-rose-200 rounded flex items-center justify-center hover:bg-rose-100 shadow-sm" title="削除"><i className="bi bi-trash3"></i></button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-slate-300">-</span>
-                          )}
+                          <div className="flex justify-center gap-1.5">
+                            {/* 翌日に複製ボタン（常に表示） */}
+                            <button onClick={() => handleDuplicateNextDay(att)} className="w-7 h-7 bg-indigo-50 text-indigo-600 border border-indigo-200 rounded flex items-center justify-center hover:bg-indigo-100 shadow-sm" title={t('duplicate_next_day')}><i className="bi bi-copy"></i></button>
+                            {/* 自分：PENDINGのみ操作可 / HR管理者が他社員：全ステータス削除可 */}
+                            {(att.status === 'PENDING' || isViewingOther) && (
+                              <>
+                                {att.status === 'PENDING' && (
+                                  <button onClick={() => handleEditAttendance(att)} className="w-7 h-7 bg-blue-50 text-blue-600 border border-blue-200 rounded flex items-center justify-center hover:bg-blue-100 shadow-sm" title="編集"><i className="bi bi-pencil"></i></button>
+                                )}
+                                <button onClick={() => handleDeleteAttendance(att.date)} className="w-7 h-7 bg-rose-50 text-rose-600 border border-rose-200 rounded flex items-center justify-center hover:bg-rose-100 shadow-sm" title="削除"><i className="bi bi-trash3"></i></button>
+                              </>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
