@@ -41,7 +41,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'evaluation' | 'rankRates' | 'headerLinks'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'evaluation' | 'rankRates' | 'headerLinks' | 'legal'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -537,9 +537,51 @@ export default function SettingsPage() {
     { key: 'evaluation',          label: '評価設定',    icon: 'bi-speedometer2' },
     { key: 'rankRates',            label: 'ランク別単価', icon: 'bi-currency-yen' },
     { key: 'headerLinks',          label: 'リンク集',     icon: 'bi-link-45deg' },
+    { key: 'legal',                label: '法務',         icon: 'bi-file-earmark-text' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks' && tab !== 'legal';
+
+  // 法務コンテンツ
+  const [legalContents, setLegalContents] = useState<Record<string, string>>({
+    privacyPolicy: '',
+    termsOfService: '',
+    appPrivacyPolicy: '',
+  });
+  const [legalLoading, setLegalLoading] = useState(false);
+  const [legalSaving, setLegalSaving] = useState<string | null>(null);
+  const [legalPreview, setLegalPreview] = useState<string | null>(null);
+
+  const fetchLegalContents = async () => {
+    setLegalLoading(true);
+    try {
+      const keys = ['privacyPolicy', 'termsOfService', 'appPrivacyPolicy'];
+      const results = await Promise.all(
+        keys.map(key => fetch(`/api/legal-content?key=${key}`).then(r => r.json()))
+      );
+      const newContents: Record<string, string> = {};
+      keys.forEach((key, i) => { newContents[key] = results[i].content || ''; });
+      setLegalContents(newContents);
+    } catch (e) { console.error(e); }
+    setLegalLoading(false);
+  };
+
+  const handleSaveLegal = async (key: string) => {
+    setLegalSaving(key);
+    try {
+      const res = await fetch('/api/legal-content', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, content: legalContents[key] }),
+      });
+      if (!res.ok) throw new Error();
+      showToast('保存しました', 'success');
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setLegalSaving(null);
+    }
+  };
 
   // 評価設定
   const [evalSettings, setEvalSettings] = useState({
@@ -713,7 +755,7 @@ export default function SettingsPage() {
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'alertCategory') fetchAlertCategories(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); if (t.key === 'headerLinks') fetchHeaderLinks(); }}
+              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'alertCategory') fetchAlertCategories(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); if (t.key === 'headerLinks') fetchHeaderLinks(); if (t.key === 'legal') fetchLegalContents(); }}
               className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === t.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${t.icon}`}></i> {t.label}
@@ -2025,6 +2067,95 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* 法務タブ */}
+        {tab === 'legal' && (
+          legalLoading ? (
+            <div className="flex items-center justify-center h-40 text-slate-400">
+              <i className="bi bi-hourglass-split text-2xl animate-spin mr-3" />読み込み中...
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {([
+                { key: 'privacyPolicy', label: 'プライバシーポリシー', icon: 'bi-shield-lock-fill', color: 'text-slate-600', desc: 'ECポータル・応募フォームに表示されるプライバシーポリシー', path: '/portal/privacy' },
+                { key: 'termsOfService', label: '利用規約', icon: 'bi-file-earmark-check-fill', color: 'text-indigo-500', desc: 'ECポータルに表示される利用規約', path: '/portal/terms' },
+                { key: 'appPrivacyPolicy', label: 'アプリプライバシーポリシー', icon: 'bi-phone-fill', color: 'text-emerald-500', desc: '配布スタッフ向けモバイルアプリのプライバシーポリシー', path: '/app-privacy' },
+              ] as const).map(item => (
+                <div key={item.key} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h2 className="font-bold text-slate-700 flex items-center gap-2">
+                        <i className={`bi ${item.icon} ${item.color}`}></i>
+                        {item.label}
+                      </h2>
+                      <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setLegalPreview(legalPreview === item.key ? null : item.key)}
+                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${
+                          legalPreview === item.key
+                            ? 'bg-indigo-100 text-indigo-700'
+                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        }`}
+                      >
+                        <i className={`bi ${legalPreview === item.key ? 'bi-code-slash' : 'bi-eye'} mr-1`}></i>
+                        {legalPreview === item.key ? '編集' : 'プレビュー'}
+                      </button>
+                      <a
+                        href={item.path}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 text-xs font-bold rounded-lg bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors"
+                      >
+                        <i className="bi bi-box-arrow-up-right mr-1"></i>表示確認
+                      </a>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    {legalPreview === item.key ? (
+                      <div className="border border-slate-200 rounded-xl p-6 bg-slate-50 max-h-[500px] overflow-y-auto">
+                        {legalContents[item.key] ? (
+                          <div
+                            className="legal-content space-y-6 text-sm leading-loose text-slate-700"
+                            dangerouslySetInnerHTML={{ __html: legalContents[item.key] }}
+                          />
+                        ) : (
+                          <p className="text-slate-400 text-sm text-center py-8">コンテンツが未設定です。HTMLを入力してください。</p>
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={legalContents[item.key]}
+                        onChange={e => setLegalContents(prev => ({ ...prev, [item.key]: e.target.value }))}
+                        rows={16}
+                        className="w-full border border-slate-300 rounded-xl p-4 text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-500 resize-y leading-relaxed"
+                        placeholder={`${item.label}のHTMLコンテンツを入力...\n\n例:\n<p>本文テキスト</p>\n<section>\n  <h4>1. 見出し</h4>\n  <p>内容</p>\n</section>`}
+                      />
+                    )}
+                    <div className="flex items-center justify-between mt-4">
+                      <p className="text-xs text-slate-400">
+                        <i className="bi bi-info-circle mr-1"></i>
+                        HTML形式で入力。h4, p, section, ul, ol, li, strong, table 等のタグが利用可能です。空の場合はデフォルトの内容が表示されます。
+                      </p>
+                      <button
+                        onClick={() => handleSaveLegal(item.key)}
+                        disabled={legalSaving === item.key}
+                        className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {legalSaving === item.key ? (
+                          <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> 保存中...</>
+                        ) : (
+                          <><i className="bi bi-check2"></i> 保存</>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         )}
       </div>
 

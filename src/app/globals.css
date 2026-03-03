@@ -45,3 +45,32 @@ body {
 .sidebar-scrollbar.is-scrolling::-webkit-scrollbar-thumb {
   background-color: #cbd5e1 !important;
 }
+
+/* 法務コンテンツ（DB保存HTML表示用） */
+.legal-content section { margin-bottom: 1.5rem; }
+.legal-content h2,
+.legal-content h3,
+.legal-content h4 {
+  font-weight: 900;
+  color: #1e293b;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  border-left: 4px solid #1e293b;
+  padding-left: 0.5rem;
+}
+.legal-content p { margin-bottom: 0.75rem; }
+.legal-content ul { list-style-type: disc; padding-left: 1.25rem; }
+.legal-content ol { list-style-type: decimal; padding-left: 1.25rem; }
+.legal-content li { margin-bottom: 0.5rem; }
+.legal-content strong { font-weight: 700; color: #1e293b; }
+.legal-content a { color: #4f46e5; text-decoration: underline; }
+.legal-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+.legal-content th,
+.legal-content td { border: 1px solid #e2e8f0; padding: 0.5rem 0.75rem; text-align: left; }
+.legal-content th { background-color: #f8fafc; font-weight: 700; }
+.legal-content blockquote {
+  border-left: 4px solid #e2e8f0;
+  padding-left: 1rem;
+  color: #64748b;
+  margin: 1rem 0;
+}

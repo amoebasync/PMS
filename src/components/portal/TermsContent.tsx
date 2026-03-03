@@ -1,10 +1,30 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 
 export default function TermsContent() {
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/legal-content?key=termsOfService')
+      .then(res => res.json())
+      .then(data => { if (data.content) setHtmlContent(data.content); })
+      .catch(() => {});
+  }, []);
+
+  if (htmlContent) {
+    return (
+      <div
+        className="legal-content space-y-6 text-sm leading-loose text-slate-700"
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 text-sm leading-loose text-slate-700">
       <p>
-        本利用規約（以下「本規約」といいます。）は、株式会社KP（以下「当社」といいます。）が提供する、印刷、配布等のサービス（以下総称して「本サービス」といいます。）の利用条件及び本サービスの利用者と当社との間の権利義務関係について定められています。本サービスの利用に際しては、本規約の全文をお読みいただいた上で、本規約に同意していただく必要があります。
+        本利用規約（以下「本規約」といいます。）は、株式会社ティラミス（以下「当社」といいます。）が提供する、印刷、配布等のサービス（以下総称して「本サービス」といいます。）の利用条件及び本サービスの利用者と当社との間の権利義務関係について定められています。本サービスの利用に際しては、本規約の全文をお読みいただいた上で、本規約に同意していただく必要があります。
       </p>
 
       <section>
@@ -75,7 +95,7 @@ export default function TermsContent() {
 
       <div className="pt-8 text-right text-slate-500 font-bold">
         <p>制定日：2022年10月1日</p>
-        <p>株式会社KP</p>
+        <p>株式会社ティラミス</p>
       </div>
     </div>
   );

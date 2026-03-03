@@ -1,16 +1,36 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useEffect } from 'react';
 
 export default function PrivacyContent() {
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/legal-content?key=privacyPolicy')
+      .then(res => res.json())
+      .then(data => { if (data.content) setHtmlContent(data.content); })
+      .catch(() => {});
+  }, []);
+
+  if (htmlContent) {
+    return (
+      <div
+        className="legal-content space-y-6 text-sm leading-loose text-slate-700"
+        dangerouslySetInnerHTML={{ __html: htmlContent }}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6 text-sm leading-loose text-slate-700">
       <p>
-        株式会社KP（以下、「当社」といいます）は、印刷、配布等のサービス（以下、「本サービス」といいます）を営む企業として、個人情報の保護に関する法律に規定される「個人情報」を適正に取り扱っております。本サービスにおける個人情報の取り扱いについて、以下のとおりお知らせいたします。
+        株式会社ティラミス（以下、「当社」といいます）は、印刷、配布等のサービス（以下、「本サービス」といいます）を営む企業として、個人情報の保護に関する法律に規定される「個人情報」を適正に取り扱っております。本サービスにおける個人情報の取り扱いについて、以下のとおりお知らせいたします。
       </p>
 
       <section>
         <h4 className="font-black text-slate-800 text-base mb-2 border-l-4 border-slate-800 pl-2">1. 個人情報の取扱事業者の名称等</h4>
         <p>
-          株式会社KP<br />
+          株式会社ティラミス<br />
           〒104-0061 東京都中央区銀座一丁目22番11号 銀座大竹ビジデンス 2F<br />
           代表取締役　金 鍵煕
         </p>
@@ -70,7 +90,7 @@ export default function PrivacyContent() {
       <section>
         <h4 className="font-black text-slate-800 text-base mb-2 border-l-4 border-slate-800 pl-2">9. 個人情報に関するお問合せ窓口</h4>
         <div className="bg-slate-100 p-5 rounded-xl text-center mt-2">
-          <p className="font-bold text-slate-800 mb-1">株式会社KP 個人情報保護相談窓口</p>
+          <p className="font-bold text-slate-800 mb-1">株式会社ティラミス 個人情報保護相談窓口</p>
           <p>Email: info@tiramis.co.jp</p>
           <p className="text-xs text-slate-500 mt-2">（受付時間：10:00～17:00 / 土・日・祝日・年末年始を除く）</p>
         </div>
@@ -78,7 +98,7 @@ export default function PrivacyContent() {
 
       <div className="pt-8 text-right text-slate-500 font-bold">
         <p>制定日：2022年10月1日</p>
-        <p>株式会社KP</p>
+        <p>株式会社ティラミス</p>
       </div>
     </div>
   );

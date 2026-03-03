@@ -22,7 +22,7 @@ export function PortalFooter() {
               〒104-0061<br />
               東京都中央区銀座一丁目22番11号<br />
               銀座大竹ビジデンス 2F<br />
-              株式会社KP
+              株式会社ティラミス
             </div>
           </div>
 
@@ -45,7 +45,7 @@ export function PortalFooter() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-slate-700 text-center text-xs text-slate-500 font-mono">
-          &copy; {new Date().getFullYear()} KP Inc. All Rights Reserved.
+          &copy; {new Date().getFullYear()} Tiramis Inc. All Rights Reserved.
         </div>
       </div>
     </footer>
