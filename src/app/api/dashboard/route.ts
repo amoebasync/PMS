@@ -89,6 +89,10 @@ export async function GET() {
       where: { status: 'UNRESOLVED' },
     });
 
+    // 8. アラート件数
+    const openAlertCount = await prisma.alert.count({ where: { status: 'OPEN' } });
+    const criticalAlertCount = await prisma.alert.count({ where: { status: 'OPEN', severity: 'CRITICAL' } });
+
     // 6. CRM タスク集計
     const overdueTaskCount = await prisma.task.count({
       where: {
@@ -181,6 +185,10 @@ export async function GET() {
       },
       quality: {
         unresolvedComplaintCount,
+      },
+      alertSummary: {
+        openAlertCount,
+        criticalAlertCount,
       },
       evaluation: {
         topDistributors,

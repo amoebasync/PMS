@@ -45,6 +45,15 @@ if [ -n "$CRON_SECRET" ]; then
     echo "CRON既存: 配布員評価（スキップ）"
   fi
 
+  # --- ビザ期限チェック CRON 登録（重複時はスキップ） ---
+  VISA_CRON_JOB="30 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/check-visa-expiry >> /tmp/pms-cron-check-visa-expiry.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "check-visa-expiry"; then
+    (crontab -l 2>/dev/null; echo "$VISA_CRON_JOB") | crontab -
+    echo "CRON登録: ビザ期限チェック（毎日03:30）"
+  else
+    echo "CRON既存: ビザ期限チェック（スキップ）"
+  fi
+
   # --- ハウスキープ CRON 登録（重複時はスキップ） ---
   # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
   HOUSEKEEP_CRON_JOB="0 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"

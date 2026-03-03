@@ -41,7 +41,7 @@ const inp = 'w-full border border-slate-300 p-3 rounded-xl text-sm outline-none 
 
 export default function SettingsPage() {
   const { showToast, showConfirm } = useNotification();
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'evaluation' | 'rankRates' | 'headerLinks'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'evaluation' | 'rankRates' | 'headerLinks'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -123,6 +123,12 @@ export default function SettingsPage() {
   const [ctEditing, setCtEditing] = useState<number | null>(null);
   const [ctSubmitting, setCtSubmitting] = useState(false);
 
+  // アラートカテゴリ管理
+  const [alertCategories, setAlertCategories] = useState<any[]>([]);
+  const [acForm, setAcForm] = useState({ name: '', icon: '', colorCls: '', sortOrder: 100, isActive: true });
+  const [acEditing, setAcEditing] = useState<number | null>(null);
+  const [acSubmitting, setAcSubmitting] = useState(false);
+
   const ICON_OPTIONS = [
     { value: 'bi-briefcase-fill', label: '💼 営業' },
     { value: 'bi-truck', label: '🚛 現場' },
@@ -132,6 +138,9 @@ export default function SettingsPage() {
     { value: 'bi-megaphone-fill', label: '📢 広報' },
     { value: 'bi-people-fill', label: '👥 人事' },
     { value: 'bi-box-seam-fill', label: '📦 物流' },
+    { value: 'bi-bicycle', label: '🚲 配布員' },
+    { value: 'bi-shield-check', label: '🛡️ セキュリティ' },
+    { value: 'bi-bell-fill', label: '🔔 通知' },
   ];
   const COLOR_OPTIONS = [
     { value: 'bg-blue-100 text-blue-700', label: '青' },
@@ -334,6 +343,56 @@ export default function SettingsPage() {
     }
   };
 
+  // アラートカテゴリ fetch & CRUD
+  const fetchAlertCategories = useCallback(async () => {
+    const res = await fetch('/api/alert-categories');
+    if (res.ok) setAlertCategories(await res.json());
+  }, []);
+
+  const handleSaveAC = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAcSubmitting(true);
+    try {
+      const method = acEditing ? 'PUT' : 'POST';
+      const url = acEditing ? `/api/alert-categories?id=${acEditing}` : '/api/alert-categories';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(acForm),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '保存に失敗しました', 'error');
+        return;
+      }
+      showToast(acEditing ? 'アラートカテゴリを更新しました' : 'アラートカテゴリを追加しました', 'success');
+      setAcEditing(null);
+      setAcForm({ name: '', icon: '', colorCls: '', sortOrder: 100, isActive: true });
+      await fetchAlertCategories();
+    } catch {
+      showToast('保存に失敗しました', 'error');
+    } finally {
+      setAcSubmitting(false);
+    }
+  };
+
+  const handleDeleteAC = async (item: any) => {
+    const ok = await showConfirm(`「${item.name}」を削除しますか？`, { variant: 'danger', confirmLabel: '削除する' });
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/alert-categories?id=${item.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const d = await res.json();
+        showToast(d.error || '削除に失敗しました', 'error');
+        return;
+      }
+      showToast('削除しました', 'success');
+      await fetchAlertCategories();
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    }
+  };
+
   const fetchSystemSettings = async () => {
     try {
       const res = await fetch('/api/settings/system');
@@ -474,12 +533,13 @@ export default function SettingsPage() {
     { key: 'recruitingMedia',     label: '求人媒体',    icon: 'bi-megaphone-fill' },
     { key: 'prohibitedReason',   label: '禁止理由',    icon: 'bi-shield-x' },
     { key: 'complaintType',      label: 'クレーム種別', icon: 'bi-exclamation-circle' },
+    { key: 'alertCategory',      label: 'アラートカテゴリ', icon: 'bi-bell' },
     { key: 'evaluation',          label: '評価設定',    icon: 'bi-speedometer2' },
     { key: 'rankRates',            label: 'ランク別単価', icon: 'bi-currency-yen' },
     { key: 'headerLinks',          label: 'リンク集',     icon: 'bi-link-45deg' },
   ] as const;
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks';
 
   // 評価設定
   const [evalSettings, setEvalSettings] = useState({
@@ -653,7 +713,7 @@ export default function SettingsPage() {
           {tabs.map(t => (
             <button
               key={t.key}
-              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); if (t.key === 'headerLinks') fetchHeaderLinks(); }}
+              onClick={() => { setTab(t.key); setErrorMsg(''); if (t.key === 'company') fetchCompanySettings(); if (t.key === 'prohibitedReason') fetchProhibitedReasons(); if (t.key === 'complaintType') fetchComplaintTypes(); if (t.key === 'alertCategory') fetchAlertCategories(); if (t.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (t.key === 'rankRates') fetchRankRates(); if (t.key === 'headerLinks') fetchHeaderLinks(); }}
               className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === t.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${t.icon}`}></i> {t.label}
@@ -780,6 +840,44 @@ export default function SettingsPage() {
                   >
                     {systemSaved ? <><i className="bi bi-check2"></i> 保存済</> : isSavingSystem ? '保存中...' : '保存'}
                   </button>
+                </div>
+              </div>
+            </div>
+            {/* 在留カードAI検証設定 */}
+            <div className="p-5 border-t border-slate-200">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <i className="bi bi-robot text-violet-500"></i>
+                在留カード AI 検証
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">配布員がアップロードした在留カード画像をAI（Gemini）で読み取り、DB情報と照合します。</p>
+            </div>
+            <div className="px-6 pb-6 divide-y divide-slate-100 space-y-0">
+              <div className="flex items-center justify-between gap-6 pb-6">
+                <div>
+                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i className="bi bi-toggle-on text-violet-500"></i>
+                    AI検証を有効にする
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">ONにすると、在留カードアップロード時に自動で検証が実行されます。</p>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <button
+                    onClick={() => {
+                      const newVal = systemSettings.residenceCardAiVerification === 'true' ? 'false' : 'true';
+                      setSystemSettings(prev => ({ ...prev, residenceCardAiVerification: newVal }));
+                      handleSaveSystemSetting('residenceCardAiVerification', newVal);
+                    }}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+                      systemSettings.residenceCardAiVerification === 'true' ? 'bg-violet-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                      systemSettings.residenceCardAiVerification === 'true' ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </button>
+                  <span className="text-sm font-bold text-slate-600 w-8">
+                    {systemSettings.residenceCardAiVerification === 'true' ? 'ON' : 'OFF'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1469,6 +1567,93 @@ export default function SettingsPage() {
                   )}
                   <button type="submit" disabled={ctSubmitting} className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition flex items-center gap-1.5">
                     {ctSubmitting ? '保存中...' : ctEditing ? '更新' : <><i className="bi bi-plus-lg"></i>追加</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+        {/* アラートカテゴリ設定タブ */}
+        {tab === 'alertCategory' && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-bell mr-2"></i>アラートカテゴリマスタ</h2>
+            </div>
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
+                <tr>
+                  <th className="px-5 py-3 text-left">名前</th>
+                  <th className="px-5 py-3 text-center">アイコン</th>
+                  <th className="px-5 py-3 text-center">カラー</th>
+                  <th className="px-5 py-3 text-center">表示順</th>
+                  <th className="px-5 py-3 text-center">有効/無効</th>
+                  <th className="px-5 py-3 text-center w-20">操作</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {alertCategories.map(item => (
+                  <tr key={item.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 font-bold text-slate-800">{item.name}</td>
+                    <td className="px-5 py-3 text-center">{item.icon && <i className={`bi ${item.icon} text-lg`}></i>}</td>
+                    <td className="px-5 py-3 text-center">
+                      {item.colorCls && <span className={`text-xs font-bold px-2 py-1 rounded ${item.colorCls}`}>サンプル</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center text-slate-500">{item.sortOrder}</td>
+                    <td className="px-5 py-3 text-center">
+                      {item.isActive ? <span className="text-emerald-600 font-bold text-xs">有効</span> : <span className="text-slate-400 text-xs">無効</span>}
+                    </td>
+                    <td className="px-5 py-3 text-center">
+                      <div className="flex items-center gap-2 justify-center">
+                        <button onClick={() => { setAcEditing(item.id); setAcForm({ name: item.name, icon: item.icon || '', colorCls: item.colorCls || '', sortOrder: item.sortOrder, isActive: item.isActive }); }} className="text-indigo-500 hover:text-indigo-700 font-bold text-xs"><i className="bi bi-pencil-fill"></i></button>
+                        <button onClick={() => handleDeleteAC(item)} className="text-rose-400 hover:text-rose-600 font-bold text-xs"><i className="bi bi-trash-fill"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {alertCategories.length === 0 && (
+                  <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-400">アラートカテゴリがありません</td></tr>
+                )}
+              </tbody>
+            </table>
+            <div className="border-t border-slate-100 p-6">
+              <h3 className="font-bold text-slate-700 text-sm mb-3">{acEditing ? 'アラートカテゴリを編集' : 'アラートカテゴリを追加'}</h3>
+              <form onSubmit={handleSaveAC} className="flex flex-wrap items-end gap-3">
+                <div className="flex-1 min-w-[200px]">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">名前 <span className="text-rose-500">*</span></label>
+                  <input type="text" required value={acForm.name} onChange={e => setAcForm(p => ({ ...p, name: e.target.value }))} className={inp} placeholder="例: 配布員, システム" />
+                </div>
+                <div className="w-48">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">アイコン</label>
+                  <select value={acForm.icon} onChange={e => setAcForm(p => ({ ...p, icon: e.target.value }))} className={inp}>
+                    <option value="">なし</option>
+                    {ICON_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="w-40">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">カラー</label>
+                  <select value={acForm.colorCls} onChange={e => setAcForm(p => ({ ...p, colorCls: e.target.value }))} className={inp}>
+                    <option value="">なし</option>
+                    {COLOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div className="w-24">
+                  <label className="block text-xs font-bold text-slate-500 mb-1">表示順</label>
+                  <input type="number" value={acForm.sortOrder} onChange={e => setAcForm(p => ({ ...p, sortOrder: parseInt(e.target.value) || 0 }))} className={inp} />
+                </div>
+                <div className="flex items-center gap-2 pb-1">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={acForm.isActive} onChange={e => setAcForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                    <span className="text-sm font-bold text-slate-700">有効</span>
+                  </label>
+                </div>
+                <div className="flex gap-2">
+                  {acEditing && (
+                    <button type="button" onClick={() => { setAcEditing(null); setAcForm({ name: '', icon: '', colorCls: '', sortOrder: 100, isActive: true }); }} className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 transition">
+                      キャンセル
+                    </button>
+                  )}
+                  <button type="submit" disabled={acSubmitting} className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm disabled:opacity-50 transition flex items-center gap-1.5">
+                    {acSubmitting ? '保存中...' : acEditing ? '更新' : <><i className="bi bi-plus-lg"></i>追加</>}
                   </button>
                 </div>
               </form>

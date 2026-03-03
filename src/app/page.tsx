@@ -145,8 +145,18 @@ export default function Dashboard() {
     <div className="space-y-6 animate-in fade-in duration-300 pb-10 max-w-7xl mx-auto">
 
       {/* ── Alerts ── */}
-      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0 || data.quality?.unresolvedComplaintCount > 0) && (
+      {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0 || data.quality?.unresolvedComplaintCount > 0 || data.alertSummary?.openAlertCount > 0) && (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {data.alertSummary?.openAlertCount > 0 && (
+            <AlertCard
+              href="/alerts"
+              icon="bi-bell-fill"
+              title={data.alertSummary.criticalAlertCount > 0 ? '緊急アラートあり' : '未対応アラート'}
+              message="未対応のアラートが"
+              count={data.alertSummary.openAlertCount}
+              color={data.alertSummary.criticalAlertCount > 0 ? 'red' : 'orange'}
+            />
+          )}
           {data.alerts.orders > 0 && (
             <AlertCard href="/orders" icon="bi-briefcase-fill" title="発注の確認・審査待ち" message="未処理の発注が" count={data.alerts.orders} color="orange" />
           )}

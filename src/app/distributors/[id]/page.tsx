@@ -204,6 +204,33 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   };
   const [formData, setFormData] = useState(initialForm);
 
+  // AI検証
+  const [verifying, setVerifying] = useState(false);
+  const [verificationExpanded, setVerificationExpanded] = useState(false);
+
+  const verifyResidenceCard = async () => {
+    setVerifying(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/verify-residence-card`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || '検証に失敗しました', 'error');
+        setVerifying(false);
+        return;
+      }
+      setDistributor((prev: any) => ({
+        ...prev,
+        residenceCardVerificationStatus: data.status,
+        residenceCardVerificationResult: data.result,
+        residenceCardVerifiedAt: data.verifiedAt,
+      }));
+      showToast(data.status === 'VERIFIED' ? 'AI検証: 一致しました' : data.status === 'MISMATCH' ? 'AI検証: 不一致があります' : '検証完了', data.status === 'VERIFIED' ? 'success' : 'warning');
+    } catch {
+      showToast('検証に失敗しました', 'error');
+    }
+    setVerifying(false);
+  };
+
   const loadDistributor = async () => {
     const res = await fetch(`/api/distributors/${id}`);
     if (!res.ok) { setNotFound(true); setLoading(false); return; }
@@ -731,11 +758,49 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="個人情報同意" value={d.hasAgreedPersonalInfo} />
               <InfoRow label="業務委託契約" value={d.hasSignedContract} />
               <InfoRow label="在留カード確認" value={d.hasResidenceCard} />
+              {/* AI検証ステータス */}
+              {d.residenceCardFrontUrl && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-xs text-slate-500 min-w-[100px]">AI検証</span>
+                  <div className="flex items-center gap-2">
+                    {d.residenceCardVerificationStatus === 'VERIFIED' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><i className="bi bi-check-circle-fill"></i> 一致</span>
+                    )}
+                    {d.residenceCardVerificationStatus === 'MISMATCH' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i className="bi bi-exclamation-triangle-fill"></i> 不一致</span>
+                    )}
+                    {d.residenceCardVerificationStatus === 'PENDING' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700"><i className="bi bi-hourglass-split"></i> 検証中...</span>
+                    )}
+                    {d.residenceCardVerificationStatus === 'ERROR' && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700"><i className="bi bi-x-circle-fill"></i> エラー</span>
+                    )}
+                    {!d.residenceCardVerificationStatus && (
+                      <span className="text-[10px] text-slate-400">未検証</span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* 在留カード画像 */}
               {(d.residenceCardFrontUrl || d.residenceCardBackUrl) && (
                 <div className="mt-4 pt-3 border-t border-slate-100">
-                  <p className="text-xs font-bold text-slate-500 mb-2">在留カード画像</p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold text-slate-500">在留カード画像</p>
+                    {d.aiVerificationEnabled && d.residenceCardFrontUrl && (
+                      <button
+                        onClick={verifyResidenceCard}
+                        disabled={verifying}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold rounded-lg bg-violet-50 text-violet-700 hover:bg-violet-100 disabled:opacity-50 transition-colors"
+                      >
+                        {verifying ? (
+                          <><i className="bi bi-hourglass-split animate-spin"></i> 検証中...</>
+                        ) : (
+                          <><i className="bi bi-robot"></i> AI検証</>
+                        )}
+                      </button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     {d.residenceCardFrontUrl && (
                       <div className="relative">
@@ -774,6 +839,64 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                       </div>
                     )}
                   </div>
+                  {/* AI検証詳細 */}
+                  {d.residenceCardVerificationResult && d.residenceCardVerificationStatus && d.residenceCardVerificationStatus !== 'PENDING' && (
+                    <div className="mt-3">
+                      <button
+                        onClick={() => setVerificationExpanded(!verificationExpanded)}
+                        className="text-[11px] text-violet-600 hover:text-violet-800 font-bold flex items-center gap-1"
+                      >
+                        <i className={`bi bi-chevron-${verificationExpanded ? 'up' : 'down'}`}></i>
+                        AI検証詳細 {verificationExpanded ? '非表示' : '表示'}
+                      </button>
+                      {verificationExpanded && (
+                        <div className="mt-2 bg-slate-50 rounded-lg p-3 text-[11px]">
+                          {d.residenceCardVerifiedAt && (
+                            <p className="text-slate-400 mb-2">検証日時: {new Date(d.residenceCardVerifiedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</p>
+                          )}
+                          {d.residenceCardVerificationResult?.comparisons ? (
+                            <table className="w-full">
+                              <thead>
+                                <tr className="text-slate-500 border-b border-slate-200">
+                                  <th className="text-left py-1 font-bold">項目</th>
+                                  <th className="text-left py-1 font-bold">カード記載</th>
+                                  <th className="text-left py-1 font-bold">DB登録値</th>
+                                  <th className="text-center py-1 font-bold">結果</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {[
+                                  { key: 'name', label: '氏名' },
+                                  { key: 'nationality', label: '国籍' },
+                                  { key: 'visaType', label: '在留資格' },
+                                  { key: 'expiryDate', label: '有効期限' },
+                                ].map(({ key, label }) => {
+                                  const comp = (d.residenceCardVerificationResult as any).comparisons[key];
+                                  if (!comp) return null;
+                                  return (
+                                    <tr key={key} className="border-b border-slate-100">
+                                      <td className="py-1.5 font-bold text-slate-700">{label}</td>
+                                      <td className="py-1.5 text-slate-600">{comp.cardValue || '-'}</td>
+                                      <td className="py-1.5 text-slate-600">{comp.dbValue || '-'}</td>
+                                      <td className="py-1.5 text-center">
+                                        {comp.match ? (
+                                          <span className="text-emerald-600"><i className="bi bi-check-circle-fill"></i></span>
+                                        ) : (
+                                          <span className="text-red-500"><i className="bi bi-x-circle-fill"></i></span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          ) : d.residenceCardVerificationResult?.error ? (
+                            <p className="text-red-500">エラー: {(d.residenceCardVerificationResult as any).error}</p>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -13,7 +13,7 @@ interface MenuItem {
   name: string;
   href: string;
   icon: string;
-  badge?: 'orders' | 'approvals';
+  badge?: 'orders' | 'approvals' | 'alerts';
   superAdminOnly?: boolean;
 }
 
@@ -65,6 +65,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: 'QUALITY',
     items: [
+      { name: 'アラート', href: '/alerts', icon: 'bi-bell-fill', badge: 'alerts' },
       { name: 'クレーム管理', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
       { name: '配布禁止物件', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
     ],
@@ -117,6 +118,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   // Badge counts
   const [orderPendingCount, setOrderPendingCount] = useState(0);
   const [approvalPendingCount, setApprovalPendingCount] = useState(0);
+  const [openAlertCount, setOpenAlertCount] = useState(0);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   // Flyout (collapsed mode)
@@ -131,6 +133,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   useEffect(() => {
     fetch('/api/orders/pending-count').then(r => r.json()).then(d => setOrderPendingCount(d.count || 0)).catch(() => {});
     fetch('/api/approvals/pending-count').then(r => r.json()).then(d => setApprovalPendingCount(d.total || 0)).catch(() => {});
+    fetch('/api/alerts/summary').then(r => r.json()).then(d => setOpenAlertCount(d.total || 0)).catch(() => {});
     fetch('/api/profile').then(r => r.ok ? r.json() : null).then(data => {
       if (data) {
         const roles = data.roles?.map((r: any) => r.role?.code) || [];
@@ -173,6 +176,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   const getBadge = (badge?: string) => {
     if (badge === 'orders') return orderPendingCount;
     if (badge === 'approvals') return approvalPendingCount;
+    if (badge === 'alerts') return openAlertCount;
     return 0;
   };
 

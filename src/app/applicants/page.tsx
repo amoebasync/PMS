@@ -111,6 +111,7 @@ type Applicant = {
 // ──────────────────────────────────────────
 const FLOW_STATUS_MAP: Record<string, { label: string; color: string }> = {
   INTERVIEW_WAITING:   { label: '面接待ち',   color: 'bg-amber-100 text-amber-700' },
+  NO_SHOW:             { label: 'NO SHOW',    color: 'bg-rose-100 text-rose-700' },
   TRAINING_WAITING:    { label: '研修待ち',   color: 'bg-blue-100 text-blue-700' },
   TRAINING_COMPLETED:  { label: '研修完了',   color: 'bg-emerald-100 text-emerald-700' },
 };
@@ -122,6 +123,132 @@ const HIRING_STATUS_MAP: Record<string, { label: string; color: string }> = {
 };
 
 const LIMIT = 20;
+
+// ──────────────────────────────────────────
+// サブコンポーネント: SearchableSelect
+// ──────────────────────────────────────────
+interface SearchableSelectProps<T> {
+  options: T[];
+  value: string;
+  onChange: (value: string) => void;
+  getOptionValue: (option: T) => string;
+  getOptionLabel: (option: T) => string;
+  placeholder: string;
+  searchPlaceholder: string;
+  noResultsText: string;
+  className?: string;
+  error?: boolean;
+  filterFn?: (option: T, search: string) => boolean;
+}
+
+function SearchableSelect<T>({
+  options,
+  value,
+  onChange,
+  getOptionValue,
+  getOptionLabel,
+  placeholder,
+  searchPlaceholder,
+  noResultsText,
+  className = '',
+  error = false,
+  filterFn,
+}: SearchableSelectProps<T>) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const selectedOption = options.find((opt) => getOptionValue(opt) === value);
+  const displayText = selectedOption ? getOptionLabel(selectedOption) : '';
+
+  const filteredOptions = options.filter((opt) =>
+    filterFn ? filterFn(opt, search) : getOptionLabel(opt).toLowerCase().includes(search.toLowerCase())
+  );
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleSelect = (optionValue: string) => {
+    onChange(optionValue);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div ref={containerRef} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-all flex items-center justify-between bg-white border focus:ring-2 focus:ring-blue-400 focus:outline-none ${
+          error ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'
+        } ${isOpen ? 'ring-2 ring-blue-400' : ''}`}
+      >
+        <span className={displayText ? 'text-slate-800' : 'text-slate-400'}>
+          {displayText || placeholder}
+        </span>
+        <i className={`bi bi-chevron-down text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg overflow-hidden">
+          <div className="p-2 border-b border-slate-100">
+            <div className="relative">
+              <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          </div>
+          <div className="max-h-60 overflow-y-auto">
+            {filteredOptions.length === 0 ? (
+              <div className="px-4 py-3 text-sm text-slate-400 text-center">{noResultsText}</div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const optValue = getOptionValue(opt);
+                const isSelected = optValue === value;
+                return (
+                  <button
+                    key={optValue}
+                    type="button"
+                    onClick={() => handleSelect(optValue)}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors ${
+                      isSelected
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    {getOptionLabel(opt)}
+                    {isSelected && <i className="bi bi-check ml-2 text-blue-600" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ──────────────────────────────────────────
 // サブコンポーネント: ScoreSelector
@@ -1062,6 +1189,32 @@ export default function ApplicantsPage() {
     }
   };
 
+  // 面接NO SHOW記録
+  const handleNoShow = async () => {
+    if (!selectedApplicant) return;
+    const ok = await showConfirm(
+      `「${selectedApplicant.name}」を面接不参加（NO SHOW）として記録しますか？`,
+      { variant: 'danger', confirmLabel: 'NO SHOWを記録', title: '面接不参加（NO SHOW）' }
+    );
+    if (!ok) return;
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ flowStatus: 'NO_SHOW' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'NO SHOWの記録に失敗しました');
+      }
+      showToast('NO SHOWを記録しました', 'success');
+      openEvalModal(selectedApplicant.id);
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || 'NO SHOWの記録に失敗しました', 'error');
+    }
+  };
+
   // 面接担当者変更
   const handleChangeInterviewer = async (newInterviewerId: number | null) => {
     if (!selectedApplicant?.interviewSlot) return;
@@ -1627,6 +1780,7 @@ export default function ApplicantsPage() {
                   >
                     <option value="">フロー: すべて</option>
                     <option value="INTERVIEW_WAITING">面接待ち</option>
+                    <option value="NO_SHOW">NO SHOW</option>
                     <option value="TRAINING_WAITING">研修待ち</option>
                     <option value="TRAINING_COMPLETED">研修完了</option>
                   </select>
@@ -2625,6 +2779,15 @@ export default function ApplicantsPage() {
                           >
                             <i className="bi bi-x-circle"></i>面接キャンセル
                           </button>
+                          {selectedApplicant.flowStatus !== 'NO_SHOW' && (
+                            <button
+                              type="button"
+                              onClick={handleNoShow}
+                              className="text-orange-600 hover:bg-orange-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-orange-200 transition-colors inline-flex items-center gap-1"
+                            >
+                              <i className="bi bi-person-x"></i>NO SHOW
+                            </button>
+                          )}
                         </div>
                       )}
 
@@ -2711,16 +2874,21 @@ export default function ApplicantsPage() {
                         <label className={`block text-xs font-bold mb-1.5 ${!evalForm.countryId ? 'text-red-500' : 'text-slate-500'}`}>
                           国籍{!evalForm.countryId && <span className="ml-1 text-[10px] font-medium">※ 入力してください</span>}
                         </label>
-                        <select
-                          value={evalForm.countryId}
-                          onChange={e => setEvalForm(f => ({ ...f, countryId: e.target.value }))}
-                          className={`w-full rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white border ${!evalForm.countryId ? 'border-red-400 ring-1 ring-red-200' : 'border-slate-200'}`}
-                        >
-                          <option value="">選択してください</option>
-                          {countries.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}（{c.nameEn}）</option>
-                          ))}
-                        </select>
+                        <SearchableSelect
+                          options={countries}
+                          value={String(evalForm.countryId || '')}
+                          onChange={(v) => setEvalForm(f => ({ ...f, countryId: v }))}
+                          getOptionValue={(c) => String(c.id)}
+                          getOptionLabel={(c) => `${c.name}（${c.nameEn}）`}
+                          placeholder="選択してください"
+                          searchPlaceholder="国名で検索..."
+                          noResultsText="該当する国がありません"
+                          error={!evalForm.countryId}
+                          filterFn={(c, search) => {
+                            const s = search.toLowerCase();
+                            return c.name.toLowerCase().includes(s) || c.nameEn.toLowerCase().includes(s);
+                          }}
+                        />
                       </div>
 
                       {!isJapanese(evalForm.countryId) && (
@@ -2873,6 +3041,7 @@ export default function ApplicantsPage() {
                           className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
                         >
                           <option value="INTERVIEW_WAITING">面接待ち</option>
+                          <option value="NO_SHOW">NO SHOW</option>
                           <option value="TRAINING_WAITING">研修待ち</option>
                           <option value="TRAINING_COMPLETED">研修完了</option>
                         </select>

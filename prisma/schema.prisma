@@ -199,6 +199,9 @@ model Employee {
   interviewSlots              InterviewSlot[]      @relation("InterviewerSlots")
   defaultInterviewSlots       DefaultInterviewSlot[] @relation("DefaultSlotInterviewer")
 
+  // アラート
+  resolvedAlerts              Alert[]              @relation("AlertResolver")
+
   @@map("employees")
 }
 
@@ -598,6 +601,9 @@ model FlyerDistributor {
   hasResidenceCard      Boolean   @default(false) @map("has_residence_card") // 在留カード (○)
   residenceCardFrontUrl String?   @map("residence_card_front_url") @db.Text // 在留カード表面画像URL
   residenceCardBackUrl  String?   @map("residence_card_back_url") @db.Text // 在留カード裏面画像URL
+  residenceCardVerificationStatus  ResidenceCardVerificationStatus? @map("residence_card_verification_status")
+  residenceCardVerificationResult  Json?                            @map("residence_card_verification_result")
+  residenceCardVerifiedAt          DateTime?                        @map("residence_card_verified_at")
 
   // 在籍情報
   joinDate    DateTime? @map("join_date") @db.Date // 入社日
@@ -2022,6 +2028,7 @@ model AuditLog {
 
 enum ApplicantFlowStatus {
   INTERVIEW_WAITING  @map("面接待ち")
+  NO_SHOW            @map("面接不参加")
   TRAINING_WAITING   @map("研修待ち")
   TRAINING_COMPLETED @map("研修完了")
 }
@@ -2241,6 +2248,13 @@ model DefaultSlotJobCategory {
 // ================================================================
 // クレーム管理 + 配布禁止物件DB
 // ================================================================
+
+enum ResidenceCardVerificationStatus {
+  PENDING
+  VERIFIED
+  MISMATCH
+  ERROR
+}
 
 enum ComplaintStatus {
   UNRESOLVED    // 未対応
@@ -2622,4 +2636,59 @@ model AdminNotification {
 
   @@index([isRead, createdAt])
   @@map("admin_notifications")
+}
+
+// --- アラート重要度 ---
+enum AlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+// --- アラートステータス ---
+enum AlertStatus {
+  OPEN
+  RESOLVED
+}
+
+// --- アラートカテゴリマスタ ---
+model AlertCategory {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  icon      String?  @db.VarChar(50)
+  colorCls  String?  @map("color_cls") @db.VarChar(100)
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  alerts    Alert[]
+
+  @@map("alert_categories")
+}
+
+// --- アラート ---
+model Alert {
+  id           Int            @id @default(autoincrement())
+  categoryId   Int            @map("category_id")
+  severity     AlertSeverity  @default(INFO)
+  status       AlertStatus    @default(OPEN)
+  title        String         @db.VarChar(255)
+  message      String?        @db.Text
+  entityType   String?        @map("entity_type") @db.VarChar(50)
+  entityId     Int?           @map("entity_id")
+  resolvedById Int?           @map("resolved_by_id")
+  resolvedAt   DateTime?      @map("resolved_at")
+  resolvedNote String?        @map("resolved_note") @db.Text
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @default(now()) @updatedAt @map("updated_at")
+
+  category     AlertCategory  @relation(fields: [categoryId], references: [id])
+  resolvedBy   Employee?      @relation("AlertResolver", fields: [resolvedById], references: [id])
+
+  @@index([status, severity])
+  @@index([categoryId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("alerts")
 }

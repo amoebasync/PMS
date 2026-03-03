@@ -39,7 +39,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
     if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { passwordHash, ...safe } = distributor;
-    return NextResponse.json(safe);
+
+    // Check if AI verification is enabled
+    const aiVerificationSetting = await prisma.systemSetting.findUnique({
+      where: { key: 'residenceCardAiVerification' },
+    });
+    const aiVerificationEnabled = aiVerificationSetting?.value === 'true';
+
+    return NextResponse.json({ ...safe, aiVerificationEnabled });
   } catch (error) {
     console.error('Get Error:', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });

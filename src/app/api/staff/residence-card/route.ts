@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 import { getPresignedPutUrl, toProxyUrl } from '@/lib/s3';
+import { triggerAutoVerification } from '@/lib/residence-card-verification';
 
 // GET: プリサインドURL生成
 export async function GET(request: Request) {
@@ -48,13 +49,18 @@ export async function POST(request: Request) {
 
     const url = toProxyUrl(s3Key);
     const updateData = side === 'front'
-      ? { residenceCardFrontUrl: url }
-      : { residenceCardBackUrl: url };
+      ? { residenceCardFrontUrl: url, hasResidenceCard: true }
+      : { residenceCardBackUrl: url, hasResidenceCard: true };
 
     await prisma.flyerDistributor.update({
       where: { id: distributor.id },
       data: updateData,
     });
+
+    // Fire-and-forget auto verification when front side is uploaded
+    if (side === 'front') {
+      triggerAutoVerification(distributor.id).catch(() => {});
+    }
 
     return NextResponse.json({ url, side });
   } catch (error) {

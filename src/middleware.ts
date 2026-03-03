@@ -40,6 +40,7 @@ export function middleware(request: NextRequest) {
     path === '/api/cron/generate-training-slots' ||
     path === '/api/cron/housekeep' ||
     path === '/api/cron/evaluate-distributors' ||
+    path === '/api/cron/check-visa-expiry' ||
     path === '/api/training-slots/available' ||
     path === '/api/training-booking' ||
     path === '/training-booking' ||
