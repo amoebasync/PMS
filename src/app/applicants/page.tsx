@@ -124,13 +124,13 @@ const ScoreSelector = ({ value, onChange, label }: { value: number | null; onCha
   <div>
     <label className="block text-xs font-bold text-slate-500 mb-1.5">{label}</label>
     <div className="flex gap-1 items-end">
-      <span className="text-[10px] text-slate-400 pb-2.5 mr-0.5">低</span>
+      <span className="text-[10px] text-slate-400 pb-2 md:pb-2.5 mr-0.5">低</span>
       {[1, 2, 3, 4, 5].map(n => (
         <button
           key={n}
           type="button"
           onClick={() => onChange(n)}
-          className={`w-10 h-10 rounded-lg text-sm font-bold transition-all ${
+          className={`w-8 h-8 md:w-10 md:h-10 rounded-lg text-xs md:text-sm font-bold transition-all ${
             value === n
               ? n <= 2
                 ? 'bg-rose-500 text-white shadow-md'
@@ -143,7 +143,7 @@ const ScoreSelector = ({ value, onChange, label }: { value: number | null; onCha
           {n}
         </button>
       ))}
-      <span className="text-[10px] text-slate-400 pb-2.5 ml-0.5">高</span>
+      <span className="text-[10px] text-slate-400 pb-2 md:pb-2.5 ml-0.5">高</span>
     </div>
   </div>
 );
@@ -1245,15 +1245,47 @@ export default function ApplicantsPage() {
         .fc td, .fc th {
           border-color: #e2e8f0;
         }
+        /* モバイル対応 */
+        @media (max-width: 767px) {
+          .fc .fc-toolbar {
+            flex-direction: column;
+            gap: 0.5rem;
+          }
+          .fc .fc-toolbar-title {
+            font-size: 1rem;
+          }
+          .fc .fc-button-primary {
+            font-size: 0.7rem;
+            padding: 0.3rem 0.5rem;
+          }
+          .fc .fc-timegrid-slot {
+            height: 2rem;
+          }
+          .fc .fc-col-header-cell {
+            font-size: 0.7rem;
+            padding: 4px 0;
+          }
+          .fc .fc-timegrid-slot-label {
+            font-size: 0.65rem;
+          }
+          .fc .fc-event {
+            font-size: 0.65rem;
+            padding: 1px 3px;
+          }
+          .fc .fc-daygrid-day-number {
+            font-size: 0.75rem;
+            padding: 4px 6px;
+          }
+        }
       `}</style>
 
       <div className="space-y-6">
         {/* ── タブ + アクションボタン ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="flex items-center border-b border-slate-200">
+          <div className="flex flex-wrap items-center border-b border-slate-200">
             <button
               onClick={() => setActiveTab('calendar')}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative ${
                 activeTab === 'calendar'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1270,7 +1302,7 @@ export default function ApplicantsPage() {
                 setActiveTab('list');
                 fetchApplicants(1);
               }}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative ${
                 activeTab === 'list'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1287,7 +1319,7 @@ export default function ApplicantsPage() {
                 setActiveTab('training');
                 fetchTrainingMgmt();
               }}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative ${
                 activeTab === 'training'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1301,50 +1333,53 @@ export default function ApplicantsPage() {
             </button>
 
             {/* スペーサー + アクションボタン */}
-            <div className="flex-1" />
-            <div className="flex items-center gap-2 px-4">
+            <div className="hidden md:block flex-1" />
+            <div className="flex items-center gap-1.5 md:gap-2 px-2 md:px-4 w-full md:w-auto overflow-x-auto py-2 md:py-0 border-t md:border-t-0 border-slate-100">
               <a
                 href="/apply"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 <i className="bi bi-box-arrow-up-right text-indigo-500"></i>
-                応募ページ
+                <span className="hidden sm:inline">応募ページ</span>
+                <span className="sm:hidden">応募</span>
               </a>
               <button
                 onClick={() => {
                   fetchJobCategories();
                   setShowManualRegisterModal(true);
                 }}
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 <i className="bi bi-person-plus-fill text-emerald-500"></i>
-                手動登録
+                <span className="hidden sm:inline">手動登録</span>
+                <span className="sm:hidden">登録</span>
               </button>
               <button
                 onClick={() => {
                   fetchJobCategories();
                   setShowJobCatModal(true);
                 }}
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 <i className="bi bi-tags-fill text-violet-500"></i>
-                職種マスタ
+                職種
               </button>
               <a
                 href="/settings?tab=interviewSlot"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-2.5 md:px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors whitespace-nowrap"
               >
                 <i className="bi bi-gear-fill text-slate-400"></i>
-                スロット設定
+                <span className="hidden sm:inline">スロット設定</span>
+                <span className="sm:hidden">設定</span>
               </a>
             </div>
           </div>
 
           {/* ── TAB 1: カレンダー ── */}
           {activeTab === 'calendar' && (
-            <div className="p-6">
+            <div className="p-2 md:p-6">
               {calendarLoading && slots.length === 0 ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="flex items-center gap-3 text-slate-400">
@@ -1399,9 +1434,9 @@ export default function ApplicantsPage() {
           {activeTab === 'list' && (
             <div>
               {/* フィルター */}
-              <div className="p-4 border-b border-slate-200 bg-slate-50/50">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex-1 min-w-[240px]">
+              <div className="p-3 md:p-4 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-3">
+                  <div className="flex-1 min-w-0 md:min-w-[240px]">
                     <div className="relative">
                       <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                       <input
@@ -1413,31 +1448,101 @@ export default function ApplicantsPage() {
                       />
                     </div>
                   </div>
-                  <select
-                    value={filterFlowStatus}
-                    onChange={e => setFilterFlowStatus(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                  >
-                    <option value="">フロー: すべて</option>
-                    <option value="INTERVIEW_WAITING">面接待ち</option>
-                    <option value="TRAINING_WAITING">研修待ち</option>
-                    <option value="TRAINING_COMPLETED">研修完了</option>
-                  </select>
-                  <select
-                    value={filterHiringStatus}
-                    onChange={e => setFilterHiringStatus(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                  >
-                    <option value="">採用: すべて</option>
-                    <option value="IN_PROGRESS">選考中</option>
-                    <option value="HIRED">採用</option>
-                    <option value="REJECTED">不採用</option>
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      value={filterFlowStatus}
+                      onChange={e => setFilterFlowStatus(e.target.value)}
+                      className="flex-1 md:flex-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                    >
+                      <option value="">フロー: すべて</option>
+                      <option value="INTERVIEW_WAITING">面接待ち</option>
+                      <option value="TRAINING_WAITING">研修待ち</option>
+                      <option value="TRAINING_COMPLETED">研修完了</option>
+                    </select>
+                    <select
+                      value={filterHiringStatus}
+                      onChange={e => setFilterHiringStatus(e.target.value)}
+                      className="flex-1 md:flex-none border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                    >
+                      <option value="">採用: すべて</option>
+                      <option value="IN_PROGRESS">選考中</option>
+                      <option value="HIRED">採用</option>
+                      <option value="REJECTED">不採用</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* テーブル */}
-              <div className="overflow-x-auto">
+              {/* モバイル: カード形式 */}
+              <div className="md:hidden">
+                {listLoading ? (
+                  <div className="p-3 space-y-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="bg-white border border-slate-100 rounded-xl p-3 space-y-2">
+                        <div className="h-4 w-32 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="h-3 w-48 bg-slate-100 rounded animate-pulse"></div>
+                        <div className="flex gap-2">
+                          <div className="h-5 w-16 bg-slate-100 rounded-full animate-pulse"></div>
+                          <div className="h-5 w-14 bg-slate-100 rounded-full animate-pulse"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : applicants.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+                    <i className="bi bi-person-x text-4xl"></i>
+                    <p className="text-sm font-medium">応募者が見つかりません</p>
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-2">
+                    {applicants.map(app => {
+                      const flow = FLOW_STATUS_MAP[app.flowStatus];
+                      const hiring = HIRING_STATUS_MAP[app.hiringStatus];
+                      return (
+                        <div
+                          key={app.id}
+                          onClick={() => openEvalModal(app.id)}
+                          className="bg-white border border-slate-100 rounded-xl p-3 active:bg-slate-50 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-800 truncate">{app.name}</p>
+                              <p className="text-xs text-slate-500 truncate">{app.jobCategory?.nameJa || '-'}</p>
+                            </div>
+                            <i className="bi bi-chevron-right text-slate-300 text-sm shrink-0 mt-0.5"></i>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 flex-wrap">
+                            {flow && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${flow.color}`}>
+                                {flow.label}
+                              </span>
+                            )}
+                            {hiring && (
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${hiring.color}`}>
+                                {hiring.label}
+                              </span>
+                            )}
+                            {app.interviewSlot && (
+                              <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                                <i className="bi bi-calendar-event"></i>
+                                {new Date(app.interviewSlot.startTime).toLocaleString('ja-JP', {
+                                  month: 'numeric',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* PC: テーブル形式 */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
@@ -1551,8 +1656,8 @@ export default function ApplicantsPage() {
           {activeTab === 'training' && (
             <div>
               {/* ツールバー */}
-              <div className="p-4 border-b border-slate-200 bg-slate-50/50">
-                <div className="flex items-center gap-3 flex-wrap">
+              <div className="p-3 md:p-4 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
                   <button
                     onClick={async () => {
                       try {
@@ -1566,24 +1671,24 @@ export default function ApplicantsPage() {
                         }
                       } catch { showToast('エラーが発生しました', 'error'); }
                     }}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold hover:bg-indigo-700 transition-colors"
                   >
                     <i className="bi bi-arrow-clockwise"></i>
                     今すぐ生成
                   </button>
                   {/* 凡例 */}
-                  <div className="flex items-center gap-3 ml-auto text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>空き</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>予約あり</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>残りわずか</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>満員</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>全員完了</span>
+                  <div className="flex items-center gap-2 md:gap-3 sm:ml-auto text-[10px] md:text-xs text-slate-500 flex-wrap">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-sm bg-slate-400 inline-block"></span>空き</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-sm bg-indigo-500 inline-block"></span>予約あり</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-sm bg-amber-400 inline-block"></span>残りわずか</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-sm bg-rose-500 inline-block"></span>満員</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 md:w-3 md:h-3 rounded-sm bg-emerald-500 inline-block"></span>全員完了</span>
                   </div>
                 </div>
               </div>
 
               {/* カレンダー */}
-              <div className="p-6">
+              <div className="p-2 md:p-6">
                 {trainingMgmtLoading && trainingMgmtSlots.length === 0 ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="flex items-center gap-3 text-slate-400">
@@ -1972,16 +2077,16 @@ export default function ApplicantsPage() {
         <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden max-h-[90vh]">
             {/* ヘッダー */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <div className="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-2 md:gap-3 min-w-0">
+                <div className="w-8 h-8 md:w-9 md:h-9 bg-indigo-100 rounded-lg flex items-center justify-center shrink-0">
                   <i className="bi bi-person-badge text-indigo-600"></i>
                 </div>
                 {evalLoading ? (
                   <div className="h-6 w-32 bg-slate-100 rounded animate-pulse"></div>
                 ) : selectedApplicant ? (
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-black text-slate-800">{selectedApplicant.name}</h2>
+                  <div className="flex flex-wrap items-center gap-1.5 md:gap-3 min-w-0">
+                    <h2 className="text-base md:text-lg font-black text-slate-800 truncate">{selectedApplicant.name}</h2>
                     {FLOW_STATUS_MAP[selectedApplicant.flowStatus] && (
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${FLOW_STATUS_MAP[selectedApplicant.flowStatus].color}`}>
                         {FLOW_STATUS_MAP[selectedApplicant.flowStatus].label}
@@ -2007,7 +2112,7 @@ export default function ApplicantsPage() {
             </div>
 
             {/* ボディ (スクロール可) */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-5 md:space-y-6">
               {evalLoading ? (
                 <div className="flex items-center justify-center py-16">
                   <div className="flex items-center gap-3 text-slate-400">
@@ -2025,7 +2130,7 @@ export default function ApplicantsPage() {
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4">
                       {/* 個人情報 */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">氏名</p>
                           <input
@@ -2066,7 +2171,7 @@ export default function ApplicantsPage() {
                       <div className="border-t border-slate-200 my-3" />
 
                       {/* 連絡先 */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                         <div className="col-span-1">
                           <p className="text-xs font-bold text-slate-400 mb-0.5">メール</p>
                           <input
@@ -2102,7 +2207,7 @@ export default function ApplicantsPage() {
                       <div className="border-t border-slate-200 my-3" />
 
                       {/* 応募情報 */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">職種</p>
                           <select
@@ -2134,7 +2239,7 @@ export default function ApplicantsPage() {
                       <div className="border-t border-slate-200 my-3" />
 
                       {/* 面接情報 */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-3">
                         <div>
                           <p className="text-xs font-bold text-slate-400 mb-0.5">面接日時</p>
                           {selectedApplicant.interviewSlot ? (
@@ -2872,23 +2977,24 @@ export default function ApplicantsPage() {
 
             {/* フッター */}
             {!evalLoading && selectedApplicant && (
-              <div className="flex items-center justify-between px-6 py-4 border-t border-slate-200 bg-slate-50 shrink-0">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 px-4 md:px-6 py-3 md:py-4 border-t border-slate-200 bg-slate-50 shrink-0">
                 <button
                   onClick={handleDeleteApplicant}
-                  className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-sm transition-colors border border-rose-200 flex items-center gap-1.5"
+                  className="px-4 py-2.5 text-rose-600 hover:bg-rose-50 rounded-xl font-bold text-sm transition-colors border border-rose-200 flex items-center justify-center gap-1.5"
                 >
                   <i className="bi bi-trash3"></i>
                   削除
                 </button>
-                <div className="flex gap-3">
+                <div className="flex flex-wrap gap-2 sm:gap-3 justify-end">
                   {selectedApplicant.hiringStatus === 'HIRED' && !showDistributorForm && (
                     registeredDistributorId ? (
                       <button
                         disabled
-                        className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
+                        className="px-3 md:px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-xs md:text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
                       >
                         <i className="bi bi-check-circle-fill"></i>
-                        配布員登録済み
+                        <span className="hidden sm:inline">配布員登録済み</span>
+                        <span className="sm:hidden">登録済み</span>
                       </button>
                     ) : (
                       <button
@@ -2900,7 +3006,7 @@ export default function ApplicantsPage() {
                           setShowDistributorForm(true);
                           if (branches.length === 0) fetchBranches();
                         }}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
+                        className="px-3 md:px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs md:text-sm transition-colors flex items-center gap-1.5"
                       >
                         <i className="bi bi-person-plus"></i>
                         配布員登録
@@ -2912,14 +3018,14 @@ export default function ApplicantsPage() {
                       setShowEvalModal(false);
                       setSelectedApplicant(null);
                     }}
-                    className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+                    className="px-4 md:px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-xs md:text-sm transition-colors border border-slate-200"
                   >
                     キャンセル
                   </button>
                   <button
                     onClick={handleSaveEval}
                     disabled={evalSaving}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-4 md:px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs md:text-sm shadow-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {evalSaving && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
                     <i className="bi bi-check-lg"></i>
