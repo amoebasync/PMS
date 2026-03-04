@@ -35,46 +35,58 @@ export async function GET(
       return NextResponse.json({ error: 'セッションが見つかりません' }, { status: 404 });
     }
 
-    // 最新のGPSポイント
-    const latestPoint = await prisma.gpsPoint.findFirst({
-      where: { sessionId: distSession.id },
-      orderBy: { timestamp: 'desc' },
-      select: {
-        latitude: true,
-        longitude: true,
-        timestamp: true,
-        steps: true,
-        distance: true,
-        calories: true,
-      },
-    });
-
-    // 最新の進捗
-    const latestProgress = await prisma.progressEvent.findFirst({
-      where: { sessionId: distSession.id },
-      orderBy: { timestamp: 'desc' },
-      select: { mailboxCount: true, timestamp: true },
-    });
-
-    // GPSポイント総数
-    const totalPointCount = await prisma.gpsPoint.count({
-      where: { sessionId: distSession.id },
-    });
+    // 最新GPS座標・最新進捗・GPS総数を1クエリで取得
+    const [result] = await prisma.$queryRaw<Array<{
+      lat: number | null;
+      lng: number | null;
+      gps_timestamp: Date | null;
+      mailbox_count: number | null;
+      progress_timestamp: Date | null;
+      total_points: bigint;
+    }>>`
+      SELECT
+        gp.latitude AS lat,
+        gp.longitude AS lng,
+        gp.timestamp AS gps_timestamp,
+        pe.mailbox_count,
+        pe.timestamp AS progress_timestamp,
+        COALESCE(cnt.total, 0) AS total_points
+      FROM (SELECT 1) AS dummy
+      LEFT JOIN (
+        SELECT latitude, longitude, timestamp
+        FROM gps_points
+        WHERE session_id = ${distSession.id}
+        ORDER BY timestamp DESC
+        LIMIT 1
+      ) gp ON 1=1
+      LEFT JOIN (
+        SELECT mailbox_count, timestamp
+        FROM progress_events
+        WHERE session_id = ${distSession.id}
+        ORDER BY timestamp DESC
+        LIMIT 1
+      ) pe ON 1=1
+      LEFT JOIN (
+        SELECT COUNT(*) AS total
+        FROM gps_points
+        WHERE session_id = ${distSession.id}
+      ) cnt ON 1=1
+    `;
 
     return NextResponse.json({
       sessionId: distSession.id,
       isActive: distSession.finishedAt === null,
-      latestPoint: latestPoint
+      latestPoint: result.lat != null
         ? {
-            lat: latestPoint.latitude,
-            lng: latestPoint.longitude,
-            timestamp: latestPoint.timestamp,
+            lat: Number(result.lat),
+            lng: Number(result.lng),
+            timestamp: result.gps_timestamp,
           }
         : null,
-      latestProgress: latestProgress
-        ? { mailboxCount: latestProgress.mailboxCount }
+      latestProgress: result.mailbox_count != null
+        ? { mailboxCount: Number(result.mailbox_count) }
         : null,
-      totalPointCount,
+      totalPointCount: Number(result.total_points),
       totalSteps: distSession.totalSteps,
       totalDistance: distSession.totalDistance,
       totalCalories: distSession.totalCalories,

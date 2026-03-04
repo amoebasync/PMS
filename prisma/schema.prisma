@@ -519,6 +519,9 @@ model Customer {
   complaints           Complaint[]
   prohibitedProperties ProhibitedProperty[]
 
+  @@index([name])
+  @@index([salesRepId])
+  @@index([status])
   @@map("customers")
 }
 
@@ -691,6 +694,8 @@ model FlyerDistributor {
   adminNotifications    AdminNotification[]
   evaluations           DistributorEvaluation[]
 
+  @@index([branchId])
+  @@index([visaExpiryDate])
   @@map("flyer_distributors")
 }
 
@@ -834,6 +839,9 @@ model DistributionSchedule {
   session            DistributionSession?
   adminNotifications AdminNotification[]
 
+  @@index([distributorId, date])
+  @@index([branchId, date])
+  @@index([status])
   @@map("distribution_schedules")
 }
 
@@ -879,6 +887,8 @@ model DistributionItem {
   flyerId Int? @map("flyer_id")
   flyer   Flyer? @relation(fields: [flyerId], references: [id])
 
+  @@index([scheduleId])
+  @@index([customerId])
   @@map("distribution_items")
 }
 
@@ -1029,6 +1039,7 @@ model Flyer {
   orderPrintings     OrderPrinting[]
   qrCodes QrCode[]
 
+  @@index([customerId])
   @@map("flyers")
 }
 
@@ -1186,6 +1197,9 @@ model Order {
   documents          Document[]
   billingItem        BillingStatementItem?
 
+  @@index([customerId])
+  @@index([status, orderDate])
+  @@index([salesRepId])
   @@map("orders")
 }
 
@@ -2458,6 +2472,8 @@ model ProhibitedProperty {
   complaint        Complaint?        @relation(fields: [complaintId], references: [id])
   skipEvents       SkipEvent[]
 
+  @@index([areaId, isActive])
+  @@index([customerId])
   @@map("prohibited_properties")
 }
 
@@ -2525,6 +2541,10 @@ model Complaint {
   prohibitedProperties ProhibitedProperty[]
   tasks                Task[]
 
+  @@index([status, createdAt])
+  @@index([distributorId])
+  @@index([customerId])
+  @@index([scheduleId])
   @@map("complaints")
 }
 
