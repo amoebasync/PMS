@@ -91,7 +91,7 @@ export default function NotificationBell() {
   // Start polling
   useEffect(() => {
     fetchNotifications();
-    pollingRef.current = setInterval(fetchNotifications, 30000);
+    pollingRef.current = setInterval(fetchNotifications, 60000);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
