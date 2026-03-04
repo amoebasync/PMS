@@ -710,6 +710,102 @@ export const sendHiringNotificationEmail = async (
 };
 
 // ─────────────────────────────────────────────────────────
+// 5b. 不採用通知メール
+// ─────────────────────────────────────────────────────────
+export const sendRejectionNotificationEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  jobCategoryName: string,
+) => {
+  const isEn = language === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Thank you for taking the time to participate in our selection process.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">Application Result</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Result</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Not Selected</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      After careful consideration, we regret to inform you that we are unable to offer you a position at this time.<br>
+      We sincerely appreciate your interest in our company and encourage you to apply again in the future.
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      この度は弊社の選考にご参加いただき、誠にありがとうございました。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">選考結果</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">選考結果</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">不採用</span>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      慎重に検討させていただきました結果、誠に残念ながら今回はご期待に添えない結果となりました。<br>
+      貴重なお時間をいただきましたことに深く感謝申し上げます。またのご応募をお待ちしております。
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Application Result Notification'
+    : '【Tiramis】選考結果のお知らせ';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nThank you for participating in our selection process.\n\nPosition: ${jobCategoryName}\nResult: Not Selected\n\nAfter careful consideration, we regret to inform you that we are unable to offer you a position at this time.\nWe appreciate your interest and encourage you to apply again in the future.\n\nContact: recruit@tiramis.co.jp`
+    : `${applicantName} 様\n\nこの度は弊社の選考にご参加いただき、ありがとうございました。\n\n応募職種: ${jobCategoryName}\n選考結果: 不採用\n\n慎重に検討させていただきました結果、誠に残念ながら今回はご期待に添えない結果となりました。\nまたのご応募をお待ちしております。\n\nお問い合わせ: recruit@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
+    text: textContent,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
 // 6. 社員パスワードリセット（ワンタイムリンク）
 // ─────────────────────────────────────────────────────────
 export const sendPasswordResetEmail = async (

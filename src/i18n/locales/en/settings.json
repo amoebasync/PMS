@@ -58,6 +58,8 @@
   "applicant_email_settings": "Applicant Email Settings",
   "auto_send_hiring_email": "Auto-send Hiring Notification Email",
   "auto_send_hiring_email_desc": "When OFF, hiring notification email will not be sent even when hiring status is changed to 'Hired'.",
+  "auto_send_rejection_email": "Auto-send Rejection Notification Email",
+  "auto_send_rejection_email_desc": "When ON, rejection notification email will be sent when hiring status is changed to 'Rejected'.",
   "company_info": "Company Info",
   "basic_info": "Basic Information",
   "company_name": "Company Name",

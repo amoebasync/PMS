@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
-import { sendHiringNotificationEmail } from '@/lib/mailer';
+import { sendHiringNotificationEmail, sendRejectionNotificationEmail } from '@/lib/mailer';
 
 // GET /api/applicants/[id]
 // 管理者: 応募者詳細取得
@@ -252,6 +252,31 @@ export async function PUT(
           lang,
           jobName,
         ).catch((err) => console.error('Hiring notification email failed:', err));
+      }
+    }
+
+    // 不採用に変更された場合、不採用通知メールを送信（システム設定で有効化が必要、デフォルトOFF）
+    if (
+      body.hiringStatus === 'REJECTED' &&
+      previousHiringStatus !== 'REJECTED'
+    ) {
+      const sendRejectionSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'sendRejectionEmail' },
+      });
+      const shouldSend = sendRejectionSetting?.value === 'true';
+
+      if (shouldSend) {
+        const lang = updated.language || 'ja';
+        const jobName = lang === 'en'
+          ? (updated.jobCategory?.nameEn || updated.jobCategory?.nameJa || '')
+          : (updated.jobCategory?.nameJa || '');
+
+        sendRejectionNotificationEmail(
+          updated.email,
+          updated.name,
+          lang,
+          jobName,
+        ).catch((err) => console.error('Rejection notification email failed:', err));
       }
     }
 

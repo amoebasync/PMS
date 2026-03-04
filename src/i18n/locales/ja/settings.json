@@ -58,6 +58,8 @@
   "applicant_email_settings": "応募者メール設定",
   "auto_send_hiring_email": "採用通知メールを自動送信する",
   "auto_send_hiring_email_desc": "OFFにすると、採用ステータスを「採用」に変更しても採用通知メールが送信されません。",
+  "auto_send_rejection_email": "不採用通知メールを自動送信する",
+  "auto_send_rejection_email_desc": "ONにすると、採用ステータスを「不採用」に変更した際に不採用通知メールが自動送信されます。",
   "company_info": "自社情報",
   "basic_info": "基本情報",
   "company_name": "会社名",

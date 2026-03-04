@@ -1001,6 +1001,29 @@ export default function SettingsPage() {
                   }`} />
                 </button>
               </div>
+              <div className="flex items-center justify-between gap-6 mt-4 pt-4 border-t border-slate-100">
+                <div>
+                  <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                    <i className="bi bi-x-circle text-rose-500"></i>
+                    {t('auto_send_rejection_email')}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">{t('auto_send_rejection_email_desc')}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    const newVal = systemSettings.sendRejectionEmail === 'true' ? 'false' : 'true';
+                    setSystemSettings(prev => ({ ...prev, sendRejectionEmail: newVal }));
+                    handleSaveSystemSetting('sendRejectionEmail', newVal);
+                  }}
+                  className={`shrink-0 relative inline-flex h-8 w-[52px] items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500 ${
+                    systemSettings.sendRejectionEmail === 'true' ? 'bg-rose-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-1 ring-black/5 transition-transform duration-200 ${
+                    systemSettings.sendRejectionEmail === 'true' ? 'translate-x-[26px]' : 'translate-x-[2px]'
+                  }`} />
+                </button>
+              </div>
             </div>
           </div>
         </>)}
