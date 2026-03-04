@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { isHoliday } from '@/lib/holidays';
 
 // 認証チェック
 async function checkAuth() {
@@ -228,6 +229,9 @@ export async function POST(request: Request) {
         where: { interviewSlotMasterId: Number(masterId) },
       });
 
+      // マスタのallowHolidays設定を取得
+      const masterRecord = await prisma.interviewSlotMaster.findUnique({ where: { id: Number(masterId) } });
+
       // このマスタに紐づく職種IDを取得（JobCategory.interviewSlotMasterId）
       const jobCategories = await prisma.jobCategory.findMany({
         where: { interviewSlotMasterId: Number(masterId) },
@@ -247,6 +251,18 @@ export async function POST(request: Request) {
         // JST日の開始・終了をUTCで表現（JST 00:00〜23:59 = UTC 前日15:00〜当日14:59）
         const dayStart = toJSTTime(currentDate, 0);          // JST 00:00
         const dayEnd = toJSTTime(currentDate, 23 * 60 + 59); // JST 23:59
+
+        // 祝日チェック: allowHolidays=false の場合、祝日の未予約スロットを削除してスキップ
+        if (masterRecord && !masterRecord.allowHolidays) {
+          const isHolidayDate = await isHoliday(currentDate);
+          if (isHolidayDate) {
+            const deleted = await prisma.interviewSlot.deleteMany({
+              where: { isBooked: false, interviewSlotMasterId: Number(masterId), startTime: { gte: dayStart, lte: dayEnd } },
+            });
+            totalDeleted += deleted.count;
+            continue;
+          }
+        }
 
         const master = masterSlots.find((s) => s.dayOfWeek === dayOfWeek && s.isEnabled);
 

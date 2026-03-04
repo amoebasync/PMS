@@ -29,6 +29,8 @@ type SlotMaster = {
   isActive: boolean;
   jobCategoryIds: number[];
   slotCount: number;
+  capacity: number;
+  allowHolidays: boolean;
 };
 
 type DefaultSlot = {
@@ -49,6 +51,9 @@ type MasterFormData = {
   zoomPassword: string;
   jobCategoryIds: number[];
   isActive: boolean;
+  capacity: number;
+  capacityUnlimited: boolean;
+  allowHolidays: boolean;
 };
 
 const INITIAL_FORM: MasterFormData = {
@@ -59,6 +64,9 @@ const INITIAL_FORM: MasterFormData = {
   zoomPassword: '',
   jobCategoryIds: [],
   isActive: true,
+  capacity: 1,
+  capacityUnlimited: false,
+  allowHolidays: true,
 };
 
 const INTERVAL_OPTIONS = [15, 30, 45, 60, 90, 120];
@@ -144,6 +152,8 @@ export default function InterviewSlotMasterSettings() {
           isActive: m.isActive,
           jobCategoryIds: (m.jobCategories || []).map((jc: any) => jc.id),
           slotCount: m._count?.interviewSlots ?? 0,
+          capacity: m.capacity ?? 1,
+          allowHolidays: m.allowHolidays ?? true,
         }));
         setMasters(mapped);
       }
@@ -224,6 +234,9 @@ export default function InterviewSlotMasterSettings() {
       zoomPassword: master.zoomPassword || '',
       jobCategoryIds: [...master.jobCategoryIds],
       isActive: master.isActive,
+      capacity: master.capacity,
+      capacityUnlimited: master.capacity === 0,
+      allowHolidays: master.allowHolidays,
     });
     setShowModal(true);
   };
@@ -240,6 +253,8 @@ export default function InterviewSlotMasterSettings() {
         zoomPassword: form.meetingType === 'ZOOM' ? form.zoomPassword.trim() || null : null,
         jobCategoryIds: form.jobCategoryIds,
         isActive: form.isActive,
+        capacity: form.capacityUnlimited ? 0 : Number(form.capacity) || 1,
+        allowHolidays: form.allowHolidays,
       };
 
       const isEdit = editingMasterId != null;
@@ -470,6 +485,16 @@ export default function InterviewSlotMasterSettings() {
                         }`}>
                           {master.isActive ? t('ism_active') : t('ism_inactive')}
                         </span>
+                        {/* Capacity badge */}
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-100 text-cyan-700">
+                          {master.capacity === 0 ? t('ism_unlimited') : `${master.capacity}${t('ism_capacity_persons')}`}
+                        </span>
+                        {/* Holiday badge */}
+                        {!master.allowHolidays && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">
+                            {t('ism_holidays_reject')}
+                          </span>
+                        )}
                       </div>
                       {/* Job category tags */}
                       <div className="flex flex-wrap gap-1 mt-1.5">
@@ -919,6 +944,89 @@ export default function InterviewSlotMasterSettings() {
                   {jobCategories.length === 0 && (
                     <p className="text-xs text-slate-400">{t('ism_job_categories')}: --</p>
                   )}
+                </div>
+              </div>
+
+              {/* Capacity */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('ism_capacity')}</label>
+                <div className="flex items-center gap-4">
+                  <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                    !form.capacityUnlimited
+                      ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="capacityType"
+                      checked={!form.capacityUnlimited}
+                      onChange={() => setForm((f) => ({ ...f, capacityUnlimited: false, capacity: f.capacity || 1 }))}
+                      className="hidden"
+                    />
+                    <span className="text-sm font-bold">{t('ism_capacity_limited')}</span>
+                  </label>
+                  <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                    form.capacityUnlimited
+                      ? 'border-cyan-400 bg-cyan-50 text-cyan-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="capacityType"
+                      checked={form.capacityUnlimited}
+                      onChange={() => setForm((f) => ({ ...f, capacityUnlimited: true }))}
+                      className="hidden"
+                    />
+                    <span className="text-sm font-bold">{t('ism_unlimited')}</span>
+                  </label>
+                </div>
+                {!form.capacityUnlimited && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={form.capacity}
+                      onChange={(e) => setForm((f) => ({ ...f, capacity: Math.max(1, Number(e.target.value) || 1) }))}
+                      className="w-24 border border-slate-300 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-cyan-500"
+                    />
+                    <span className="text-sm text-slate-500">{t('ism_capacity_persons')}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Holiday slots */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('ism_holidays')}</label>
+                <div className="flex items-center gap-4">
+                  <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                    form.allowHolidays
+                      ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="allowHolidays"
+                      checked={form.allowHolidays}
+                      onChange={() => setForm((f) => ({ ...f, allowHolidays: true }))}
+                      className="hidden"
+                    />
+                    <span className="text-sm font-bold">{t('ism_holidays_accept')}</span>
+                  </label>
+                  <label className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border cursor-pointer transition-all ${
+                    !form.allowHolidays
+                      ? 'border-amber-400 bg-amber-50 text-amber-700'
+                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="allowHolidays"
+                      checked={!form.allowHolidays}
+                      onChange={() => setForm((f) => ({ ...f, allowHolidays: false }))}
+                      className="hidden"
+                    />
+                    <span className="text-sm font-bold">{t('ism_holidays_reject')}</span>
+                  </label>
                 </div>
               </div>
 

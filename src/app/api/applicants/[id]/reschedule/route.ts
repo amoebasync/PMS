@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { createGoogleMeetEvent, isGoogleMeetConfigured, deleteGoogleCalendarEvent } from '@/lib/google-meet';
+import { isSlotAvailable, bookSlotForApplicant, unbookSlotForApplicant } from '@/lib/interview-slot-helpers';
 
 // POST /api/applicants/[id]/reschedule
 // 管理者: 面接日程を変更（旧スロット解放 → 新スロット予約）
@@ -31,15 +32,23 @@ export async function POST(
     // 応募者+現在のスロットを取得
     const applicant = await prisma.applicant.findUnique({
       where: { id: applicantId },
-      include: { interviewSlot: true, jobCategory: true },
+      include: {
+        interviewSlot: true,
+        interviewSlotApplicants: {
+          include: { interviewSlot: true },
+          take: 1,
+        },
+        jobCategory: true,
+      },
     });
 
     if (!applicant) {
       return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
     }
 
-    const oldSlotId = applicant.interviewSlot?.id;
-    const oldCalendarEventId = applicant.interviewSlot?.calendarEventId;
+    const linkedSlot = applicant.interviewSlotApplicants[0]?.interviewSlot || applicant.interviewSlot;
+    const oldSlotId = linkedSlot?.id;
+    const oldCalendarEventId = linkedSlot?.calendarEventId;
 
     // 新スロットの確認
     const newSlot = await prisma.interviewSlot.findUnique({
@@ -54,7 +63,8 @@ export async function POST(
       return NextResponse.json({ error: '指定されたスロットが見つかりません' }, { status: 404 });
     }
 
-    if (newSlot.isBooked) {
+    const newSlotAvailable = await isSlotAvailable(prisma, newSlot.id);
+    if (!newSlotAvailable) {
       return NextResponse.json({ error: 'このスロットは既に予約されています' }, { status: 409 });
     }
 
@@ -89,27 +99,13 @@ export async function POST(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
-      // 旧スロット解放（存在する場合）
+      // 旧スロット解放（存在する場合、中間テーブル + レガシー）
       if (oldSlotId) {
-        await tx.interviewSlot.update({
-          where: { id: oldSlotId },
-          data: {
-            isBooked: false,
-            applicantId: null,
-          },
-        });
+        await unbookSlotForApplicant(tx, oldSlotId, applicantId);
       }
 
-      // 新スロット予約
-      await tx.interviewSlot.update({
-        where: { id: Number(newSlotId) },
-        data: {
-          isBooked: true,
-          applicantId: applicantId,
-          meetUrl: meetUrl || newSlot.meetUrl,
-          calendarEventId: calendarEventId || undefined,
-        },
-      });
+      // 新スロット予約（中間テーブル + レガシー）
+      await bookSlotForApplicant(tx, Number(newSlotId), applicantId, meetUrl || newSlot.meetUrl, calendarEventId);
 
       // 監査ログ
       await writeAuditLog({

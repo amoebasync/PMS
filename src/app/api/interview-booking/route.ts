@@ -5,6 +5,7 @@ import {
   sendApplicantConfirmationEmail,
   sendInterviewBookingAdminNotification,
 } from '@/lib/mailer';
+import { isSlotAvailable, bookSlotForApplicant } from '@/lib/interview-slot-helpers';
 
 const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
 const TZ = 'Asia/Tokyo';
@@ -54,7 +55,11 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '無効なトークンです' }, { status: 404 });
     }
 
-    if (applicant.interviewSlot) {
+    // 中間テーブルで既存予約をチェック
+    const existingBooking = await prisma.interviewSlotApplicant.findFirst({
+      where: { applicantId: applicant.id },
+    });
+    if (existingBooking || applicant.interviewSlot) {
       return NextResponse.json({ error: 'すでに面接スロットが予約されています' }, { status: 409 });
     }
 
@@ -62,10 +67,9 @@ export async function GET(request: Request) {
     // 4時間後以降のスロットのみ表示
     const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
-    // 空きスロット取得（職種フィルタ or 全職種対応）
-    const slots = await prisma.interviewSlot.findMany({
+    // 全スロット取得（容量ベースで空き判定）
+    const allSlots = await prisma.interviewSlot.findMany({
       where: {
-        isBooked: false,
         startTime: { gt: fourHoursLater },
         OR: [
           { jobCategoryId: applicant.jobCategoryId },
@@ -81,7 +85,15 @@ export async function GET(request: Request) {
         interviewer: {
           select: { id: true, lastNameJa: true, firstNameJa: true },
         },
+        interviewSlotMaster: { select: { capacity: true } },
+        _count: { select: { interviewSlotApplicants: true } },
       },
+    });
+
+    // 容量ベースで空きスロットをフィルタ
+    const slots = allSlots.filter(s => {
+      const capacity = s.interviewSlotMaster?.capacity ?? 1;
+      return capacity === 0 || s._count.interviewSlotApplicants < capacity;
     });
 
     return NextResponse.json({
@@ -121,7 +133,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '無効なトークンです' }, { status: 404 });
     }
 
-    if (applicant.interviewSlot) {
+    // 中間テーブルで既存予約をチェック
+    const existingBooking = await prisma.interviewSlotApplicant.findFirst({
+      where: { applicantId: applicant.id },
+    });
+    if (existingBooking || applicant.interviewSlot) {
       return NextResponse.json({ error: 'すでに面接スロットが予約されています' }, { status: 409 });
     }
 
@@ -138,7 +154,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'スロットが見つかりません' }, { status: 404 });
     }
 
-    if (slot.isBooked) {
+    const available = await isSlotAvailable(prisma, slot.id);
+    if (!available) {
       return NextResponse.json({ error: 'このスロットはすでに予約されています' }, { status: 409 });
     }
 
@@ -182,21 +199,13 @@ export async function POST(request: Request) {
     }
 
     // トランザクション: スロット予約 + 応募者更新
-    await prisma.$transaction([
-      prisma.interviewSlot.update({
-        where: { id: slot.id },
-        data: {
-          isBooked: true,
-          applicantId: applicant.id,
-          meetUrl: meetUrl || slot.meetUrl || null,
-          calendarEventId: eventId || null,
-        },
-      }),
-      prisma.applicant.update({
+    await prisma.$transaction(async (tx) => {
+      await bookSlotForApplicant(tx, slot.id, applicant.id, meetUrl || slot.meetUrl || null, eventId);
+      await tx.applicant.update({
         where: { id: applicant.id },
         data: { flowStatus: 'INTERVIEW_WAITING' },
-      }),
-    ]);
+      });
+    });
 
     // 確認メール送信（応募者へ）
     const slotStart = new Date(slot.startTime);

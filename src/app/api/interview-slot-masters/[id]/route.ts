@@ -116,6 +116,8 @@ export async function PUT(
           zoomPassword: body.zoomPassword !== undefined ? (body.zoomPassword || null) : beforeData.zoomPassword,
           isActive: body.isActive !== undefined ? body.isActive : beforeData.isActive,
           sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) : beforeData.sortOrder,
+          capacity: body.capacity !== undefined ? Number(body.capacity) : beforeData.capacity,
+          allowHolidays: body.allowHolidays !== undefined ? body.allowHolidays : beforeData.allowHolidays,
         },
       });
 
@@ -208,11 +210,10 @@ export async function DELETE(
       return NextResponse.json({ error: '面接スロットマスタが見つかりません' }, { status: 404 });
     }
 
-    // 予約済みスロットがある場合は削除不可
-    const bookedCount = await prisma.interviewSlot.count({
+    // 予約済みスロットがある場合は削除不可（中間テーブルで判定）
+    const bookedCount = await prisma.interviewSlotApplicant.count({
       where: {
-        interviewSlotMasterId: id,
-        isBooked: true,
+        interviewSlot: { interviewSlotMasterId: id },
       },
     });
     if (bookedCount > 0) {

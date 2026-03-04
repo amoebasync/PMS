@@ -354,5 +354,12 @@
   "ism_toast_updated": "Master updated",
   "ism_toast_deleted": "Master deleted",
   "ism_toast_save_error": "Failed to save",
-  "ism_generate_footer": "\"Generate Now\" creates slots for the next 2 weeks. After changing settings, use \"Save All\" to auto-adjust slots from the effective date."
+  "ism_generate_footer": "\"Generate Now\" creates slots for the next 2 weeks. After changing settings, use \"Save All\" to auto-adjust slots from the effective date.",
+  "ism_capacity": "Capacity",
+  "ism_capacity_limited": "Limited",
+  "ism_unlimited": "Unlimited",
+  "ism_capacity_persons": "",
+  "ism_holidays": "Holiday Slots",
+  "ism_holidays_accept": "Accept",
+  "ism_holidays_reject": "Reject"
 }

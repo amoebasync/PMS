@@ -354,5 +354,12 @@
   "ism_toast_updated": "マスタを更新しました",
   "ism_toast_deleted": "マスタを削除しました",
   "ism_toast_save_error": "保存に失敗しました",
-  "ism_generate_footer": "「今すぐ生成」で今後2週間分の面接スロットを作成します。設定変更後は「全て保存」で適用開始日以降のスロットを自動的に再調整します。"
+  "ism_generate_footer": "「今すぐ生成」で今後2週間分の面接スロットを作成します。設定変更後は「全て保存」で適用開始日以降のスロットを自動的に再調整します。",
+  "ism_capacity": "定員",
+  "ism_capacity_limited": "制限あり",
+  "ism_unlimited": "無制限",
+  "ism_capacity_persons": "名",
+  "ism_holidays": "祝日スロット",
+  "ism_holidays_accept": "受け付ける",
+  "ism_holidays_reject": "受け付けない"
 }

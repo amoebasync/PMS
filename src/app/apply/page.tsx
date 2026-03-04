@@ -66,6 +66,7 @@ const translations = {
     errorGeneral: '送信に失敗しました。もう一度お試しください。',
     searchPlaceholder: '検索...',
     noResults: '該当なし',
+    remaining: '残り',
   },
   en: {
     title: 'Job Application',
@@ -126,6 +127,7 @@ const translations = {
     errorGeneral: 'Submission failed. Please try again.',
     searchPlaceholder: 'Search...',
     noResults: 'No results',
+    remaining: 'remaining',
   },
 };
 
@@ -154,6 +156,9 @@ interface InterviewSlot {
   id: number;
   startTime: string;
   endTime: string;
+  capacity?: number;
+  remainingCapacity?: number | null;
+  bookedCount?: number;
   interviewSlotMaster?: {
     id: number;
     name: string;
@@ -1120,6 +1125,11 @@ function ApplyForm() {
                                   : 'bg-indigo-100 text-indigo-700'
                               }`}>
                                 {meetingType === 'ZOOM' ? t.badgeZoom : t.badgeGoogleMeet}
+                              </span>
+                            )}
+                            {(slot.capacity ?? 1) > 1 && slot.remainingCapacity != null && (
+                              <span className="text-xs text-slate-500">
+                                ({t.remaining}: {slot.remainingCapacity})
                               </span>
                             )}
                           </div>

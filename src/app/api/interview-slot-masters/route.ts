@@ -79,6 +79,8 @@ export async function POST(request: Request) {
           zoomPassword: body.zoomPassword || null,
           isActive: body.isActive !== false,
           sortOrder: body.sortOrder !== undefined ? Number(body.sortOrder) : 100,
+          capacity: body.capacity !== undefined ? Number(body.capacity) : 1,
+          allowHolidays: body.allowHolidays !== undefined ? body.allowHolidays : true,
         },
       });
 

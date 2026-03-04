@@ -37,6 +37,23 @@ type InterviewSlot = {
     hiringStatus: string;
     jobCategory: { id: number; nameJa: string; nameEn: string | null } | null;
   } | null;
+  interviewSlotApplicants?: Array<{
+    applicant: {
+      id: number;
+      name: string;
+      email: string;
+      phone: string | null;
+      flowStatus: string;
+      hiringStatus: string;
+      jobCategory: { id: number; nameJa: string; nameEn: string | null } | null;
+    };
+  }>;
+  _count?: { interviewSlotApplicants: number };
+  interviewSlotMaster?: {
+    id: number;
+    name: string;
+    capacity: number;
+  } | null;
 };
 
 type Country = { id: number; code: string; name: string; nameEn: string };
@@ -86,6 +103,23 @@ type Applicant = {
       zoomPassword?: string | null;
     } | null;
   } | null;
+  interviewSlotApplicants?: Array<{
+    interviewSlot: {
+      id: number;
+      startTime: string;
+      endTime: string;
+      meetUrl: string | null;
+      isBooked: boolean;
+      interviewer: { id: number; lastNameJa: string; firstNameJa: string; email: string } | null;
+      interviewSlotMaster?: {
+        id: number;
+        name: string;
+        meetingType: 'GOOGLE_MEET' | 'ZOOM';
+        zoomMeetingNumber?: string | null;
+        zoomPassword?: string | null;
+      } | null;
+    };
+  }>;
   trainingSlot: {
     id: number;
     startTime: string;
@@ -295,7 +329,7 @@ const ScoreSelector = ({ value, onChange, label, lowLabel = '低', highLabel = '
 // ──────────────────────────────────────────
 export default function ApplicantsPage() {
   const { showToast, showConfirm } = useNotification();
-  const { t } = useTranslation('applicants');
+  const { t, lang } = useTranslation('applicants');
   const calendarRef = useRef<FullCalendar>(null);
   const trainingCalendarRef = useRef<FullCalendar>(null);
   const trainingDateRangeRef = useRef<{ from: string; to: string } | null>(null);
@@ -414,6 +448,10 @@ export default function ApplicantsPage() {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
+  const [filterMasterId, setFilterMasterId] = useState<number | ''>('');
+  const [slotMasters, setSlotMasters] = useState<Array<{id: number; name: string}>>([]);
+  const [slotMinTime, setSlotMinTime] = useState('08:00:00');
+  const [slotMaxTime, setSlotMaxTime] = useState('20:00:00');
 
   // ── 応募者リスト ──
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -537,6 +575,8 @@ export default function ApplicantsPage() {
   const [jobCatLoading, setJobCatLoading] = useState(false);
   const [newJobCat, setNewJobCat] = useState({ nameJa: '', nameEn: '' });
   const [jobCatCreating, setJobCatCreating] = useState(false);
+  const [editingJobCat, setEditingJobCat] = useState<{ id: number; nameJa: string; nameEn: string } | null>(null);
+  const [jobCatSaving, setJobCatSaving] = useState(false);
 
   // ── マスターデータ ──
   const [countries, setCountries] = useState<Country[]>([]);
@@ -545,16 +585,43 @@ export default function ApplicantsPage() {
   const [interviewerEmployees, setInterviewerEmployees] = useState<{ id: number; lastNameJa: string; firstNameJa: string; email: string }[]>([]);
 
   // ──────────────────────────────────────────
+  // ヘルパー: 応募者の面接スロット取得（junction table対応）
+  // ──────────────────────────────────────────
+  function getApplicantInterviewSlot(applicant: Applicant) {
+    if (applicant.interviewSlotApplicants && applicant.interviewSlotApplicants.length > 0) {
+      return applicant.interviewSlotApplicants[0].interviewSlot;
+    }
+    return applicant.interviewSlot;
+  }
+
+  // ──────────────────────────────────────────
   // データ取得
   // ──────────────────────────────────────────
   const fetchSlots = useCallback(async (month?: string, silent = false) => {
     if (!silent) setCalendarLoading(true);
     try {
       const m = month || currentMonth;
-      const res = await fetch(`/api/interview-slots?month=${m}`);
+      const url = new URL('/api/interview-slots', window.location.origin);
+      url.searchParams.set('month', m);
+      if (filterMasterId) url.searchParams.set('masterId', String(filterMasterId));
+      const res = await fetch(url.toString());
       if (!res.ok) throw new Error('fetch failed');
       const data = await res.json();
-      setSlots(data.data || []);
+      const fetchedSlots = data.data || [];
+      setSlots(fetchedSlots);
+
+      // Compute dynamic time range
+      if (fetchedSlots.length > 0) {
+        const times = fetchedSlots.map((s: InterviewSlot) => {
+          const start = new Date(s.startTime);
+          const end = new Date(s.endTime);
+          return { startH: start.getHours(), endH: end.getHours() + (end.getMinutes() > 0 ? 1 : 0) };
+        });
+        const minH = Math.max(0, Math.min(...times.map((t: { startH: number }) => t.startH)) - 1);
+        const maxH = Math.min(24, Math.max(...times.map((t: { endH: number }) => t.endH)) + 1);
+        setSlotMinTime(`${String(minH).padStart(2, '0')}:00:00`);
+        setSlotMaxTime(`${String(maxH).padStart(2, '0')}:00:00`);
+      }
     } catch {
       if (!silent) {
         setSlots([]);
@@ -563,7 +630,7 @@ export default function ApplicantsPage() {
     } finally {
       if (!silent) setCalendarLoading(false);
     }
-  }, [currentMonth, showToast]);
+  }, [currentMonth, filterMasterId, showToast]);
 
   const fetchApplicants = useCallback(async (p = 1, silent = false) => {
     if (!silent) setListLoading(true);
@@ -606,11 +673,12 @@ export default function ApplicantsPage() {
 
   const fetchMasterData = useCallback(async () => {
     try {
-      const [countriesRes, visaTypesRes, rmRes, empRes] = await Promise.all([
+      const [countriesRes, visaTypesRes, rmRes, empRes, mastersRes] = await Promise.all([
         fetch('/api/countries/public'),
         fetch('/api/visa-types/public'),
         fetch('/api/recruiting-media'),
         fetch('/api/employees?simple=true'),
+        fetch('/api/interview-slot-masters'),
       ]);
       if (countriesRes.ok) {
         const data = await countriesRes.json();
@@ -627,6 +695,10 @@ export default function ApplicantsPage() {
       if (empRes.ok) {
         const data = await empRes.json();
         setInterviewerEmployees(data || []);
+      }
+      if (mastersRes.ok) {
+        const data = await mastersRes.json();
+        setSlotMasters((data || []).map((m: any) => ({ id: m.id, name: m.name })));
       }
     } catch {
       // silently fail
@@ -810,6 +882,11 @@ export default function ApplicantsPage() {
     return () => clearInterval(interval);
   }, [fetchApplicants, fetchSlots]);
 
+  // ── マスタフィルター変更時にスロット再取得 ──
+  useEffect(() => {
+    fetchSlots();
+  }, [filterMasterId]);
+
   // ── 検索デバウンス ──
   useEffect(() => {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
@@ -844,20 +921,40 @@ export default function ApplicantsPage() {
   // カレンダーイベント変換
   // ──────────────────────────────────────────
   const calendarEvents = slots.map(slot => {
-    const isBooked = slot.isBooked && slot.applicant;
+    const capacity = slot.interviewSlotMaster?.capacity ?? 1;
+    const bookedCount = slot._count?.interviewSlotApplicants ?? (slot.isBooked ? 1 : 0);
+    const isFull = capacity > 0 && bookedCount >= capacity;
+    const isPartial = bookedCount > 0 && !isFull;
+    const isBooked = bookedCount > 0;
+
+    // Color: empty=green, partial=amber, full=purple
+    const backgroundColor = isFull ? '#7c3aed' : isPartial ? '#d97706' : '#059669';
+    const borderColor = isFull ? '#6d28d9' : isPartial ? '#b45309' : '#047857';
+
+    // Title: capacity=1 shows applicant name, capacity>1 shows count format
+    let title: string;
+    if (capacity === 1) {
+      const applicantName = slot.applicant?.name || slot.interviewSlotApplicants?.[0]?.applicant?.name;
+      title = applicantName || t('empty_slot');
+    } else {
+      title = `${bookedCount}/${capacity === 0 ? '\u221E' : capacity}${lang === 'ja' ? '\u540D' : ''}`;
+    }
+
     const interviewerName = slot.interviewer ? `${slot.interviewer.lastNameJa} ${slot.interviewer.firstNameJa}` : '';
     return {
       id: String(slot.id),
-      title: isBooked ? slot.applicant!.name : t('empty_slot'),
+      title,
       start: slot.startTime,
       end: slot.endTime,
-      backgroundColor: isBooked ? '#6366f1' : '#10b981',
-      borderColor: isBooked ? '#4f46e5' : '#059669',
+      backgroundColor,
+      borderColor,
       textColor: '#ffffff',
       extendedProps: {
         slot,
         isBooked,
         interviewerName,
+        bookedCount,
+        capacity,
       },
     };
   });
@@ -988,8 +1085,10 @@ export default function ApplicantsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEventClick = async (arg: any) => {
     const { slot, isBooked } = arg.event.extendedProps as { slot: InterviewSlot; isBooked: boolean };
-    if (isBooked && slot.applicant) {
-      openEvalModal(slot.applicant.id);
+    // Try junction table first, then legacy applicant
+    const firstApplicant = slot.interviewSlotApplicants?.[0]?.applicant || slot.applicant;
+    if (isBooked && firstApplicant) {
+      openEvalModal(firstApplicant.id);
     } else {
       const ok = await showConfirm(
         t('slot_delete_confirm', { dateTime: new Date(slot.startTime).toLocaleString('ja-JP') }),
@@ -1241,8 +1340,9 @@ export default function ApplicantsPage() {
 
   // 面接担当者変更
   const handleChangeInterviewer = async (newInterviewerId: number | null) => {
-    if (!selectedApplicant?.interviewSlot) return;
-    const slotId = selectedApplicant.interviewSlot.id;
+    const slot = selectedApplicant ? getApplicantInterviewSlot(selectedApplicant) : null;
+    if (!slot) return;
+    const slotId = slot.id;
     try {
       const res = await fetch(`/api/interview-slots/${slotId}`, {
         method: 'PATCH',
@@ -1478,6 +1578,50 @@ export default function ApplicantsPage() {
       showToast(e.message || t('jobcat_create_failed'), 'error');
     } finally {
       setJobCatCreating(false);
+    }
+  };
+
+  // 職種更新
+  const handleUpdateJobCategory = async () => {
+    if (!editingJobCat || !editingJobCat.nameJa.trim()) return;
+    setJobCatSaving(true);
+    try {
+      const res = await fetch(`/api/job-categories/${editingJobCat.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nameJa: editingJobCat.nameJa.trim(),
+          nameEn: editingJobCat.nameEn.trim() || null,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || t('jobcat_update_failed'));
+      }
+      showToast(t('jobcat_updated'), 'success');
+      setEditingJobCat(null);
+      fetchJobCategories();
+    } catch (e: any) {
+      showToast(e.message || t('jobcat_update_failed'), 'error');
+    } finally {
+      setJobCatSaving(false);
+    }
+  };
+
+  // 職種削除
+  const handleDeleteJobCategory = async (cat: JobCategory) => {
+    const confirmed = await showConfirm(t('jobcat_delete_confirm', { name: cat.nameJa }));
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/job-categories/${cat.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || t('jobcat_delete_failed'));
+      }
+      showToast(t('jobcat_deleted'), 'success');
+      fetchJobCategories();
+    } catch (e: any) {
+      showToast(e.message || t('jobcat_delete_failed'), 'error');
     }
   };
 
@@ -1728,6 +1872,20 @@ export default function ApplicantsPage() {
           {/* ── TAB 1: カレンダー ── */}
           {activeTab === 'calendar' && (
             <div className="p-6">
+              {/* Master filter dropdown */}
+              <div className="mb-4 flex items-center gap-3">
+                <label className="text-xs font-bold text-slate-500">{t('filter_master')}:</label>
+                <select
+                  value={filterMasterId}
+                  onChange={(e) => setFilterMasterId(e.target.value ? Number(e.target.value) : '')}
+                  className="border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="">{t('all_masters')}</option>
+                  {slotMasters.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
               {calendarLoading && slots.length === 0 ? (
                 <div className="flex items-center justify-center py-20">
                   <div className="flex items-center gap-3 text-slate-400">
@@ -1755,8 +1913,8 @@ export default function ApplicantsPage() {
                   dateClick={handleDateClick}
                   eventClick={handleEventClick}
                   datesSet={handleDatesSet}
-                  slotMinTime="08:00:00"
-                  slotMaxTime="21:00:00"
+                  slotMinTime={slotMinTime}
+                  slotMaxTime={slotMaxTime}
                   allDaySlot={false}
                   height="auto"
                   dayMaxEvents={4}
@@ -1874,18 +2032,21 @@ export default function ApplicantsPage() {
                               <span className="text-sm text-slate-600">{app.jobCategory?.nameJa || '-'}</span>
                             </td>
                             <td className="px-4 py-3">
-                              {app.interviewSlot ? (
-                                <span className="text-sm text-slate-600">
-                                  {new Date(app.interviewSlot.startTime).toLocaleString('ja-JP', {
-                                    month: 'numeric',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                  })}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-slate-400">{t('interview_unset')}</span>
-                              )}
+                              {(() => {
+                                const slot = getApplicantInterviewSlot(app);
+                                return slot ? (
+                                  <span className="text-sm text-slate-600">
+                                    {new Date(slot.startTime).toLocaleString('ja-JP', {
+                                      month: 'numeric',
+                                      day: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    })}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-400">{t('interview_unset')}</span>
+                                );
+                              })()}
                             </td>
                             <td className="px-4 py-3">
                               {flow && (
@@ -2788,76 +2949,83 @@ export default function ApplicantsPage() {
                       <div className="border-t border-slate-200 my-3" />
 
                       {/* 面接情報 */}
-                      <div className="grid grid-cols-3 gap-x-4 gap-y-3">
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interview_date')}</p>
-                          {selectedApplicant.interviewSlot ? (
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className="text-sm text-slate-700">
-                                {new Date(selectedApplicant.interviewSlot.startTime).toLocaleString('ja-JP', {
-                                  year: 'numeric',
-                                  month: 'numeric',
-                                  day: 'numeric',
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })}
-                              </p>
-                              {selectedApplicant.interviewSlot.meetUrl && (() => {
-                                const slotMaster = selectedApplicant.interviewSlot!.interviewSlotMaster;
-                                const isZoom = slotMaster?.meetingType === 'ZOOM';
-                                return (
+                      {(() => {
+                        const evalSlot = getApplicantInterviewSlot(selectedApplicant);
+                        return (
+                          <>
+                            <div className="grid grid-cols-3 gap-x-4 gap-y-3">
+                              <div>
+                                <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interview_date')}</p>
+                                {evalSlot ? (
                                   <div className="flex items-center gap-2 flex-wrap">
-                                    <a
-                                      href={selectedApplicant.interviewSlot!.meetUrl!}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className={`inline-flex items-center gap-1 text-xs font-medium hover:underline transition-colors ${
-                                        isZoom ? 'text-violet-500 hover:text-violet-700' : 'text-blue-500 hover:text-blue-700'
-                                      }`}
-                                    >
-                                      <i className="bi bi-camera-video text-xs"></i>
-                                      {isZoom ? 'Zoom' : 'Meet'}
-                                    </a>
-                                    {isZoom && slotMaster?.zoomMeetingNumber && (
-                                      <span className="text-[10px] text-slate-400">
-                                        ID: {slotMaster.zoomMeetingNumber}
-                                        {slotMaster.zoomPassword && ` / PW: ${slotMaster.zoomPassword}`}
-                                      </span>
-                                    )}
+                                    <p className="text-sm text-slate-700">
+                                      {new Date(evalSlot.startTime).toLocaleString('ja-JP', {
+                                        year: 'numeric',
+                                        month: 'numeric',
+                                        day: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      })}
+                                    </p>
+                                    {evalSlot.meetUrl && (() => {
+                                      const slotMaster = evalSlot.interviewSlotMaster;
+                                      const isZoom = slotMaster?.meetingType === 'ZOOM';
+                                      return (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                          <a
+                                            href={evalSlot.meetUrl!}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className={`inline-flex items-center gap-1 text-xs font-medium hover:underline transition-colors ${
+                                              isZoom ? 'text-violet-500 hover:text-violet-700' : 'text-blue-500 hover:text-blue-700'
+                                            }`}
+                                          >
+                                            <i className="bi bi-camera-video text-xs"></i>
+                                            {isZoom ? 'Zoom' : 'Meet'}
+                                          </a>
+                                          {isZoom && slotMaster?.zoomMeetingNumber && (
+                                            <span className="text-[10px] text-slate-400">
+                                              ID: {slotMaster.zoomMeetingNumber}
+                                              {slotMaster.zoomPassword && ` / PW: ${slotMaster.zoomPassword}`}
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
                                   </div>
-                                );
-                              })()}
+                                ) : (
+                                  <p className="text-sm text-slate-400">{t('interview_unset')}</p>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interviewer')}</p>
+                                {evalSlot ? (
+                                  <select
+                                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                                    value={evalSlot.interviewer?.id || ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      handleChangeInterviewer(val ? Number(val) : null);
+                                    }}
+                                  >
+                                    <option value="">{t('eval_interviewer_unset')}</option>
+                                    {interviewerEmployees.map((emp) => (
+                                      <option key={emp.id} value={emp.id}>
+                                        {emp.lastNameJa} {emp.firstNameJa}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <p className="text-sm text-slate-400">{t('eval_interview_not_booked')}</p>
+                                )}
+                              </div>
                             </div>
-                          ) : (
-                            <p className="text-sm text-slate-400">{t('interview_unset')}</p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-slate-400 mb-0.5">{t('eval_interviewer')}</p>
-                          {selectedApplicant.interviewSlot ? (
-                            <select
-                              className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                              value={selectedApplicant.interviewSlot.interviewer?.id || ''}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                handleChangeInterviewer(val ? Number(val) : null);
-                              }}
-                            >
-                              <option value="">{t('eval_interviewer_unset')}</option>
-                              {interviewerEmployees.map((emp) => (
-                                <option key={emp.id} value={emp.id}>
-                                  {emp.lastNameJa} {emp.firstNameJa}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <p className="text-sm text-slate-400">{t('eval_interview_not_booked')}</p>
-                          )}
-                        </div>
-                      </div>
+                          </>
+                        );
+                      })()}
 
                       {/* 面接操作ボタン */}
-                      {selectedApplicant.interviewSlot && (
+                      {(getApplicantInterviewSlot(selectedApplicant)) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
                           <button
                             type="button"
@@ -2886,7 +3054,7 @@ export default function ApplicantsPage() {
                       )}
 
                       {/* 面接案内メール送信（未予約時） */}
-                      {!selectedApplicant.interviewSlot && (
+                      {!getApplicantInterviewSlot(selectedApplicant) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
                           <button
                             type="button"
@@ -3923,22 +4091,75 @@ export default function ApplicantsPage() {
                     {jobCategories.map(cat => (
                       <div
                         key={cat.id}
-                        className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-4 py-3"
+                        className="bg-white border border-slate-200 rounded-lg px-4 py-3"
                       >
-                        <div>
-                          <p className="text-sm font-bold text-slate-800">{cat.nameJa}</p>
-                          {cat.nameEn && <p className="text-xs text-slate-500">{cat.nameEn}</p>}
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs text-slate-400">
-                            {t('jobcat_applicant_count', { count: cat._count?.applicants || 0 })}
-                          </span>
-                          {!cat.isActive && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">
-                              {t('jobcat_inactive')}
-                            </span>
-                          )}
-                        </div>
+                        {editingJobCat?.id === cat.id ? (
+                          <div className="space-y-2">
+                            <div className="grid grid-cols-2 gap-2">
+                              <input
+                                type="text"
+                                value={editingJobCat.nameJa}
+                                onChange={e => setEditingJobCat(prev => prev ? { ...prev, nameJa: e.target.value } : prev)}
+                                className="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                                placeholder={t('jobcat_name_ja')}
+                              />
+                              <input
+                                type="text"
+                                value={editingJobCat.nameEn}
+                                onChange={e => setEditingJobCat(prev => prev ? { ...prev, nameEn: e.target.value } : prev)}
+                                className="w-full border border-indigo-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 focus:outline-none"
+                                placeholder={t('jobcat_name_en')}
+                              />
+                            </div>
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => setEditingJobCat(null)}
+                                className="px-3 py-1.5 text-xs font-bold text-slate-500 hover:bg-slate-100 rounded-lg transition-colors"
+                              >
+                                {t('cancel')}
+                              </button>
+                              <button
+                                onClick={handleUpdateJobCategory}
+                                disabled={jobCatSaving || !editingJobCat.nameJa.trim()}
+                                className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {jobCatSaving && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                                {t('save')}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{cat.nameJa}</p>
+                              {cat.nameEn && <p className="text-xs text-slate-500">{cat.nameEn}</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-slate-400">
+                                {t('jobcat_applicant_count', { count: cat._count?.applicants || 0 })}
+                              </span>
+                              {!cat.isActive && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-500">
+                                  {t('jobcat_inactive')}
+                                </span>
+                              )}
+                              <button
+                                onClick={() => setEditingJobCat({ id: cat.id, nameJa: cat.nameJa, nameEn: cat.nameEn || '' })}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                title={t('edit')}
+                              >
+                                <i className="bi bi-pencil-square text-sm"></i>
+                              </button>
+                              <button
+                                onClick={() => handleDeleteJobCategory(cat)}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                                title={t('delete')}
+                              >
+                                <i className="bi bi-trash3 text-sm"></i>
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

@@ -28,7 +28,18 @@ export async function GET(
         interviewSlot: {
           include: {
             interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
-            interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true } },
+            interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true } },
+          },
+        },
+        interviewSlotApplicants: {
+          include: {
+            interviewSlot: {
+              select: {
+                id: true, startTime: true, endTime: true, meetUrl: true, isBooked: true,
+                interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+                interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true } },
+              },
+            },
           },
         },
         recruitingMedia: true,
@@ -85,7 +96,10 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
-      // 面接スロットが紐付いている場合は解放
+      // 中間テーブルから予約を削除
+      await tx.interviewSlotApplicant.deleteMany({ where: { applicantId } });
+
+      // 面接スロットが紐付いている場合は解放（レガシー）
       if (applicant.interviewSlot) {
         await tx.interviewSlot.update({
           where: { id: applicant.interviewSlot.id },
@@ -199,7 +213,18 @@ export async function PUT(
           interviewSlot: {
             include: {
               interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
-              interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true } },
+              interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true } },
+            },
+          },
+          interviewSlotApplicants: {
+            include: {
+              interviewSlot: {
+                select: {
+                  id: true, startTime: true, endTime: true, meetUrl: true, isBooked: true,
+                  interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+                  interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true } },
+                },
+              },
             },
           },
           recruitingMedia: true,

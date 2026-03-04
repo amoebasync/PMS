@@ -317,11 +317,21 @@
   "jobcat_name_required": "Please enter a category name (Japanese)",
   "jobcat_created": "Job category created",
   "jobcat_create_failed": "Failed to create job category",
+  "jobcat_updated": "Job category updated",
+  "jobcat_update_failed": "Failed to update job category",
+  "jobcat_deleted": "Job category deleted",
+  "jobcat_delete_failed": "Failed to delete job category",
+  "jobcat_delete_confirm": "Delete \"{{name}}\"?",
 
   "error_occurred": "An error occurred",
   "update_failed": "Failed to update",
   "meeting_type_google_meet": "Google Meet Interview",
   "meeting_type_zoom": "Zoom Interview",
   "zoom_meeting_number": "Meeting Number",
-  "zoom_password": "Password"
+  "zoom_password": "Password",
+
+  "filter_master": "Master",
+  "all_masters": "All Masters",
+  "booked_count": "Booked",
+  "remaining": "remaining"
 }

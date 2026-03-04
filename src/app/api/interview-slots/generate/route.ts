@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { isHoliday } from '@/lib/holidays';
 
 const DAYS_AHEAD = 14;
 
@@ -72,6 +73,12 @@ export async function POST(request: Request) {
         const dayOfWeek = date.getUTCDay();
         const defaultSlot = master.defaultInterviewSlots.find((s) => s.dayOfWeek === dayOfWeek);
         if (!defaultSlot) continue;
+
+        // 祝日スキップチェック（allowHolidays=false の場合）
+        if (!master.allowHolidays) {
+          const isHolidayDate = await isHoliday(date);
+          if (isHolidayDate) continue;
+        }
 
         const [startH, startM] = defaultSlot.startTime.split(':').map(Number);
         const [endH, endM] = defaultSlot.endTime.split(':').map(Number);

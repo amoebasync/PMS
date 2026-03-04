@@ -96,7 +96,8 @@ export async function DELETE(
       return NextResponse.json({ error: 'スロットが見つかりません' }, { status: 404 });
     }
 
-    if (slot.isBooked) {
+    const bookingCount = await prisma.interviewSlotApplicant.count({ where: { interviewSlotId: slotId } });
+    if (bookingCount > 0 || slot.isBooked) {
       return NextResponse.json(
         { error: '予約済みのスロットは削除できません' },
         { status: 400 }

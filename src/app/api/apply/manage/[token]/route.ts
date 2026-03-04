@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 import { sendInterviewChangeEmail, sendInterviewCancelEmail } from '@/lib/mailer';
 import { createGoogleMeetEvent, isGoogleMeetConfigured, deleteGoogleCalendarEvent } from '@/lib/google-meet';
+import { isSlotAvailable, bookSlotForApplicant, unbookSlotForApplicant } from '@/lib/interview-slot-helpers';
 
 // 応募者をトークンで検索し、面接スロットと職種情報を含めて返す
 async function findApplicantByToken(token: string) {
@@ -10,6 +11,10 @@ async function findApplicantByToken(token: string) {
     where: { managementToken: token },
     include: {
       interviewSlot: true,
+      interviewSlotApplicants: {
+        include: { interviewSlot: true },
+        take: 1,
+      },
       jobCategory: true,
     },
   });
@@ -50,7 +55,7 @@ export async function GET(
       );
     }
 
-    const slot = applicant.interviewSlot;
+    const slot = applicant.interviewSlotApplicants[0]?.interviewSlot || applicant.interviewSlot;
     const canChange = canModify(applicant) && slot && isBeforeInterviewDay(slot.startTime);
 
     const isEn = applicant.language === 'en';
@@ -137,7 +142,7 @@ export async function PUT(
       );
     }
 
-    const currentSlot = applicant.interviewSlot;
+    const currentSlot = applicant.interviewSlotApplicants[0]?.interviewSlot || applicant.interviewSlot;
     if (!currentSlot) {
       return NextResponse.json(
         { error: '面接予約が見つかりません' },
@@ -160,7 +165,12 @@ export async function PUT(
         include: { interviewer: { select: { email: true } } },
       });
 
-      if (!newSlot || newSlot.isBooked) {
+      if (!newSlot) {
+        throw new Error('SLOT_UNAVAILABLE');
+      }
+
+      const newSlotAvailable = await isSlotAvailable(tx, newSlot.id);
+      if (!newSlotAvailable) {
         throw new Error('SLOT_UNAVAILABLE');
       }
 
@@ -191,25 +201,14 @@ export async function PUT(
         calendarEventId = meetResult.eventId;
       }
 
-      // 旧スロット解放
-      await tx.interviewSlot.update({
-        where: { id: currentSlot.id },
-        data: {
-          isBooked: false,
-          applicantId: null,
-        },
-      });
+      // 旧スロット解放（中間テーブル + レガシー）
+      await unbookSlotForApplicant(tx, currentSlot.id, applicant.id);
 
-      // 新スロット予約
-      const updatedSlot = await tx.interviewSlot.update({
-        where: { id: Number(newSlotId) },
-        data: {
-          isBooked: true,
-          applicantId: applicant.id,
-          meetUrl: meetUrl || newSlot.meetUrl,
-          calendarEventId: calendarEventId || undefined,
-        },
-      });
+      // 新スロット予約（中間テーブル + レガシー）
+      await bookSlotForApplicant(tx, Number(newSlotId), applicant.id, meetUrl || newSlot.meetUrl, calendarEventId);
+
+      // 更新後のスロット情報を取得
+      const updatedSlot = await tx.interviewSlot.findUnique({ where: { id: Number(newSlotId) } });
 
       // 監査ログ
       await writeAuditLog({
@@ -218,13 +217,13 @@ export async function PUT(
         targetModel: 'InterviewSlot',
         targetId: applicant.id,
         beforeData: { slotId: currentSlot.id, startTime: currentSlot.startTime } as unknown as Record<string, unknown>,
-        afterData: { slotId: updatedSlot.id, startTime: updatedSlot.startTime } as unknown as Record<string, unknown>,
+        afterData: { slotId: updatedSlot!.id, startTime: updatedSlot!.startTime } as unknown as Record<string, unknown>,
         ipAddress: getIpAddress(request),
-        description: `応募者「${applicant.name}」が面接時間を変更（旧枠ID: ${currentSlot.id} → 新枠ID: ${updatedSlot.id}）`,
+        description: `応募者「${applicant.name}」が面接時間を変更（旧枠ID: ${currentSlot.id} → 新枠ID: ${updatedSlot!.id}）`,
         tx,
       });
 
-      return updatedSlot;
+      return updatedSlot!;
     });
 
     // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行）
@@ -316,7 +315,7 @@ export async function DELETE(
       );
     }
 
-    const currentSlot = applicant.interviewSlot;
+    const currentSlot = applicant.interviewSlotApplicants[0]?.interviewSlot || applicant.interviewSlot;
     if (!currentSlot) {
       return NextResponse.json(
         { error: '面接予約が見つかりません' },
@@ -333,14 +332,8 @@ export async function DELETE(
 
     // トランザクション: スロット解放 + ステータス更新
     await prisma.$transaction(async (tx) => {
-      // スロット解放
-      await tx.interviewSlot.update({
-        where: { id: currentSlot.id },
-        data: {
-          isBooked: false,
-          applicantId: null,
-        },
-      });
+      // スロット解放（中間テーブル + レガシー）
+      await unbookSlotForApplicant(tx, currentSlot.id, applicant.id);
 
       // 応募者ステータス更新（自己キャンセル）
       await tx.applicant.update({

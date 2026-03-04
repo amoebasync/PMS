@@ -2090,6 +2090,8 @@ model InterviewSlotMaster {
   zoomUrl           String?     @map("zoom_url") @db.VarChar(500)
   zoomMeetingNumber String?     @map("zoom_meeting_number") @db.VarChar(50)
   zoomPassword      String?     @map("zoom_password") @db.VarChar(50)
+  capacity          Int         @default(1)
+  allowHolidays     Boolean     @default(true) @map("allow_holidays")
   isActive          Boolean     @default(true) @map("is_active")
   sortOrder         Int         @default(100) @map("sort_order")
   createdAt         DateTime    @default(now()) @map("created_at")
@@ -2149,12 +2151,41 @@ model InterviewSlot {
   interviewerId Int?      @map("interviewer_id")
   interviewer   Employee? @relation("InterviewerSlots", fields: [interviewerId], references: [id])
 
+  // 複数人予約対応（中間テーブル）
+  interviewSlotApplicants InterviewSlotApplicant[]
+
   @@index([startTime])
   @@index([isBooked])
   @@index([jobCategoryId])
   @@index([interviewerId])
   @@index([interviewSlotMasterId])
   @@map("interview_slots")
+}
+
+// --- 面接スロット×応募者 中間テーブル（複数人予約対応） ---
+model InterviewSlotApplicant {
+  id              Int       @id @default(autoincrement())
+  interviewSlotId Int       @map("interview_slot_id")
+  applicantId     Int       @map("applicant_id")
+  meetUrl         String?   @map("meet_url") @db.VarChar(500)
+  calendarEventId String?   @map("calendar_event_id") @db.VarChar(500)
+  bookedAt        DateTime  @default(now()) @map("booked_at")
+
+  interviewSlot   InterviewSlot @relation(fields: [interviewSlotId], references: [id], onDelete: Cascade)
+  applicant       Applicant     @relation(fields: [applicantId], references: [id], onDelete: Cascade)
+
+  @@unique([interviewSlotId, applicantId])
+  @@index([applicantId])
+  @@map("interview_slot_applicants")
+}
+
+// --- カスタム祝日 ---
+model CustomHoliday {
+  id   Int      @id @default(autoincrement())
+  date DateTime @unique @db.Date
+  name String   @db.VarChar(100)
+
+  @@map("custom_holidays")
 }
 
 // --- 応募者 ---
@@ -2195,8 +2226,11 @@ model Applicant {
   recruitingMediaId Int?              @map("recruiting_media_id")
   recruitingMedia   RecruitingMedia?  @relation(fields: [recruitingMediaId], references: [id])
 
-  // 面接スロット (1:1 逆参照)
+  // 面接スロット (1:1 逆参照) — レガシー、Phase 5で削除予定
   interviewSlot InterviewSlot?
+
+  // 複数人予約対応（中間テーブル）
+  interviewSlotApplicants InterviewSlotApplicant[]
 
   // 研修スロット (多対1: 同じ研修枠に複数人参加可)
   trainingSlotId Int?           @map("training_slot_id")

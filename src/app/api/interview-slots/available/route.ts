@@ -16,7 +16,6 @@ export async function GET(request: Request) {
     tomorrow.setHours(0, 0, 0, 0);
 
     const where: any = {
-      isBooked: false,
       startTime: { gte: tomorrow },
     };
 
@@ -28,7 +27,7 @@ export async function GET(request: Request) {
       ];
     }
 
-    const slots = await prisma.interviewSlot.findMany({
+    const allSlots = await prisma.interviewSlot.findMany({
       where,
       orderBy: { startTime: 'asc' },
       select: {
@@ -40,12 +39,30 @@ export async function GET(request: Request) {
           select: { id: true, nameJa: true, nameEn: true },
         },
         interviewSlotMaster: {
-          select: { id: true, name: true, meetingType: true },
+          select: { id: true, name: true, meetingType: true, capacity: true },
         },
+        _count: { select: { interviewSlotApplicants: true } },
       },
     });
 
-    return NextResponse.json({ slots });
+    // 容量ベースで空きスロットをフィルタし、残りキャパシティ情報を付与
+    const availableSlots = allSlots
+      .filter(s => {
+        const capacity = s.interviewSlotMaster?.capacity ?? 1;
+        return capacity === 0 || s._count.interviewSlotApplicants < capacity;
+      })
+      .map(s => {
+        const capacity = s.interviewSlotMaster?.capacity ?? 1;
+        const booked = s._count.interviewSlotApplicants;
+        return {
+          ...s,
+          remainingCapacity: capacity === 0 ? null : capacity - booked,
+          bookedCount: booked,
+          capacity,
+        };
+      });
+
+    return NextResponse.json({ slots: availableSlots });
   } catch (error) {
     console.error('Available Slots Fetch Error:', error);
     return NextResponse.json({ error: 'スロットの取得に失敗しました' }, { status: 500 });

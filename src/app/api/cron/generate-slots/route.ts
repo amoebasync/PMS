@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog } from '@/lib/audit';
+import { isHoliday } from '@/lib/holidays';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const DAYS_AHEAD = 14; // 何日先まで生成するか
@@ -64,6 +65,12 @@ export async function GET(request: Request) {
         const dayOfWeek = date.getUTCDay(); // 0=日, 1=月, ..., 6=土（UTC基準）
         const defaultSlot = master.defaultInterviewSlots.find((s) => s.dayOfWeek === dayOfWeek);
         if (!defaultSlot) continue;
+
+        // 祝日スキップチェック（allowHolidays=false の場合）
+        if (!master.allowHolidays) {
+          const isHolidayDate = await isHoliday(date);
+          if (isHolidayDate) continue;
+        }
 
         // 時間枠を intervalMinutes 単位で分割
         const [startH, startM] = defaultSlot.startTime.split(':').map(Number);

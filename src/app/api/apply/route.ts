@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 import { sendApplicantConfirmationEmail } from '@/lib/mailer';
 import { createGoogleMeetEvent, isGoogleMeetConfigured } from '@/lib/google-meet';
+import { isSlotAvailable, bookSlotForApplicant } from '@/lib/interview-slot-helpers';
 
 // POST /api/apply
 // 公開API: 応募者情報を送信し、面接スロットを予約する
@@ -61,7 +62,8 @@ export async function POST(request: Request) {
         },
       });
 
-      if (!slot || slot.isBooked) {
+      const available = await isSlotAvailable(tx, Number(interviewSlotId));
+      if (!slot || !available) {
         throw new Error('SLOT_UNAVAILABLE');
       }
 
@@ -118,16 +120,11 @@ export async function POST(request: Request) {
         },
       });
 
-      // スロットに応募者を紐付け（Meet URLも更新）
-      const updatedSlot = await tx.interviewSlot.update({
-        where: { id: Number(interviewSlotId) },
-        data: {
-          isBooked: true,
-          applicantId: applicant.id,
-          meetUrl: meetUrl || slot.meetUrl,
-          calendarEventId: calendarEventId || undefined,
-        },
-      });
+      // スロットに応募者を紐付け（中間テーブル + レガシーフィールド更新）
+      await bookSlotForApplicant(tx, Number(interviewSlotId), applicant.id, meetUrl || slot.meetUrl, calendarEventId);
+
+      // 更新後のスロット情報を取得（メール送信用にmeetUrlが必要）
+      const updatedSlot = await tx.interviewSlot.findUnique({ where: { id: Number(interviewSlotId) } });
 
       // 監査ログ
       await writeAuditLog({
@@ -141,7 +138,7 @@ export async function POST(request: Request) {
         tx,
       });
 
-      return { applicant, slot: updatedSlot };
+      return { applicant, slot: updatedSlot! };
     });
 
     const lang = language || 'ja';

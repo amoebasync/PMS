@@ -15,6 +15,7 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const month = searchParams.get('month'); // "2026-03" 形式
     const jobCategoryId = searchParams.get('jobCategoryId');
+    const masterId = searchParams.get('masterId');
 
     const where: any = {};
     if (month) {
@@ -25,6 +26,9 @@ export async function GET(request: Request) {
     }
     if (jobCategoryId) {
       where.jobCategoryId = Number(jobCategoryId);
+    }
+    if (masterId) {
+      where.interviewSlotMasterId = Number(masterId);
     }
 
     const slots = await prisma.interviewSlot.findMany({
@@ -38,7 +42,7 @@ export async function GET(request: Request) {
           select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
         },
         interviewSlotMaster: {
-          select: { id: true, name: true, meetingType: true },
+          select: { id: true, name: true, meetingType: true, capacity: true },
         },
         applicant: {
           select: {
@@ -51,6 +55,17 @@ export async function GET(request: Request) {
             jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
           },
         },
+        interviewSlotApplicants: {
+          include: {
+            applicant: {
+              select: {
+                id: true, name: true, email: true, phone: true, flowStatus: true, hiringStatus: true,
+                jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
+              },
+            },
+          },
+        },
+        _count: { select: { interviewSlotApplicants: true } },
       },
     });
 

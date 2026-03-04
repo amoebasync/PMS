@@ -317,11 +317,21 @@
   "jobcat_name_required": "職種名（日本語）を入力してください",
   "jobcat_created": "職種を作成しました",
   "jobcat_create_failed": "職種の作成に失敗しました",
+  "jobcat_updated": "職種を更新しました",
+  "jobcat_update_failed": "職種の更新に失敗しました",
+  "jobcat_deleted": "職種を削除しました",
+  "jobcat_delete_failed": "職種の削除に失敗しました",
+  "jobcat_delete_confirm": "「{{name}}」を削除しますか？",
 
   "error_occurred": "エラーが発生しました",
   "update_failed": "更新に失敗しました",
   "meeting_type_google_meet": "Google Meet 面接",
   "meeting_type_zoom": "Zoom 面接",
   "zoom_meeting_number": "ミーティング番号",
-  "zoom_password": "パスワード"
+  "zoom_password": "パスワード",
+
+  "filter_master": "マスタ",
+  "all_masters": "すべてのマスタ",
+  "booked_count": "予約済",
+  "remaining": "残り"
 }

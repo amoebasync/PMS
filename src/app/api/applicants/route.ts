@@ -59,7 +59,18 @@ export async function GET(request: Request) {
                 select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
               },
               interviewSlotMaster: {
-                select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true },
+                select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true },
+              },
+            },
+          },
+          interviewSlotApplicants: {
+            include: {
+              interviewSlot: {
+                select: {
+                  id: true, startTime: true, endTime: true, meetUrl: true, isBooked: true,
+                  interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+                  interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true, capacity: true } },
+                },
               },
             },
           },
