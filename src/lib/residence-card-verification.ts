@@ -181,7 +181,7 @@ async function autoFillFromCardData(
     const country = await prisma.country.findFirst({
       where: {
         OR: [
-          { nameEn: { equals: extracted.nationality, mode: 'insensitive' as const } },
+          { nameEn: extracted.nationality },
           { name: extracted.nationality },
         ],
       },
