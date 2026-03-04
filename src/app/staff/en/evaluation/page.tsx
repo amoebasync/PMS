@@ -7,12 +7,12 @@ const RANK_COLORS: Record<string, string> = {
   S: 'bg-yellow-500 text-white',
   A: 'bg-blue-500 text-white',
   B: 'bg-green-500 text-white',
-  C: 'bg-gray-400 text-white',
+  C: 'bg-slate-400 text-white',
   D: 'bg-red-400 text-white',
 };
 
 function RankBadge({ rank, size = 'lg' }: { rank: string; size?: 'sm' | 'lg' }) {
-  const cls = RANK_COLORS[rank] || 'bg-gray-300 text-white';
+  const cls = RANK_COLORS[rank] || 'bg-slate-300 text-white';
   if (size === 'sm') {
     return <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-black ${cls}`}>{rank}</span>;
   }

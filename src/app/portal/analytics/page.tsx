@@ -47,7 +47,7 @@ type OrderProgress = {
 const DEVICE_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6'];
 
 const STATUS_COLOR: Record<string, string> = {
-  DRAFT: 'bg-gray-100 text-gray-600',
+  DRAFT: 'bg-slate-100 text-slate-600',
   PLANNING: 'bg-blue-100 text-blue-700',
   PENDING_PAYMENT: 'bg-yellow-100 text-yellow-700',
   PENDING_SUBMISSION: 'bg-orange-100 text-orange-700',
@@ -73,14 +73,14 @@ function formatDate(iso: string) {
 // =====================
 function KpiCard({ icon, label, value, sub }: { icon: string; label: string; value: string | number; sub?: string }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-start gap-4">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5 flex items-start gap-4">
       <div className="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
         <i className={`bi ${icon} text-indigo-600 text-xl`} />
       </div>
       <div className="min-w-0">
-        <p className="text-xs text-gray-500 mb-0.5">{label}</p>
-        <p className="text-2xl font-bold text-gray-800 leading-tight">{typeof value === 'number' ? formatNum(value) : value}</p>
-        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="text-2xl font-bold text-slate-800 leading-tight">{typeof value === 'number' ? formatNum(value) : value}</p>
+        {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
       </div>
     </div>
   );
@@ -140,7 +140,7 @@ export default function AnalyticsPage() {
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
           <div className="animate-spin w-10 h-10 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">データを読み込んでいます...</p>
+          <p className="text-slate-500 text-sm">データを読み込んでいます...</p>
         </div>
       </div>
     );
@@ -165,11 +165,11 @@ export default function AnalyticsPage() {
     <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
       {/* ヘッダー */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+        <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
           <i className="bi bi-graph-up-arrow text-indigo-600" />
           反響分析
         </h1>
-        <p className="text-sm text-gray-500 mt-1">チラシ配布・QRスキャンの効果を確認できます。</p>
+        <p className="text-sm text-slate-500 mt-1">チラシ配布・QRスキャンの効果を確認できます。</p>
       </div>
 
       {/* KPIサマリー */}
@@ -195,9 +195,9 @@ export default function AnalyticsPage() {
       )}
 
       {/* QRスキャン日次グラフ */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
-          <h2 className="font-semibold text-gray-700 flex items-center gap-2">
+          <h2 className="font-semibold text-slate-700 flex items-center gap-2">
             <i className="bi bi-bar-chart-line text-indigo-500" />
             QRスキャン推移
           </h2>
@@ -209,7 +209,7 @@ export default function AnalyticsPage() {
                 className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
                   days === d
                     ? 'bg-indigo-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                 }`}
               >
                 {d}日
@@ -246,7 +246,7 @@ export default function AnalyticsPage() {
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+          <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
             <p>この期間のスキャンデータがありません。</p>
           </div>
         )}
@@ -255,8 +255,8 @@ export default function AnalyticsPage() {
       {/* デバイス内訳 & チラシ別スキャン数 */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* デバイス内訳 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="font-semibold text-gray-700 flex items-center gap-2 mb-5">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h2 className="font-semibold text-slate-700 flex items-center gap-2 mb-5">
             <i className="bi bi-phone text-indigo-500" />
             デバイス内訳（全期間）
           </h2>
@@ -278,20 +278,20 @@ export default function AnalyticsPage() {
                 </Pie>
                 <Tooltip formatter={(value: number) => [value, 'スキャン']} />
                 <Legend
-                  formatter={(value) => <span className="text-xs text-gray-600">{value}</span>}
+                  formatter={(value) => <span className="text-xs text-slate-600">{value}</span>}
                 />
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
               <p>データがありません。</p>
             </div>
           )}
         </div>
 
         {/* チラシ別スキャン数 */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h2 className="font-semibold text-gray-700 flex items-center gap-2 mb-5">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+          <h2 className="font-semibold text-slate-700 flex items-center gap-2 mb-5">
             <i className="bi bi-files text-indigo-500" />
             チラシ別スキャン数（全期間）
           </h2>
@@ -316,7 +316,7 @@ export default function AnalyticsPage() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-gray-400 text-sm">
+            <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">
               <p>データがありません。</p>
             </div>
           )}
@@ -324,36 +324,36 @@ export default function AnalyticsPage() {
       </div>
 
       {/* 発注別進捗 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h2 className="font-semibold text-gray-700 flex items-center gap-2 mb-5">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+        <h2 className="font-semibold text-slate-700 flex items-center gap-2 mb-5">
           <i className="bi bi-list-check text-indigo-500" />
           発注別 配布進捗
         </h2>
         {progress.length === 0 ? (
-          <p className="text-center text-gray-400 text-sm py-10">発注データがありません。</p>
+          <p className="text-center text-slate-400 text-sm py-10">発注データがありません。</p>
         ) : (
           <div className="space-y-4">
             {progress.map((order) => (
-              <div key={order.id} className="border border-gray-100 rounded-lg p-4 hover:border-indigo-100 transition-colors">
+              <div key={order.id} className="border border-slate-100 rounded-lg p-4 hover:border-indigo-100 transition-colors">
                 <div className="flex items-start justify-between gap-3 flex-wrap mb-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-gray-400 font-mono">{order.orderNo}</span>
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[order.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      <span className="text-xs text-slate-400 font-mono">{order.orderNo}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLOR[order.status] ?? 'bg-slate-100 text-slate-600'}`}>
                         {order.statusLabel}
                       </span>
                     </div>
-                    <p className="font-medium text-gray-800 mt-1 truncate">{order.title}</p>
+                    <p className="font-medium text-slate-800 mt-1 truncate">{order.title}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-2xl font-bold text-indigo-600">{order.progressPct}<span className="text-sm font-normal text-gray-500">%</span></p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-2xl font-bold text-indigo-600">{order.progressPct}<span className="text-sm font-normal text-slate-500">%</span></p>
+                    <p className="text-xs text-slate-400">
                       {formatNum(order.actual)} / {formatNum(order.planned)} 枚
                     </p>
                   </div>
                 </div>
                 {/* プログレスバー */}
-                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
                   <div
                     className={`h-2.5 rounded-full transition-all duration-500 ${
                       order.progressPct >= 100
@@ -366,7 +366,7 @@ export default function AnalyticsPage() {
                   />
                 </div>
                 {order.planned === 0 && (
-                  <p className="text-xs text-gray-400 mt-1">配布枚数未設定</p>
+                  <p className="text-xs text-slate-400 mt-1">配布枚数未設定</p>
                 )}
               </div>
             ))}

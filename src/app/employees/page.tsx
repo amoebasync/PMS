@@ -659,8 +659,8 @@ export default function EmployeePage() {
         </div>
       )}
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[250px]">
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:flex-wrap gap-3 md:gap-4 md:items-end">
+        <div className="w-full md:flex-1 md:min-w-[250px]">
           <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
@@ -673,48 +673,51 @@ export default function EmployeePage() {
             />
           </div>
         </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => handleEmpFilterChange({ filterStatus: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
-          >
-            <option value="ACTIVE">{t('filter_status_active')}</option>
-            <option value="INACTIVE">{t('filter_status_inactive')}</option>
-            <option value="ALL">{t('filter_all')}</option>
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_branch')}</label>
-          <select
-            value={filterBranchId}
-            onChange={(e) => handleEmpFilterChange({ filterBranchId: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
-          >
-            <option value="">{t('filter_all')}</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.nameJa}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_department')}</label>
-          <select
-            value={filterDepartmentId}
-            onChange={(e) => handleEmpFilterChange({ filterDepartmentId: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
-          >
-            <option value="">{t('filter_all')}</option>
-            {departments.map(d => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </select>
+        <div className="flex gap-2 flex-wrap md:flex-nowrap md:gap-4">
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => handleEmpFilterChange({ filterStatus: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[120px] bg-white cursor-pointer"
+            >
+              <option value="ACTIVE">{t('filter_status_active')}</option>
+              <option value="INACTIVE">{t('filter_status_inactive')}</option>
+              <option value="ALL">{t('filter_all')}</option>
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_branch')}</label>
+            <select
+              value={filterBranchId}
+              onChange={(e) => handleEmpFilterChange({ filterBranchId: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[120px] bg-white cursor-pointer"
+            >
+              <option value="">{t('filter_all')}</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.nameJa}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_department')}</label>
+            <select
+              value={filterDepartmentId}
+              onChange={(e) => handleEmpFilterChange({ filterDepartmentId: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[120px] bg-white cursor-pointer"
+            >
+              <option value="">{t('filter_all')}</option>
+              {departments.map(d => (
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop テーブル */}
+        <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
             <tr>
@@ -820,13 +823,69 @@ export default function EmployeePage() {
           </tbody>
         </table>
         </div>
+
+        {/* Mobile カードレイアウト */}
+        <div className="md:hidden">
+          {isLoading ? (
+            <div className="p-3 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-100 p-4 space-y-2 animate-pulse">
+                  <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-100 rounded w-2/3"></div>
+                </div>
+              ))}
+            </div>
+          ) : sortedEmployees.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+              <i className="bi bi-person-x text-4xl"></i>
+              <p className="text-sm font-medium">{t('no_match_title')}</p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-3">
+              {sortedEmployees.map((emp) => (
+                <div
+                  key={emp.id}
+                  onClick={() => openDetailModal(emp)}
+                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm active:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-3 mb-2">
+                    <Avatar name={emp.firstNameJa} url={emp.avatarUrl} size="sm" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-sm text-slate-800 truncate">{emp.lastNameJa} {emp.firstNameJa}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">{emp.employeeCode || '-'}</div>
+                    </div>
+                    {emp.isActive ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span>{t('status_active')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-500 shrink-0">
+                        {t('status_inactive')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <span className="text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">
+                      {t(EMP_TYPE_LABEL_KEYS[emp.employmentType] || 'emp_type_not_set')}
+                    </span>
+                    <span className="text-slate-500 truncate">
+                      {emp.branch?.nameJa ? `${emp.branch.nameJa}${t('branch_suffix')}` : ''}
+                      {emp.department?.name ? ` ${emp.department.name}` : ''}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} onPageChange={handleEmpPageChange} />
       </div>
 
       {/* --- ★ 詳細表示モーダル --- */}
       {isDetailModalOpen && selectedEmployee && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col md:flex-row h-auto max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-none md:rounded-3xl shadow-2xl w-full md:max-w-5xl overflow-hidden flex flex-col md:flex-row h-full md:h-auto md:max-h-[90vh]">
             
             <div className="w-full md:w-1/3 bg-gradient-to-b from-blue-600 to-indigo-800 p-8 text-white flex flex-col items-center text-center relative overflow-y-auto custom-scrollbar">
                <button onClick={() => setIsDetailModalOpen(false)} className="md:hidden absolute top-4 right-4 text-white/70 hover:text-white">
@@ -1079,7 +1138,7 @@ export default function EmployeePage() {
 
       {/* --- ★ 登録・編集モーダル --- */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 md:p-8 animate-in fade-in duration-200">
           <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-[90vh] overflow-hidden">
             
             <div className="px-6 py-5 border-b border-slate-200 bg-white flex justify-between items-center shrink-0 z-10 shadow-sm">
@@ -1449,7 +1508,7 @@ export default function EmployeePage() {
       )}
 
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-in fade-in zoom-in-95 duration-200">
             <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
@@ -1466,7 +1525,7 @@ export default function EmployeePage() {
 
       {/* --- ウェルカムメール送信確認モーダル --- */}
       {pendingWelcomeEmp && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* アイコンヘッダー */}
             <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 px-6 pt-8 pb-6 flex flex-col items-center text-center">
@@ -1522,7 +1581,7 @@ export default function EmployeePage() {
       {/* --- ウェルカムメール送信完了トースト --- */}
       {welcomeToast && (
         <div
-          className={`fixed bottom-6 right-6 z-[3000] flex items-center gap-3 bg-indigo-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-350 ease-in-out ${
+          className={`fixed bottom-6 right-6 z-[300] flex items-center gap-3 bg-indigo-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-350 ease-in-out ${
             isToastExiting
               ? 'opacity-0 translate-y-3 scale-95'
               : 'opacity-100 translate-y-0 scale-100 animate-in slide-in-from-bottom-4 fade-in duration-300'

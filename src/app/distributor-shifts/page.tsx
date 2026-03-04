@@ -693,7 +693,7 @@ export default function DistributorShiftsPage() {
 
       {/* ==================== 作成・編集モーダル ==================== */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[1200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">

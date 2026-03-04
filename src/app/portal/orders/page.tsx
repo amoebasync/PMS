@@ -528,7 +528,7 @@ function PortalOrdersContent() {
       {selectedOrder && (() => {
         const flyerId = selectedOrder.distributions?.[0]?.flyerId as number | undefined;
         return (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={closeOrderModal}>
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={closeOrderModal}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
 
               {/* ヘッダー */}
@@ -954,7 +954,7 @@ function PortalOrdersContent() {
 
       {/* --- キャンセル確認モーダル --- */}
       {isCancelModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsCancelModalOpen(false)}>
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsCancelModalOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center" onClick={e => e.stopPropagation()}>
             <div className="w-14 h-14 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>
@@ -977,7 +977,7 @@ function PortalOrdersContent() {
 
       {/* --- お問い合わせモーダル --- */}
       {isInquiryModalOpen && selectedOrder && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsInquiryModalOpen(false)}>
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95" onClick={() => setIsInquiryModalOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="bg-slate-50 p-5 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">

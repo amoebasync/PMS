@@ -621,7 +621,7 @@ export default function DispatchPage() {
 
       {/* --- 移動用モーダル --- */}
       {movingItem && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
               <h3 className="font-bold text-slate-800">{t('move_modal_title')}</h3>

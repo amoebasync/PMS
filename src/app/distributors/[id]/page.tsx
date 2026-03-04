@@ -11,7 +11,7 @@ const RANK_COLORS: Record<string, { bg: string; text: string }> = {
   S: { bg: 'bg-yellow-500', text: 'text-white' },
   A: { bg: 'bg-blue-500', text: 'text-white' },
   B: { bg: 'bg-green-500', text: 'text-white' },
-  C: { bg: 'bg-gray-400', text: 'text-white' },
+  C: { bg: 'bg-slate-400', text: 'text-white' },
   D: { bg: 'bg-red-400', text: 'text-white' },
 };
 
@@ -1249,7 +1249,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* ====== 編集モーダル（4タブ: 基本情報 / 在留・契約 / 口座情報 / レート・評価） ====== */}
       {isEditOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
             <div className="px-6 pt-5 pb-0 border-b border-slate-100">
               <div className="flex items-center justify-between mb-4">
@@ -1615,7 +1615,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* パスワードリセット確認モーダル */}
       {isResetPasswordOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-2xl p-6 shadow-2xl text-center max-w-sm w-full mx-4">
             <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-key-fill text-amber-500 text-xl"></i>
@@ -1658,7 +1658,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* 削除確認モーダル */}
       {isDeleteOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-2xl p-6 shadow-2xl text-center max-w-sm w-full mx-4">
             <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-rose-500 text-xl"></i>
@@ -1681,7 +1681,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* アプリ配信モーダル */}
       {isAppDistOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50" onClick={() => setIsAppDistOpen(false)}>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50" onClick={() => setIsAppDistOpen(false)}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">

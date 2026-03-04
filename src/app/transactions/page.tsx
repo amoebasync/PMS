@@ -313,7 +313,7 @@ export default function TransactionsPage() {
 
       {/* 登録・編集モーダル */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
             <div className="p-5 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
               <h3 className="font-bold text-slate-800"><i className="bi bi-box-seam text-blue-600 mr-2"></i>{currentId ? t('modal_title_edit') : t('modal_title_new')}</h3>

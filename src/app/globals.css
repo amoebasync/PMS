@@ -74,3 +74,19 @@ body {
   color: #64748b;
   margin: 1rem 0;
 }
+
+/* スクロールバー非表示（モバイル横スクロールタブ等） */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile touch scroll improvements */
+@media (max-width: 767px) {
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+}

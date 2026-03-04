@@ -258,7 +258,7 @@ export default function PortalMyPage() {
       {/* ★ 新規追加: データ入稿・印刷オプション設定モーダル */}
       {/* ========================================== */}
       {isSubmitModalOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
             
             {/* ヘッダー */}

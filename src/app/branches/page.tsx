@@ -207,7 +207,7 @@ export default function BranchPage() {
 
       {/* 登録・編集モーダル */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
             <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
               <h3 className="font-bold text-slate-800">{currentId ? t('form_title_edit') : t('form_title_new')}</h3>
@@ -304,7 +304,7 @@ export default function BranchPage() {
 
       {/* 削除モーダル */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white p-6 rounded-xl text-center max-w-sm w-full">
             <h3 className="font-bold text-lg mb-2 text-slate-800">{t('delete_confirm')}</h3>
             <p className="text-sm text-slate-500 mb-6">{t('delete_warning')}</p>

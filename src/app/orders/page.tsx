@@ -211,30 +211,30 @@ export default function OrdersListPage() {
 
       {/* ★ 要対応アラートパネル */}
       {(pendingPaymentCount > 0 || pendingReviewCount > 0) && (
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-3 md:gap-4">
           {pendingPaymentCount > 0 && (
-            <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded-r-xl shadow-sm flex items-center gap-4 flex-1">
-              <div className="w-10 h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xl">
+            <div className="bg-orange-50 border-l-4 border-orange-500 p-3 md:p-4 rounded-r-xl shadow-sm flex items-center gap-3 md:gap-4 flex-1">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-base md:text-xl shrink-0">
                 <i className="bi bi-coin"></i>
               </div>
               <div>
-                <p className="text-xs text-orange-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
-                <p className="text-sm font-bold text-slate-800">
-                  <span className="text-2xl font-black text-orange-600 mr-1">{pendingPaymentCount}</span>
+                <p className="text-[10px] md:text-xs text-orange-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
+                <p className="text-xs md:text-sm font-bold text-slate-800">
+                  <span className="text-xl md:text-2xl font-black text-orange-600 mr-1">{pendingPaymentCount}</span>
                   <span dangerouslySetInnerHTML={{ __html: t('alert_pending_payment') }} />
                 </p>
               </div>
             </div>
           )}
           {pendingReviewCount > 0 && (
-            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded-r-xl shadow-sm flex items-center gap-4 flex-1">
-              <div className="w-10 h-10 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center text-xl">
+            <div className="bg-yellow-50 border-l-4 border-yellow-500 p-3 md:p-4 rounded-r-xl shadow-sm flex items-center gap-3 md:gap-4 flex-1">
+              <div className="w-8 h-8 md:w-10 md:h-10 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center text-base md:text-xl shrink-0">
                 <i className="bi bi-ui-checks"></i>
               </div>
               <div>
-                <p className="text-xs text-yellow-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
-                <p className="text-sm font-bold text-slate-800">
-                  <span className="text-2xl font-black text-yellow-600 mr-1">{pendingReviewCount}</span>
+                <p className="text-[10px] md:text-xs text-yellow-600 font-bold uppercase tracking-wider">{t('alert_action_required')}</p>
+                <p className="text-xs md:text-sm font-bold text-slate-800">
+                  <span className="text-xl md:text-2xl font-black text-yellow-600 mr-1">{pendingReviewCount}</span>
                   <span dangerouslySetInnerHTML={{ __html: t('alert_pending_review') }} />
                 </p>
               </div>
@@ -243,8 +243,8 @@ export default function OrdersListPage() {
         </div>
       )}
 
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[250px]">
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:flex-wrap gap-3 md:gap-4 md:items-end">
+        <div className="w-full md:flex-1 md:min-w-[250px]">
           <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400"></i>
@@ -258,49 +258,52 @@ export default function OrdersListPage() {
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_source')}</label>
-          <select
-            value={filterSource}
-            onChange={(e) => handleFilterChange({ filterSource: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
-          >
-            <option value="ALL">{t('filter_all')}</option>
-            <option value="WEB_EC">{t('filter_source_web')}</option>
-            <option value="SALES_INTERNAL">{t('filter_source_sales')}</option>
-          </select>
-        </div>
+        <div className="flex gap-2 flex-wrap md:flex-nowrap md:gap-4">
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_source')}</label>
+            <select
+              value={filterSource}
+              onChange={(e) => handleFilterChange({ filterSource: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[120px] bg-white cursor-pointer"
+            >
+              <option value="ALL">{t('filter_all')}</option>
+              <option value="WEB_EC">{t('filter_source_web')}</option>
+              <option value="SALES_INTERNAL">{t('filter_source_sales')}</option>
+            </select>
+          </div>
 
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => handleFilterChange({ filterStatus: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[120px] bg-white cursor-pointer"
-          >
-            <option value="ALL">{t('filter_all')}</option>
-            {Object.entries(STATUS_MAP).map(([key, val]) => (
-              <option key={key} value={key}>{t(val.labelKey)}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_sales_rep')}</label>
-          <select
-            value={filterSalesRep}
-            onChange={(e) => handleFilterChange({ filterSalesRep: e.target.value })}
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[140px] bg-white cursor-pointer"
-          >
-            <option value="ALL">{t('filter_all')}</option>
-            {salesReps.map(rep => (
-              <option key={rep.id} value={String(rep.id)}>{rep.lastNameJa} {rep.firstNameJa}</option>
-            ))}
-          </select>
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
+            <select
+              value={filterStatus}
+              onChange={(e) => handleFilterChange({ filterStatus: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[120px] bg-white cursor-pointer"
+            >
+              <option value="ALL">{t('filter_all')}</option>
+              {Object.entries(STATUS_MAP).map(([key, val]) => (
+                <option key={key} value={key}>{t(val.labelKey)}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_sales_rep')}</label>
+            <select
+              value={filterSalesRep}
+              onChange={(e) => handleFilterChange({ filterSalesRep: e.target.value })}
+              className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-0 md:min-w-[140px] bg-white cursor-pointer"
+            >
+              <option value="ALL">{t('filter_all')}</option>
+              {salesReps.map(rep => (
+                <option key={rep.id} value={String(rep.id)}>{rep.lastNameJa} {rep.firstNameJa}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop テーブル */}
+        <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
@@ -392,13 +395,67 @@ export default function OrdersListPage() {
           </tbody>
         </table>
         </div>
+
+        {/* Mobile カードレイアウト */}
+        <div className="md:hidden">
+          {isLoading ? (
+            <div className="p-3 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-100 p-4 space-y-2 animate-pulse">
+                  <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-100 rounded w-2/3"></div>
+                  <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                </div>
+              ))}
+            </div>
+          ) : sortedOrders.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+              <i className="bi bi-briefcase text-4xl"></i>
+              <p className="text-sm font-medium">{t('empty_title')}</p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-3">
+              {sortedOrders.map(o => {
+                const status = STATUS_MAP[o.status] || STATUS_MAP['PLANNING'];
+                return (
+                  <Link
+                    key={o.id}
+                    href={`/orders/${o.id}`}
+                    className="block bg-white rounded-xl border border-slate-200 p-4 shadow-sm active:bg-slate-50 transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-xs text-indigo-600">{o.orderNo}</span>
+                        {o.orderSource === 'WEB_EC' ? (
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-fuchsia-100 text-fuchsia-700">{t('badge_ec')}</span>
+                        ) : (
+                          <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600">{t('badge_sales')}</span>
+                        )}
+                      </div>
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold whitespace-nowrap ${status.color}`}>
+                        <i className={`bi ${status.icon}`}></i> {t(status.labelKey)}
+                      </span>
+                    </div>
+                    <div className="font-bold text-slate-700 text-sm truncate mb-1">{o.customer?.name}</div>
+                    {o.title && <div className="text-xs text-slate-500 truncate mb-1">{o.title}</div>}
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-400">{new Date(o.orderDate).toLocaleDateString()}</span>
+                      <span className="font-bold text-slate-800">{o.totalAmount ? `¥${o.totalAmount.toLocaleString()}` : '-'}</span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
         <Pagination page={page} totalPages={totalPages} total={total} limit={LIMIT} onPageChange={handlePageChange} />
       </div>
 
       {/* --- ★ 審査モーダル --- */}
       {reviewModalOpen && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full md:max-w-3xl flex flex-col overflow-hidden h-full md:h-auto md:max-h-[90vh]">
             <div className="bg-yellow-50 p-5 border-b border-yellow-200 flex justify-between items-center">
               <h3 className="font-bold text-yellow-800 text-lg flex items-center gap-2">
                 <i className="bi bi-ui-checks"></i> {t('review_modal_title')}

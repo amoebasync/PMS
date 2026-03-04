@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from '@/i18n';
 
 interface Notification {
   id: number;
@@ -16,6 +17,7 @@ interface Notification {
 }
 
 export default function NotificationBell() {
+  const { t } = useTranslation('common');
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -134,9 +136,9 @@ export default function NotificationBell() {
       const diffMs = now.getTime() - d.getTime();
       const diffMin = Math.floor(diffMs / 60000);
 
-      if (diffMin < 1) return '今';
-      if (diffMin < 60) return `${diffMin}分前`;
-      if (diffMin < 1440) return `${Math.floor(diffMin / 60)}時間前`;
+      if (diffMin < 1) return t('notification_just_now');
+      if (diffMin < 60) return t('notification_minutes_ago', { count: diffMin });
+      if (diffMin < 1440) return t('notification_hours_ago', { count: Math.floor(diffMin / 60) });
       return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
     } catch {
       return '';
@@ -148,7 +150,8 @@ export default function NotificationBell() {
       {/* Bell icon */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+        aria-label={t('notifications')}
+        className="relative min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 w-9 h-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
       >
         <i className="bi bi-bell text-lg"></i>
         {unreadCount > 0 && (
@@ -163,13 +166,13 @@ export default function NotificationBell() {
         <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden z-50">
           {/* Header */}
           <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-bold text-sm text-slate-700">通知</h3>
+            <h3 className="font-bold text-sm text-slate-700">{t('notifications')}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
                 className="text-xs text-indigo-600 hover:text-indigo-700 font-bold"
               >
-                全て既読にする
+                {t('mark_all_read')}
               </button>
             )}
           </div>
@@ -178,7 +181,7 @@ export default function NotificationBell() {
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="px-4 py-8 text-center text-sm text-slate-400">
-                通知はありません
+                {t('no_notifications')}
               </div>
             ) : (
               notifications.map((n) => (

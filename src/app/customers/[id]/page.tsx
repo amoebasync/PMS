@@ -757,7 +757,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       {/* ===== 顧客情報編集モーダル ===== */}
       {isEditModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mb-8 animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
               <div className="flex items-center gap-3">

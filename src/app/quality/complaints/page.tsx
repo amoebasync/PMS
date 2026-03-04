@@ -860,8 +860,12 @@ function CreateComplaintModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[200] flex items-end md:items-start justify-center bg-black/50 backdrop-blur-sm md:overflow-y-auto md:py-8">
+      <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-none overflow-y-auto">
+        {/* Mobile drag handle */}
+        <div className="md:hidden flex justify-center pt-2 pb-1 sticky top-0 bg-white z-10">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
         {/* Modal Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-black text-slate-800">
@@ -1462,8 +1466,12 @@ function DetailModal({
   const responses = complaint?.responses || [];
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-6">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[200] flex items-end md:items-start justify-center bg-black/50 backdrop-blur-sm md:overflow-y-auto md:py-6">
+      <div className="bg-white w-full h-full md:h-auto md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 overflow-y-auto">
+        {/* Mobile drag handle */}
+        <div className="md:hidden flex justify-center pt-2 pb-1 sticky top-0 bg-white z-10">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
         {loading || !complaint ? (
           <div className="flex items-center justify-center py-24">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
@@ -1997,8 +2005,12 @@ function ProhibitedPropertyModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40 md:p-4">
+      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+        {/* Mobile drag handle */}
+        <div className="md:hidden flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h3 className="text-base font-black text-slate-800">
             <i className="bi bi-shield-exclamation text-red-500 mr-2"></i>

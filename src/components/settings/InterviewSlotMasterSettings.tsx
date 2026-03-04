@@ -812,8 +812,12 @@ export default function InterviewSlotMasterSettings() {
 
       {/* ========== Create / Edit Master Modal ========== */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             <div className="p-5 border-b border-slate-100">
               <h3 className="font-bold text-slate-700">
                 {editingMasterId != null ? t('ism_edit') : t('ism_add')}
@@ -1040,7 +1044,7 @@ export default function InterviewSlotMasterSettings() {
                     onChange={(e) => setForm((f) => ({ ...f, isActive: e.target.checked }))}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-indigo-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600" />
                 </label>
               </div>
             </div>

@@ -321,8 +321,12 @@ export default function InterviewSlotManager() {
 
       {/* 追加モーダル */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-6">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center -mt-4 mb-3">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-black text-slate-800 text-lg">面接スロット追加</h2>
               <button

@@ -197,29 +197,35 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isMobileOpen && (
-        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm z-[999] md:hidden" onClick={onMobileClose} />
-      )}
+      {/* Mobile overlay (backdrop) */}
+      <div
+        className={`fixed inset-0 bg-black/30 backdrop-blur-sm md:hidden transition-opacity duration-300 ${
+          isMobileOpen ? 'opacity-100 pointer-events-auto z-[120]' : 'opacity-0 pointer-events-none z-[120]'
+        }`}
+        onClick={onMobileClose}
+      />
 
       <nav
         ref={sidebarRef}
+        role="navigation"
+        aria-label="メインナビゲーション"
         className={`
-          h-screen bg-white fixed left-0 top-0 z-[1000] flex flex-col
-          border-r border-gray-200/60
+          h-screen bg-white fixed left-0 top-0 flex flex-col
+          border-r border-slate-200/60
           transition-all duration-300 ease-in-out
+          md:z-[100]
           ${isCollapsed ? 'md:w-[72px]' : 'md:w-[240px]'}
-          w-[240px]
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          w-[280px] md:w-auto
+          ${isMobileOpen ? 'translate-x-0 z-[120]' : '-translate-x-full md:translate-x-0 z-[100]'}
         `}
       >
         {/* ── Logo ── */}
-        <div className={`h-[64px] flex items-center border-b border-gray-100 shrink-0 ${isCollapsed ? 'justify-center px-0' : 'px-5'}`}>
+        <div className={`h-[64px] flex items-center border-b border-slate-100 shrink-0 ${isCollapsed ? 'justify-center px-0' : 'px-5'}`}>
           <Link href="/" className="flex items-center gap-2.5" onClick={onMobileClose}>
             <div className="relative w-7 h-7 shrink-0">
               <Image src="/logo/logo_Icon_transparent.png" alt="PMS" fill className="object-contain" priority />
             </div>
-            <span className={`font-extrabold text-gray-900 text-lg tracking-wide whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'hidden' : ''}`}>
+            <span className={`font-extrabold text-slate-900 text-lg tracking-wide whitespace-nowrap transition-opacity duration-200 ${isCollapsed ? 'hidden' : ''}`}>
               PMS <span className="text-blue-600">Pro</span>
             </span>
           </Link>
@@ -229,9 +235,9 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
         <button
           onClick={toggleCollapse}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="absolute -right-3 top-[28px] w-6 h-6 bg-white border border-gray-200 rounded-full
-                     flex items-center justify-center text-gray-400 shadow-sm
-                     hover:bg-gray-50 hover:text-gray-700 transition-colors z-[1010] hidden md:flex"
+          className="absolute -right-3 top-[28px] w-6 h-6 bg-white border border-slate-200 rounded-full
+                     flex items-center justify-center text-slate-400 shadow-sm
+                     hover:bg-slate-50 hover:text-slate-700 transition-colors z-[110] hidden md:flex"
         >
           <i className={`bi ${isCollapsed ? 'bi-chevron-right' : 'bi-chevron-left'} text-[10px]`} />
         </button>
@@ -254,7 +260,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                     onClick={onMobileClose}
                     className={`
                       flex items-center justify-center py-2.5 rounded-xl transition-all duration-150 group relative
-                      ${active ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'}
+                      ${active ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}
                     `}
                   >
                     <i className={`${item.icon} text-[17px]`} />
@@ -268,12 +274,12 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                     href={item.href}
                     onClick={onMobileClose}
                     className={`
-                      flex items-center gap-3 py-2 px-3 rounded-xl transition-all duration-150 group relative
-                      ${active ? 'bg-blue-50/70 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                      flex items-center gap-3 py-2.5 md:py-2 px-3 rounded-xl transition-all duration-150 group relative
+                      ${active ? 'bg-blue-50/70 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                     `}
                   >
                     {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
-                    <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500 transition-colors'}`} />
+                    <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'}`} />
                     <span className="text-[13px] flex-1">{label}</span>
                     {badgeCount > 0 && (
                       <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -299,13 +305,14 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                 {/* ── Collapsed: separator + flyout trigger ── */}
                 {isCollapsed && (
                   <>
-                    <div className="my-2 mx-1.5 border-t border-gray-100" />
+                    <div className="my-2 mx-1.5 border-t border-slate-100" />
                     <button
                       onClick={(e) => handleGroupFlyout(group.title, e)}
                       title={group.title}
+                      aria-label={group.title}
                       className={`
                         w-full flex items-center justify-center py-2.5 rounded-xl transition-all duration-150 group relative
-                        ${filteredGroup.items.some(item => isHrefActive(item.href, pathname)) ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-50 hover:text-gray-700'}
+                        ${filteredGroup.items.some(item => isHrefActive(item.href, pathname)) ? 'bg-blue-50 text-blue-600' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-700'}
                       `}
                     >
                       <i className={`${filteredGroup.items[0].icon} text-[17px]`} />
@@ -320,7 +327,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                 {/* ── Expanded: static group header + items ── */}
                 {!isCollapsed && (
                   <>
-                    <div className="px-3 pt-5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-gray-400 select-none">
+                    <div className="px-3 pt-5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400 select-none">
                       {group.title}
                     </div>
                     <div className="space-y-0.5">
@@ -333,12 +340,12 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                             href={item.href}
                             onClick={onMobileClose}
                             className={`
-                              flex items-center gap-3 py-2 px-3 rounded-xl transition-all duration-150 group relative
-                              ${active ? 'bg-blue-50/70 text-blue-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                              flex items-center gap-3 py-2.5 md:py-2 px-3 rounded-xl transition-all duration-150 group relative
+                              ${active ? 'bg-blue-50/70 text-blue-700 font-semibold' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                             `}
                           >
                             {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
-                            <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400 group-hover:text-gray-500 transition-colors'}`} />
+                            <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'}`} />
                             <span className="text-[13px] flex-1">{t(item.nameKey)}</span>
                             {badgeCount > 0 && (
                               <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
@@ -366,10 +373,10 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
         return (
           <div
             ref={flyoutRef}
-            className="fixed z-[1100] bg-white rounded-xl shadow-lg border border-gray-200/80 py-1.5 min-w-[180px] animate-in fade-in slide-in-from-left-1 duration-150"
+            className="fixed z-[120] bg-white rounded-xl shadow-lg border border-slate-200/80 py-1.5 min-w-[180px] animate-in fade-in slide-in-from-left-1 duration-150"
             style={{ left: 80, top: flyoutTop }}
           >
-            <div className="px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400 select-none">
+            <div className="px-3.5 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 select-none">
               {group.title}
             </div>
             {flyoutItems.map(item => {
@@ -384,10 +391,10 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                     flex items-center gap-2 px-3.5 py-2 text-[13px] transition-colors mx-1.5 rounded-lg
                     ${active
                       ? 'text-blue-700 font-semibold bg-blue-50'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                      : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}
                   `}
                 >
-                  <i className={`${item.icon} text-[13px] w-4 text-center shrink-0 ${active ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <i className={`${item.icon} text-[13px] w-4 text-center shrink-0 ${active ? 'text-blue-600' : 'text-slate-400'}`} />
                   <span className="flex-1">{t(item.nameKey)}</span>
                   {badgeCount > 0 && (
                     <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">

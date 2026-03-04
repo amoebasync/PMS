@@ -399,7 +399,7 @@ export default function PayrollPage() {
 
       {/* 編集モーダル */}
       {editRecord && editForm && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
             {/* ヘッダー */}
             <div className="bg-gradient-to-r from-indigo-600 to-violet-700 px-6 py-4 flex justify-between items-center">

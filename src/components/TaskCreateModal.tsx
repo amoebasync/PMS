@@ -331,12 +331,16 @@ export default function TaskCreateModal({ isOpen, onClose, onCreated }: TaskCrea
   const catCode = getCategoryCode(taskForm.categoryId);
 
   return (
-    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
       <div className="absolute inset-0 bg-black/40" onClick={onClose}></div>
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col">
+      <div className="relative bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[95vh] md:max-h-[85vh] flex flex-col">
+        {/* Mobile drag handle */}
+        <div className="md:hidden flex justify-center pt-2 pb-1">
+          <div className="w-10 h-1 bg-slate-300 rounded-full" />
+        </div>
         <div className="flex items-center justify-between p-6 border-b border-slate-100 shrink-0">
           <h2 className="font-bold text-slate-800 text-lg">新規タスク</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-slate-600">
             <i className="bi bi-x-lg text-xl"></i>
           </button>
         </div>

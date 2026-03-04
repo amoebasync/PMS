@@ -186,7 +186,7 @@ function TopHeader({
     <header
       className={`
         fixed top-0 right-0 h-[64px] bg-[#f0f2f5]
-        z-[900] flex items-center px-4 md:px-8 gap-4
+        z-[110] flex items-center px-4 md:px-8 gap-4
         transition-all duration-300
         ${isSidebarCollapsed ? 'md:left-[72px]' : 'md:left-[240px]'}
         left-0
@@ -194,7 +194,7 @@ function TopHeader({
     >
       {/* ページタイトル */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-[17px] font-semibold text-gray-800 truncate flex items-center gap-2">
+        <h1 className="text-[17px] font-semibold text-slate-800 truncate flex items-center gap-2">
           <i className={`bi ${pageIcon} text-indigo-600 text-[15px]`}></i>
           {pageTitle}
         </h1>
@@ -212,7 +212,7 @@ function TopHeader({
           <span className="hidden lg:inline">{t('add_task')}</span>
         </button>
 
-        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <div className="w-px h-6 bg-slate-200 mx-1" />
 
         {/* Gmail */}
         <a
@@ -220,7 +220,8 @@ function TopHeader({
           target="_blank"
           rel="noopener noreferrer"
           title="Gmail"
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-red-500"
+          aria-label="Gmail"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-red-500"
         >
           <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor">
             <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z"/>
@@ -233,7 +234,8 @@ function TopHeader({
           target="_blank"
           rel="noopener noreferrer"
           title="Google Calendar"
-          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-blue-500"
+          aria-label="Google Calendar"
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-blue-500"
         >
           <svg viewBox="0 0 24 24" className="w-[18px] h-[18px]" fill="currentColor">
             <path d="M19.5 3h-1V1.5a.5.5 0 0 0-1 0V3h-11V1.5a.5.5 0 0 0-1 0V3h-1A2.5 2.5 0 0 0 2 5.5v14A2.5 2.5 0 0 0 4.5 22h15a2.5 2.5 0 0 0 2.5-2.5v-14A2.5 2.5 0 0 0 19.5 3zM21 19.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5V9h18v10.5zM21 8H3V5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5V8z"/>
@@ -251,14 +253,14 @@ function TopHeader({
             <button
               onClick={() => setIsLinksOpen(!isLinksOpen)}
               title={t('links')}
-              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-indigo-600"
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-indigo-600"
             >
               <i className="bi bi-grid-3x3-gap-fill text-[16px]"></i>
             </button>
             {isLinksOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-[920]">
-                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
-                  <div className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">{t('links')}</div>
+              <div className="absolute right-0 top-full mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-[50]">
+                <div className="px-4 py-2.5 border-b border-slate-100 bg-slate-50/80">
+                  <div className="text-[12px] font-bold text-slate-500 uppercase tracking-wider">{t('links')}</div>
                 </div>
                 <div className="py-1 max-h-64 overflow-y-auto">
                   {headerLinks.map((link, idx) => (
@@ -268,9 +270,9 @@ function TopHeader({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => setIsLinksOpen(false)}
-                      className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
                     >
-                      <i className={`bi ${link.icon || 'bi-link-45deg'} text-gray-400 w-4 text-center`}></i>
+                      <i className={`bi ${link.icon || 'bi-link-45deg'} text-slate-400 w-4 text-center`}></i>
                       {link.label}
                     </a>
                   ))}
@@ -280,13 +282,13 @@ function TopHeader({
           </div>
         )}
 
-        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <div className="w-px h-6 bg-slate-200 mx-1" />
 
         {/* 言語切替トグル */}
         <button
           onClick={toggleLanguage}
           title={lang === 'ja' ? 'Switch to English' : '日本語に切り替え'}
-          className="relative flex items-center h-8 w-[68px] rounded-full bg-gray-100 p-0.5 transition-colors hover:bg-gray-200/80 group"
+          className="relative flex items-center h-8 w-[68px] rounded-full bg-slate-100 p-0.5 transition-colors hover:bg-slate-200/80 group"
         >
           {/* sliding pill */}
           <span
@@ -295,36 +297,37 @@ function TopHeader({
             }`}
           />
           <span className={`relative z-10 flex-1 flex items-center justify-center text-[11px] font-bold transition-colors duration-200 ${
-            lang === 'ja' ? 'text-gray-800' : 'text-gray-400'
+            lang === 'ja' ? 'text-slate-800' : 'text-slate-400'
           }`}>
             JA
           </span>
           <span className={`relative z-10 flex-1 flex items-center justify-center text-[11px] font-bold transition-colors duration-200 ${
-            lang === 'en' ? 'text-gray-800' : 'text-gray-400'
+            lang === 'en' ? 'text-slate-800' : 'text-slate-400'
           }`}>
             EN
           </span>
         </button>
 
-        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <div className="w-px h-6 bg-slate-200 mx-1" />
 
         <div className="flex items-center">
           <NotificationBell />
         </div>
 
-        <div className="w-px h-6 bg-gray-200 mx-1" />
+        <div className="w-px h-6 bg-slate-200 mx-1" />
 
         {/* ユーザープロフィール */}
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-gray-100 transition-all"
+            aria-label="User menu"
+            className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl hover:bg-slate-100 transition-all"
           >
             {userProfile?.avatarUrl ? (
               <img
                 src={userProfile.avatarUrl}
                 alt="Avatar"
-                className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                className="w-8 h-8 rounded-full object-cover border border-slate-200 shrink-0"
               />
             ) : (
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0">
@@ -332,24 +335,24 @@ function TopHeader({
               </div>
             )}
             <div className="text-left hidden sm:block">
-              <div className="text-[13px] font-semibold text-gray-800 leading-tight whitespace-nowrap">
+              <div className="text-[13px] font-semibold text-slate-800 leading-tight whitespace-nowrap">
                 {userProfile ? `${userProfile.lastNameJa} ${userProfile.firstNameJa}` : '...'}
               </div>
               <div className="text-[10px] text-blue-600 font-semibold uppercase tracking-wide leading-tight">
                 {userProfile?.role?.name || 'USER'}
               </div>
             </div>
-            <i className={`bi bi-chevron-${isUserMenuOpen ? 'up' : 'down'} text-gray-400 text-[11px] hidden sm:block`}></i>
+            <i className={`bi bi-chevron-${isUserMenuOpen ? 'up' : 'down'} text-slate-400 text-[11px] hidden sm:block`}></i>
           </button>
 
           {/* ドロップダウンメニュー */}
           {isUserMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-2xl shadow-xl overflow-hidden z-[920]">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/80">
-                <div className="text-[13px] font-semibold text-gray-800">
+            <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-[50]">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/80">
+                <div className="text-[13px] font-semibold text-slate-800">
                   {userProfile ? `${userProfile.lastNameJa} ${userProfile.firstNameJa}` : '...'}
                 </div>
-                <div className="text-[11px] text-gray-500 truncate">
+                <div className="text-[11px] text-slate-500 truncate">
                   {userProfile?.email || ''}
                 </div>
               </div>
@@ -357,9 +360,9 @@ function TopHeader({
                 <Link
                   href="/profile"
                   onClick={() => setIsUserMenuOpen(false)}
-                  className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-700 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
                 >
-                  <i className="bi bi-person-gear text-gray-400 w-4 text-center"></i>
+                  <i className="bi bi-person-gear text-slate-400 w-4 text-center"></i>
                   {t('profile_edit')}
                 </Link>
                 <button
@@ -375,6 +378,50 @@ function TopHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  MobileHeader                                                      */
+/* ------------------------------------------------------------------ */
+
+function MobileHeader({
+  onMenuOpen,
+  onOpenTaskModal,
+}: {
+  onMenuOpen: () => void;
+  onOpenTaskModal: () => void;
+}) {
+  const pathname = usePathname();
+  const { t } = useTranslation('sidebar');
+  const pageIcon = getPageIcon(pathname);
+  const pageTitleKey = getPageTitleKey(pathname);
+  const pageTitle = pageTitleKey ? t(pageTitleKey) : 'PMS Pro';
+
+  return (
+    <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-slate-200/60 z-[120] flex items-center px-3 gap-2">
+      <button
+        onClick={onMenuOpen}
+        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors rounded-lg active:bg-slate-100"
+        aria-label="Open menu"
+      >
+        <i className="bi bi-list text-[24px]" />
+      </button>
+      <div className="flex-1 min-w-0">
+        <h1 className="text-[15px] font-bold text-slate-800 truncate flex items-center gap-1.5">
+          <i className={`bi ${pageIcon} text-indigo-600 text-[13px]`}></i>
+          {pageTitle}
+        </h1>
+      </div>
+      <button
+        onClick={onOpenTaskModal}
+        className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg
+                   bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors"
+      >
+        <i className="bi bi-plus-lg text-[16px]"></i>
+      </button>
+      <NotificationBell />
+    </div>
   );
 }
 
@@ -437,26 +484,10 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
         <div className="flex min-h-screen bg-[#f0f2f5]">
 
           {/* モバイルヘッダー */}
-          <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-gray-200/60 z-[1100] flex items-center px-4 gap-3">
-            <button
-              onClick={() => setIsMobileOpen(true)}
-              className="text-gray-500 hover:text-gray-900 transition-colors"
-              aria-label="Open menu"
-            >
-              <i className="bi bi-list text-2xl" />
-            </button>
-            <span className="font-extrabold text-gray-900 tracking-wide flex-1">
-              PMS <span className="text-blue-600">Pro</span>
-            </span>
-            <button
-              onClick={() => setIsGlobalTaskModalOpen(true)}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-semibold
-                         bg-indigo-600 text-white hover:bg-indigo-700 transition-colors"
-            >
-              <i className="bi bi-plus-lg text-[10px]"></i>
-            </button>
-            <NotificationBell />
-          </div>
+          <MobileHeader
+            onMenuOpen={() => setIsMobileOpen(true)}
+            onOpenTaskModal={() => setIsGlobalTaskModalOpen(true)}
+          />
 
           {/* サイドバー */}
           <Sidebar

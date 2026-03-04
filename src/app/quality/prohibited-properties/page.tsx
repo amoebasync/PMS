@@ -1548,7 +1548,7 @@ export default function ProhibitedPropertiesPage() {
 
       {/* ===== Detail Modal ===== */}
       {(selectedProperty || detailLoading) && (
-        <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl animate-in slide-in-from-bottom-4 fade-in duration-200">
             {detailLoading && !selectedProperty ? (
               <div className="p-12 text-center text-slate-400">
@@ -2013,7 +2013,7 @@ export default function ProhibitedPropertiesPage() {
 
       {/* ===== Create Modal ===== */}
       {showCreate && (
-        <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-8 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-in slide-in-from-bottom-4 fade-in duration-200">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
@@ -2263,7 +2263,7 @@ export default function ProhibitedPropertiesPage() {
       )}
       {/* ===== Draw Create Modal (ポリゴン描画で禁止エリア登録) ===== */}
       {showDrawCreate && (
-        <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-4 px-4">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm overflow-y-auto py-4 px-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl animate-in slide-in-from-bottom-4 fade-in duration-200">
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">

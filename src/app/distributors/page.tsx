@@ -376,7 +376,7 @@ export default function DistributorPage() {
             ) : filteredDistributors.length === 0 ? (
               <tr><td colSpan={8} className="p-8 text-center text-slate-400">{t('no_results')}</td></tr>
             ) : filteredDistributors.map(d => {
-              const rankColorMap: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-gray-400', D: 'bg-red-400' };
+              const rankColorMap: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-slate-400', D: 'bg-red-400' };
               const monthlyAttendance = d._count?.schedules ?? 0;
               return (
               <tr
@@ -394,7 +394,7 @@ export default function DistributorPage() {
                 </td>
                 <td className="px-5 py-3 text-center">
                   {d.rank ? (
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black text-white ${rankColorMap[d.rank] || 'bg-gray-300'}`}>
+                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black text-white ${rankColorMap[d.rank] || 'bg-slate-300'}`}>
                       {d.rank}
                     </span>
                   ) : (
@@ -449,7 +449,7 @@ export default function DistributorPage() {
 
       {/* ====== 登録・編集モーダル ====== */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: '90vh' }}>
 
             {/* ヘッダー */}
@@ -929,7 +929,7 @@ export default function DistributorPage() {
 
       {/* ゆうちょ記号番号変換モーダル */}
       {showYuchoModal && (
-        <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             {/* ヘッダー */}
             <div className="bg-amber-50 border-b border-amber-200 px-5 py-4 flex items-center justify-between">
@@ -1043,7 +1043,7 @@ export default function DistributorPage() {
 
       {/* 削除確認モーダル */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-2xl p-6 shadow-2xl text-center max-w-sm w-full mx-4">
             <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-rose-500 text-xl"></i>

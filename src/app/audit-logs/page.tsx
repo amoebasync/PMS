@@ -273,7 +273,7 @@ export default function AuditLogsPage() {
                       {log.actorName || <span className="text-slate-400">—</span>}
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_LABELS[log.action]?.color || 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_LABELS[log.action]?.color || 'bg-slate-100 text-slate-600'}`}>
                         {ACTION_LABELS[log.action]?.label || log.action}
                       </span>
                     </td>
@@ -350,7 +350,7 @@ export default function AuditLogsPage() {
                     </div>
                     <div>
                       <span className="text-xs font-medium text-slate-500 block mb-0.5">{t('detail_action')}</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_LABELS[selectedLog.action]?.color || 'bg-gray-100 text-gray-600'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_LABELS[selectedLog.action]?.color || 'bg-slate-100 text-slate-600'}`}>
                         {ACTION_LABELS[selectedLog.action]?.label || selectedLog.action}
                       </span>
                     </div>

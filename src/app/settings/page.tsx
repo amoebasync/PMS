@@ -645,7 +645,7 @@ export default function SettingsPage() {
 
   // ランク別単価設定
   const RANKS = ['S', 'A', 'B', 'C', 'D'] as const;
-  const RANK_BADGE: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-gray-400', D: 'bg-red-400' };
+  const RANK_BADGE: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-slate-400', D: 'bg-red-400' };
   const emptyRankRates: Record<string, number[]> = { S: [0,0,0,0,0,0], A: [0,0,0,0,0,0], B: [0,0,0,0,0,0], C: [0,0,0,0,0,0], D: [0,0,0,0,0,0] };
   const [rankRates, setRankRates] = useState<Record<string, number[]>>(emptyRankRates);
   const [rankRatesSaving, setRankRatesSaving] = useState(false);
@@ -803,12 +803,12 @@ export default function SettingsPage() {
         )}
 
         {/* タブ */}
-        <div className="flex flex-wrap gap-1 mb-6 bg-gray-200/60 p-1 rounded-xl">
+        <div className="flex overflow-x-auto scrollbar-hide gap-1 mb-6 bg-slate-200/60 p-1 rounded-xl -mx-4 px-4 md:mx-0 md:px-1 md:overflow-visible md:flex-wrap">
           {tabs.map(tb => (
             <button
               key={tb.key}
               onClick={() => { setTab(tb.key); setErrorMsg(''); if (tb.key === 'company') fetchCompanySettings(); if (tb.key === 'prohibitedReason') fetchProhibitedReasons(); if (tb.key === 'complaintType') fetchComplaintTypes(); if (tb.key === 'alertCategory') fetchAlertCategories(); if (tb.key === 'alertDefinition') fetchAlertDefinitions(); if (tb.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (tb.key === 'rankRates') fetchRankRates(); if (tb.key === 'headerLinks') fetchHeaderLinks(); if (tb.key === 'legal') fetchLegalContents(); }}
-              className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-1.5 transition-all ${tab === tb.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+              className={`shrink-0 whitespace-nowrap px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${tab === tb.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
             >
               <i className={`bi ${tb.icon}`}></i> {tb.label}
             </button>
@@ -1406,8 +1406,12 @@ export default function SettingsPage() {
 
         {/* タスク種類モーダル */}
         {tcModal && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="fixed inset-0 bg-black/50 z-[200] flex items-end md:items-center justify-center md:p-4">
+            <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-6">
+              {/* Mobile drag handle */}
+              <div className="md:hidden flex justify-center -mt-4 mb-3">
+                <div className="w-10 h-1 bg-slate-300 rounded-full" />
+              </div>
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-black text-slate-800 text-lg">
                   {tcModal === 'create' ? t('tc_modal_add') : t('tc_modal_edit')}
@@ -1529,8 +1533,12 @@ export default function SettingsPage() {
 
         {/* 求人媒体モーダル */}
         {rmModal && (
-          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+          <div className="fixed inset-0 bg-black/50 z-[200] flex items-end md:items-center justify-center md:p-4">
+            <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-6">
+              {/* Mobile drag handle */}
+              <div className="md:hidden flex justify-center -mt-4 mb-3">
+                <div className="w-10 h-1 bg-slate-300 rounded-full" />
+              </div>
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-black text-slate-800 text-lg">
                   {rmModal === 'create' ? t('rm_modal_add') : t('rm_modal_edit')}
@@ -2105,7 +2113,7 @@ export default function SettingsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-500 mb-1">
-                      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-gray-400 text-white text-[10px] font-black mr-1">C</span>
+                      <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-400 text-white text-[10px] font-black mr-1">C</span>
                       {t('eval_rank_c')}
                     </label>
                     <input type="number" value={evalSettings.evalRankC}
@@ -2447,8 +2455,12 @@ export default function SettingsPage() {
 
       {/* モーダル */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 bg-black/50 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl max-h-[95vh] md:max-h-[90vh] overflow-y-auto p-6">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center -mt-4 mb-3">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-black text-slate-800 text-lg">
                 {showModal === 'create' ? t('modal_add') : t('modal_edit')} — {tabs.find(tb => tb.key === tab)?.label}

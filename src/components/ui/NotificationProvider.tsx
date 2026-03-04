@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from '@/i18n';
 
 // ─── 型定義 ───────────────────────────────────────────────
@@ -68,17 +68,39 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     return new Promise(resolve => setConfirmState({ message, options, resolve }));
   }, []);
 
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+
   const respond = (value: boolean) => {
     confirmState?.resolve(value);
     setConfirmState(null);
   };
+
+  // ESC key handler for confirm dialog
+  useEffect(() => {
+    if (!confirmState) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        respond(false);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmState]);
+
+  // Auto-focus cancel button when confirm dialog opens
+  useEffect(() => {
+    if (confirmState && cancelBtnRef.current) {
+      cancelBtnRef.current.focus();
+    }
+  }, [confirmState]);
 
   return (
     <NotificationContext.Provider value={{ showToast, showConfirm }}>
       {children}
 
       {/* ── Toast スタック ── */}
-      <div className="fixed bottom-6 right-6 z-[9998] flex flex-col gap-2 pointer-events-none">
+      <div className="fixed bottom-6 right-6 z-[300] flex flex-col gap-2 pointer-events-none" role="alert" aria-live="polite">
         {toasts.map(t => {
           const s = TOAST_STYLES[t.type];
           return (
@@ -105,7 +127,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const variant = options.variant ?? 'primary';
         const s = CONFIRM_STYLES[variant];
         return (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" role="dialog" aria-modal="true">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-6 text-center animate-in zoom-in-95 duration-200">
               <div className={`w-14 h-14 ${s.iconBg} ${s.iconColor} rounded-full flex items-center justify-center mx-auto mb-4`}>
                 <i className={`bi ${s.icon} text-2xl`}></i>
@@ -120,6 +142,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               <div className="flex justify-center gap-3 mt-6">
                 {!options.infoOnly && (
                   <button
+                    ref={cancelBtnRef}
                     onClick={() => respond(false)}
                     className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
                   >

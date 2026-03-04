@@ -1717,10 +1717,11 @@ export default function ApplicantsPage() {
       <div className="space-y-6">
         {/* ── タブ + アクションボタン ── */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="flex items-center border-b border-slate-200">
+          <div className="flex flex-col md:flex-row md:items-center border-b border-slate-200">
+            <div className="flex overflow-x-auto md:overflow-visible scrollbar-hide">
             <button
               onClick={() => setActiveTab('calendar')}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative shrink-0 whitespace-nowrap ${
                 activeTab === 'calendar'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1737,7 +1738,7 @@ export default function ApplicantsPage() {
                 setActiveTab('list');
                 fetchApplicants(1);
               }}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative shrink-0 whitespace-nowrap ${
                 activeTab === 'list'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1754,7 +1755,7 @@ export default function ApplicantsPage() {
                 setActiveTab('training');
                 fetchTrainingMgmt();
               }}
-              className={`flex items-center gap-2 px-6 py-3.5 text-sm font-bold transition-colors relative ${
+              className={`flex items-center gap-2 px-4 md:px-6 py-3 md:py-3.5 text-xs md:text-sm font-bold transition-colors relative shrink-0 whitespace-nowrap ${
                 activeTab === 'training'
                   ? 'text-indigo-600'
                   : 'text-slate-500 hover:text-slate-700'
@@ -1766,23 +1767,24 @@ export default function ApplicantsPage() {
                 <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600"></div>
               )}
             </button>
+            </div>
 
             {/* スペーサー + アクションボタン */}
-            <div className="flex-1" />
-            <div className="flex items-center gap-2 px-4">
+            <div className="hidden md:block flex-1" />
+            <div className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-0 overflow-x-auto scrollbar-hide">
               <div className="relative">
                 <button
                   onClick={() => setShowLinkPopover(v => !v)}
-                  className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                  className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap"
                 >
                   <i className="bi bi-link-45deg text-indigo-500"></i>
-                  {t('btn_apply_page')}
+                  <span className="hidden md:inline">{t('btn_apply_page')}</span>
                   <i className="bi bi-chevron-down text-[10px] text-slate-400"></i>
                 </button>
                 {showLinkPopover && (
                   <>
-                    <div className="fixed inset-0 z-[999]" onClick={() => setShowLinkPopover(false)} />
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[1000] p-4 space-y-3">
+                    <div className="fixed inset-0 z-[200]" onClick={() => setShowLinkPopover(false)} />
+                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[210] p-4 space-y-3">
                       <div className="text-xs font-black text-slate-700 mb-1">{t('apply_link_title')}</div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_language')}</label>
@@ -1844,34 +1846,34 @@ export default function ApplicantsPage() {
                   fetchJobCategories();
                   setShowManualRegisterModal(true);
                 }}
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap"
               >
                 <i className="bi bi-person-plus-fill text-emerald-500"></i>
-                {t('btn_manual_register')}
+                <span className="hidden md:inline">{t('btn_manual_register')}</span>
               </button>
               <button
                 onClick={() => {
                   fetchJobCategories();
                   setShowJobCatModal(true);
                 }}
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap"
               >
                 <i className="bi bi-tags-fill text-violet-500"></i>
-                {t('btn_job_category_master')}
+                <span className="hidden md:inline">{t('btn_job_category_master')}</span>
               </button>
               <a
                 href="/settings?tab=interviewSlot"
-                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors"
+                className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap"
               >
                 <i className="bi bi-gear-fill text-slate-400"></i>
-                {t('btn_slot_settings')}
+                <span className="hidden md:inline">{t('btn_slot_settings')}</span>
               </a>
             </div>
           </div>
 
           {/* ── TAB 1: カレンダー ── */}
           {activeTab === 'calendar' && (
-            <div className="p-6">
+            <div className="p-3 md:p-6">
               {/* Master filter dropdown */}
               <div className="mb-4 flex items-center gap-3">
                 <label className="text-xs font-bold text-slate-500">{t('filter_master')}:</label>
@@ -1940,9 +1942,9 @@ export default function ApplicantsPage() {
           {activeTab === 'list' && (
             <div>
               {/* フィルター */}
-              <div className="p-4 border-b border-slate-200 bg-slate-50/50">
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex-1 min-w-[240px]">
+              <div className="p-3 md:p-4 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex flex-col md:flex-row md:flex-wrap md:items-center gap-2 md:gap-3">
+                  <div className="w-full md:flex-1 md:min-w-[240px]">
                     <div className="relative">
                       <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
                       <input
@@ -1954,32 +1956,34 @@ export default function ApplicantsPage() {
                       />
                     </div>
                   </div>
-                  <select
-                    value={filterFlowStatus}
-                    onChange={e => setFilterFlowStatus(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                  >
-                    <option value="">{t('list_filter_flow_all')}</option>
-                    <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
-                    <option value="NO_SHOW">{t('flow_no_show')}</option>
-                    <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
-                    <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
-                  </select>
-                  <select
-                    value={filterHiringStatus}
-                    onChange={e => setFilterHiringStatus(e.target.value)}
-                    className="border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
-                  >
-                    <option value="">{t('list_filter_hiring_all')}</option>
-                    <option value="IN_PROGRESS">{t('hiring_in_progress')}</option>
-                    <option value="HIRED">{t('hiring_hired')}</option>
-                    <option value="REJECTED">{t('hiring_rejected')}</option>
-                  </select>
+                  <div className="flex gap-2 flex-1 md:flex-none">
+                    <select
+                      value={filterFlowStatus}
+                      onChange={e => setFilterFlowStatus(e.target.value)}
+                      className="flex-1 md:flex-none border border-slate-200 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                    >
+                      <option value="">{t('list_filter_flow_all')}</option>
+                      <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
+                      <option value="NO_SHOW">{t('flow_no_show')}</option>
+                      <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
+                      <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
+                    </select>
+                    <select
+                      value={filterHiringStatus}
+                      onChange={e => setFilterHiringStatus(e.target.value)}
+                      className="flex-1 md:flex-none border border-slate-200 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-blue-400 focus:outline-none bg-white"
+                    >
+                      <option value="">{t('list_filter_hiring_all')}</option>
+                      <option value="IN_PROGRESS">{t('hiring_in_progress')}</option>
+                      <option value="HIRED">{t('hiring_hired')}</option>
+                      <option value="REJECTED">{t('hiring_rejected')}</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* テーブル */}
-              <div className="overflow-x-auto">
+              {/* Desktop テーブル */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50">
@@ -2081,6 +2085,72 @@ export default function ApplicantsPage() {
                 </table>
               </div>
 
+              {/* Mobile カードレイアウト */}
+              <div className="md:hidden">
+                {listLoading ? (
+                  <div className="p-3 space-y-3">
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="bg-white rounded-xl border border-slate-200 p-4 space-y-2 animate-pulse">
+                        <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                        <div className="h-3 bg-slate-100 rounded w-2/3"></div>
+                        <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : applicants.length === 0 ? (
+                  <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+                    <i className="bi bi-person-x text-4xl"></i>
+                    <p className="text-sm font-medium">{t('no_applicants')}</p>
+                  </div>
+                ) : (
+                  <div className="p-3 space-y-3">
+                    {applicants.map(app => {
+                      const flow = FLOW_STATUS_MAP[app.flowStatus];
+                      const hiring = HIRING_STATUS_MAP[app.hiringStatus];
+                      const slot = getApplicantInterviewSlot(app);
+                      return (
+                        <div
+                          key={app.id}
+                          onClick={() => openEvalModal(app.id)}
+                          className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm active:bg-slate-50 transition-colors cursor-pointer"
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="font-bold text-sm text-slate-800 truncate mr-2">{app.name}</span>
+                            <div className="flex gap-1 shrink-0">
+                              {flow && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${flow.color}`}>
+                                  {t(flow.labelKey)}
+                                </span>
+                              )}
+                              {hiring && (
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${hiring.color}`}>
+                                  {t(hiring.labelKey)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-slate-500 truncate mb-1">{app.email}</div>
+                          <div className="flex items-center gap-3 text-xs text-slate-600">
+                            <span className="truncate">{app.jobCategory?.nameJa || '-'}</span>
+                            {slot && (
+                              <span className="text-slate-400 shrink-0">
+                                <i className="bi bi-calendar3 mr-0.5"></i>
+                                {new Date(slot.startTime).toLocaleString('ja-JP', {
+                                  month: 'numeric',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
               {/* ページネーション */}
               <Pagination
                 page={page}
@@ -2096,8 +2166,8 @@ export default function ApplicantsPage() {
           {activeTab === 'training' && (
             <div>
               {/* ツールバー */}
-              <div className="p-4 border-b border-slate-200 bg-slate-50/50">
-                <div className="flex items-center gap-3 flex-wrap">
+              <div className="p-3 md:p-4 border-b border-slate-200 bg-slate-50/50">
+                <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3">
                   <button
                     onClick={async () => {
                       try {
@@ -2111,24 +2181,24 @@ export default function ApplicantsPage() {
                         }
                       } catch { showToast(t('error_occurred'), 'error'); }
                     }}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-indigo-700 transition-colors"
+                    className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs md:text-sm font-bold hover:bg-indigo-700 transition-colors self-start"
                   >
                     <i className="bi bi-arrow-clockwise"></i>
                     {t('training_generate_now')}
                   </button>
                   {/* 凡例 */}
-                  <div className="flex items-center gap-3 ml-auto text-xs text-slate-500">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>{t('training_legend_empty')}</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>{t('training_legend_booked')}</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>{t('training_legend_few')}</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>{t('training_legend_full')}</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>{t('training_legend_done')}</span>
+                  <div className="flex items-center gap-2 md:gap-3 md:ml-auto text-[10px] md:text-xs text-slate-500 overflow-x-auto scrollbar-hide">
+                    <span className="flex items-center gap-1 shrink-0"><span className="w-3 h-3 rounded-sm bg-slate-400 inline-block"></span>{t('training_legend_empty')}</span>
+                    <span className="flex items-center gap-1 shrink-0"><span className="w-3 h-3 rounded-sm bg-indigo-500 inline-block"></span>{t('training_legend_booked')}</span>
+                    <span className="flex items-center gap-1 shrink-0"><span className="w-3 h-3 rounded-sm bg-amber-400 inline-block"></span>{t('training_legend_few')}</span>
+                    <span className="flex items-center gap-1 shrink-0"><span className="w-3 h-3 rounded-sm bg-rose-500 inline-block"></span>{t('training_legend_full')}</span>
+                    <span className="flex items-center gap-1 shrink-0"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span>{t('training_legend_done')}</span>
                   </div>
                 </div>
               </div>
 
               {/* カレンダー */}
-              <div className="p-6">
+              <div className="p-3 md:p-6">
                 {trainingMgmtLoading && trainingMgmtSlots.length === 0 ? (
                   <div className="flex items-center justify-center py-20">
                     <div className="flex items-center gap-3 text-slate-400">
@@ -2204,8 +2274,12 @@ export default function ApplicantsPage() {
         const fillRate = slot.capacity > 0 ? (slot.bookedCount / slot.capacity) * 100 : 0;
         const canDelete = slot.bookedCount === 0;
         return (
-          <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col overflow-hidden max-h-[85vh]">
+          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
+            <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh] md:max-h-[85vh]">
+              {/* Mobile drag handle */}
+              <div className="md:hidden flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 bg-slate-300 rounded-full" />
+              </div>
               {/* ヘッダー */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
                 <div className="flex items-center gap-3">
@@ -2357,8 +2431,8 @@ export default function ApplicantsPage() {
                                     </button>
                                     {trainingActionMenuId === app.id && (
                                       <>
-                                        <div className="fixed inset-0 z-[2999]" onClick={() => setTrainingActionMenuId(null)} />
-                                        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[3000] py-1 overflow-hidden">
+                                        <div className="fixed inset-0 z-[200]" onClick={() => setTrainingActionMenuId(null)} />
+                                        <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-[210] py-1 overflow-hidden">
                                           <button
                                             onClick={() => {
                                               setTrainingActionMenuId(null);
@@ -2648,8 +2722,12 @@ export default function ApplicantsPage() {
           モーダル: スロット作成
          ════════════════════════════════════════════ */}
       {showSlotModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh]">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
@@ -2787,8 +2865,12 @@ export default function ApplicantsPage() {
           モーダル: 応募者評価
          ════════════════════════════════════════════ */}
       {showEvalModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center md:justify-center bg-black/50 backdrop-blur-sm md:p-4">
+          <div className="bg-white w-full h-full md:h-auto md:max-w-4xl rounded-none md:rounded-2xl shadow-2xl flex flex-col overflow-hidden md:max-h-[90vh]">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1 sticky top-0 bg-white z-10">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-3">
@@ -3719,8 +3801,12 @@ export default function ApplicantsPage() {
           モーダル: 配布員登録
          ════════════════════════════════════════════ */}
       {showDistributorForm && selectedApplicant && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh]">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-3">
@@ -3798,8 +3884,12 @@ export default function ApplicantsPage() {
           モーダル: 応募者手動登録
          ════════════════════════════════════════════ */}
       {showManualRegisterModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-xl rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh]">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
               <div className="flex items-center gap-3">
@@ -4018,8 +4108,12 @@ export default function ApplicantsPage() {
           モーダル: 職種マスタ管理
          ════════════════════════════════════════════ */}
       {showJobCatModal && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4">
+          <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh]">
+            {/* Mobile drag handle */}
+            <div className="md:hidden flex justify-center pt-2 pb-1">
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
             {/* ヘッダー */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
               <div className="flex items-center gap-3">

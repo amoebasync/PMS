@@ -825,7 +825,7 @@ export default function ProfilePage() {
       {/* --- 社員プロフィール閲覧モーダル --- */}
       {viewingEmployee && (
         <div
-          className="fixed inset-0 z-[9000] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm"
           onClick={() => setViewingEmployee(null)}
         >
           <div
@@ -962,7 +962,7 @@ export default function ProfilePage() {
 
       {/* --- 画像トリミングモーダル --- */}
       {isUploadModalOpen && tempImageSrc && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
           <div className="bg-white rounded-2xl overflow-hidden shadow-2xl w-full max-w-lg md:max-w-2xl m-4">
             <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
               <h3 className="font-bold text-slate-800"><i className="bi bi-crop text-indigo-600 mr-2"></i>{t('modal_crop_title')}</h3>

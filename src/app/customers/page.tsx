@@ -383,8 +383,8 @@ export default function CustomerPage() {
       </div>
 
       {/* フィルタパネル */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 items-end">
-        <div className="flex-1 min-w-[220px]">
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:flex-wrap gap-3 md:gap-4 md:items-end">
+        <div className="w-full md:flex-1 md:min-w-[220px]">
           <label className={labelCls}>{t('search_keyword')}</label>
           <div className="relative">
             <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-sm"></i>
@@ -397,37 +397,39 @@ export default function CustomerPage() {
             />
           </div>
         </div>
-        <div>
-          <label className={labelCls}>{t('filter_sales_rep')}</label>
-          <select value={filterSalesRepId} onChange={e => setFilterSalesRepId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[120px]">
-            <option value="">{t('filter_all')}</option>
-            {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>{t('filter_channel')}</label>
-          <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
-            <option value="">{t('filter_all')}</option>
-            <option value="EC">{t('channel_ec')}</option>
-            <option value="SALES">{t('channel_sales')}</option>
-            <option value="REFERRAL">{t('channel_referral')}</option>
-            <option value="INQUIRY">{t('channel_inquiry')}</option>
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>{t('filter_campaign')}</label>
-          <select value={filterCampaignId} onChange={e => setFilterCampaignId(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[130px]">
-            <option value="">{t('filter_all')}</option>
-            {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>{t('table_status')}</label>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-[110px]">
-            <option value="">{t('filter_all')}</option>
-            <option value="VALID">{t('status_valid')}</option>
-            <option value="INVALID">{t('status_invalid')}</option>
-          </select>
+        <div className="flex gap-2 flex-wrap md:flex-nowrap md:gap-4">
+          <div className="flex-1 md:flex-none">
+            <label className={labelCls}>{t('filter_sales_rep')}</label>
+            <select value={filterSalesRepId} onChange={e => setFilterSalesRepId(e.target.value)} className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-0 md:min-w-[120px]">
+              <option value="">{t('filter_all')}</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.lastNameJa} {e.firstNameJa}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className={labelCls}>{t('filter_channel')}</label>
+            <select value={filterChannel} onChange={e => setFilterChannel(e.target.value)} className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-0 md:min-w-[110px]">
+              <option value="">{t('filter_all')}</option>
+              <option value="EC">{t('channel_ec')}</option>
+              <option value="SALES">{t('channel_sales')}</option>
+              <option value="REFERRAL">{t('channel_referral')}</option>
+              <option value="INQUIRY">{t('channel_inquiry')}</option>
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className={labelCls}>{t('filter_campaign')}</label>
+            <select value={filterCampaignId} onChange={e => setFilterCampaignId(e.target.value)} className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-0 md:min-w-[130px]">
+              <option value="">{t('filter_all')}</option>
+              {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div className="flex-1 md:flex-none">
+            <label className={labelCls}>{t('table_status')}</label>
+            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="w-full md:w-auto border border-slate-300 rounded-lg px-2 md:px-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none bg-white min-w-0 md:min-w-[110px]">
+              <option value="">{t('filter_all')}</option>
+              <option value="VALID">{t('status_valid')}</option>
+              <option value="INVALID">{t('status_invalid')}</option>
+            </select>
+          </div>
         </div>
         {(searchTerm || filterSalesRepId || filterChannel || filterCampaignId || filterStatus) && (
           <button
@@ -441,7 +443,8 @@ export default function CustomerPage() {
 
       {/* テーブル */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Desktop テーブル */}
+        <div className="hidden md:block overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
@@ -529,12 +532,72 @@ export default function CustomerPage() {
           </tbody>
         </table>
         </div>
+
+        {/* Mobile カードレイアウト */}
+        <div className="md:hidden">
+          {isLoading ? (
+            <div className="p-3 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-xl border border-slate-100 p-4 space-y-2 animate-pulse">
+                  <div className="h-4 bg-slate-100 rounded w-1/3"></div>
+                  <div className="h-3 bg-slate-100 rounded w-2/3"></div>
+                </div>
+              ))}
+            </div>
+          ) : filteredCustomers.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 text-slate-400 py-16">
+              <i className="bi bi-buildings text-4xl"></i>
+              <p className="text-sm font-medium">{t('no_match')}</p>
+            </div>
+          ) : (
+            <div className="p-3 space-y-3">
+              {filteredCustomers.map(cust => (
+                <div
+                  key={cust.id}
+                  onClick={() => router.push(`/customers/${cust.id}`)}
+                  className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm active:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-mono text-slate-400">{cust.customerCode}</div>
+                      <div className="font-bold text-sm text-slate-800 truncate">{cust.name}</div>
+                    </div>
+                    {cust.status === 'VALID' ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-600 shrink-0 ml-2">
+                        {t('status_valid')}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500 shrink-0 ml-2">
+                        {t('status_invalid')}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-500 mb-1">
+                    <i className="bi bi-telephone text-slate-400 mr-1"></i>{cust.phone || '-'}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    {cust.salesRep && (
+                      <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                        {cust.salesRep.lastNameJa} {cust.salesRep.firstNameJa}
+                      </span>
+                    )}
+                    {cust.acquisitionChannel && (
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${CHANNEL_COLORS[cust.acquisitionChannel]}`}>
+                        {t(`channel_${cust.acquisitionChannel.toLowerCase()}`)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ===== 登録・編集モーダル ===== */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-start justify-center bg-black/50 backdrop-blur-sm p-4 pt-8 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl mb-8 animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/50 backdrop-blur-sm p-0 md:p-4 md:pt-8 overflow-y-auto">
+          <div className="bg-white rounded-none md:rounded-2xl shadow-2xl w-full md:max-w-3xl md:mb-8 animate-in fade-in zoom-in-95 duration-200 min-h-full md:min-h-0">
 
             {/* ヘッダー */}
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white rounded-t-2xl z-10">
@@ -853,7 +916,7 @@ export default function CustomerPage() {
 
       {/* 削除確認モーダル */}
       {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-in fade-in zoom-in-95 duration-200">
             <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <i className="bi bi-exclamation-triangle-fill text-2xl"></i>

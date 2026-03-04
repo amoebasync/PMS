@@ -238,7 +238,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-slate-600 text-sm">軌跡データを読み込み中...</p>
@@ -249,7 +249,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
   if (error || !data) {
     return (
-      <div className="fixed inset-0 z-[1100] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center max-w-sm">
           <i className="bi bi-exclamation-triangle text-3xl text-amber-500 mb-3 block"></i>
           <p className="text-slate-700 font-bold mb-2">{error || 'データが見つかりません'}</p>
@@ -308,7 +308,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const totalMailboxes = lastProgress?.mailboxCount || 0;
 
   return (
-    <div className="fixed inset-0 z-[1100] flex flex-col bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
       <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">

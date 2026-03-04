@@ -283,7 +283,7 @@ export default function SignupPage() {
       {/* 利用規約モーダル */}
       {/* ========================================================= */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowTermsModal(false)} aria-hidden="true">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowTermsModal(false)} aria-hidden="true">
           <div role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
               <h3 id="terms-modal-title" className="font-bold text-lg">利用規約</h3>
@@ -305,7 +305,7 @@ export default function SignupPage() {
       {/* プライバシーポリシーモーダル */}
       {/* ========================================================= */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[5000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowPrivacyModal(false)} aria-hidden="true">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowPrivacyModal(false)} aria-hidden="true">
           <div role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
               <h3 id="privacy-modal-title" className="font-bold text-lg">個人情報の取り扱いについて</h3>

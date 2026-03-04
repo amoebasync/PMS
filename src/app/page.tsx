@@ -36,17 +36,17 @@ function StatCard({ title, value, subValue, icon, accentColor }: {
   const c = colors[accentColor];
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5 flex flex-col justify-between h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow duration-200">
-      <div className="flex justify-between items-start mb-3">
-        <span className="text-gray-500 text-xs font-medium tracking-wide">{title}</span>
-        <div className={`w-9 h-9 rounded-xl ${c.bg} ${c.text} flex items-center justify-center shrink-0`}>
-          <i className={`bi ${icon} text-[16px]`} />
+    <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-3 md:p-5 flex flex-col justify-between h-full hover:shadow-[0_4px_12px_rgba(0,0,0,0.06)] transition-shadow duration-200">
+      <div className="flex justify-between items-start mb-2 md:mb-3">
+        <span className="text-slate-500 text-[11px] md:text-xs font-medium tracking-wide">{title}</span>
+        <div className={`w-8 h-8 md:w-9 md:h-9 rounded-xl ${c.bg} ${c.text} flex items-center justify-center shrink-0`}>
+          <i className={`bi ${icon} text-[14px] md:text-[16px]`} />
         </div>
       </div>
       <div>
-        <div className="text-[26px] font-extrabold text-gray-800 tracking-tight leading-none">{value}</div>
+        <div className="text-xl md:text-[26px] font-extrabold text-slate-800 tracking-tight leading-none">{value}</div>
         {subValue && (
-          <div className="text-[11px] mt-2 text-gray-400 font-medium">{subValue}</div>
+          <div className="text-[10px] md:text-[11px] mt-1.5 md:mt-2 text-slate-400 font-medium">{subValue}</div>
         )}
       </div>
     </div>
@@ -221,9 +221,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Left: Announcements */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
-            <h3 className="font-bold text-gray-800 text-sm flex items-center gap-2">
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] overflow-hidden flex flex-col">
+          <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
               <i className="bi bi-megaphone-fill text-indigo-500" /> {t('announcements_title')}
             </h3>
             {isSuperAdmin && (
@@ -238,10 +238,10 @@ export default function Dashboard() {
           <div className="p-6 space-y-5 flex-1">
             {announcements.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <div className="w-12 h-12 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mb-3">
+                <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mb-3">
                   <i className="bi bi-megaphone text-xl" />
                 </div>
-                <p className="text-gray-500 text-sm font-medium">{t('announcements_empty')}</p>
+                <p className="text-slate-500 text-sm font-medium">{t('announcements_empty')}</p>
                 {isSuperAdmin && (
                   <Link href="/announcements" className="mt-2 text-xs text-indigo-500 hover:underline">
                     {t('announcements_post')}
@@ -254,7 +254,7 @@ export default function Dashboard() {
                 const dateStr = new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
                 return (
                   <React.Fragment key={a.id}>
-                    {i > 0 && <div className="w-full h-px bg-gray-100" />}
+                    {i > 0 && <div className="w-full h-px bg-slate-100" />}
                     <div className="flex gap-4 items-start">
                       <div className={`w-10 h-10 ${cfg.bgColor} ${cfg.textColor} rounded-xl flex items-center justify-center text-base shrink-0 mt-0.5`}>
                         <i className={`bi ${cfg.icon}`} />
@@ -262,10 +262,10 @@ export default function Dashboard() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <span className={`text-[10px] font-bold ${cfg.badgeText} ${cfg.badgeBg} px-2 py-0.5 rounded`}>{t(cfg.labelKey)}</span>
-                          <span className="text-[10px] text-gray-400 font-mono">{dateStr}</span>
+                          <span className="text-[10px] text-slate-400 font-mono">{dateStr}</span>
                         </div>
-                        <h4 className="font-bold text-gray-800 text-sm mb-1">{a.title}</h4>
-                        <p className="text-xs text-gray-500 leading-relaxed whitespace-pre-wrap">{a.content}</p>
+                        <h4 className="font-bold text-slate-800 text-sm mb-1">{a.title}</h4>
+                        <p className="text-xs text-slate-500 leading-relaxed whitespace-pre-wrap">{a.content}</p>
                       </div>
                     </div>
                   </React.Fragment>
@@ -280,9 +280,9 @@ export default function Dashboard() {
 
           {/* Tasks */}
           {data?.crm && (
-            <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
                   <i className="bi bi-check2-all text-indigo-500" /> {t('tasks_title')}
                 </h3>
                 <Link href="/crm/tasks" className="text-xs text-blue-600 hover:underline font-medium">{t('tasks_view_all')}</Link>
@@ -293,7 +293,7 @@ export default function Dashboard() {
                 </div>
               )}
               {data.crm.myTasks.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">{t('tasks_none')}</p>
+                <p className="text-xs text-slate-400 text-center py-4">{t('tasks_none')}</p>
               ) : (
                 <div className="space-y-1">
                   {data.crm.myTasks.map((task: any) => {
@@ -303,16 +303,16 @@ export default function Dashboard() {
                     dueDate.setHours(0, 0, 0, 0);
                     const isOverdue = dueDate < today;
                     return (
-                      <div key={task.id} className="flex items-start justify-between gap-2 py-2 border-b border-gray-50 last:border-0">
+                      <div key={task.id} className="flex items-start justify-between gap-2 py-2 border-b border-slate-50 last:border-0">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-700 truncate">{task.title}</p>
+                          <p className="text-sm font-medium text-slate-700 truncate">{task.title}</p>
                           <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-[10px] font-medium ${isOverdue ? 'text-red-500 font-bold' : 'text-gray-400'}`}>
+                            <span className={`text-[10px] font-medium ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
                               {isOverdue && <i className="bi bi-exclamation-triangle-fill mr-0.5" />}
                               {dueDate.toLocaleDateString('ja-JP')}
                             </span>
                             {task.customer && (
-                              <span className="text-[10px] text-gray-400">· {task.customer.name}</span>
+                              <span className="text-[10px] text-slate-400">· {task.customer.name}</span>
                             )}
                           </div>
                         </div>
@@ -341,26 +341,26 @@ export default function Dashboard() {
 
           {/* Distributor Performance */}
           {data?.evaluation && (
-            <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
                   <i className="bi bi-award-fill text-amber-500" /> {t('performance_title')}
                 </h3>
                 <Link href="/distributors" className="text-xs text-blue-600 hover:underline font-medium">{t('performance_view_all')}</Link>
               </div>
               {data.evaluation.topDistributors?.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Top 5</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Top 5</p>
                   <div className="space-y-1.5">
                     {data.evaluation.topDistributors.slice(0, 5).map((d: any, i: number) => {
-                      const rankColors: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-gray-400', D: 'bg-red-400' };
+                      const rankColors: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-slate-400', D: 'bg-red-400' };
                       return (
                         <div key={d.id || i} className="flex items-center gap-2.5">
-                          <span className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${rankColors[d.rank] || 'bg-gray-300'}`}>
+                          <span className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${rankColors[d.rank] || 'bg-slate-300'}`}>
                             {d.rank}
                           </span>
-                          <span className="text-sm font-medium text-gray-700 flex-1 truncate">{d.name}</span>
-                          <span className="text-sm font-bold text-gray-800">{d.score}</span>
+                          <span className="text-sm font-medium text-slate-700 flex-1 truncate">{d.name}</span>
+                          <span className="text-sm font-bold text-slate-800">{d.score}</span>
                         </div>
                       );
                     })}
@@ -373,7 +373,7 @@ export default function Dashboard() {
                   <div className="space-y-1.5">
                     {data.evaluation.attentionDistributors.slice(0, 5).map((d: any, i: number) => (
                       <div key={d.id || i} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-700 truncate flex-1">{d.name}</span>
+                        <span className="text-sm text-slate-700 truncate flex-1">{d.name}</span>
                         <span className="text-xs font-bold text-red-500">
                           <i className="bi bi-exclamation-triangle-fill mr-0.5" />{t('performance_complaints', { count: d.complaintCount })}
                         </span>
@@ -383,16 +383,16 @@ export default function Dashboard() {
                 </div>
               )}
               {(!data.evaluation.topDistributors?.length && !data.evaluation.attentionDistributors?.length) && (
-                <p className="text-xs text-gray-400 text-center py-4">{t('performance_no_data')}</p>
+                <p className="text-xs text-slate-400 text-center py-4">{t('performance_no_data')}</p>
               )}
             </div>
           )}
 
           {/* EC Portal status */}
           {data && (
-            <div className="bg-white rounded-2xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
+            <div className="bg-white rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04)] p-5">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2 text-sm">
+                <h3 className="font-bold text-slate-800 flex items-center gap-2 text-sm">
                   <i className="bi bi-laptop text-fuchsia-500" /> {t('ec_portal_title')}
                 </h3>
                 {data.ec.activeUsers > 0 && (
@@ -402,24 +402,24 @@ export default function Dashboard() {
                 )}
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between items-end border-b border-gray-100 pb-2.5">
-                  <div className="text-xs text-gray-500 font-medium">{t('ec_active_users')} <span className="text-[9px] text-gray-400 ml-1">{t('ec_active_users_suffix')}</span></div>
-                  <div className="text-xl font-extrabold text-gray-800 tracking-tight">{data.ec.activeUsers}<span className="text-xs font-medium text-gray-400 ml-0.5">{t('ec_active_users_unit')}</span></div>
+                <div className="flex justify-between items-end border-b border-slate-100 pb-2.5">
+                  <div className="text-xs text-slate-500 font-medium">{t('ec_active_users')} <span className="text-[9px] text-slate-400 ml-1">{t('ec_active_users_suffix')}</span></div>
+                  <div className="text-xl font-extrabold text-slate-800 tracking-tight">{data.ec.activeUsers}<span className="text-xs font-medium text-slate-400 ml-0.5">{t('ec_active_users_unit')}</span></div>
                 </div>
-                <div className="flex justify-between items-end border-b border-gray-100 pb-2.5">
-                  <div className="text-xs text-gray-500 font-medium">{t('ec_new_registrations')}</div>
-                  <div className="text-base font-bold text-gray-700">{data.ec.newUsersThisMonth}<span className="text-[10px] font-medium text-gray-400 ml-0.5">{t('ec_count_unit')}</span></div>
+                <div className="flex justify-between items-end border-b border-slate-100 pb-2.5">
+                  <div className="text-xs text-slate-500 font-medium">{t('ec_new_registrations')}</div>
+                  <div className="text-base font-bold text-slate-700">{data.ec.newUsersThisMonth}<span className="text-[10px] font-medium text-slate-400 ml-0.5">{t('ec_count_unit')}</span></div>
                 </div>
                 <div className="flex justify-between items-end">
-                  <div className="text-xs text-gray-500 font-medium">{t('ec_total_accounts')}</div>
-                  <div className="text-sm font-bold text-gray-700">{data.ec.totalUsers}<span className="text-[10px] font-medium text-gray-400 ml-0.5">{t('ec_count_unit')}</span></div>
+                  <div className="text-xs text-slate-500 font-medium">{t('ec_total_accounts')}</div>
+                  <div className="text-sm font-bold text-slate-700">{data.ec.totalUsers}<span className="text-[10px] font-medium text-slate-400 ml-0.5">{t('ec_count_unit')}</span></div>
                 </div>
               </div>
             </div>
           )}
 
           {/* System Status */}
-          <div className="bg-gray-900 rounded-2xl p-5 text-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] relative overflow-hidden">
+          <div className="bg-slate-900 rounded-2xl p-5 text-white shadow-[0_1px_3px_rgba(0,0,0,0.04)] relative overflow-hidden">
             <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-3xl opacity-15 -mr-8 -mt-8 ${dbStatus === 'connected' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
 
             <div className="flex items-center gap-3 mb-4 relative z-10">
@@ -437,20 +437,20 @@ export default function Dashboard() {
 
             <div className="space-y-2.5 relative z-10">
               <div className="flex justify-between items-center text-[11px] border-b border-white/10 pb-2">
-                <span className="text-gray-400">Database (RDS)</span>
+                <span className="text-slate-400">Database (RDS)</span>
                 <span className={`font-mono font-bold ${dbStatus === 'connected' ? 'text-emerald-400' : 'text-rose-400'}`}>
                   {dbStatus === 'connected' ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[11px] border-b border-white/10 pb-2">
-                <span className="text-gray-400">API Latency</span>
+                <span className="text-slate-400">API Latency</span>
                 <span className={`font-mono font-bold ${latency && latency < 100 ? 'text-blue-400' : latency && latency < 500 ? 'text-yellow-400' : 'text-rose-400'}`}>
                   {latency ? `${latency}ms` : '--'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-[10px]">
-                <span className="text-gray-500">Last Check</span>
-                <span className="text-gray-400 font-mono">Just now</span>
+                <span className="text-slate-500">Last Check</span>
+                <span className="text-slate-400 font-mono">Just now</span>
               </div>
             </div>
           </div>
