@@ -48,5 +48,13 @@
   "btn_cancel": "キャンセル",
   "btn_update": "更新する",
   "btn_register": "登録する",
-  "btn_delete": "削除する"
+  "btn_delete": "削除する",
+  "day_mon": "月",
+  "day_tue": "火",
+  "day_wed": "水",
+  "day_thu": "木",
+  "day_fri": "金",
+  "day_sat": "土",
+  "day_sun": "日",
+  "day_holiday": "祝日"
 }

@@ -133,7 +133,19 @@ export default function InterviewSlotMasterSettings() {
       const res = await fetch('/api/interview-slot-masters');
       if (res.ok) {
         const data = await res.json();
-        setMasters(data);
+        // API returns jobCategories[] and _count, transform to flat shape
+        const mapped: SlotMaster[] = data.map((m: any) => ({
+          id: m.id,
+          name: m.name,
+          meetingType: m.meetingType,
+          zoomUrl: m.zoomUrl,
+          zoomMeetingNumber: m.zoomMeetingNumber,
+          zoomPassword: m.zoomPassword,
+          isActive: m.isActive,
+          jobCategoryIds: (m.jobCategories || []).map((jc: any) => jc.id),
+          slotCount: m._count?.interviewSlots ?? 0,
+        }));
+        setMasters(mapped);
       }
     } catch (e) {
       console.error(e);

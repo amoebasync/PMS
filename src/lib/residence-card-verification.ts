@@ -165,6 +165,79 @@ function compareExpiryDate(cardDate: string | null, dbDate: Date | null): { matc
   return { match: false, confidence: 0 };
 }
 
+/**
+ * 在留カードから読み取った国籍・ビザ・有効期限をDBに自動セットする
+ */
+async function autoFillFromCardData(
+  entityType: VerifiableEntityType,
+  entityId: number,
+  extracted: ResidenceCardData
+): Promise<void> {
+  const updateData: Record<string, unknown> = {};
+
+  // 国籍の解決: nameEn → name → aliases で検索
+  if (extracted.nationality) {
+    const cardVal = normalizeForComparison(extracted.nationality);
+    const country = await prisma.country.findFirst({
+      where: {
+        OR: [
+          { nameEn: { equals: extracted.nationality, mode: 'insensitive' as const } },
+          { name: extracted.nationality },
+        ],
+      },
+    });
+    if (country) {
+      updateData.countryId = country.id;
+    } else {
+      // aliases 検索（カンマ区切り）
+      const allCountries = await prisma.country.findMany({ where: { aliases: { not: null } } });
+      const matched = allCountries.find(c => {
+        if (!c.aliases) return false;
+        return c.aliases.split(',').some(a => {
+          const normAlias = normalizeForComparison(a);
+          return normAlias === cardVal || normAlias.includes(cardVal) || cardVal.includes(normAlias);
+        });
+      });
+      if (matched) {
+        updateData.countryId = matched.id;
+      }
+    }
+  }
+
+  // ビザ種別の解決: name / nameEn で検索
+  if (extracted.visaType) {
+    const cardVal = normalizeForComparison(extracted.visaType);
+    const allVisaTypes = await prisma.visaType.findMany();
+    const matched = allVisaTypes.find(v => {
+      const normName = normalizeForComparison(v.name);
+      const normNameEn = normalizeForComparison(v.nameEn);
+      return normName === cardVal || normNameEn === cardVal
+        || normName.includes(cardVal) || cardVal.includes(normName)
+        || (normNameEn && (normNameEn.includes(cardVal) || cardVal.includes(normNameEn)));
+    });
+    if (matched) {
+      updateData.visaTypeId = matched.id;
+    }
+  }
+
+  // 有効期限のパース
+  if (extracted.expiryDate) {
+    const normalized = extracted.expiryDate.replace(/\//g, '-');
+    const parsed = new Date(normalized);
+    if (!isNaN(parsed.getTime())) {
+      updateData.visaExpiryDate = parsed;
+    }
+  }
+
+  if (Object.keys(updateData).length === 0) return;
+
+  if (entityType === 'FlyerDistributor') {
+    await prisma.flyerDistributor.update({ where: { id: entityId }, data: updateData });
+  } else {
+    await prisma.employee.update({ where: { id: entityId }, data: updateData });
+  }
+}
+
 export interface VerificationResult {
   extracted: ResidenceCardData;
   comparisons: {
@@ -209,7 +282,8 @@ export async function verifyResidenceCard(entityType: VerifiableEntityType, enti
   const visaComp = compareVisaType(extracted.visaType, entity.visaType);
   const expiryComp = compareExpiryDate(extracted.expiryDate, entity.visaExpiryDate);
 
-  const overallMatch = nameComp.match && nationalityComp.match && visaComp.match && expiryComp.match;
+  // 名前一致のみで判定（国籍・ビザ・有効期限は自動セットするため照合不要）
+  const overallMatch = nameComp.match;
 
   return {
     extracted,
@@ -257,13 +331,22 @@ export async function triggerAutoVerification(entityType: VerifiableEntityType, 
 
     const result = await verifyResidenceCard(entityType, entityId);
 
+    // 名前一致 → 国籍・ビザ・有効期限をマスタに自動セット
+    if (result.overallMatch) {
+      try {
+        await autoFillFromCardData(entityType, entityId, result.extracted);
+      } catch (fillError) {
+        console.error('[ResidenceCardVerification] AutoFill error:', fillError);
+      }
+    }
+
     await updateVerificationStatus(entityType, entityId, {
       residenceCardVerificationStatus: result.overallMatch ? 'VERIFIED' : 'MISMATCH',
       residenceCardVerificationResult: result as any,
       residenceCardVerifiedAt: new Date(),
     });
 
-    // MISMATCH の場合はアラートを生成（AlertDefinitionの設定に従う）
+    // 名前不一致の場合のみアラートを生成
     if (!result.overallMatch) {
       try {
         const alertDef = await prisma.alertDefinition.findUnique({
@@ -276,8 +359,8 @@ export async function triggerAutoVerification(entityType: VerifiableEntityType, 
         if (alertDef && alertDef.isEnabled) {
           const entity = await fetchVerifiableEntity(entityType, entityId);
           const staffLabel = entity?.staffId ? `[${entity.staffId}]` : '';
-          const title = `在留カード不一致: ${staffLabel}${entity?.name || ''}`;
-          const message = `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`;
+          const title = `在留カード名前不一致: ${staffLabel}${entity?.name || ''}`;
+          const message = `AI検証の結果、在留カードの名前とDB登録情報が一致しませんでした。カード記載名: ${result.comparisons.name.cardValue || '(読取不可)'}`;
 
           await createAlert({
             categoryId: alertDef.categoryId,
@@ -307,8 +390,8 @@ export async function triggerAutoVerification(entityType: VerifiableEntityType, 
             await createAlert({
               categoryId: category.id,
               severity: 'WARNING',
-              title: `在留カード不一致: ${staffLabel}${entity?.name || ''}`,
-              message: `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`,
+              title: `在留カード名前不一致: ${staffLabel}${entity?.name || ''}`,
+              message: `AI検証の結果、在留カードの名前とDB登録情報が一致しませんでした。カード記載名: ${result.comparisons.name.cardValue || '(読取不可)'}`,
               entityType,
               entityId,
             });

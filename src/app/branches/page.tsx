@@ -52,6 +52,25 @@ export default function BranchPage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const DAY_OPTIONS = [
+    { label: t('day_mon'), value: '月曜日' },
+    { label: t('day_tue'), value: '火曜日' },
+    { label: t('day_wed'), value: '水曜日' },
+    { label: t('day_thu'), value: '木曜日' },
+    { label: t('day_fri'), value: '金曜日' },
+    { label: t('day_sat'), value: '土曜日' },
+    { label: t('day_sun'), value: '日曜日' },
+    { label: t('day_holiday'), value: '祝日' },
+  ];
+
+  const toggleClosedDay = (dayValue: string) => {
+    const current = formData.closedDays ? formData.closedDays.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const updated = current.includes(dayValue)
+      ? current.filter(d => d !== dayValue)
+      : [...current, dayValue];
+    setFormData(prev => ({ ...prev, closedDays: updated.join(',') }));
+  };
+
   const openForm = (branch?: Branch) => {
     if (branch) {
       setCurrentId(branch.id);
@@ -145,7 +164,12 @@ export default function BranchPage() {
                   </td>
                   <td className="px-6 py-4 text-sm">
                     <div className="text-slate-700"><i className="bi bi-clock mr-1 text-slate-400"></i> {b.openingTime || '-'}</div>
-                    <div className="text-slate-500 text-xs mt-1"><i className="bi bi-calendar-x mr-1 text-rose-400"></i> {b.closedDays || '-'}</div>
+                    <div className="text-slate-500 text-xs mt-1 flex items-center gap-1 flex-wrap">
+                      <i className="bi bi-calendar-x text-rose-400"></i>
+                      {b.closedDays ? b.closedDays.split(',').map((d: string) => d.trim()).filter(Boolean).map((d: string, i: number) => (
+                        <span key={i} className="bg-rose-50 text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded text-[10px] font-bold">{d}</span>
+                      )) : <span>-</span>}
+                    </div>
                     {b.alternateBranch && (
                       <div className="text-slate-500 text-xs mt-1"><i className="bi bi-arrow-right-circle mr-1 text-amber-500"></i> {t('alternate_branch')}{b.alternateBranch.nameJa}</div>
                     )}
@@ -220,7 +244,28 @@ export default function BranchPage() {
                   <div className="col-span-2"><label className="text-xs font-bold text-slate-600">{t('form_address')}</label><input name="address" value={formData.address} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
                   <div className="col-span-2"><label className="text-xs font-bold text-slate-600">{t('form_google_map_url')}</label><input name="googleMapUrl" value={formData.googleMapUrl} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder="https://maps.app.goo.gl/..." /></div>
                   <div><label className="text-xs font-bold text-slate-600">{t('form_opening_time')}</label><input type="time" name="openingTime" value={formData.openingTime} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" /></div>
-                  <div><label className="text-xs font-bold text-slate-600">{t('form_closed_days')}</label><input name="closedDays" value={formData.closedDays} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm" placeholder={t('form_closed_days_placeholder')} /></div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-600">{t('form_closed_days')}</label>
+                    <div className="flex flex-wrap gap-1.5 mt-1">
+                      {DAY_OPTIONS.map(day => {
+                        const selected = formData.closedDays ? formData.closedDays.split(',').map(s => s.trim()).includes(day.value) : false;
+                        return (
+                          <button
+                            key={day.value}
+                            type="button"
+                            onClick={() => toggleClosedDay(day.value)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                              selected
+                                ? 'bg-rose-600 text-white border-rose-600'
+                                : 'bg-white text-slate-600 border-slate-300 hover:border-rose-300 hover:text-rose-600'
+                            }`}
+                          >
+                            {day.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                   <div>
                     <label className="text-xs font-bold text-slate-600">{t('form_alternate_branch')}</label>
                     <select name="alternateBranchId" value={(formData as any).alternateBranchId} onChange={handleInputChange} className="w-full border p-2 rounded-lg text-sm bg-white">
