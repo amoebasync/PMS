@@ -4,7 +4,11 @@ export PATH=$PATH:/home/ec2-user/.nvm/versions/node/v20.20.0/bin
 npm install --legacy-peer-deps
 npx prisma generate
 npx prisma db push
-pm2 restart pms
+# PM2 cluster mode（2プロセス）で起動
+# 既存プロセスがあれば削除して再作成（fork→cluster切替に必要）
+pm2 describe pms > /dev/null 2>&1 && pm2 delete pms
+pm2 start npm --name pms -i 2 -- start
+pm2 save
 
 # --- crond が未インストールならインストール ---
 if ! command -v crontab &> /dev/null; then
