@@ -69,6 +69,7 @@ export async function GET(request: Request) {
         branch: true,
         roles: { include: { role: true } },
         country: true,
+        visaType: true,
         financial: true,
         manager: { select: { id: true, lastNameJa: true, firstNameJa: true } },
       };
@@ -111,6 +112,7 @@ export async function GET(request: Request) {
         branch: true,
         roles: { include: { role: true } },
         country: true,
+        visaType: true,
         financial: true,
         manager: { select: { id: true, lastNameJa: true, firstNameJa: true } }
       }

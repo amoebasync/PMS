@@ -319,5 +319,9 @@
   "jobcat_create_failed": "職種の作成に失敗しました",
 
   "error_occurred": "エラーが発生しました",
-  "update_failed": "更新に失敗しました"
+  "update_failed": "更新に失敗しました",
+  "meeting_type_google_meet": "Google Meet 面接",
+  "meeting_type_zoom": "Zoom 面接",
+  "zoom_meeting_number": "ミーティング番号",
+  "zoom_password": "パスワード"
 }

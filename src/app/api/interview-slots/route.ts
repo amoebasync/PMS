@@ -37,6 +37,9 @@ export async function GET(request: Request) {
         interviewer: {
           select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
         },
+        interviewSlotMaster: {
+          select: { id: true, name: true, meetingType: true },
+        },
         applicant: {
           select: {
             id: true,
@@ -80,6 +83,7 @@ export async function POST(request: Request) {
             endTime: new Date(body.endTime),
             jobCategoryId: body.jobCategoryId ? Number(body.jobCategoryId) : null,
             interviewerId: body.interviewerId ? Number(body.interviewerId) : null,
+            interviewSlotMasterId: body.interviewSlotMasterId ? Number(body.interviewSlotMasterId) : null,
             meetUrl: body.meetUrl || null,
           },
           include: {

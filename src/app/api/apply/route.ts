@@ -55,7 +55,10 @@ export async function POST(request: Request) {
       // スロットの空き状況を確認
       const slot = await tx.interviewSlot.findUnique({
         where: { id: Number(interviewSlotId) },
-        include: { interviewer: { select: { email: true } } },
+        include: {
+          interviewer: { select: { email: true } },
+          interviewSlotMaster: true,
+        },
       });
 
       if (!slot || slot.isBooked) {
@@ -66,11 +69,16 @@ export async function POST(request: Request) {
         throw new Error('SLOT_EXPIRED');
       }
 
-      // Google Meet イベントを作成（設定されている場合のみ）
+      // ミーティングURL決定（マスタのmeetingTypeに応じて分岐）
+      const master = slot.interviewSlotMaster;
       let meetUrl = slot.meetUrl; // 既存のURLがあればそれを使用
       let calendarEventId: string | null = null;
 
-      if (!meetUrl && isGoogleMeetConfigured()) {
+      if (master?.meetingType === 'ZOOM') {
+        // Zoom: マスタに設定された固定URLを使用
+        meetUrl = master.zoomUrl || null;
+      } else if (!meetUrl && isGoogleMeetConfigured()) {
+        // Google Meet: 既存ロジック
         const jobName = jobCategory?.nameJa || '面接';
         const meetTitle = `【ティラミス】${name}様 ${jobName} 面接`;
         const meetDescription = `応募者: ${name}\nメール: ${email}\n職種: ${jobName}`;
@@ -151,6 +159,13 @@ export async function POST(request: Request) {
       { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
     )}`;
 
+    // トランザクション内で取得したマスタ情報を再取得（トランザクション外で使用するため）
+    const slotWithMaster = await prisma.interviewSlot.findUnique({
+      where: { id: result.slot.id },
+      include: { interviewSlotMaster: true },
+    });
+    const slotMaster = slotWithMaster?.interviewSlotMaster;
+
     // メール送信（非同期、エラーでもレスポンスは成功とする）
     sendApplicantConfirmationEmail(
       email,
@@ -161,6 +176,9 @@ export async function POST(request: Request) {
       result.slot.meetUrl,
       isEn ? (jobCategory?.nameEn || jobCategory?.nameJa || '') : (jobCategory?.nameJa || ''),
       result.applicant.managementToken,
+      (slotMaster?.meetingType as string) || 'GOOGLE_MEET',
+      slotMaster?.zoomMeetingNumber,
+      slotMaster?.zoomPassword,
     ).catch((err) => console.error('Applicant confirmation email failed:', err));
 
     return NextResponse.json({

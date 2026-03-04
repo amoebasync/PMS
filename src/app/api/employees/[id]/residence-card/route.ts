@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getDistributorFromCookie } from '@/lib/distributorAuth';
+import { cookies } from 'next/headers';
 import { getPresignedPutUrl, toProxyUrl } from '@/lib/s3';
 import { triggerAutoVerification } from '@/lib/residence-card-verification';
 
 // GET: プリサインドURL生成
-export async function GET(request: Request) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const distributor = await getDistributorFromCookie();
-    if (!distributor) {
-      return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('pms_session')?.value;
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { id } = await params;
+    const employeeId = parseInt(id);
 
     const { searchParams } = new URL(request.url);
     const side = searchParams.get('side');
@@ -18,7 +25,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'side パラメータは front または back を指定してください' }, { status: 400 });
     }
 
-    const s3Key = `uploads/residence-cards/distributor-${distributor.id}-residence-card-${side}-${Date.now()}.jpg`;
+    const s3Key = `uploads/residence-cards/employee-${employeeId}-residence-card-${side}-${Date.now()}.jpg`;
     const uploadUrl = await getPresignedPutUrl(s3Key, 'image/jpeg');
 
     return NextResponse.json({ uploadUrl, s3Key });
@@ -30,12 +37,19 @@ export async function GET(request: Request) {
 }
 
 // POST: S3アップロード完了後にDB更新
-export async function POST(request: Request) {
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
-    const distributor = await getDistributorFromCookie();
-    if (!distributor) {
-      return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    const cookieStore = await cookies();
+    const sessionId = cookieStore.get('pms_session')?.value;
+    if (!sessionId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const { id } = await params;
+    const employeeId = parseInt(id);
 
     const body = await request.json();
     const { s3Key, side } = body;
@@ -52,14 +66,14 @@ export async function POST(request: Request) {
       ? { residenceCardFrontUrl: url, hasResidenceCard: true }
       : { residenceCardBackUrl: url, hasResidenceCard: true };
 
-    await prisma.flyerDistributor.update({
-      where: { id: distributor.id },
+    await prisma.employee.update({
+      where: { id: employeeId },
       data: updateData,
     });
 
     // Fire-and-forget auto verification when front side is uploaded
     if (side === 'front') {
-      triggerAutoVerification('FlyerDistributor', distributor.id).catch(() => {});
+      triggerAutoVerification('Employee', employeeId).catch(() => {});
     }
 
     return NextResponse.json({ url, side });

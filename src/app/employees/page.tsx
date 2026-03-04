@@ -14,6 +14,8 @@ type Role = { id: number; code: string; name: string; permissionLevel: string };
 type Country = { id: number; code: string; name: string; nameEn: string };
 type Branch = { id: number; nameJa: string; nameEn: string };
 
+type VisaType = { id: number; name: string; nameEn: string };
+
 type Employee = {
   id: number;
   employeeCode: string | null;
@@ -31,18 +33,27 @@ type Employee = {
   birthday: string | null;
   gender: 'male' | 'female' | 'other' | 'unknown';
   isActive: boolean;
-  employmentType: string; 
-  avatarUrl: string | null; 
+  employmentType: string;
+  avatarUrl: string | null;
   department?: Department;
   branchId?: number | null;
   branch?: Branch;
   rank?: string;
   jobTitle?: string | null;
-  roles?: any[]; 
+  roles?: any[];
   managerId?: number | null;
   manager?: { id: number; lastNameJa: string; firstNameJa: string };
   country?: Country;
-  financial?: any; 
+  financial?: any;
+  visaTypeId?: number | null;
+  visaType?: VisaType | null;
+  visaExpiryDate?: string | null;
+  hasResidenceCard?: boolean;
+  residenceCardFrontUrl?: string | null;
+  residenceCardBackUrl?: string | null;
+  residenceCardVerificationStatus?: string | null;
+  residenceCardVerificationResult?: any;
+  bankCardImageUrl?: string | null;
 };
 
 const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
@@ -90,9 +101,16 @@ export default function EmployeePage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
-  const [branches, setBranches] = useState<Branch[]>([]); 
-  
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [visaTypes, setVisaTypes] = useState<VisaType[]>([]);
+
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // 在留カード・銀行カードアップロード
+  const [isUploadingCard, setIsUploadingCard] = useState<string | null>(null); // 'front' | 'back' | 'bank' | null
+  const [bankCardAnalyzing, setBankCardAnalyzing] = useState(false);
+  const residenceCardInputRef = useRef<HTMLInputElement>(null);
+  const bankCardInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -136,6 +154,7 @@ export default function EmployeePage() {
     createWorkspaceAccount: false,
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as 'male' | 'female' | 'other' | 'unknown',
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
+    visaTypeId: '', visaExpiryDate: '',
     rank: 'ASSOCIATE', jobTitle: '', managerId: '',
     roleIds: [] as string[],
     employmentType: 'FULL_TIME', salaryType: 'MONTHLY',
@@ -181,10 +200,11 @@ export default function EmployeePage() {
 
   const fetchData = async () => {
     try {
-      const [masterRes, branchRes, profileRes] = await Promise.all([
+      const [masterRes, branchRes, profileRes, visaTypeRes] = await Promise.all([
         fetch('/api/masters'),
         fetch('/api/branches'),
-        fetch('/api/profile')
+        fetch('/api/profile'),
+        fetch('/api/visa-types/public'),
       ]);
       const masterData = await masterRes.json();
       const branchData = await branchRes.json();
@@ -195,6 +215,10 @@ export default function EmployeePage() {
       setCountries(masterData.countries || []);
       if (Array.isArray(branchData)) setBranches(branchData);
       if (profileData && profileData.id) setCurrentUser(profileData);
+      if (visaTypeRes.ok) {
+        const vtData = await visaTypeRes.json();
+        setVisaTypes(Array.isArray(vtData) ? vtData : []);
+      }
     } catch (error) { console.error(error); }
   };
 
@@ -287,6 +311,8 @@ export default function EmployeePage() {
         branchId: employee.branchId?.toString() || '',
         departmentId: employee.department?.id.toString() || '',
         countryId: employee.country?.id.toString() || '',
+        visaTypeId: employee.visaTypeId?.toString() || employee.visaType?.id.toString() || '',
+        visaExpiryDate: employee.visaExpiryDate && !isNaN(new Date(employee.visaExpiryDate).getTime()) ? new Date(employee.visaExpiryDate).toISOString().split('T')[0] : '',
         rank: employee.rank || 'ASSOCIATE',
         jobTitle: employee.jobTitle || '',
         managerId: employee.managerId?.toString() || '', // ★ 上司情報を復元
@@ -354,6 +380,8 @@ export default function EmployeePage() {
       personalEmail: formData.personalEmail || null,
       employeeCode: formData.employeeCode || null,
       managerId: formData.managerId || null,
+      visaTypeId: formData.visaTypeId || null,
+      visaExpiryDate: formData.visaExpiryDate || null,
       // 新規作成時のみ Workspace フラグを送信
       createWorkspaceAccount: !currentId ? formData.createWorkspaceAccount : undefined,
       // Workspace 作成時は email を空にする（API側で自動生成）
@@ -512,6 +540,108 @@ export default function EmployeePage() {
     } catch (error) { showToast(t('delete_error'), 'error'); }
   };
 
+
+  // --- 在留カードアップロード ---
+  const handleResidenceCardUpload = async (side: 'front' | 'back') => {
+    if (!currentId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setIsUploadingCard(side);
+      try {
+        const presignRes = await fetch(`/api/employees/${currentId}/residence-card?side=${side}`);
+        if (!presignRes.ok) throw new Error('Failed to get presigned URL');
+        const { uploadUrl, s3Key } = await presignRes.json();
+        await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/jpeg' } });
+        const saveRes = await fetch(`/api/employees/${currentId}/residence-card`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ s3Key, side }),
+        });
+        if (!saveRes.ok) throw new Error('Failed to save');
+        const data = await saveRes.json();
+        // Update the employee in the list
+        setEmployees(prev => prev.map(emp => emp.id === currentId ? {
+          ...emp,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url } : { residenceCardBackUrl: data.url }),
+          hasResidenceCard: true,
+          ...(side === 'front' ? { residenceCardVerificationStatus: 'PENDING' } : {}),
+        } : emp));
+        showToast(t('form_residence_card_upload') + ' OK', 'success');
+      } catch (err) {
+        showToast(t('comm_error'), 'error');
+      }
+      setIsUploadingCard(null);
+    };
+    input.click();
+  };
+
+  // --- 銀行カードアップロード ---
+  const handleBankCardUpload = async () => {
+    if (!currentId) return;
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setBankCardAnalyzing(true);
+      try {
+        const presignRes = await fetch(`/api/employees/${currentId}/bank-card`);
+        if (!presignRes.ok) throw new Error('Failed to get presigned URL');
+        const { uploadUrl, s3Key } = await presignRes.json();
+        await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/jpeg' } });
+        const analyzeRes = await fetch(`/api/employees/${currentId}/bank-card`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ s3Key }),
+        });
+        const result = await analyzeRes.json();
+        if (result.success && result.data) {
+          // Auto-save to EmployeeFinancial via PUT
+          const matchedBank = banks.find((b: any) =>
+            b.name === result.data.bankName || b.nameEn === result.data.bankName
+          );
+          await fetch(`/api/employees/${currentId}/bank-card`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bankId: matchedBank?.id || null,
+              branchName: result.data.branchName || null,
+              branchCode: result.data.branchCode || null,
+              accountType: result.data.accountType === '当座' ? 'CURRENT' : result.data.accountType === '貯蓄' ? 'SAVINGS' : 'ORDINARY',
+              accountNumber: result.data.accountNumber || null,
+              accountName: result.data.accountHolder || null,
+              accountNameKana: result.data.accountHolderKana || null,
+            }),
+          });
+          showToast(t('form_bank_card_scan_success'), 'success');
+        } else {
+          showToast(result.error || t('form_bank_card_scan_error'), 'error');
+        }
+      } catch (err) {
+        showToast(t('comm_error'), 'error');
+      }
+      setBankCardAnalyzing(false);
+    };
+    input.click();
+  };
+
+  // banks state for bank card auto-fill
+  const [banks, setBanks] = useState<any[]>([]);
+  useEffect(() => {
+    fetch('/api/banks').then(r => r.ok ? r.json() : []).then(d => Array.isArray(d) ? setBanks(d) : null).catch(() => {});
+  }, []);
+
+  const getVerificationBadge = (status: string | null | undefined) => {
+    switch (status) {
+      case 'VERIFIED': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><i className="bi bi-check-circle-fill"></i> {t('form_verification_verified')}</span>;
+      case 'MISMATCH': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700"><i className="bi bi-x-circle-fill"></i> {t('form_verification_mismatch')}</span>;
+      case 'PENDING': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i className="bi bi-hourglass-split"></i> {t('form_verification_pending')}</span>;
+      case 'ERROR': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600"><i className="bi bi-exclamation-triangle-fill"></i> {t('form_verification_error')}</span>;
+      default: return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">{t('form_verification_not_verified')}</span>;
+    }
+  };
 
   const sectionClass = "bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4";
   const sectionHeaderClass = "text-sm font-black text-slate-800 border-b border-slate-100 pb-3 mb-4 flex items-center gap-2";
@@ -1131,6 +1261,89 @@ export default function EmployeePage() {
                     <p className="text-[10px] text-slate-500 mt-2">{t('form_roles_hint')}</p>
                   </div>
                 </div>
+              </div>
+
+              {/* --- ビザ・書類セクション --- */}
+              <div className={sectionClass}>
+                <h4 className={sectionHeaderClass}><i className="bi bi-card-heading text-blue-600"></i> {t('form_section_visa_docs')}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>{t('form_visa_type')}</label>
+                    <select name="visaTypeId" value={formData.visaTypeId} onChange={handleInputChange} className={inputClass}>
+                      <option value="">{t('form_not_set')}</option>
+                      {visaTypes.map(vt => <option key={vt.id} value={vt.id}>{vt.name} ({vt.nameEn})</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelClass}>{t('form_visa_expiry')}</label>
+                    <input type="date" name="visaExpiryDate" value={formData.visaExpiryDate} onChange={handleInputChange} className={inputClass} />
+                  </div>
+                </div>
+
+                {/* 在留カード（編集時のみ表示） */}
+                {currentId && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-2 mb-3">
+                      <label className={labelClass + ' mb-0'}>{t('form_residence_card')}</label>
+                      {getVerificationBadge(employees.find(e => e.id === currentId)?.residenceCardVerificationStatus)}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* 表面 */}
+                      <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('form_residence_card_front')}</div>
+                        {employees.find(e => e.id === currentId)?.residenceCardFrontUrl ? (
+                          <div className="space-y-2">
+                            <img src={employees.find(e => e.id === currentId)?.residenceCardFrontUrl || ''} alt="Front" className="w-full h-32 object-cover rounded-lg border" />
+                            <button type="button" onClick={() => handleResidenceCardUpload('front')} disabled={isUploadingCard === 'front'} className="w-full text-xs font-bold text-blue-600 hover:bg-blue-50 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                              {isUploadingCard === 'front' ? <span className="inline-block w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mr-1"></span> : <i className="bi bi-arrow-repeat mr-1"></i>}
+                              {t('form_residence_card_replace')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => handleResidenceCardUpload('front')} disabled={isUploadingCard === 'front'} className="w-full h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors disabled:opacity-50">
+                            {isUploadingCard === 'front' ? <span className="inline-block w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span> : <><i className="bi bi-cloud-arrow-up text-xl"></i><span className="text-xs mt-1">{t('form_residence_card_upload')}</span></>}
+                          </button>
+                        )}
+                      </div>
+                      {/* 裏面 */}
+                      <div className="border border-slate-200 rounded-xl p-3 bg-slate-50">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('form_residence_card_back')}</div>
+                        {employees.find(e => e.id === currentId)?.residenceCardBackUrl ? (
+                          <div className="space-y-2">
+                            <img src={employees.find(e => e.id === currentId)?.residenceCardBackUrl || ''} alt="Back" className="w-full h-32 object-cover rounded-lg border" />
+                            <button type="button" onClick={() => handleResidenceCardUpload('back')} disabled={isUploadingCard === 'back'} className="w-full text-xs font-bold text-blue-600 hover:bg-blue-50 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                              {isUploadingCard === 'back' ? <span className="inline-block w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mr-1"></span> : <i className="bi bi-arrow-repeat mr-1"></i>}
+                              {t('form_residence_card_replace')}
+                            </button>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={() => handleResidenceCardUpload('back')} disabled={isUploadingCard === 'back'} className="w-full h-32 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors disabled:opacity-50">
+                            {isUploadingCard === 'back' ? <span className="inline-block w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span> : <><i className="bi bi-cloud-arrow-up text-xl"></i><span className="text-xs mt-1">{t('form_residence_card_upload')}</span></>}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 銀行カード（編集時のみ表示） */}
+                {currentId && (
+                  <div className="mt-4 pt-4 border-t border-slate-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <label className={labelClass + ' mb-0'}>{t('form_bank_card')}</label>
+                      <button type="button" onClick={handleBankCardUpload} disabled={bankCardAnalyzing} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                        {bankCardAnalyzing ? (
+                          <><span className="inline-block w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span> {t('form_bank_card_analyzing')}</>
+                        ) : (
+                          <><i className="bi bi-camera"></i> {t('form_bank_card_upload')}</>
+                        )}
+                      </button>
+                    </div>
+                    {employees.find(e => e.id === currentId)?.bankCardImageUrl && (
+                      <img src={employees.find(e => e.id === currentId)?.bankCardImageUrl || ''} alt="Bank Card" className="w-full max-w-sm h-32 object-cover rounded-lg border" />
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="bg-indigo-50/40 p-6 rounded-2xl border border-indigo-100 shadow-sm space-y-4">

@@ -28,6 +28,7 @@ export async function GET(
         interviewSlot: {
           include: {
             interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+            interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true } },
           },
         },
         recruitingMedia: true,
@@ -198,6 +199,7 @@ export async function PUT(
           interviewSlot: {
             include: {
               interviewer: { select: { id: true, lastNameJa: true, firstNameJa: true, email: true } },
+              interviewSlotMaster: { select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true } },
             },
           },
           recruitingMedia: true,

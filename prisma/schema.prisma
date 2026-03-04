@@ -134,6 +134,20 @@ model Employee {
   countryId      Int?          @map("country_id")
   country        Country?      @relation(fields: [countryId], references: [id])
 
+  // ★ ビザ・在留カード・銀行カード
+  visaTypeId                         Int?      @map("visa_type_id")
+  visaType                           VisaType? @relation(fields: [visaTypeId], references: [id])
+  visaExpiryDate                     DateTime? @map("visa_expiry_date") @db.Date
+
+  hasResidenceCard                   Boolean   @default(false) @map("has_residence_card")
+  residenceCardFrontUrl              String?   @map("residence_card_front_url") @db.Text
+  residenceCardBackUrl               String?   @map("residence_card_back_url") @db.Text
+  residenceCardVerificationStatus    ResidenceCardVerificationStatus? @map("residence_card_verification_status")
+  residenceCardVerificationResult    Json?     @map("residence_card_verification_result")
+  residenceCardVerifiedAt            DateTime? @map("residence_card_verified_at")
+
+  bankCardImageUrl                   String?   @map("bank_card_image_url") @db.Text
+
   // ============================
 
   // ------------------------------------------------
@@ -725,6 +739,7 @@ model VisaType {
 
   distributors FlyerDistributor[]
   applicants   Applicant[]
+  employees    Employee[]
 
   @@map("visa_types")
 }
@@ -2061,6 +2076,32 @@ enum ApplicantHiringStatus {
   REJECTED    @map("不採用")
 }
 
+// --- 面接方法 ---
+enum MeetingType {
+  GOOGLE_MEET
+  ZOOM
+}
+
+// --- 面接スロットマスタ ---
+model InterviewSlotMaster {
+  id                Int         @id @default(autoincrement())
+  name              String      @db.VarChar(100)
+  meetingType       MeetingType @default(GOOGLE_MEET) @map("meeting_type")
+  zoomUrl           String?     @map("zoom_url") @db.VarChar(500)
+  zoomMeetingNumber String?     @map("zoom_meeting_number") @db.VarChar(50)
+  zoomPassword      String?     @map("zoom_password") @db.VarChar(50)
+  isActive          Boolean     @default(true) @map("is_active")
+  sortOrder         Int         @default(100) @map("sort_order")
+  createdAt         DateTime    @default(now()) @map("created_at")
+  updatedAt         DateTime    @updatedAt @map("updated_at")
+
+  jobCategories         JobCategory[]
+  defaultInterviewSlots DefaultInterviewSlot[]
+  interviewSlots        InterviewSlot[]
+
+  @@map("interview_slot_masters")
+}
+
 // --- 応募職種マスタ ---
 model JobCategory {
   id        Int      @id @default(autoincrement())
@@ -2071,9 +2112,11 @@ model JobCategory {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  interviewSlotMasterId Int?               @map("interview_slot_master_id")
+  interviewSlotMaster   InterviewSlotMaster? @relation(fields: [interviewSlotMasterId], references: [id])
+
   applicants     Applicant[]
   interviewSlots InterviewSlot[]
-  defaultSlots   DefaultSlotJobCategory[]
 
   @@map("job_categories")
 }
@@ -2098,6 +2141,10 @@ model InterviewSlot {
   applicantId Int?       @unique @map("applicant_id")
   applicant   Applicant? @relation(fields: [applicantId], references: [id])
 
+  // 面接スロットマスタ
+  interviewSlotMasterId Int?               @map("interview_slot_master_id")
+  interviewSlotMaster   InterviewSlotMaster? @relation(fields: [interviewSlotMasterId], references: [id])
+
   // 面接担当者
   interviewerId Int?      @map("interviewer_id")
   interviewer   Employee? @relation("InterviewerSlots", fields: [interviewerId], references: [id])
@@ -2106,6 +2153,7 @@ model InterviewSlot {
   @@index([isBooked])
   @@index([jobCategoryId])
   @@index([interviewerId])
+  @@index([interviewSlotMasterId])
   @@map("interview_slots")
 }
 
@@ -2246,26 +2294,17 @@ model DefaultInterviewSlot {
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
+  // マスタ
+  interviewSlotMasterId Int @map("interview_slot_master_id")
+  interviewSlotMaster   InterviewSlotMaster @relation(fields: [interviewSlotMasterId], references: [id], onDelete: Cascade)
+
   // リレーション
   interviewer   Employee? @relation("DefaultSlotInterviewer", fields: [interviewerId], references: [id])
-  jobCategories DefaultSlotJobCategory[]
 
-  @@unique([dayOfWeek])
+  @@unique([interviewSlotMasterId, dayOfWeek])
   @@map("default_interview_slots")
 }
 
-// --- デフォルトスロット × 職種 中間テーブル ---
-model DefaultSlotJobCategory {
-  id                     Int @id @default(autoincrement())
-  defaultInterviewSlotId Int @map("default_interview_slot_id")
-  jobCategoryId          Int @map("job_category_id")
-
-  defaultInterviewSlot DefaultInterviewSlot @relation(fields: [defaultInterviewSlotId], references: [id], onDelete: Cascade)
-  jobCategory          JobCategory          @relation(fields: [jobCategoryId], references: [id], onDelete: Cascade)
-
-  @@unique([defaultInterviewSlotId, jobCategoryId])
-  @@map("default_slot_job_categories")
-}
 
 // ================================================================
 // クレーム管理 + 配布禁止物件DB

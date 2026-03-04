@@ -44,7 +44,10 @@ export async function POST(
     // 新スロットの確認
     const newSlot = await prisma.interviewSlot.findUnique({
       where: { id: Number(newSlotId) },
-      include: { interviewer: { select: { email: true } } },
+      include: {
+        interviewer: { select: { email: true } },
+        interviewSlotMaster: true,
+      },
     });
 
     if (!newSlot) {
@@ -59,10 +62,16 @@ export async function POST(
       return NextResponse.json({ error: '過去のスロットは選択できません' }, { status: 400 });
     }
 
-    // Google Meet生成
+    // ミーティングURL決定（マスタのmeetingTypeに応じて分岐）
+    const slotMaster = newSlot.interviewSlotMaster;
     let meetUrl = newSlot.meetUrl;
     let calendarEventId: string | null = null;
-    if (!meetUrl && isGoogleMeetConfigured()) {
+
+    if (slotMaster?.meetingType === 'ZOOM') {
+      // Zoom: マスタに設定された固定URLを使用、Google Calendar操作はスキップ
+      meetUrl = slotMaster.zoomUrl || null;
+    } else if (!meetUrl && isGoogleMeetConfigured()) {
+      // Google Meet: 既存ロジック
       const jobName = applicant.jobCategory?.nameJa || '面接';
       const meetTitle = `【ティラミス】${applicant.name}様 ${jobName} 面接`;
       const meetDescription = `応募者: ${applicant.name}\nメール: ${applicant.email}\n職種: ${jobName}`;
@@ -128,8 +137,8 @@ export async function POST(
       });
     });
 
-    // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行）
-    if (oldCalendarEventId) {
+    // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行、Zoom時はスキップ）
+    if (oldCalendarEventId && slotMaster?.meetingType !== 'ZOOM') {
       deleteGoogleCalendarEvent(oldCalendarEventId).catch(() => {});
     }
 

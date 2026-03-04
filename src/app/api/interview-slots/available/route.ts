@@ -39,6 +39,9 @@ export async function GET(request: Request) {
         jobCategory: {
           select: { id: true, nameJa: true, nameEn: true },
         },
+        interviewSlotMaster: {
+          select: { id: true, name: true, meetingType: true },
+        },
       },
     });
 

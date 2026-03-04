@@ -16,6 +16,13 @@ type EmployeeOption = {
   email: string;
 };
 
+type InterviewSlotMasterOption = {
+  id: number;
+  name: string;
+  meetingType: 'GOOGLE_MEET' | 'ZOOM';
+  isActive: boolean;
+};
+
 type InterviewSlot = {
   id: number;
   startTime: string;
@@ -24,6 +31,7 @@ type InterviewSlot = {
   jobCategoryId: number | null;
   jobCategory: JobCategory | null;
   interviewer: EmployeeOption | null;
+  interviewSlotMaster?: InterviewSlotMasterOption | null;
   applicant: {
     id: number;
     name: string;
@@ -36,6 +44,7 @@ export default function InterviewSlotManager() {
   const [slots, setSlots] = useState<InterviewSlot[]>([]);
   const [jobCategories, setJobCategories] = useState<JobCategory[]>([]);
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [masters, setMasters] = useState<InterviewSlotMasterOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,6 +55,7 @@ export default function InterviewSlotManager() {
   const [formEndTime, setFormEndTime] = useState('11:00');
   const [formJobCategoryId, setFormJobCategoryId] = useState<string>('');
   const [formInterviewerId, setFormInterviewerId] = useState<string>('');
+  const [formMasterId, setFormMasterId] = useState<string>('');
 
   // フィルター
   const [filterMonth, setFilterMonth] = useState(() => {
@@ -90,9 +100,22 @@ export default function InterviewSlotManager() {
     }
   };
 
+  const fetchMasters = async () => {
+    try {
+      const res = await fetch('/api/interview-slot-masters');
+      if (res.ok) {
+        const data = await res.json();
+        setMasters((data || []).filter((m: InterviewSlotMasterOption) => m.isActive));
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   useEffect(() => {
     fetchJobCategories();
     fetchEmployees();
+    fetchMasters();
   }, []);
 
   useEffect(() => {
@@ -120,6 +143,7 @@ export default function InterviewSlotManager() {
           endTime: endTime.toISOString(),
           jobCategoryId: formJobCategoryId ? Number(formJobCategoryId) : null,
           interviewerId: formInterviewerId ? Number(formInterviewerId) : null,
+          interviewSlotMasterId: formMasterId ? Number(formMasterId) : null,
         }),
       });
 
@@ -131,6 +155,7 @@ export default function InterviewSlotManager() {
         setFormEndTime('11:00');
         setFormJobCategoryId('');
         setFormInterviewerId('');
+        setFormMasterId('');
         fetchSlots();
       } else {
         const err = await res.json();
@@ -230,6 +255,20 @@ export default function InterviewSlotManager() {
                   </div>
                   <div className="text-sm text-slate-600">
                     {formatTime(slot.startTime)} - {formatTime(slot.endTime)}
+                  </div>
+                  {/* マスタ名 */}
+                  <div className="w-28">
+                    {slot.interviewSlotMaster ? (
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                        slot.interviewSlotMaster.meetingType === 'ZOOM'
+                          ? 'bg-violet-100 text-violet-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {slot.interviewSlotMaster.name}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">-</span>
+                    )}
                   </div>
                   <div className="flex-1">
                     {slot.jobCategory ? (
@@ -336,6 +375,28 @@ export default function InterviewSlotManager() {
                 </div>
               </div>
 
+              {/* マスタ選択 */}
+              <div>
+                <label className="block text-sm font-bold text-slate-700 mb-1">
+                  面接マスタ
+                </label>
+                <select
+                  value={formMasterId}
+                  onChange={(e) => setFormMasterId(e.target.value)}
+                  className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                >
+                  <option value="">未設定</option>
+                  {masters.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.meetingType === 'ZOOM' ? 'Zoom' : 'Google Meet'})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-slate-500 mt-1">
+                  マスタを選択すると、面接方法（Google Meet / Zoom）が自動的に設定されます
+                </p>
+              </div>
+
               <div>
                 <label className="block text-sm font-bold text-slate-700 mb-1">
                   対象職種
@@ -374,7 +435,7 @@ export default function InterviewSlotManager() {
                   ))}
                 </select>
                 <p className="text-xs text-slate-500 mt-1">
-                  担当者を設定すると、Google Meet作成時にカレンダー招待が送信されます
+                  担当者を設定すると、面接作成時にカレンダー招待が送信されます
                 </p>
               </div>
 

@@ -58,6 +58,9 @@ export async function GET(request: Request) {
               interviewer: {
                 select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
               },
+              interviewSlotMaster: {
+                select: { id: true, name: true, meetingType: true, zoomMeetingNumber: true, zoomPassword: true },
+              },
             },
           },
           recruitingMedia: { select: { id: true, nameJa: true, nameEn: true, code: true } },

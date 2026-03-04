@@ -18,6 +18,8 @@ export async function GET(
         department: true,
         branch: true,
         roles: { include: { role: true } },
+        country: true,
+        visaType: true,
         manager: { select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true } },
         subordinates: {
           where: { isActive: true },
@@ -73,8 +75,10 @@ export async function PUT(
           branchId: body.branchId ? parseInt(body.branchId) : null, 
           countryId: body.countryId ? parseInt(body.countryId) : null,
           managerId: body.managerId ? parseInt(body.managerId) : null, // ★ 追加: 上司IDの保存
-          rank: body.rank || 'ASSOCIATE', 
-          jobTitle: body.jobTitle || null, 
+          visaTypeId: body.visaTypeId ? parseInt(body.visaTypeId) : null,
+          visaExpiryDate: body.visaExpiryDate ? new Date(body.visaExpiryDate) : null,
+          rank: body.rank || 'ASSOCIATE',
+          jobTitle: body.jobTitle || null,
           isActive: body.isActive,
         },
       });

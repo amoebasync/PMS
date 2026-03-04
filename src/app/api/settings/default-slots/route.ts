@@ -15,24 +15,28 @@ async function checkAuth() {
   return !!emp;
 }
 
-// GET /api/settings/default-slots
-// デフォルトスロット設定一覧を取得（職種情報含む）
-export async function GET() {
+// GET /api/settings/default-slots?masterId=X
+// デフォルトスロット設定一覧を取得（マスタIDでフィルタ可能）
+export async function GET(request: Request) {
   if (!(await checkAuth())) {
     return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
   }
 
   try {
+    const { searchParams } = new URL(request.url);
+    const masterIdParam = searchParams.get('masterId');
+
+    const where: any = {};
+    if (masterIdParam) {
+      where.interviewSlotMasterId = Number(masterIdParam);
+    }
+
     const slots = await prisma.defaultInterviewSlot.findMany({
+      where,
       orderBy: { dayOfWeek: 'asc' },
       include: {
         interviewer: {
           select: { id: true, lastNameJa: true, firstNameJa: true, email: true },
-        },
-        jobCategories: {
-          include: {
-            jobCategory: { select: { id: true, nameJa: true, nameEn: true } },
-          },
         },
       },
     });
@@ -51,8 +55,7 @@ export async function GET() {
           isEnabled: existing.isEnabled,
           interviewerId: existing.interviewerId,
           interviewer: existing.interviewer,
-          jobCategoryIds: existing.jobCategories.map((jc) => jc.jobCategoryId),
-          jobCategories: existing.jobCategories.map((jc) => jc.jobCategory),
+          interviewSlotMasterId: existing.interviewSlotMasterId,
         });
       } else {
         result.push({
@@ -64,8 +67,7 @@ export async function GET() {
           isEnabled: false,
           interviewerId: null,
           interviewer: null,
-          jobCategoryIds: [],
-          jobCategories: [],
+          interviewSlotMasterId: masterIdParam ? Number(masterIdParam) : null,
         });
       }
     }
@@ -78,7 +80,7 @@ export async function GET() {
 }
 
 // PUT /api/settings/default-slots
-// デフォルトスロット設定を更新（upsert）— 個別曜日
+// デフォルトスロット設定を更新（upsert）— 個別曜日 + マスタID
 export async function PUT(request: Request) {
   if (!(await checkAuth())) {
     return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
@@ -86,49 +88,47 @@ export async function PUT(request: Request) {
 
   try {
     const body = await request.json();
-    const { dayOfWeek, startTime, endTime, intervalMinutes, isEnabled, jobCategoryIds, interviewerId } = body;
+    const { dayOfWeek, startTime, endTime, intervalMinutes, isEnabled, interviewerId, masterId } = body;
 
     if (dayOfWeek === undefined || dayOfWeek < 0 || dayOfWeek > 6) {
       return NextResponse.json({ error: '曜日が不正です' }, { status: 400 });
     }
 
+    if (!masterId) {
+      return NextResponse.json({ error: 'マスタIDが必要です' }, { status: 400 });
+    }
+
     const slot = await prisma.$transaction(async (tx) => {
-      // upsert: 存在すれば更新、なければ作成
-      const upserted = await tx.defaultInterviewSlot.upsert({
-        where: { dayOfWeek },
-        update: {
-          startTime: startTime || '09:00',
-          endTime: endTime || '17:00',
-          intervalMinutes: intervalMinutes || 60,
-          isEnabled: isEnabled ?? false,
-          interviewerId: interviewerId ? Number(interviewerId) : null,
-        },
-        create: {
+      // findFirst + create/update pattern (compound unique: interviewSlotMasterId_dayOfWeek)
+      const existing = await tx.defaultInterviewSlot.findFirst({
+        where: {
+          interviewSlotMasterId: Number(masterId),
           dayOfWeek,
-          startTime: startTime || '09:00',
-          endTime: endTime || '17:00',
-          intervalMinutes: intervalMinutes || 60,
-          isEnabled: isEnabled ?? false,
-          interviewerId: interviewerId ? Number(interviewerId) : null,
         },
       });
 
-      // 職種の関連付けを差し替え
-      if (Array.isArray(jobCategoryIds)) {
-        await tx.defaultSlotJobCategory.deleteMany({
-          where: { defaultInterviewSlotId: upserted.id },
-        });
-        if (jobCategoryIds.length > 0) {
-          await tx.defaultSlotJobCategory.createMany({
-            data: jobCategoryIds.map((jcId: number) => ({
-              defaultInterviewSlotId: upserted.id,
-              jobCategoryId: jcId,
-            })),
-          });
-        }
-      }
+      const data = {
+        startTime: startTime || '09:00',
+        endTime: endTime || '17:00',
+        intervalMinutes: intervalMinutes || 60,
+        isEnabled: isEnabled ?? false,
+        interviewerId: interviewerId ? Number(interviewerId) : null,
+      };
 
-      return upserted;
+      if (existing) {
+        return tx.defaultInterviewSlot.update({
+          where: { id: existing.id },
+          data,
+        });
+      } else {
+        return tx.defaultInterviewSlot.create({
+          data: {
+            ...data,
+            dayOfWeek,
+            interviewSlotMasterId: Number(masterId),
+          },
+        });
+      }
     });
 
     return NextResponse.json(slot);
@@ -147,59 +147,60 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { slots, effectiveFrom } = body as {
+    const { slots, effectiveFrom, masterId } = body as {
       slots: Array<{
         dayOfWeek: number;
         startTime: string;
         endTime: string;
         intervalMinutes: number;
         isEnabled: boolean;
-        jobCategoryIds: number[];
         interviewerId: number | null;
       }>;
       effectiveFrom?: string; // YYYY-MM-DD
+      masterId: number;
     };
 
     if (!Array.isArray(slots)) {
       return NextResponse.json({ error: '不正なリクエストです' }, { status: 400 });
     }
 
-    // ① マスタ設定を一括 upsert
+    if (!masterId) {
+      return NextResponse.json({ error: 'マスタIDが必要です' }, { status: 400 });
+    }
+
+    // ① マスタ設定を一括 upsert (compound unique: interviewSlotMasterId_dayOfWeek)
     const results = await prisma.$transaction(async (tx) => {
       const upserted = [];
       for (const s of slots) {
-        const slot = await tx.defaultInterviewSlot.upsert({
-          where: { dayOfWeek: s.dayOfWeek },
-          update: {
-            startTime: s.startTime || '09:00',
-            endTime: s.endTime || '17:00',
-            intervalMinutes: s.intervalMinutes || 60,
-            isEnabled: s.isEnabled ?? false,
-            interviewerId: s.interviewerId ? Number(s.interviewerId) : null,
-          },
-          create: {
+        const existing = await tx.defaultInterviewSlot.findFirst({
+          where: {
+            interviewSlotMasterId: Number(masterId),
             dayOfWeek: s.dayOfWeek,
-            startTime: s.startTime || '09:00',
-            endTime: s.endTime || '17:00',
-            intervalMinutes: s.intervalMinutes || 60,
-            isEnabled: s.isEnabled ?? false,
-            interviewerId: s.interviewerId ? Number(s.interviewerId) : null,
           },
         });
 
-        // 職種の関連付けを差し替え
-        if (Array.isArray(s.jobCategoryIds)) {
-          await tx.defaultSlotJobCategory.deleteMany({
-            where: { defaultInterviewSlotId: slot.id },
+        const data = {
+          startTime: s.startTime || '09:00',
+          endTime: s.endTime || '17:00',
+          intervalMinutes: s.intervalMinutes || 60,
+          isEnabled: s.isEnabled ?? false,
+          interviewerId: s.interviewerId ? Number(s.interviewerId) : null,
+        };
+
+        let slot;
+        if (existing) {
+          slot = await tx.defaultInterviewSlot.update({
+            where: { id: existing.id },
+            data,
           });
-          if (s.jobCategoryIds.length > 0) {
-            await tx.defaultSlotJobCategory.createMany({
-              data: s.jobCategoryIds.map((jcId: number) => ({
-                defaultInterviewSlotId: slot.id,
-                jobCategoryId: jcId,
-              })),
-            });
-          }
+        } else {
+          slot = await tx.defaultInterviewSlot.create({
+            data: {
+              ...data,
+              dayOfWeek: s.dayOfWeek,
+              interviewSlotMasterId: Number(masterId),
+            },
+          });
         }
 
         upserted.push(slot);
@@ -222,10 +223,17 @@ export async function POST(request: Request) {
         return new Date(`${yyyy}-${mm}-${dd}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`);
       };
 
-      // 保存後のマスタ設定を取得
+      // 保存後のこのマスタのデフォルト設定を取得
       const masterSlots = await prisma.defaultInterviewSlot.findMany({
-        include: { jobCategories: { select: { jobCategoryId: true } } },
+        where: { interviewSlotMasterId: Number(masterId) },
       });
+
+      // このマスタに紐づく職種IDを取得（JobCategory.interviewSlotMasterId）
+      const jobCategories = await prisma.jobCategory.findMany({
+        where: { interviewSlotMasterId: Number(masterId) },
+        select: { id: true },
+      });
+      const jcIds = jobCategories.map((jc) => jc.id);
 
       let totalDeleted = 0;
       let totalCreated = 0;
@@ -243,10 +251,11 @@ export async function POST(request: Request) {
         const master = masterSlots.find((s) => s.dayOfWeek === dayOfWeek && s.isEnabled);
 
         if (!master) {
-          // 無効な曜日: 未予約スロットを全削除
+          // 無効な曜日: このマスタの未予約スロットを全削除
           const deleted = await prisma.interviewSlot.deleteMany({
             where: {
               isBooked: false,
+              interviewSlotMasterId: Number(masterId),
               startTime: { gte: dayStart, lte: dayEnd },
             },
           });
@@ -256,7 +265,6 @@ export async function POST(request: Request) {
           const [startH, startM] = master.startTime.split(':').map(Number);
           const [endH, endM] = master.endTime.split(':').map(Number);
           const interval = master.intervalMinutes;
-          const jcIds = master.jobCategories.map((jc) => jc.jobCategoryId);
           const categoryList: (number | null)[] = jcIds.length > 0 ? jcIds : [null];
 
           type ValidSlot = { startTime: Date; endTime: Date; jobCategoryId: number | null };
@@ -273,10 +281,11 @@ export async function POST(request: Request) {
             currentMinutes += interval;
           }
 
-          // この日の既存の未予約スロットを取得
+          // この日のこのマスタの既存の未予約スロットを取得
           const existingUnbooked = await prisma.interviewSlot.findMany({
             where: {
               isBooked: false,
+              interviewSlotMasterId: Number(masterId),
               startTime: { gte: dayStart, lte: dayEnd },
             },
           });
@@ -310,6 +319,7 @@ export async function POST(request: Request) {
                   endTime: vs.endTime,
                   jobCategoryId: vs.jobCategoryId,
                   interviewerId: master.interviewerId,
+                  interviewSlotMasterId: Number(masterId),
                 },
               });
               totalCreated++;

@@ -69,5 +69,20 @@
   "crop_instruction": "Drag to move, use slider to zoom in/out",
   "btn_apply_crop": "Apply This Crop",
   "error_communication_short": "Communication error",
-  "label_rank_modal": "Rank"
+  "label_rank_modal": "Rank",
+  "section_residence_card": "Residence Card",
+  "residence_card_front": "Residence Card (Front)",
+  "residence_card_back": "Residence Card (Back)",
+  "upload_card": "Upload Image",
+  "replace_card": "Replace Image",
+  "verification_status": "Verification Status",
+  "verification_verified": "Verified",
+  "verification_mismatch": "Mismatch",
+  "verification_pending": "Verifying",
+  "verification_error": "Verification Error",
+  "verification_not_verified": "Not Verified",
+  "bank_card_scan": "Scan Card for Auto-fill",
+  "bank_card_analyzing": "AI analyzing...",
+  "bank_card_scan_success": "Account info auto-filled. Please verify the details.",
+  "bank_card_scan_error": "Failed to read card. Please enter information manually."
 }

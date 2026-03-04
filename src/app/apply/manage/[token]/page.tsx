@@ -17,7 +17,9 @@ const translations = {
     date: '面接日',
     time: '面接時間',
     meetUrl: 'Google Meet',
+    meetUrlZoom: 'Zoom',
     joinMeet: 'Google Meetに参加する',
+    joinZoom: 'Zoomに参加する',
     changeTitle: '面接時間を変更する',
     changeDesc: '別の日時に変更できます',
     changeBtn: '日時を変更する',
@@ -57,7 +59,9 @@ const translations = {
     date: 'Date',
     time: 'Time',
     meetUrl: 'Google Meet',
+    meetUrlZoom: 'Zoom',
     joinMeet: 'Join Google Meet',
+    joinZoom: 'Join Zoom',
     changeTitle: 'Reschedule Interview',
     changeDesc: 'Change to a different date and time',
     changeBtn: 'Reschedule',
@@ -342,17 +346,20 @@ export default function ManageInterviewPage() {
                       <td className="py-1.5 text-slate-500">{t.newTime}</td>
                       <td className="py-1.5 font-semibold text-slate-800">{newInterview.time}</td>
                     </tr>
-                    {newInterview.meetUrl && (
-                      <tr>
-                        <td className="py-1.5 text-slate-500">{t.meetUrl}</td>
-                        <td className="py-1.5">
-                          <a href={newInterview.meetUrl} target="_blank" rel="noopener noreferrer"
-                            className="text-indigo-600 font-semibold hover:underline">
-                            {t.joinMeet}
-                          </a>
-                        </td>
-                      </tr>
-                    )}
+                    {newInterview.meetUrl && (() => {
+                      const isZoom = newInterview.meetUrl!.toLowerCase().includes('zoom');
+                      return (
+                        <tr>
+                          <td className="py-1.5 text-slate-500">{isZoom ? t.meetUrlZoom : t.meetUrl}</td>
+                          <td className="py-1.5">
+                            <a href={newInterview.meetUrl!} target="_blank" rel="noopener noreferrer"
+                              className={`font-semibold hover:underline ${isZoom ? 'text-violet-600' : 'text-indigo-600'}`}>
+                              {isZoom ? t.joinZoom : t.joinMeet}
+                            </a>
+                          </td>
+                        </tr>
+                      );
+                    })()}
                   </tbody>
                 </table>
               </div>
@@ -400,15 +407,18 @@ export default function ManageInterviewPage() {
                 <span className="text-sm text-slate-500">{t.time}</span>
                 <span className="text-sm font-semibold text-slate-800">{interview.time}</span>
               </div>
-              {interview.meetUrl && (
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-slate-500">{t.meetUrl}</span>
-                  <a href={interview.meetUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-sm text-indigo-600 font-semibold hover:underline">
-                    {t.joinMeet}
-                  </a>
-                </div>
-              )}
+              {interview.meetUrl && (() => {
+                const isZoom = interview.meetUrl!.toLowerCase().includes('zoom');
+                return (
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-slate-500">{isZoom ? t.meetUrlZoom : t.meetUrl}</span>
+                    <a href={interview.meetUrl!} target="_blank" rel="noopener noreferrer"
+                      className={`text-sm font-semibold hover:underline ${isZoom ? 'text-violet-600' : 'text-indigo-600'}`}>
+                      {isZoom ? t.joinZoom : t.joinMeet}
+                    </a>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* 変更不可メッセージ */}

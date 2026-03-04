@@ -77,7 +77,7 @@ export default function DistributorPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
   const [filterBranchId, setFilterBranchId] = useState('');
-  const [sortKey, setSortKey] = useState<'id' | 'branch' | 'rank' | ''>('');
+  const [sortKey, setSortKey] = useState<'id' | 'code' | 'branch' | 'rank' | ''>('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -187,6 +187,8 @@ export default function DistributorPage() {
         let cmp = 0;
         if (sortKey === 'id') {
           cmp = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        } else if (sortKey === 'code') {
+          cmp = (a.staffId || '').localeCompare(b.staffId || '', 'ja');
         } else if (sortKey === 'branch') {
           const aName = a.branch?.nameJa || '';
           const bName = b.branch?.nameJa || '';
@@ -202,7 +204,7 @@ export default function DistributorPage() {
     return list;
   }, [distributors, searchTerm, filterStatus, filterBranchId, sortKey, sortDir]);
 
-  const handleSort = (key: 'id' | 'branch' | 'rank') => {
+  const handleSort = (key: 'id' | 'code' | 'branch' | 'rank') => {
     if (sortKey === key) {
       setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -358,7 +360,7 @@ export default function DistributorPage() {
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 text-xs uppercase">
             <tr>
-              <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('id')}>{t('th_id_name')}<SortIcon col="id" /></th>
+              <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('code')}>{t('th_id_name')}<SortIcon col="code" /></th>
               <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('branch')}>{t('th_branch')}<SortIcon col="branch" /></th>
               <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('rank')}>{t('th_rank')}<SortIcon col="rank" /></th>
               <th className="px-5 py-3 text-center">{t('th_score')}</th>

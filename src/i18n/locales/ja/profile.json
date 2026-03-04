@@ -69,5 +69,20 @@
   "crop_instruction": "ドラッグして移動、スライダーで拡大・縮小できます",
   "btn_apply_crop": "この範囲で適用する",
   "error_communication_short": "通信エラー",
-  "label_rank_modal": "階級"
+  "label_rank_modal": "階級",
+  "section_residence_card": "在留カード",
+  "residence_card_front": "在留カード（表面）",
+  "residence_card_back": "在留カード（裏面）",
+  "upload_card": "画像をアップロード",
+  "replace_card": "画像を変更",
+  "verification_status": "検証ステータス",
+  "verification_verified": "検証済み",
+  "verification_mismatch": "不一致",
+  "verification_pending": "検証中",
+  "verification_error": "検証エラー",
+  "verification_not_verified": "未検証",
+  "bank_card_scan": "カードを撮影して自動入力",
+  "bank_card_analyzing": "AI解析中...",
+  "bank_card_scan_success": "口座情報を自動入力しました。内容を確認してください。",
+  "bank_card_scan_error": "カードの読み取りに失敗しました。手動で入力してください。"
 }

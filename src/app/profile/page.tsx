@@ -97,6 +97,10 @@ export default function ProfilePage() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 在留カード・銀行カード
+  const [isUploadingCard, setIsUploadingCard] = useState<string | null>(null);
+  const [bankCardAnalyzing, setBankCardAnalyzing] = useState(false);
+
   const [formData, setFormData] = useState({
     lastNameJa: '', firstNameJa: '', lastNameEn: '', firstNameEn: '',
     email: '', phone: '', avatarUrl: '',
@@ -162,6 +166,95 @@ export default function ProfilePage() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // --- 在留カードアップロード ---
+  const handleResidenceCardUpload = async (side: 'front' | 'back') => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setIsUploadingCard(side);
+      try {
+        const presignRes = await fetch(`/api/profile/residence-card?side=${side}`);
+        if (!presignRes.ok) throw new Error('Failed to get presigned URL');
+        const { uploadUrl, s3Key } = await presignRes.json();
+        await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/jpeg' } });
+        const saveRes = await fetch('/api/profile/residence-card', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ s3Key, side }),
+        });
+        if (!saveRes.ok) throw new Error('Failed to save');
+        const data = await saveRes.json();
+        setProfile((prev: any) => prev ? {
+          ...prev,
+          ...(side === 'front' ? { residenceCardFrontUrl: data.url, residenceCardVerificationStatus: 'PENDING' } : { residenceCardBackUrl: data.url }),
+          hasResidenceCard: true,
+        } : prev);
+        showToast(t('upload_card') + ' OK', 'success');
+      } catch {
+        showToast('Upload failed', 'error');
+      }
+      setIsUploadingCard(null);
+    };
+    input.click();
+  };
+
+  // --- 銀行カードアップロード ---
+  const handleBankCardUpload = async () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setBankCardAnalyzing(true);
+      try {
+        const presignRes = await fetch('/api/profile/bank-card');
+        if (!presignRes.ok) throw new Error('Failed to get presigned URL');
+        const { uploadUrl, s3Key } = await presignRes.json();
+        await fetch(uploadUrl, { method: 'PUT', body: file, headers: { 'Content-Type': 'image/jpeg' } });
+        const analyzeRes = await fetch('/api/profile/bank-card', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ s3Key }),
+        });
+        const result = await analyzeRes.json();
+        if (result.success && result.data) {
+          showToast(t('bank_card_scan_success'), 'success');
+          const matchedBank = banks.find((b: any) =>
+            b.name === result.data.bankName || b.nameEn === result.data.bankName
+          );
+          setFormData(prev => ({
+            ...prev,
+            ...(matchedBank ? { bankId: matchedBank.id.toString() } : {}),
+            branchName: result.data.branchName || prev.branchName,
+            branchCode: result.data.branchCode || prev.branchCode,
+            accountType: result.data.accountType === '当座' ? 'CURRENT' : result.data.accountType === '貯蓄' ? 'SAVINGS' : 'ORDINARY',
+            accountNumber: result.data.accountNumber || prev.accountNumber,
+            accountName: result.data.accountHolder || prev.accountName,
+            accountNameKana: result.data.accountHolderKana || prev.accountNameKana,
+          }));
+        } else {
+          showToast(result.error || t('bank_card_scan_error'), 'error');
+        }
+      } catch {
+        showToast('Upload failed', 'error');
+      }
+      setBankCardAnalyzing(false);
+    };
+    input.click();
+  };
+
+  const getVerificationBadge = (status: string | null | undefined) => {
+    switch (status) {
+      case 'VERIFIED': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><i className="bi bi-check-circle-fill"></i> {t('verification_verified')}</span>;
+      case 'MISMATCH': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700"><i className="bi bi-x-circle-fill"></i> {t('verification_mismatch')}</span>;
+      case 'PENDING': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-700"><i className="bi bi-hourglass-split"></i> {t('verification_pending')}</span>;
+      case 'ERROR': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600"><i className="bi bi-exclamation-triangle-fill"></i> {t('verification_error')}</span>;
+      default: return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">{t('verification_not_verified')}</span>;
+    }
+  };
 
   // 上司検索オートコンプリート
   const handleManagerSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -591,8 +684,57 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* --- 在留カードセクション --- */}
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
+              <i className="bi bi-card-heading text-slate-400"></i> {t('section_residence_card')}
+              {getVerificationBadge(profile?.residenceCardVerificationStatus)}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-5 rounded-xl border border-slate-200">
+              {/* 表面 */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('residence_card_front')}</div>
+                {profile?.residenceCardFrontUrl ? (
+                  <div className="space-y-2">
+                    <img src={profile.residenceCardFrontUrl} alt="Front" className="w-full h-40 object-cover rounded-lg border" />
+                    <button type="button" onClick={() => handleResidenceCardUpload('front')} disabled={isUploadingCard === 'front'} className="w-full text-xs font-bold text-blue-600 hover:bg-blue-50 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                      {isUploadingCard === 'front' ? <span className="inline-block w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mr-1"></span> : <i className="bi bi-arrow-repeat mr-1"></i>}
+                      {t('replace_card')}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => handleResidenceCardUpload('front')} disabled={isUploadingCard === 'front'} className="w-full h-40 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors disabled:opacity-50">
+                    {isUploadingCard === 'front' ? <span className="inline-block w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span> : <><i className="bi bi-cloud-arrow-up text-xl"></i><span className="text-xs mt-1">{t('upload_card')}</span></>}
+                  </button>
+                )}
+              </div>
+              {/* 裏面 */}
+              <div className="border border-slate-200 rounded-xl p-3 bg-white">
+                <div className="text-[10px] font-bold text-slate-500 uppercase mb-2">{t('residence_card_back')}</div>
+                {profile?.residenceCardBackUrl ? (
+                  <div className="space-y-2">
+                    <img src={profile.residenceCardBackUrl} alt="Back" className="w-full h-40 object-cover rounded-lg border" />
+                    <button type="button" onClick={() => handleResidenceCardUpload('back')} disabled={isUploadingCard === 'back'} className="w-full text-xs font-bold text-blue-600 hover:bg-blue-50 py-1.5 rounded-lg transition-colors disabled:opacity-50">
+                      {isUploadingCard === 'back' ? <span className="inline-block w-3 h-3 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin mr-1"></span> : <i className="bi bi-arrow-repeat mr-1"></i>}
+                      {t('replace_card')}
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => handleResidenceCardUpload('back')} disabled={isUploadingCard === 'back'} className="w-full h-40 border-2 border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-colors disabled:opacity-50">
+                    {isUploadingCard === 'back' ? <span className="inline-block w-5 h-5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin"></span> : <><i className="bi bi-cloud-arrow-up text-xl"></i><span className="text-xs mt-1">{t('upload_card')}</span></>}
+                  </button>
+                )}
+              </div>
+            </div>
+
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
               <i className="bi bi-bank text-slate-400"></i> {t('section_bank_account')}
+              <button type="button" onClick={handleBankCardUpload} disabled={bankCardAnalyzing} className="ml-auto text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                {bankCardAnalyzing ? (
+                  <><span className="inline-block w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span> {t('bank_card_analyzing')}</>
+                ) : (
+                  <><i className="bi bi-camera"></i> {t('bank_card_scan')}</>
+                )}
+              </button>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
               <div className="md:col-span-2">

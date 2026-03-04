@@ -16,6 +16,8 @@ export async function GET(request: Request) {
         branch: true,
         department: true,
         roles: { include: { role: true } },
+        country: true,
+        visaType: true,
         financial: true,
         manager: { select: { id: true, lastNameJa: true, firstNameJa: true, jobTitle: true, avatarUrl: true } },
         subordinates: {

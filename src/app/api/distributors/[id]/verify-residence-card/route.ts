@@ -42,7 +42,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     });
 
     try {
-      const result = await verifyResidenceCard(distributorId);
+      const result = await verifyResidenceCard('FlyerDistributor', distributorId);
 
       const updated = await prisma.flyerDistributor.update({
         where: { id: distributorId },

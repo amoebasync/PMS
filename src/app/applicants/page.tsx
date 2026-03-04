@@ -78,6 +78,13 @@ type Applicant = {
     meetUrl: string | null;
     isBooked: boolean;
     interviewer: { id: number; lastNameJa: string; firstNameJa: string; email: string } | null;
+    interviewSlotMaster?: {
+      id: number;
+      name: string;
+      meetingType: 'GOOGLE_MEET' | 'ZOOM';
+      zoomMeetingNumber?: string | null;
+      zoomPassword?: string | null;
+    } | null;
   } | null;
   trainingSlot: {
     id: number;
@@ -2795,17 +2802,31 @@ export default function ApplicantsPage() {
                                   minute: '2-digit',
                                 })}
                               </p>
-                              {selectedApplicant.interviewSlot.meetUrl && (
-                                <a
-                                  href={selectedApplicant.interviewSlot.meetUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-blue-500 hover:text-blue-700 inline-flex items-center gap-1 text-xs font-medium hover:underline transition-colors"
-                                >
-                                  <i className="bi bi-camera-video text-xs"></i>
-                                  Meet
-                                </a>
-                              )}
+                              {selectedApplicant.interviewSlot.meetUrl && (() => {
+                                const slotMaster = selectedApplicant.interviewSlot!.interviewSlotMaster;
+                                const isZoom = slotMaster?.meetingType === 'ZOOM';
+                                return (
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <a
+                                      href={selectedApplicant.interviewSlot!.meetUrl!}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`inline-flex items-center gap-1 text-xs font-medium hover:underline transition-colors ${
+                                        isZoom ? 'text-violet-500 hover:text-violet-700' : 'text-blue-500 hover:text-blue-700'
+                                      }`}
+                                    >
+                                      <i className="bi bi-camera-video text-xs"></i>
+                                      {isZoom ? 'Zoom' : 'Meet'}
+                                    </a>
+                                    {isZoom && slotMaster?.zoomMeetingNumber && (
+                                      <span className="text-[10px] text-slate-400">
+                                        ID: {slotMaster.zoomMeetingNumber}
+                                        {slotMaster.zoomPassword && ` / PW: ${slotMaster.zoomPassword}`}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </div>
                           ) : (
                             <p className="text-sm text-slate-400">{t('interview_unset')}</p>

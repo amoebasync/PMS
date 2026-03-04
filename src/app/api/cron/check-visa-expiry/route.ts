@@ -80,9 +80,71 @@ export async function GET(request: Request) {
       created++;
     }
 
+    // === 社員のビザ期限チェック ===
+    const employees = await prisma.employee.findMany({
+      where: {
+        isActive: true,
+        visaExpiryDate: {
+          lte: thirtyDaysLater,
+        },
+      },
+      select: {
+        id: true,
+        lastNameJa: true,
+        firstNameJa: true,
+        employeeCode: true,
+        visaExpiryDate: true,
+      },
+    });
+
+    // 「社員」カテゴリの取得（なければ「配布員」カテゴリをフォールバック）
+    const employeeCategory = await prisma.alertCategory.findFirst({
+      where: { name: '社員' },
+    }) || category;
+
+    if (employeeCategory) {
+      for (const emp of employees) {
+        if (!emp.visaExpiryDate) continue;
+
+        const daysRemaining = Math.ceil(
+          (emp.visaExpiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        let severity: 'CRITICAL' | 'WARNING' | 'INFO';
+        let titlePrefix: string;
+
+        if (daysRemaining <= 0) {
+          severity = 'CRITICAL';
+          titlePrefix = 'ビザ期限超過';
+        } else if (daysRemaining <= 7) {
+          severity = 'CRITICAL';
+          titlePrefix = 'ビザ期限7日以内';
+        } else if (daysRemaining <= 14) {
+          severity = 'WARNING';
+          titlePrefix = 'ビザ期限14日以内';
+        } else {
+          severity = 'INFO';
+          titlePrefix = 'ビザ期限30日以内';
+        }
+
+        const expiryStr = emp.visaExpiryDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+        const empLabel = emp.employeeCode ? `[${emp.employeeCode}]` : '';
+
+        await createAlert({
+          categoryId: employeeCategory.id,
+          severity,
+          title: `${titlePrefix}: ${empLabel}${emp.lastNameJa} ${emp.firstNameJa}`,
+          message: `ビザ有効期限: ${expiryStr}（残り${daysRemaining <= 0 ? '超過' : daysRemaining + '日'}）`,
+          entityType: 'Employee',
+          entityId: emp.id,
+        });
+        created++;
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      checked: distributors.length,
+      checked: distributors.length + employees.length,
       alertsCreated: created,
       timestamp: new Date().toISOString(),
     });

@@ -319,5 +319,9 @@
   "jobcat_create_failed": "Failed to create job category",
 
   "error_occurred": "An error occurred",
-  "update_failed": "Failed to update"
+  "update_failed": "Failed to update",
+  "meeting_type_google_meet": "Google Meet Interview",
+  "meeting_type_zoom": "Zoom Interview",
+  "zoom_meeting_number": "Meeting Number",
+  "zoom_password": "Password"
 }

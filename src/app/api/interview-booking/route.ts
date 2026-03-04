@@ -130,6 +130,7 @@ export async function POST(request: Request) {
       where: { id: Number(interviewSlotId) },
       include: {
         interviewer: { select: { lastNameJa: true, firstNameJa: true, email: true } },
+        interviewSlotMaster: true,
       },
     });
 
@@ -146,27 +147,39 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '開始まで4時間を切っているスロットは予約できません' }, { status: 400 });
     }
 
-    // Google Meet 作成
+    // ミーティングURL決定（マスタのmeetingTypeに応じて分岐）
     const lang = applicant.language || 'ja';
     const jobName = lang === 'en'
       ? (applicant.jobCategory?.nameEn || applicant.jobCategory?.nameJa || '')
       : (applicant.jobCategory?.nameJa || '');
 
-    const meetTitle = lang === 'en'
-      ? `Interview: ${applicant.name} — ${jobName}`
-      : `面接: ${applicant.name}（${jobName}）`;
-    const meetDescription = lang === 'en'
-      ? `Interview for ${applicant.name} (${applicant.email})`
-      : `${applicant.name}（${applicant.email}）の面接`;
+    const slotMaster = slot.interviewSlotMaster;
+    let meetUrl: string | null = null;
+    let eventId: string | null = null;
 
-    const { meetUrl, eventId } = await createGoogleMeetEvent(
-      meetTitle,
-      meetDescription,
-      slot.startTime,
-      slot.endTime,
-      applicant.email,
-      slot.interviewer?.email ?? undefined,
-    );
+    if (slotMaster?.meetingType === 'ZOOM') {
+      // Zoom: マスタに設定された固定URLを使用
+      meetUrl = slotMaster.zoomUrl || null;
+    } else {
+      // Google Meet: 既存ロジック
+      const meetTitle = lang === 'en'
+        ? `Interview: ${applicant.name} — ${jobName}`
+        : `面接: ${applicant.name}（${jobName}）`;
+      const meetDescription = lang === 'en'
+        ? `Interview for ${applicant.name} (${applicant.email})`
+        : `${applicant.name}（${applicant.email}）の面接`;
+
+      const meetResult = await createGoogleMeetEvent(
+        meetTitle,
+        meetDescription,
+        slot.startTime,
+        slot.endTime,
+        applicant.email,
+        slot.interviewer?.email ?? undefined,
+      );
+      meetUrl = meetResult.meetUrl;
+      eventId = meetResult.eventId;
+    }
 
     // トランザクション: スロット予約 + 応募者更新
     await prisma.$transaction([
@@ -200,6 +213,9 @@ export async function POST(request: Request) {
       meetUrl,
       jobName,
       applicant.managementToken,
+      (slotMaster?.meetingType as string) || 'GOOGLE_MEET',
+      slotMaster?.zoomMeetingNumber,
+      slotMaster?.zoomPassword,
     ).catch(err => console.error('Interview confirmation email failed:', err));
 
     // 管理者通知メール

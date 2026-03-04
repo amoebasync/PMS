@@ -13,6 +13,68 @@ const s3 = new S3Client({
   },
 });
 
+export type VerifiableEntityType = 'FlyerDistributor' | 'Employee';
+
+interface VerifiableEntity {
+  name: string;
+  staffId: string | null;
+  residenceCardFrontUrl: string | null;
+  residenceCardBackUrl: string | null;
+  country: { name: string; nameEn: string | null; aliases: string | null } | null;
+  visaType: { name: string; nameEn: string } | null;
+  visaExpiryDate: Date | null;
+}
+
+async function fetchVerifiableEntity(type: VerifiableEntityType, id: number): Promise<VerifiableEntity | null> {
+  if (type === 'FlyerDistributor') {
+    const d = await prisma.flyerDistributor.findUnique({
+      where: { id },
+      include: { country: true, visaType: true },
+    });
+    if (!d) return null;
+    return {
+      name: d.name,
+      staffId: d.staffId,
+      residenceCardFrontUrl: d.residenceCardFrontUrl,
+      residenceCardBackUrl: d.residenceCardBackUrl,
+      country: d.country,
+      visaType: d.visaType,
+      visaExpiryDate: d.visaExpiryDate,
+    };
+  } else {
+    const e = await prisma.employee.findUnique({
+      where: { id },
+      include: { country: true, visaType: true },
+    });
+    if (!e) return null;
+    return {
+      name: `${e.lastNameJa} ${e.firstNameJa}`,
+      staffId: e.employeeCode,
+      residenceCardFrontUrl: e.residenceCardFrontUrl,
+      residenceCardBackUrl: e.residenceCardBackUrl,
+      country: e.country,
+      visaType: e.visaType,
+      visaExpiryDate: e.visaExpiryDate,
+    };
+  }
+}
+
+async function updateVerificationStatus(
+  type: VerifiableEntityType,
+  id: number,
+  data: {
+    residenceCardVerificationStatus: string;
+    residenceCardVerificationResult?: unknown;
+    residenceCardVerifiedAt?: Date;
+  }
+) {
+  if (type === 'FlyerDistributor') {
+    await prisma.flyerDistributor.update({ where: { id }, data: data as any });
+  } else {
+    await prisma.employee.update({ where: { id }, data: data as any });
+  }
+}
+
 function extractS3Key(url: string): string | null {
   if (!url) return null;
   // Proxy URL: /api/s3-proxy?key=uploads/...
@@ -116,23 +178,20 @@ export interface VerificationResult {
   model: string;
 }
 
-export async function verifyResidenceCard(distributorId: number): Promise<VerificationResult> {
-  const distributor = await prisma.flyerDistributor.findUnique({
-    where: { id: distributorId },
-    include: { country: true, visaType: true },
-  });
+export async function verifyResidenceCard(entityType: VerifiableEntityType, entityId: number): Promise<VerificationResult> {
+  const entity = await fetchVerifiableEntity(entityType, entityId);
 
-  if (!distributor) throw new Error('Distributor not found');
-  if (!distributor.residenceCardFrontUrl) throw new Error('No residence card front image');
+  if (!entity) throw new Error(`${entityType} not found`);
+  if (!entity.residenceCardFrontUrl) throw new Error('No residence card front image');
 
-  const frontKey = extractS3Key(distributor.residenceCardFrontUrl);
+  const frontKey = extractS3Key(entity.residenceCardFrontUrl);
   if (!frontKey) throw new Error('Invalid front image URL');
 
   const frontImage = await fetchImageAsBase64(frontKey);
 
   let backImage: { base64: string; mimeType: string } | undefined;
-  if (distributor.residenceCardBackUrl) {
-    const backKey = extractS3Key(distributor.residenceCardBackUrl);
+  if (entity.residenceCardBackUrl) {
+    const backKey = extractS3Key(entity.residenceCardBackUrl);
     if (backKey) {
       backImage = await fetchImageAsBase64(backKey);
     }
@@ -145,33 +204,33 @@ export async function verifyResidenceCard(distributorId: number): Promise<Verifi
     backImage?.mimeType
   );
 
-  const nameComp = compareNames(extracted.name, distributor.name);
-  const nationalityComp = compareNationality(extracted.nationality, distributor.country);
-  const visaComp = compareVisaType(extracted.visaType, distributor.visaType);
-  const expiryComp = compareExpiryDate(extracted.expiryDate, distributor.visaExpiryDate);
+  const nameComp = compareNames(extracted.name, entity.name);
+  const nationalityComp = compareNationality(extracted.nationality, entity.country);
+  const visaComp = compareVisaType(extracted.visaType, entity.visaType);
+  const expiryComp = compareExpiryDate(extracted.expiryDate, entity.visaExpiryDate);
 
   const overallMatch = nameComp.match && nationalityComp.match && visaComp.match && expiryComp.match;
 
   return {
     extracted,
     comparisons: {
-      name: { match: nameComp.match, cardValue: extracted.name, dbValue: distributor.name, confidence: nameComp.confidence },
+      name: { match: nameComp.match, cardValue: extracted.name, dbValue: entity.name, confidence: nameComp.confidence },
       nationality: {
         match: nationalityComp.match,
         cardValue: extracted.nationality,
-        dbValue: distributor.country?.nameEn || distributor.country?.name || null,
+        dbValue: entity.country?.nameEn || entity.country?.name || null,
         confidence: nationalityComp.confidence,
       },
       visaType: {
         match: visaComp.match,
         cardValue: extracted.visaType,
-        dbValue: distributor.visaType?.name || null,
+        dbValue: entity.visaType?.name || null,
         confidence: visaComp.confidence,
       },
       expiryDate: {
         match: expiryComp.match,
         cardValue: extracted.expiryDate,
-        dbValue: distributor.visaExpiryDate?.toISOString().slice(0, 10) || null,
+        dbValue: entity.visaExpiryDate?.toISOString().slice(0, 10) || null,
         confidence: expiryComp.confidence,
       },
     },
@@ -181,7 +240,7 @@ export async function verifyResidenceCard(distributorId: number): Promise<Verifi
   };
 }
 
-export async function triggerAutoVerification(distributorId: number): Promise<void> {
+export async function triggerAutoVerification(entityType: VerifiableEntityType, entityId: number): Promise<void> {
   try {
     if (!isGeminiConfigured()) return;
 
@@ -192,20 +251,16 @@ export async function triggerAutoVerification(distributorId: number): Promise<vo
     if (setting?.value !== 'true') return;
 
     // Set PENDING
-    await prisma.flyerDistributor.update({
-      where: { id: distributorId },
-      data: { residenceCardVerificationStatus: 'PENDING' },
+    await updateVerificationStatus(entityType, entityId, {
+      residenceCardVerificationStatus: 'PENDING',
     });
 
-    const result = await verifyResidenceCard(distributorId);
+    const result = await verifyResidenceCard(entityType, entityId);
 
-    await prisma.flyerDistributor.update({
-      where: { id: distributorId },
-      data: {
-        residenceCardVerificationStatus: result.overallMatch ? 'VERIFIED' : 'MISMATCH',
-        residenceCardVerificationResult: result as any,
-        residenceCardVerifiedAt: new Date(),
-      },
+    await updateVerificationStatus(entityType, entityId, {
+      residenceCardVerificationStatus: result.overallMatch ? 'VERIFIED' : 'MISMATCH',
+      residenceCardVerificationResult: result as any,
+      residenceCardVerifiedAt: new Date(),
     });
 
     // MISMATCH の場合はアラートを生成（AlertDefinitionの設定に従う）
@@ -215,14 +270,13 @@ export async function triggerAutoVerification(distributorId: number): Promise<vo
           where: { code: 'RESIDENCE_CARD_MISMATCH' },
         });
 
+        const categoryName = entityType === 'Employee' ? '社員' : '配布員';
+
         // AlertDefinitionが無効の場合はスキップ
         if (alertDef && alertDef.isEnabled) {
-          const dist = await prisma.flyerDistributor.findUnique({
-            where: { id: distributorId },
-            select: { name: true, staffId: true },
-          });
-          const staffLabel = dist?.staffId ? `[${dist.staffId}]` : '';
-          const title = `在留カード不一致: ${staffLabel}${dist?.name || ''}`;
+          const entity = await fetchVerifiableEntity(entityType, entityId);
+          const staffLabel = entity?.staffId ? `[${entity.staffId}]` : '';
+          const title = `在留カード不一致: ${staffLabel}${entity?.name || ''}`;
           const message = `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`;
 
           await createAlert({
@@ -230,35 +284,33 @@ export async function triggerAutoVerification(distributorId: number): Promise<vo
             severity: alertDef.severity,
             title,
             message,
-            entityType: 'FlyerDistributor',
-            entityId: distributorId,
+            entityType,
+            entityId,
           });
 
           // 通知生成
           if (alertDef.notifyEnabled) {
             const { createAlertNotification } = await import('@/lib/alert-notifications');
             const latestAlert = await prisma.alert.findFirst({
-              where: { entityType: 'FlyerDistributor', entityId: distributorId, categoryId: alertDef.categoryId, status: 'OPEN' },
+              where: { entityType, entityId, categoryId: alertDef.categoryId, status: 'OPEN' },
               orderBy: { createdAt: 'desc' },
             });
             await createAlertNotification(alertDef, latestAlert?.id ?? null, title, message);
           }
         } else {
           // AlertDefinitionがない場合は従来のフォールバック
-          const category = await prisma.alertCategory.findFirst({ where: { name: '配布員' } });
+          const category = await prisma.alertCategory.findFirst({ where: { name: categoryName } })
+            || await prisma.alertCategory.findFirst({ where: { name: '配布員' } });
           if (category) {
-            const dist = await prisma.flyerDistributor.findUnique({
-              where: { id: distributorId },
-              select: { name: true, staffId: true },
-            });
-            const staffLabel = dist?.staffId ? `[${dist.staffId}]` : '';
+            const entity = await fetchVerifiableEntity(entityType, entityId);
+            const staffLabel = entity?.staffId ? `[${entity.staffId}]` : '';
             await createAlert({
               categoryId: category.id,
               severity: 'WARNING',
-              title: `在留カード不一致: ${staffLabel}${dist?.name || ''}`,
+              title: `在留カード不一致: ${staffLabel}${entity?.name || ''}`,
               message: `AI検証の結果、在留カード情報とDB登録情報に不一致が検出されました。`,
-              entityType: 'FlyerDistributor',
-              entityId: distributorId,
+              entityType,
+              entityId,
             });
           }
         }
@@ -269,16 +321,13 @@ export async function triggerAutoVerification(distributorId: number): Promise<vo
   } catch (error) {
     console.error('[ResidenceCardVerification] Auto verification error:', error);
     try {
-      await prisma.flyerDistributor.update({
-        where: { id: distributorId },
-        data: {
-          residenceCardVerificationStatus: 'ERROR',
-          residenceCardVerificationResult: {
-            error: error instanceof Error ? error.message : String(error),
-            processedAt: new Date().toISOString(),
-          },
-          residenceCardVerifiedAt: new Date(),
+      await updateVerificationStatus(entityType, entityId, {
+        residenceCardVerificationStatus: 'ERROR',
+        residenceCardVerificationResult: {
+          error: error instanceof Error ? error.message : String(error),
+          processedAt: new Date().toISOString(),
         },
+        residenceCardVerifiedAt: new Date(),
       });
     } catch (dbError) {
       console.error('[ResidenceCardVerification] Failed to save error status:', dbError);

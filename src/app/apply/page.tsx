@@ -53,7 +53,11 @@ const translations = {
     interviewDate: '面接日',
     interviewTime: '時間',
     meetLink: 'Google Meet リンク',
+    meetLinkZoom: 'Zoom リンク',
     joinMeet: 'Google Meet に参加',
+    joinZoom: 'Zoomに参加',
+    badgeGoogleMeet: 'Google Meet面接',
+    badgeZoom: 'Zoom面接',
     backToTop: 'トップページへ',
     required: '必須',
     optional: '任意',
@@ -109,7 +113,11 @@ const translations = {
     interviewDate: 'Interview Date',
     interviewTime: 'Time',
     meetLink: 'Google Meet Link',
+    meetLinkZoom: 'Zoom Link',
     joinMeet: 'Join Google Meet',
+    joinZoom: 'Join Zoom',
+    badgeGoogleMeet: 'Google Meet Interview',
+    badgeZoom: 'Zoom Interview',
     backToTop: 'Back to Home',
     required: 'Required',
     optional: 'Optional',
@@ -146,12 +154,18 @@ interface InterviewSlot {
   id: number;
   startTime: string;
   endTime: string;
+  interviewSlotMaster?: {
+    id: number;
+    name: string;
+    meetingType: 'GOOGLE_MEET' | 'ZOOM';
+  } | null;
 }
 
 interface SuccessData {
   date: string;
   time: string;
   meetUrl: string | null;
+  meetingType?: 'GOOGLE_MEET' | 'ZOOM' | null;
 }
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -568,6 +582,7 @@ function ApplyForm() {
         date: data.interview.date,
         time: data.interview.time,
         meetUrl: data.interview.meetUrl,
+        meetingType: data.interview.meetingType || null,
       });
     } catch {
       setErrorMsg(t.errorGeneral);
@@ -608,26 +623,39 @@ function ApplyForm() {
                 {success.time}
               </p>
             </div>
-            {success.meetUrl && (
-              <div>
-                <p className="text-xs font-bold text-slate-400 mb-1">{t.meetLink}</p>
-                <a
-                  href={success.meetUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 shadow-sm font-semibold py-2.5 px-5 rounded-full transition-all text-sm text-slate-700"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M3.5 6.5A3 3 0 0 1 6.5 3.5h5a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-11Z" fill="#00AC47"/>
-                    <path d="M14.5 8.2l4.8-3.2a.8.8 0 0 1 1.2.7v12.6a.8.8 0 0 1-1.2.7l-4.8-3.2V8.2Z" fill="#00832D"/>
-                    <path d="M6.5 3.5h5a3 3 0 0 1 3 3v2.5h-11V6.5a3 3 0 0 1 3-3Z" fill="#00AC47"/>
-                    <path d="M14.5 9v6l4.8 3.2a.8.8 0 0 0 1.2-.7V5.7a.8.8 0 0 0-1.2-.7L14.5 8.2" fill="#00832D"/>
-                    <rect x="3.5" y="3.5" width="11" height="17" rx="3" fill="#00AC47" fillOpacity=".15"/>
-                  </svg>
-                  {t.joinMeet}
-                </a>
-              </div>
-            )}
+            {success.meetUrl && (() => {
+              const isZoom = success.meetingType === 'ZOOM' || (!success.meetingType && success.meetUrl.toLowerCase().includes('zoom'));
+              return (
+                <div>
+                  <p className="text-xs font-bold text-slate-400 mb-1">
+                    {isZoom ? t.meetLinkZoom : t.meetLink}
+                  </p>
+                  <a
+                    href={success.meetUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-3 bg-white hover:bg-slate-50 border border-slate-200 shadow-sm font-semibold py-2.5 px-5 rounded-full transition-all text-sm text-slate-700"
+                  >
+                    {isZoom ? (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="5" width="14" height="14" rx="3" fill="#2D8CFF"/>
+                        <path d="M16 10l4.5-2.5a.5.5 0 0 1 .75.43v8.14a.5.5 0 0 1-.75.43L16 14V10Z" fill="#2D8CFF"/>
+                        <rect x="5" y="9" width="8" height="5" rx="1" fill="white" fillOpacity=".9"/>
+                      </svg>
+                    ) : (
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path d="M3.5 6.5A3 3 0 0 1 6.5 3.5h5a3 3 0 0 1 3 3v11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3v-11Z" fill="#00AC47"/>
+                        <path d="M14.5 8.2l4.8-3.2a.8.8 0 0 1 1.2.7v12.6a.8.8 0 0 1-1.2.7l-4.8-3.2V8.2Z" fill="#00832D"/>
+                        <path d="M6.5 3.5h5a3 3 0 0 1 3 3v2.5h-11V6.5a3 3 0 0 1 3-3Z" fill="#00AC47"/>
+                        <path d="M14.5 9v6l4.8 3.2a.8.8 0 0 0 1.2-.7V5.7a.8.8 0 0 0-1.2-.7L14.5 8.2" fill="#00832D"/>
+                        <rect x="3.5" y="3.5" width="11" height="17" rx="3" fill="#00AC47" fillOpacity=".15"/>
+                      </svg>
+                    )}
+                    {isZoom ? t.joinZoom : t.joinMeet}
+                  </a>
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>
@@ -1058,6 +1086,7 @@ function ApplyForm() {
                       );
                       const isSelected =
                         form.interviewSlotId === String(slot.id);
+                      const meetingType = slot.interviewSlotMaster?.meetingType;
 
                       return (
                         <button
@@ -1075,12 +1104,25 @@ function ApplyForm() {
                               : 'border-slate-200 bg-white text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
                           }`}
                         >
-                          <i
-                            className={`bi bi-clock mr-1.5 ${
-                              isSelected ? 'text-indigo-500' : 'text-slate-400'
-                            }`}
-                          />
-                          {start} - {end}
+                          <div className="flex flex-col items-center gap-1">
+                            <span>
+                              <i
+                                className={`bi bi-clock mr-1.5 ${
+                                  isSelected ? 'text-indigo-500' : 'text-slate-400'
+                                }`}
+                              />
+                              {start} - {end}
+                            </span>
+                            {meetingType && (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                meetingType === 'ZOOM'
+                                  ? 'bg-violet-100 text-violet-700'
+                                  : 'bg-indigo-100 text-indigo-700'
+                              }`}>
+                                {meetingType === 'ZOOM' ? t.badgeZoom : t.badgeGoogleMeet}
+                              </span>
+                            )}
+                          </div>
                         </button>
                       );
                     })}

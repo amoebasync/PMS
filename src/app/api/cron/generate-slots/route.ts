@@ -17,18 +17,17 @@ export async function GET(request: Request) {
   }
 
   try {
-    // 有効なデフォルトスロット設定を取得
-    const defaultSlots = await prisma.defaultInterviewSlot.findMany({
-      where: { isEnabled: true },
+    // アクティブなマスタとそのデフォルトスロット設定・職種を取得
+    const masters = await prisma.interviewSlotMaster.findMany({
+      where: { isActive: true },
       include: {
-        jobCategories: {
-          select: { jobCategoryId: true },
-        },
+        defaultInterviewSlots: { where: { isEnabled: true } },
+        jobCategories: { select: { id: true } },
       },
     });
 
-    if (defaultSlots.length === 0) {
-      return NextResponse.json({ message: '有効なデフォルト設定がありません', created: 0, skipped: 0 });
+    if (masters.length === 0) {
+      return NextResponse.json({ message: '有効なマスタ設定がありません', created: 0, skipped: 0 });
     }
 
     // 今日から DAYS_AHEAD 日先までの日付を生成
@@ -55,57 +54,61 @@ export async function GET(request: Request) {
       return new Date(`${yyyy}-${mm}-${dd}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00+09:00`);
     };
 
-    // 各日付に対して処理
-    for (const date of targetDates) {
-      const dayOfWeek = date.getUTCDay(); // 0=日, 1=月, ..., 6=土（UTC基準）
-      const defaultSlot = defaultSlots.find((s) => s.dayOfWeek === dayOfWeek);
-      if (!defaultSlot) continue;
+    // 各マスタに対して処理
+    for (const master of masters) {
+      const jobCategoryIds = master.jobCategories.map((jc) => jc.id);
+      const categoryList: (number | null)[] = jobCategoryIds.length > 0 ? jobCategoryIds : [null];
 
-      // 時間枠を intervalMinutes 単位で分割
-      const [startH, startM] = defaultSlot.startTime.split(':').map(Number);
-      const [endH, endM] = defaultSlot.endTime.split(':').map(Number);
-      const interval = defaultSlot.intervalMinutes;
+      // 各日付に対して処理
+      for (const date of targetDates) {
+        const dayOfWeek = date.getUTCDay(); // 0=日, 1=月, ..., 6=土（UTC基準）
+        const defaultSlot = master.defaultInterviewSlots.find((s) => s.dayOfWeek === dayOfWeek);
+        if (!defaultSlot) continue;
 
-      let currentMinutes = startH * 60 + startM;
-      const endMinutes = endH * 60 + endM;
+        // 時間枠を intervalMinutes 単位で分割
+        const [startH, startM] = defaultSlot.startTime.split(':').map(Number);
+        const [endH, endM] = defaultSlot.endTime.split(':').map(Number);
+        const interval = defaultSlot.intervalMinutes;
 
-      // 職種リスト（空なら null = 全職種対応）
-      const jobCategoryIds = defaultSlot.jobCategories.map((jc) => jc.jobCategoryId);
-      const categoryList = jobCategoryIds.length > 0 ? jobCategoryIds : [null];
+        let currentMinutes = startH * 60 + startM;
+        const endMinutes = endH * 60 + endM;
 
-      while (currentMinutes + interval <= endMinutes) {
-        const slotStart = toJSTTime(date, currentMinutes);
-        const slotEnd = toJSTTime(date, currentMinutes + interval);
+        while (currentMinutes + interval <= endMinutes) {
+          const slotStart = toJSTTime(date, currentMinutes);
+          const slotEnd = toJSTTime(date, currentMinutes + interval);
 
-        // 各職種ごとにスロットを作成
-        for (const jcId of categoryList) {
-          // 重複チェック: 同じ startTime + endTime + jobCategoryId が既に存在するか
-          const existing = await prisma.interviewSlot.findFirst({
-            where: {
-              startTime: slotStart,
-              endTime: slotEnd,
-              jobCategoryId: jcId,
-            },
-          });
+          // 各職種ごとにスロットを作成
+          for (const jcId of categoryList) {
+            // 重複チェック: 同じ startTime + endTime + jobCategoryId + masterId が既に存在するか
+            const existing = await prisma.interviewSlot.findFirst({
+              where: {
+                startTime: slotStart,
+                endTime: slotEnd,
+                jobCategoryId: jcId,
+                interviewSlotMasterId: master.id,
+              },
+            });
 
-          if (existing) {
-            totalSkipped++;
-            continue;
+            if (existing) {
+              totalSkipped++;
+              continue;
+            }
+
+            // Google Meet URL は応募者が予約した時点（/api/apply）で生成するため、ここでは作成しない
+            await prisma.interviewSlot.create({
+              data: {
+                startTime: slotStart,
+                endTime: slotEnd,
+                jobCategoryId: jcId,
+                interviewerId: defaultSlot.interviewerId,
+                interviewSlotMasterId: master.id,
+              },
+            });
+            totalCreated++;
           }
 
-          // Google Meet URL は応募者が予約した時点（/api/apply）で生成するため、ここでは作成しない
-          await prisma.interviewSlot.create({
-            data: {
-              startTime: slotStart,
-              endTime: slotEnd,
-              jobCategoryId: jcId,
-              interviewerId: defaultSlot.interviewerId,
-            },
-          });
-          totalCreated++;
+          currentMinutes += interval;
         }
-
-        currentMinutes += interval;
       }
     }
 

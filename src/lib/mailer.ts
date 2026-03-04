@@ -447,16 +447,37 @@ export const sendApplicantConfirmationEmail = async (
   meetUrl: string | null,
   jobCategoryName: string,
   managementToken?: string | null,
+  meetingType?: string,
+  zoomMeetingNumber?: string | null,
+  zoomPassword?: string | null,
 ) => {
   const isEn = language === 'en';
+  const isZoom = meetingType === 'ZOOM';
   const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
   const manageUrl = managementToken ? `${siteUrl}/apply/manage/${managementToken}` : null;
 
   const meetSection = meetUrl
-    ? `<tr>
-        <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
-        <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
-       </tr>`
+    ? isZoom
+      ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Type' : '面接方法'}</td>
+          <td style="padding:6px 0;font-weight:bold;">Zoom</td>
+         </tr>
+         <tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Zoom URL' : 'Zoom URL'}</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>
+         ${zoomMeetingNumber ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Number' : 'ミーティング番号'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomMeetingNumber}</td>
+         </tr>` : ''}
+         ${zoomPassword ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Password' : 'パスワード'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomPassword}</td>
+         </tr>` : ''}`
+      : `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>`
     : '';
 
   const manageSection = manageUrl
@@ -481,7 +502,7 @@ export const sendApplicantConfirmationEmail = async (
     </p>
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
       <p style="margin:0;font-size:14px;color:#1d4ed8;">
-        📹 <strong>This interview will be conducted online via Google Meet.</strong>
+        📹 <strong>This interview will be conducted online via ${isZoom ? 'Zoom' : 'Google Meet'}.</strong>
       </p>
     </div>
 
@@ -507,7 +528,7 @@ export const sendApplicantConfirmationEmail = async (
     </table>
 
     ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
-      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Join Google Meet</a>
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Join Zoom Meeting' : 'Join Google Meet'}</a>
     </div>` : ''}
 
     ${manageSection}
@@ -524,7 +545,7 @@ export const sendApplicantConfirmationEmail = async (
     </p>
     <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
       <p style="margin:0;font-size:14px;color:#1d4ed8;">
-        📹 <strong>面接は Google Meet を使用したオンライン面接で実施いたします。</strong>
+        📹 <strong>面接は ${isZoom ? 'Zoom' : 'Google Meet'} を使用したオンライン面接で実施いたします。</strong>
       </p>
     </div>
 
@@ -550,7 +571,7 @@ export const sendApplicantConfirmationEmail = async (
     </table>
 
     ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
-      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Meetに参加する</a>
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Zoomミーティングに参加する' : 'Google Meetに参加する'}</a>
     </div>` : ''}
 
     ${manageSection}
@@ -571,9 +592,16 @@ export const sendApplicantConfirmationEmail = async (
       : `\n面接の変更・キャンセル: ${manageUrl}\n`)
     : '';
 
+  const meetLabel = isZoom ? 'Zoom' : 'Google Meet';
+  const meetTextDetails = meetUrl
+    ? isZoom
+      ? `${meetLabel}: ${meetUrl}\n${zoomMeetingNumber ? `${isEn ? 'Meeting Number' : 'ミーティング番号'}: ${zoomMeetingNumber}\n` : ''}${zoomPassword ? `${isEn ? 'Password' : 'パスワード'}: ${zoomPassword}\n` : ''}`
+      : `${meetLabel}: ${meetUrl}\n`
+    : '';
+
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
-    : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}${manageText}\n面接当日はお時間に余裕を持ってご参加ください。`;
+    ? `Dear ${applicantName},\n\nThank you for your application. Your interview has been scheduled.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetTextDetails}${manageText}\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\nご応募いただきありがとうございます。面接のご予約を承りました。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetTextDetails}${manageText}\n面接当日はお時間に余裕を持ってご参加ください。`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
@@ -1399,9 +1427,18 @@ export async function sendInterviewBookingAdminNotification(
   interviewTime: string,
   meetUrl: string | null,
   jobCategoryName?: string,
+  meetingType?: string,
+  zoomMeetingNumber?: string | null,
+  zoomPassword?: string | null,
 ): Promise<void> {
+  const isZoomAdmin = meetingType === 'ZOOM';
   const meetSection = meetUrl
-    ? `<tr><td style="padding:6px 0;color:#64748b;width:140px;">Google Meet</td><td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${meetUrl}</a></td></tr>`
+    ? isZoomAdmin
+      ? `<tr><td style="padding:6px 0;color:#64748b;width:140px;">面接方法</td><td style="padding:6px 0;">Zoom</td></tr>
+         <tr><td style="padding:6px 0;color:#64748b;width:140px;">Zoom URL</td><td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${meetUrl}</a></td></tr>
+         ${zoomMeetingNumber ? `<tr><td style="padding:6px 0;color:#64748b;width:140px;">ミーティング番号</td><td style="padding:6px 0;">${zoomMeetingNumber}</td></tr>` : ''}
+         ${zoomPassword ? `<tr><td style="padding:6px 0;color:#64748b;width:140px;">パスワード</td><td style="padding:6px 0;">${zoomPassword}</td></tr>` : ''}`
+      : `<tr><td style="padding:6px 0;color:#64748b;width:140px;">Google Meet</td><td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${meetUrl}</a></td></tr>`
     : '';
 
   const contentHtml = `
@@ -1427,7 +1464,7 @@ export async function sendInterviewBookingAdminNotification(
     to,
     subject: `【面接予約】${applicantName} 様より面接日程が確定しました`,
     html: htmlWrapper(contentHtml),
-    text: `【面接予約通知】\n\n応募者: ${applicantName}（${applicantEmail}）\n${jobCategoryName ? `職種: ${jobCategoryName}\n` : ''}面接日: ${interviewDate}\n時間: ${interviewTime}${meetUrl ? `\nMeet: ${meetUrl}` : ''}`,
+    text: `【面接予約通知】\n\n応募者: ${applicantName}（${applicantEmail}）\n${jobCategoryName ? `職種: ${jobCategoryName}\n` : ''}面接日: ${interviewDate}\n時間: ${interviewTime}${meetUrl ? `\n${isZoomAdmin ? 'Zoom' : 'Meet'}: ${meetUrl}` : ''}${isZoomAdmin && zoomMeetingNumber ? `\nミーティング番号: ${zoomMeetingNumber}` : ''}${isZoomAdmin && zoomPassword ? `\nパスワード: ${zoomPassword}` : ''}`,
   });
 }
 

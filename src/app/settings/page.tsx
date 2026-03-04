@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
-import DefaultSlotSettings from '@/components/settings/DefaultSlotSettings';
+import InterviewSlotMasterSettings from '@/components/settings/InterviewSlotMasterSettings';
 import DefaultTrainingSlotSettings from '@/components/settings/DefaultTrainingSlotSettings';
 import { useTranslation } from '@/i18n/useTranslation';
 
@@ -1324,7 +1324,7 @@ export default function SettingsPage() {
 
         {/* 面接スロット設定タブ */}
         {tab === 'interviewSlot' && (
-          <DefaultSlotSettings />
+          <InterviewSlotMasterSettings />
         )}
 
         {/* 研修スロット設定タブ */}
