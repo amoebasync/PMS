@@ -242,7 +242,7 @@ export default function ApprovalsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-slate-600 font-bold">{item.workHours > 0 ? `${item.workHours} h` : '-'}</td>
+                      <td className="px-4 py-4 text-slate-600 font-bold">{item.workHours > 0 ? `${Math.round(item.workHours * 10) / 10} h` : '-'}</td>
                       <td className="px-4 py-4 text-slate-500 text-xs truncate max-w-[200px]" title={item.note}>{item.note || '-'}</td>
                     </>
                   ) : (

@@ -103,6 +103,7 @@ type Applicant = {
   trainingMotivationScore: number | null;
   trainingNotes: string | null;
   gender: string | null;
+  registeredDistributorId: number | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -1060,6 +1061,7 @@ export default function ApplicantsPage() {
       if (!res.ok) throw new Error('fetch failed');
       const data: Applicant = await res.json();
       setSelectedApplicant(data);
+      setRegisteredDistributorId(data.registeredDistributorId);
       setEvalForm({
         name: data.name || '',
         email: data.email || '',
@@ -3466,74 +3468,6 @@ export default function ApplicantsPage() {
                     </div>
                   )}
 
-                  {/* セクション 6: 配布員登録（採用済み） */}
-                  {selectedApplicant.hiringStatus === 'HIRED' && (
-                    <div>
-                      <div className="flex items-center gap-2 mb-3">
-                        <i className="bi bi-person-badge text-emerald-600"></i>
-                        <h3 className="text-sm font-black text-slate-800">{t('eval_section_distributor')}</h3>
-                      </div>
-
-                      {registeredDistributorId ? (
-                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-center gap-2">
-                          <i className="bi bi-check-circle-fill text-emerald-500"></i>
-                          <p className="text-xs font-bold text-emerald-700">
-                            {t('eval_distributor_registered', { id: registeredDistributorId })}
-                          </p>
-                        </div>
-                      ) : showDistributorForm ? (
-                        <div className="bg-slate-50 rounded-xl p-4 space-y-3">
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_branch')} <span className="text-rose-500">*</span></label>
-                            <select
-                              value={distForm.branchId}
-                              onChange={e => {
-                                const val = e.target.value;
-                                setDistForm(f => ({ ...f, branchId: val, staffId: '' }));
-                                if (val) fetchNextStaffId(val);
-                              }}
-                              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
-                            >
-                              <option value="">{t('eval_select_placeholder')}</option>
-                              {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}{b.prefix ? ` (${b.prefix})` : ''}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_staff_id')}</label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                value={distForm.staffId}
-                                onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
-                                placeholder={distForm.branchId ? t('eval_distributor_staff_placeholder_branch') : t('eval_distributor_staff_placeholder_select')}
-                                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-400 outline-none font-mono"
-                              />
-                              {staffIdLoading && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                              )}
-                            </div>
-                            <p className="text-[10px] text-slate-400 mt-1">{t('eval_distributor_staff_note')}</p>
-                          </div>
-                          <div className="flex gap-2 pt-1">
-                            <button
-                              onClick={() => setShowDistributorForm(false)}
-                              className="flex-1 px-4 py-2 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors"
-                            >
-                              {t('cancel')}
-                            </button>
-                            <button
-                              onClick={handleRegisterAsDistributor}
-                              disabled={registering || !distForm.branchId}
-                              className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
-                            >
-                              {registering && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
-                              {t('eval_distributor_register_btn')}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
                 </>
               ) : null}
             </div>
@@ -3549,31 +3483,26 @@ export default function ApplicantsPage() {
                   {t('eval_btn_delete')}
                 </button>
                 <div className="flex gap-3">
-                  {selectedApplicant.hiringStatus === 'HIRED' && !showDistributorForm && (
-                    registeredDistributorId ? (
-                      <button
-                        disabled
-                        className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
-                      >
-                        <i className="bi bi-check-circle-fill"></i>
-                        {t('eval_distributor_registered_btn')}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          if (!evalForm.birthday) {
-                            showToast('生年月日を入力してから配布員登録を行ってください', 'warning');
-                            return;
-                          }
-                          setShowDistributorForm(true);
-                          if (branches.length === 0) fetchBranches();
-                        }}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
-                      >
-                        <i className="bi bi-person-plus"></i>
-                        {t('eval_distributor_register')}
-                      </button>
-                    )
+                  {registeredDistributorId ? (
+                    <button
+                      disabled
+                      className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
+                    >
+                      <i className="bi bi-check-circle-fill"></i>
+                      {t('eval_distributor_registered_btn')}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setShowDistributorForm(true);
+                        setDistForm({ branchId: '', staffId: '' });
+                        if (branches.length === 0) fetchBranches();
+                      }}
+                      className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
+                    >
+                      <i className="bi bi-person-plus"></i>
+                      {t('eval_distributor_register')}
+                    </button>
                   )}
                   <button
                     onClick={closeEvalModal}
@@ -3593,6 +3522,85 @@ export default function ApplicantsPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════
+          モーダル: 配布員登録
+         ════════════════════════════════════════════ */}
+      {showDistributorForm && selectedApplicant && (
+        <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+            {/* ヘッダー */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                  <i className="bi bi-person-badge-fill text-emerald-600"></i>
+                </div>
+                <div>
+                  <h2 className="text-lg font-black text-slate-800">{t('eval_section_distributor')}</h2>
+                  <p className="text-xs text-slate-500">{selectedApplicant.name}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDistributorForm(false)}
+                className="text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                <i className="bi bi-x-lg text-lg"></i>
+              </button>
+            </div>
+            {/* フォーム */}
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_branch')} <span className="text-rose-500">*</span></label>
+                <select
+                  value={distForm.branchId}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setDistForm(f => ({ ...f, branchId: val, staffId: '' }));
+                    if (val) fetchNextStaffId(val);
+                  }}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 outline-none bg-white"
+                >
+                  <option value="">{t('eval_select_placeholder')}</option>
+                  {branches.map(b => <option key={b.id} value={b.id}>{b.nameJa}{b.prefix ? ` (${b.prefix})` : ''}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-500 mb-1.5">{t('eval_distributor_staff_id')}</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={distForm.staffId}
+                    onChange={e => setDistForm(f => ({ ...f, staffId: e.target.value }))}
+                    placeholder={distForm.branchId ? t('eval_distributor_staff_placeholder_branch') : t('eval_distributor_staff_placeholder_select')}
+                    className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-400 outline-none font-mono"
+                  />
+                  {staffIdLoading && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">{t('eval_distributor_staff_note')}</p>
+              </div>
+            </div>
+            {/* フッター */}
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+              <button
+                onClick={() => setShowDistributorForm(false)}
+                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 text-sm font-bold rounded-xl hover:bg-slate-100 transition-colors"
+              >
+                {t('cancel')}
+              </button>
+              <button
+                onClick={handleRegisterAsDistributor}
+                disabled={registering || !distForm.branchId}
+                className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
+              >
+                {registering && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>}
+                {t('eval_distributor_register_btn')}
+              </button>
+            </div>
           </div>
         </div>
       )}

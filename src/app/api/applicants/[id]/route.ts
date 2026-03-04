@@ -39,7 +39,18 @@ export async function GET(
       return NextResponse.json({ error: '応募者が見つかりません' }, { status: 404 });
     }
 
-    return NextResponse.json(applicant);
+    // 配布員登録済みかチェック（メールアドレスで照合）
+    const registeredDistributor = applicant.email
+      ? await prisma.flyerDistributor.findFirst({
+          where: { email: applicant.email },
+          select: { id: true },
+        })
+      : null;
+
+    return NextResponse.json({
+      ...applicant,
+      registeredDistributorId: registeredDistributor?.id ?? null,
+    });
   } catch (error) {
     console.error('Applicant Detail Error:', error);
     return NextResponse.json({ error: '応募者の取得に失敗しました' }, { status: 500 });

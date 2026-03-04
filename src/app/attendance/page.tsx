@@ -408,7 +408,7 @@ export default function AttendancePage() {
                             <span className="text-sm font-bold text-emerald-600">{att.attendanceType?.name || t('leave_default')}</span>
                           )}
                         </td>
-                        <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${att.workHours}h` : '-'}</td>
+                        <td className="py-3 font-bold text-center text-slate-600">{att.workHours > 0 ? `${Math.round(att.workHours * 10) / 10}h` : '-'}</td>
                         <td className="py-3 text-right font-mono font-bold text-indigo-600">¥{(att.calculatedWage || 0).toLocaleString()}</td>
                         <td className="py-3 text-center">
                           <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${att.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : att.status === 'REJECTED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>

@@ -790,8 +790,8 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
-      <div className="max-w-5xl mx-auto px-4 py-10">
+    <div className="font-sans">
+      <div className="max-w-5xl mx-auto py-6">
         {errorMsg && (
           <div className="mb-4 flex items-center gap-3 bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl text-sm font-bold">
             <i className="bi bi-exclamation-triangle-fill"></i>
@@ -803,7 +803,7 @@ export default function SettingsPage() {
         )}
 
         {/* タブ */}
-        <div className="flex flex-wrap gap-1 mb-6 bg-slate-200 p-1 rounded-xl">
+        <div className="flex flex-wrap gap-1 mb-6 bg-gray-200/60 p-1 rounded-xl">
           {tabs.map(tb => (
             <button
               key={tb.key}
@@ -954,25 +954,20 @@ export default function SettingsPage() {
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">{t('ai_enable_desc')}</p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => {
-                      const newVal = systemSettings.residenceCardAiVerification === 'true' ? 'false' : 'true';
-                      setSystemSettings(prev => ({ ...prev, residenceCardAiVerification: newVal }));
-                      handleSaveSystemSetting('residenceCardAiVerification', newVal);
-                    }}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                      systemSettings.residenceCardAiVerification === 'true' ? 'bg-violet-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                      systemSettings.residenceCardAiVerification === 'true' ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
-                  <span className="text-sm font-bold text-slate-600 w-8">
-                    {systemSettings.residenceCardAiVerification === 'true' ? 'ON' : 'OFF'}
-                  </span>
-                </div>
+                <button
+                  onClick={() => {
+                    const newVal = systemSettings.residenceCardAiVerification === 'true' ? 'false' : 'true';
+                    setSystemSettings(prev => ({ ...prev, residenceCardAiVerification: newVal }));
+                    handleSaveSystemSetting('residenceCardAiVerification', newVal);
+                  }}
+                  className={`shrink-0 relative inline-flex h-8 w-[52px] items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-violet-500 ${
+                    systemSettings.residenceCardAiVerification === 'true' ? 'bg-violet-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-1 ring-black/5 transition-transform duration-200 ${
+                    systemSettings.residenceCardAiVerification === 'true' ? 'translate-x-[26px]' : 'translate-x-[2px]'
+                  }`} />
+                </button>
               </div>
             </div>
           </div>
@@ -991,25 +986,20 @@ export default function SettingsPage() {
                   </p>
                   <p className="text-xs text-slate-500 mt-0.5">{t('auto_send_hiring_email_desc')}</p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <button
-                    onClick={() => {
-                      const newVal = systemSettings.sendHiringEmail !== 'false' ? 'false' : 'true';
-                      setSystemSettings(prev => ({ ...prev, sendHiringEmail: newVal }));
-                      handleSaveSystemSetting('sendHiringEmail', newVal);
-                    }}
-                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-                      systemSettings.sendHiringEmail !== 'false' ? 'bg-emerald-600' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
-                      systemSettings.sendHiringEmail !== 'false' ? 'translate-x-6' : 'translate-x-1'
-                    }`} />
-                  </button>
-                  <span className="text-sm font-bold text-slate-600 w-8">
-                    {systemSettings.sendHiringEmail !== 'false' ? 'ON' : 'OFF'}
-                  </span>
-                </div>
+                <button
+                  onClick={() => {
+                    const newVal = systemSettings.sendHiringEmail !== 'false' ? 'false' : 'true';
+                    setSystemSettings(prev => ({ ...prev, sendHiringEmail: newVal }));
+                    handleSaveSystemSetting('sendHiringEmail', newVal);
+                  }}
+                  className={`shrink-0 relative inline-flex h-8 w-[52px] items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-emerald-500 ${
+                    systemSettings.sendHiringEmail !== 'false' ? 'bg-emerald-600' : 'bg-slate-200'
+                  }`}
+                >
+                  <span className={`inline-block h-6 w-6 transform rounded-full bg-white shadow-md ring-1 ring-black/5 transition-transform duration-200 ${
+                    systemSettings.sendHiringEmail !== 'false' ? 'translate-x-[26px]' : 'translate-x-[2px]'
+                  }`} />
+                </button>
               </div>
             </div>
           </div>

@@ -6,10 +6,18 @@ npx prisma generate
 npx prisma db push
 pm2 restart pms
 
+# --- crond が未インストールならインストール ---
+if ! command -v crontab &> /dev/null; then
+  sudo yum install -y cronie
+  sudo systemctl enable crond
+  sudo systemctl start crond
+  echo "crond をインストール・起動しました"
+fi
+
 # --- 面接スロット自動生成 CRON 登録（重複時はスキップ） ---
 CRON_SECRET=$(grep '^CRON_SECRET=' .env | cut -d'=' -f2-)
 if [ -n "$CRON_SECRET" ]; then
-  CRON_JOB="0 1 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/generate-slots >> /tmp/pms-cron-generate-slots.log 2>&1"
+  CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/generate-slots >> /tmp/pms-cron-generate-slots.log 2>&1"
   # 既に同じCRONが登録されていなければ追加
   if ! crontab -l 2>/dev/null | grep -q "generate-slots"; then
     (crontab -l 2>/dev/null; echo "$CRON_JOB") | crontab -
@@ -19,7 +27,7 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- 定期タスク自動生成 CRON 登録（重複時はスキップ） ---
-  TASK_CRON_JOB="0 0 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/generate-tasks >> /tmp/pms-cron-generate-tasks.log 2>&1"
+  TASK_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/generate-tasks >> /tmp/pms-cron-generate-tasks.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "generate-tasks"; then
     (crontab -l 2>/dev/null; echo "$TASK_CRON_JOB") | crontab -
     echo "CRON登録: 定期タスク自動生成（毎日00:00）"
@@ -28,7 +36,7 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- 研修スロット自動生成 CRON 登録（重複時はスキップ） ---
-  TRAINING_CRON_JOB="0 2 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/generate-training-slots >> /tmp/pms-cron-generate-training-slots.log 2>&1"
+  TRAINING_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/generate-training-slots >> /tmp/pms-cron-generate-training-slots.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "generate-training-slots"; then
     (crontab -l 2>/dev/null; echo "$TRAINING_CRON_JOB") | crontab -
     echo "CRON登録: 研修スロット自動生成（毎日02:00）"
@@ -37,7 +45,7 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- 配布員評価 CRON 登録（重複時はスキップ） ---
-  EVAL_CRON_JOB="0 4 * * 1 curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/evaluate-distributors >> /tmp/pms-cron-evaluate-distributors.log 2>&1"
+  EVAL_CRON_JOB="0 15 * * 1 curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/evaluate-distributors >> /tmp/pms-cron-evaluate-distributors.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "evaluate-distributors"; then
     (crontab -l 2>/dev/null; echo "$EVAL_CRON_JOB") | crontab -
     echo "CRON登録: 配布員評価（毎週月曜04:00）"
@@ -46,7 +54,7 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- ビザ期限チェック CRON 登録（重複時はスキップ） ---
-  VISA_CRON_JOB="30 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/check-visa-expiry >> /tmp/pms-cron-check-visa-expiry.log 2>&1"
+  VISA_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/check-visa-expiry >> /tmp/pms-cron-check-visa-expiry.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "check-visa-expiry"; then
     (crontab -l 2>/dev/null; echo "$VISA_CRON_JOB") | crontab -
     echo "CRON登録: ビザ期限チェック（毎日03:30）"
@@ -55,7 +63,7 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- アラート定義チェック CRON 登録（重複時はスキップ） ---
-  ALERT_CRON_JOB="0 21 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/check-alert-definitions >> /tmp/pms-cron-check-alert-definitions.log 2>&1"
+  ALERT_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/check-alert-definitions >> /tmp/pms-cron-check-alert-definitions.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "check-alert-definitions"; then
     (crontab -l 2>/dev/null; echo "$ALERT_CRON_JOB") | crontab -
     echo "CRON登録: アラート定義チェック（毎日21:00 UTC = 06:00 JST）"
@@ -65,7 +73,7 @@ if [ -n "$CRON_SECRET" ]; then
 
   # --- ハウスキープ CRON 登録（重複時はスキップ） ---
   # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
-  HOUSEKEEP_CRON_JOB="0 3 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" https://pms.tiramis.co.jp/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"
+  HOUSEKEEP_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "housekeep"; then
     (crontab -l 2>/dev/null; echo "$HOUSEKEEP_CRON_JOB") | crontab -
     echo "CRON登録: ハウスキープ（毎日03:00）"
