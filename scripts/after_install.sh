@@ -5,9 +5,8 @@ npm install --legacy-peer-deps
 npx prisma generate
 npx prisma db push
 # PM2 cluster mode（2プロセス）で起動
-# 既存プロセスがあれば削除して再作成（fork→cluster切替に必要）
 pm2 describe pms > /dev/null 2>&1 && pm2 delete pms
-pm2 start npm --name pms -i 2 -- start
+pm2 start ecosystem.config.js
 pm2 save
 
 # --- crond が未インストールならインストール ---
