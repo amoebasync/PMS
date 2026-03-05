@@ -220,6 +220,9 @@ model Employee {
   // 通知受信
   receivedNotifications       AdminNotification[]  @relation("NotificationRecipient")
 
+  // 巡回記録（巡回員として）
+  fieldInspections            FieldInspection[]
+
   @@map("employees")
 }
 
@@ -693,6 +696,7 @@ model FlyerDistributor {
   distributionSessions  DistributionSession[]
   adminNotifications    AdminNotification[]
   evaluations           DistributorEvaluation[]
+  fieldInspections      FieldInspection[]
 
   @@index([branchId])
   @@index([visaExpiryDate])
@@ -2371,6 +2375,19 @@ enum ComplaintStatus {
   RESOLVED      // 解決済み
 }
 
+// --- 現地確認関連 Enum ---
+enum InspectionCategory {
+  CHECK      // チェック（配布確認）
+  GUIDANCE   // 指導（配布指導）
+}
+
+enum FraudType {
+  DISPOSAL
+  SKIP
+  FALSIFICATION
+  OTHER
+}
+
 enum ComplaintSource {
   CUSTOMER    // 顧客
   RESIDENT    // 住人
@@ -2525,6 +2542,10 @@ model Complaint {
   // 個別減点スコア（null = ComplaintType のデフォルトを使用）
   penaltyScore    Int?             @map("penalty_score")
 
+  // 不正行為フラグ
+  isFraud         Boolean          @default(false) @map("is_fraud")
+  fraudType       FraudType?       @map("fraud_type")
+
   createdAt       DateTime         @default(now()) @map("created_at")
   updatedAt       DateTime         @updatedAt @map("updated_at")
 
@@ -2592,6 +2613,44 @@ model DistributorEvaluation {
 
   @@unique([distributorId, periodStart])
   @@map("distributor_evaluations")
+}
+
+// --- 現場巡回記録 ---
+model FieldInspection {
+  id              Int                @id @default(autoincrement())
+  distributorId   Int                @map("distributor_id")
+  distributor     FlyerDistributor   @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  inspectorId     Int                @map("inspector_id")
+  inspector       Employee           @relation(fields: [inspectorId], references: [id])
+  scheduleId      Int?               @map("schedule_id")
+
+  inspectedAt     DateTime           @map("inspected_at")
+  category        InspectionCategory @default(CHECK)
+
+  // === チェック項目 ===
+  coverageChecked       Int?         @map("coverage_checked")       // 確認件数
+  coverageFound         Int?         @map("coverage_found")         // チラシ確認件数
+  prohibitedTotal       Int?         @map("prohibited_total")       // 禁止物件数
+  prohibitedViolations  Int?         @map("prohibited_violations")  // 禁止物件投函数
+  multipleInsertion     String?      @map("multiple_insertion") @db.VarChar(20)  // NONE/MINOR/SOME/MANY
+  fraudTrace            String?      @map("fraud_trace") @db.VarChar(20)         // NONE/SUSPICIOUS/FOUND
+
+  // === 指導項目 ===
+  distributionSpeed     String?      @map("distribution_speed") @db.VarChar(20)    // VERY_SLOW/SLOW/NORMAL/FAST/VERY_FAST
+  stickerCompliance     String?      @map("sticker_compliance") @db.VarChar(20)    // NO_MISTAKES/SOME/MANY
+  prohibitedCompliance  String?      @map("prohibited_compliance") @db.VarChar(20) // NO_MISTAKES/SOME/MANY
+  mapComprehension      String?      @map("map_comprehension") @db.VarChar(20)     // BAD/NORMAL/GOOD
+  workAttitude          String?      @map("work_attitude") @db.VarChar(20)         // BAD/NORMAL/GOOD
+
+  // 共通
+  note               String?         @db.Text
+  followUpRequired   Boolean         @default(false) @map("follow_up_required")
+
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  @@index([distributorId, inspectedAt])
+  @@map("field_inspections")
 }
 
 // ==========================================

@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import AnalyticsTab from '@/components/distributors/AnalyticsTab';
+import InspectionsTab from '@/components/distributors/InspectionsTab';
 
 const RANK_COLORS: Record<string, { bg: string; text: string }> = {
   S: { bg: 'bg-yellow-500', text: 'text-white' },
@@ -31,14 +33,15 @@ const FORM_TABS: { key: FormTab; label: string; icon: string }[] = [
 ];
 
 /* ─── 詳細画面タブ ─── */
-type DetailTab = 'overview' | 'finance' | 'evaluation' | 'schedules' | 'tasks' | 'complaints';
+type DetailTab = 'overview' | 'finance' | 'analytics' | 'inspections' | 'schedules' | 'tasks' | 'complaints';
 const DETAIL_TABS: { key: DetailTab; label: string; icon: string }[] = [
-  { key: 'overview',   label: '概要',     icon: 'bi-person-fill' },
-  { key: 'finance',    label: '口座・レート', icon: 'bi-bank2' },
-  { key: 'evaluation', label: '評価',     icon: 'bi-award' },
-  { key: 'schedules',  label: '配布履歴', icon: 'bi-calendar-check' },
-  { key: 'tasks',      label: 'タスク',   icon: 'bi-list-task' },
-  { key: 'complaints', label: 'クレーム', icon: 'bi-exclamation-triangle' },
+  { key: 'overview',    label: '概要',     icon: 'bi-person-fill' },
+  { key: 'finance',     label: '口座・レート', icon: 'bi-bank2' },
+  { key: 'analytics',   label: '分析',     icon: 'bi-graph-up-arrow' },
+  { key: 'inspections', label: '現地確認',  icon: 'bi-clipboard-check' },
+  { key: 'schedules',   label: '配布履歴', icon: 'bi-calendar-check' },
+  { key: 'tasks',       label: 'タスク',   icon: 'bi-list-task' },
+  { key: 'complaints',  label: 'クレーム', icon: 'bi-exclamation-triangle' },
 ];
 
 const inputCls = 'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white';
@@ -963,142 +966,22 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
-      {/* ─── 評価タブ ─── */}
-      {activeTab === 'evaluation' && (
-        <div className="space-y-5">
-          {evalLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-3 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : !evalData ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
-              <i className="bi bi-award text-4xl text-slate-200 block mb-2"></i>
-              <p className="text-sm text-slate-400">評価データがありません</p>
-            </div>
-          ) : (
-            <>
-              {/* Score Summary */}
-              {evalData.evaluations?.length > 0 && (() => {
-                const latest = evalData.evaluations[0];
-                const prev = evalData.evaluations[1];
-                const change = prev ? latest.totalScore - prev.totalScore : 0;
-                return (
-                  <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                    <EvalRankBadge rank={latest.determinedRank} size="lg" />
-                    <div>
-                      <p className="text-2xl font-black text-slate-800">{latest.totalScore} <span className="text-sm text-slate-400">点</span></p>
-                      {change !== 0 && (
-                        <p className={`text-xs font-bold ${change > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                          {change > 0 ? '+' : ''}{change} (先週比)
-                        </p>
-                      )}
-                    </div>
-                    <div className="ml-auto text-right">
-                      <p className="text-xs text-slate-400">パフォーマンス</p>
-                      <p className="text-sm font-bold text-emerald-600">{latest.performanceScore}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-xs text-slate-400">品質</p>
-                      <p className="text-sm font-bold text-rose-600">{latest.qualityScore}</p>
-                    </div>
-                  </div>
-                );
-              })()}
+      {/* ─── 分析タブ ─── */}
+      {activeTab === 'analytics' && (
+        <AnalyticsTab
+          distributorId={id}
+          evalData={evalData}
+          evalLoading={evalLoading}
+          evalRankForm={evalRankForm}
+          setEvalRankForm={setEvalRankForm}
+          saveEvalRank={saveEvalRank}
+          evalSaving={evalSaving}
+        />
+      )}
 
-              {/* Chart */}
-              {evalData.evaluations?.length > 1 && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                  <p className="text-xs font-bold text-slate-500 mb-3">スコア推移</p>
-                  <ResponsiveContainer width="100%" height={220}>
-                    <LineChart data={[...evalData.evaluations].reverse().map((e: any) => ({
-                      week: `${new Date(e.periodStart).getMonth() + 1}/${new Date(e.periodStart).getDate()}`,
-                      totalScore: e.totalScore,
-                      performanceScore: e.performanceScore,
-                      qualityScore: e.qualityScore,
-                    }))}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                      <YAxis tick={{ fontSize: 10 }} />
-                      <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Line type="monotone" dataKey="totalScore" stroke="#3b82f6" name="総合" strokeWidth={2} dot={{ r: 2 }} />
-                      <Line type="monotone" dataKey="performanceScore" stroke="#22c55e" name="パフォーマンス" strokeWidth={1.5} dot={false} />
-                      <Line type="monotone" dataKey="qualityScore" stroke="#ef4444" name="品質" strokeWidth={1.5} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              {/* Complaints in eval */}
-              {evalData.complaints?.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-                  <p className="text-xs font-bold text-slate-500 mb-3">クレーム履歴</p>
-                  <div className="border border-slate-200 rounded-xl overflow-hidden">
-                    <table className="w-full text-xs">
-                      <thead className="bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-slate-500">日付</th>
-                          <th className="px-3 py-2 text-left text-slate-500">種別</th>
-                          <th className="px-3 py-2 text-left text-slate-500">内容</th>
-                          <th className="px-3 py-2 text-right text-slate-500">減点</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {evalData.complaints.map((c: any) => (
-                          <tr key={c.id} className="hover:bg-slate-50">
-                            <td className="px-3 py-2 text-slate-600">{new Date(c.occurredAt).toLocaleDateString('ja-JP')}</td>
-                            <td className="px-3 py-2 text-slate-700 font-bold">{c.complaintType?.name || '-'}</td>
-                            <td className="px-3 py-2 text-slate-600 truncate max-w-[160px]">{c.title}</td>
-                            <td className="px-3 py-2 text-right text-rose-600 font-bold">-{c.penaltyScore ?? c.complaintType?.penaltyScore ?? 0}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual Rank Adjustment */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
-                <p className="text-xs font-bold text-amber-700 flex items-center gap-1.5">
-                  <i className="bi bi-pencil-square"></i> ランク手動調整
-                </p>
-                <div className="flex items-end gap-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">ランク</label>
-                    <select
-                      value={evalRankForm.determinedRank}
-                      onChange={e => setEvalRankForm(p => ({ ...p, determinedRank: e.target.value }))}
-                      className={selectCls}
-                    >
-                      <option value="">-- 選択 --</option>
-                      <option value="S">S</option>
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="C">C</option>
-                      <option value="D">D</option>
-                    </select>
-                  </div>
-                  <div className="flex-[2]">
-                    <label className="block text-xs font-bold text-slate-600 mb-1">コメント</label>
-                    <input
-                      value={evalRankForm.note}
-                      onChange={e => setEvalRankForm(p => ({ ...p, note: e.target.value }))}
-                      className={inputCls}
-                      placeholder="調整理由を入力..."
-                    />
-                  </div>
-                  <button
-                    onClick={saveEvalRank}
-                    disabled={evalSaving || !evalRankForm.determinedRank}
-                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5 whitespace-nowrap"
-                  >
-                    {evalSaving ? '保存中...' : <><i className="bi bi-check2"></i> 更新</>}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+      {/* ─── 巡回タブ ─── */}
+      {activeTab === 'inspections' && (
+        <InspectionsTab distributorId={id} />
       )}
 
       {/* ─── 配布履歴タブ ─── */}
