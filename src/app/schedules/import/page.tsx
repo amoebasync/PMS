@@ -158,29 +158,51 @@ export default function DataImportPage() {
   };
 
   /* ────── 支店 パース ────── */
-  const processBranchRows = async (rows: any[][]) => {
-    if (rows.length < 2) { setMessage(`エラー: ${tb('import_error_empty')}`); return; }
+  // 既知のヘッダー名一覧（1行目にこのいずれかがあればヘッダー付きと判定）
+  const BRANCH_HEADERS = ['支店', 'Branch', 'Postal Code', '住所', 'Address', 'Google Map Link', 'Manager', 'Sub Manager', 'Closed on', 'Open Date', 'Open Time', 'Close Time'];
+  // ヘッダー無し時の固定カラム順（上記と同じ順番）
+  const BRANCH_FIXED_ORDER = BRANCH_HEADERS;
 
-    const headers = rows[0].map((h: any) => String(h ?? '').trim());
-    const dataRows = rows.slice(1);
-    const idx = (n: string) => headers.indexOf(n);
+  const processBranchRows = async (rows: any[][]) => {
+    if (rows.length < 1) { setMessage(`エラー: ${tb('import_error_empty')}`); return; }
+
+    // ヘッダー行の有無を自動判定: 1行目に既知ヘッダー名が2つ以上含まれていればヘッダー付き
+    const firstRow = rows[0].map((h: any) => String(h ?? '').trim());
+    const matchCount = firstRow.filter(cell => BRANCH_HEADERS.includes(cell)).length;
+    const hasHeader = matchCount >= 2;
+
+    let colIndex: Record<string, number>;
+    let dataRows: any[][];
+
+    if (hasHeader) {
+      colIndex = {};
+      firstRow.forEach((h, i) => { colIndex[h] = i; });
+      dataRows = rows.slice(1);
+    } else {
+      // 固定カラム順でインデックスを割り当て
+      colIndex = {};
+      BRANCH_FIXED_ORDER.forEach((h, i) => { colIndex[h] = i; });
+      dataRows = rows; // 全行がデータ
+    }
+
+    const ci = (n: string) => colIndex[n] ?? -1;
 
     const branches = dataRows.map((row, index) => {
-      const nameJa = idx('支店') !== -1 && row[idx('支店')] ? String(row[idx('支店')]).trim() : null;
+      const nameJa = ci('支店') !== -1 && row[ci('支店')] ? String(row[ci('支店')]).trim() : null;
       if (!nameJa) return null;
       return {
-        excelRowNumber: index + 2, nameJa,
-        nameEn: idx('Branch') !== -1 && row[idx('Branch')] ? String(row[idx('Branch')]).trim() : nameJa,
-        postalCode: idx('Postal Code') !== -1 && row[idx('Postal Code')] ? String(row[idx('Postal Code')]).trim() : null,
-        address: idx('住所') !== -1 && row[idx('住所')] ? String(row[idx('住所')]).trim() : null,
-        addressEn: idx('Address') !== -1 && row[idx('Address')] ? String(row[idx('Address')]).trim() : null,
-        googleMapUrl: idx('Google Map Link') !== -1 && row[idx('Google Map Link')] ? String(row[idx('Google Map Link')]).trim() : null,
-        managerName: idx('Manager') !== -1 && row[idx('Manager')] ? String(row[idx('Manager')]).trim() : null,
-        subManagerName: idx('Sub Manager') !== -1 && row[idx('Sub Manager')] ? String(row[idx('Sub Manager')]).trim() : null,
-        closedDays: idx('Closed on') !== -1 && row[idx('Closed on')] ? String(row[idx('Closed on')]).trim() : null,
-        openDate: idx('Open Date') !== -1 ? formatExcelDate(row[idx('Open Date')]) : null,
-        openTime: idx('Open Time') !== -1 ? formatExcelTime(row[idx('Open Time')]) : null,
-        closeTime: idx('Close Time') !== -1 ? formatExcelTime(row[idx('Close Time')]) : null,
+        excelRowNumber: index + (hasHeader ? 2 : 1), nameJa,
+        nameEn: ci('Branch') !== -1 && row[ci('Branch')] ? String(row[ci('Branch')]).trim() : nameJa,
+        postalCode: ci('Postal Code') !== -1 && row[ci('Postal Code')] ? String(row[ci('Postal Code')]).trim() : null,
+        address: ci('住所') !== -1 && row[ci('住所')] ? String(row[ci('住所')]).trim() : null,
+        addressEn: ci('Address') !== -1 && row[ci('Address')] ? String(row[ci('Address')]).trim() : null,
+        googleMapUrl: ci('Google Map Link') !== -1 && row[ci('Google Map Link')] ? String(row[ci('Google Map Link')]).trim() : null,
+        managerName: ci('Manager') !== -1 && row[ci('Manager')] ? String(row[ci('Manager')]).trim() : null,
+        subManagerName: ci('Sub Manager') !== -1 && row[ci('Sub Manager')] ? String(row[ci('Sub Manager')]).trim() : null,
+        closedDays: ci('Closed on') !== -1 && row[ci('Closed on')] ? String(row[ci('Closed on')]).trim() : null,
+        openDate: ci('Open Date') !== -1 ? formatExcelDate(row[ci('Open Date')]) : null,
+        openTime: ci('Open Time') !== -1 ? formatExcelTime(row[ci('Open Time')]) : null,
+        closeTime: ci('Close Time') !== -1 ? formatExcelTime(row[ci('Close Time')]) : null,
       };
     }).filter(Boolean);
 
