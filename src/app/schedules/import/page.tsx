@@ -424,12 +424,17 @@ export default function DataImportPage() {
                     <th className="px-4 py-3">{ts('col_area_info')}</th>
                     <th className="px-4 py-3">{ts('col_area_unit_price')}</th>
                     <th className="px-4 py-3">{ts('col_size_unit_price')}</th>
+                    {[1,2,3,4,5,6].map(n => (
+                      <th key={n} className="px-4 py-3">チラシ{n}</th>
+                    ))}
                     <th className="px-4 py-3">{ts('col_status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {parsedData.map((s, idx) => {
                     const hasActual = s.items?.some((i: any) => i.actualCount !== null && !isNaN(i.actualCount));
+                    const itemsBySlot: Record<number, any> = {};
+                    s.items?.forEach((i: any) => { itemsBySlot[i.slotIndex] = i; });
                     return (
                       <tr key={idx} className="hover:bg-slate-50">
                         <td className="px-4 py-3">{s.date}</td>
@@ -438,6 +443,22 @@ export default function DataImportPage() {
                         <td className="px-4 py-3">{s.dbPrefectureName ? `${s.dbPrefectureName}, ` : ''}{s.dbFullAreaName}</td>
                         <td className="px-4 py-3 text-right">{s.areaUnitPrice != null ? `¥${s.areaUnitPrice.toLocaleString()}` : '-'}</td>
                         <td className="px-4 py-3 text-right">{s.sizeUnitPrice != null ? `¥${s.sizeUnitPrice.toLocaleString()}` : '-'}</td>
+                        {[1,2,3,4,5,6].map(n => {
+                          const item = itemsBySlot[n];
+                          return (
+                            <td key={n} className="px-4 py-3 text-xs">
+                              {item ? (
+                                <div>
+                                  <div className="font-semibold text-slate-700 truncate max-w-[120px]" title={item.flyerName}>{item.flyerName}</div>
+                                  <div className="text-slate-400">
+                                    {item.plannedCount != null ? `予${item.plannedCount.toLocaleString()}` : ''}
+                                    {item.actualCount != null ? ` / 実${item.actualCount.toLocaleString()}` : ''}
+                                  </div>
+                                </div>
+                              ) : <span className="text-slate-300">-</span>}
+                            </td>
+                          );
+                        })}
                         <td className="px-4 py-3">
                           {hasActual
                             ? <span className="text-blue-600 font-bold"><i className="bi bi-check-circle-fill"></i> {ts('status_completed')}</span>
