@@ -251,13 +251,19 @@ export default function DataImportPage() {
 
     if (rawSchedules.length === 0) { setMessage(`エラー: ${ts('error_no_data')}`); return; }
 
-    // Area lookup
+    // Area lookup (batch by 500 to avoid CloudFront/WAF body size limit)
     const uniqueAreaCodes = Array.from(new Set(rawSchedules.map(s => s?.areaCode).filter(Boolean)));
     let areaMap: Record<string, any> = {};
+    const BATCH_SIZE = 500;
     try {
-      const res = await fetch('/api/areas/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ addressCodes: uniqueAreaCodes }) });
-      if (res.ok) areaMap = await res.json();
-      else { setMessage(`エラー: ${ts('error_master_fetch')}`); return; }
+      for (let i = 0; i < uniqueAreaCodes.length; i += BATCH_SIZE) {
+        const batch = uniqueAreaCodes.slice(i, i + BATCH_SIZE);
+        const res = await fetch('/api/areas/lookup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ addressCodes: batch }) });
+        if (res.ok) {
+          const batchResult = await res.json();
+          Object.assign(areaMap, batchResult);
+        } else { setMessage(`エラー: ${ts('error_master_fetch')}`); return; }
+      }
     } catch { setMessage(`エラー: ${ts('error_master_api')}`); return; }
 
     const missingAreas: string[] = [];
