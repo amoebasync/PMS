@@ -55,6 +55,7 @@ const MENU_GROUPS: MenuGroup[] = [
     items: [
       { nameKey: 'dispatch', href: '/dispatch', icon: 'bi-diagram-3-fill' },
       { nameKey: 'schedule_inquiry', href: '/schedules', icon: 'bi-calendar-check' },
+      { nameKey: 'data_import', href: '/schedules/import', icon: 'bi-file-earmark-arrow-up' },
       { nameKey: 'area_management', href: '/areas', icon: 'bi-geo-alt-fill' },
       { nameKey: 'flyer_management', href: '/flyers', icon: 'bi-file-earmark-richtext' },
       { nameKey: 'inventory_management', href: '/transactions', icon: 'bi-box-seam' },
@@ -105,6 +106,9 @@ function isHrefActive(href: string, pathname: string): boolean {
   if (href === '/') return pathname === '/';
   if (href === '/distributors') {
     return pathname === '/distributors' || (pathname.startsWith('/distributors/') && !pathname.startsWith('/distributors/payroll'));
+  }
+  if (href === '/schedules') {
+    return pathname === '/schedules' || (pathname.startsWith('/schedules/') && !pathname.startsWith('/schedules/import'));
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

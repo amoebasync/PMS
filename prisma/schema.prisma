@@ -764,9 +764,13 @@ model Branch {
   // 店舗情報
   prefix       String? @db.VarChar(10) // スタッフIDプレフィックス (例: "MBF")
   staffIdSeq   Int     @default(0) @map("staff_id_seq") // スタッフID連番カウンター（次の番号 = staffIdSeq + 1）
-  address      String? @db.Text // 住所
+  postalCode   String? @map("postal_code") @db.VarChar(10) // 郵便番号
+  address      String? @db.Text // 住所（日本語）
+  addressEn    String? @map("address_en") @db.Text // 住所（英語）
   googleMapUrl String? @map("google_map_url") @db.Text // GoogleMapリンク
+  openDate     DateTime? @map("open_date") @db.Date // 開店日
   openingTime  String? @map("opening_time") @db.VarChar(10) // 開店時間 (例: "07:00")
+  closingTime  String? @map("closing_time") @db.VarChar(10) // 閉店時間 (例: "22:00")
   closedDays   String? @map("closed_days") @db.VarChar(50) // 定休日 (例: "火曜日", "土日祝")
 
   // 定休日の代替出勤先支店
