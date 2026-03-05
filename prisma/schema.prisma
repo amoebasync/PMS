@@ -895,6 +895,8 @@ model DistributionItem {
   flyerId Int? @map("flyer_id")
   flyer   Flyer? @relation(fields: [flyerId], references: [id])
 
+  billingUnitPrice Float? @map("billing_unit_price")
+
   @@index([scheduleId])
   @@index([customerId])
   @@map("distribution_items")
@@ -1112,8 +1114,26 @@ model Partner {
   newspaperInserts  OrderNewspaperInsert[]
   designs           OrderDesign[]
   complaints        Complaint[]
+  orders            Order[]
+  flyerPrices       PartnerFlyerPrice[]
 
   @@map("partners")
+}
+
+model PartnerFlyerPrice {
+  id            Int      @id @default(autoincrement())
+  partnerId     Int      @map("partner_id")
+  partner       Partner  @relation(fields: [partnerId], references: [id])
+  flyerName     String   @map("flyer_name") @db.VarChar(200)
+  customerCode  String?  @map("customer_code") @db.VarChar(50)
+  flyerCode     String?  @map("flyer_code") @db.VarChar(50)
+  unitPrice     Float    @map("unit_price")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@unique([partnerId, flyerName, customerCode, flyerCode])
+  @@index([partnerId])
+  @@map("partner_flyer_prices")
 }
 
 // --- パートナータイプマスタ (追加) ---
@@ -1172,6 +1192,7 @@ model OrderApproval {
 enum OrderSource {
   WEB_EC
   SALES_INTERNAL
+  PARTNER_IMPORT
 }
 
 // --- 受注ヘッダ (親) ---
@@ -1183,11 +1204,14 @@ model Order {
   orderSource  OrderSource @default(WEB_EC) @map("order_source")
   paymentMethod String?    @map("payment_method") @db.VarChar(50) 
   
-  customerId   Int         @map("customer_id")
-  customer     Customer    @relation(fields: [customerId], references: [id])
-  
+  customerId   Int?        @map("customer_id")
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+
+  partnerId    Int?        @map("partner_id")
+  partner      Partner?    @relation(fields: [partnerId], references: [id])
+
   salesRepId   Int?        @map("sales_rep_id")
-  salesRep     Employee?   @relation(fields: [salesRepId], references: [id]) 
+  salesRep     Employee?   @relation(fields: [salesRepId], references: [id])
 
   orderDate    DateTime    @map("order_date") @db.Date 
   totalAmount  Int?        @map("total_amount") 
@@ -1206,6 +1230,7 @@ model Order {
   billingItem        BillingStatementItem?
 
   @@index([customerId])
+  @@index([partnerId])
   @@index([status, orderDate])
   @@index([salesRepId])
   @@map("orders")

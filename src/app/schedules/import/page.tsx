@@ -43,7 +43,7 @@ const textToRows = (text: string): any[][] => {
   return lines.map(line => line.split('\t'));
 };
 
-type DataType = 'schedule' | 'branch';
+type DataType = 'schedule' | 'branch' | 'partner';
 type InputMode = 'file' | 'paste';
 
 /* ──────────────────────────────────────────────────
@@ -62,12 +62,105 @@ export default function DataImportPage() {
   const [pasteText, setPasteText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const t = dataType === 'schedule' ? ts : tb;
+  // パートナー案件用
+  const [partners, setPartners] = useState<{ id: number; name: string }[]>([]);
+  const [selectedPartnerId, setSelectedPartnerId] = useState<number | null>(null);
+  const [orderTitle, setOrderTitle] = useState('');
+  const [partnersLoaded, setPartnersLoaded] = useState(false);
+
+  // 単価マスタ用
+  const [flyerPrices, setFlyerPrices] = useState<{ flyerName: string; customerCode: string | null; flyerCode: string | null; unitPrice: number }[]>([]);
+  const [priceCount, setPriceCount] = useState<number>(0);
+  const [showPriceInput, setShowPriceInput] = useState(false);
+  const [pricePasteText, setPricePasteText] = useState('');
+  const [priceMessage, setPriceMessage] = useState('');
+
+  const loadPartners = async () => {
+    if (partnersLoaded) return;
+    try {
+      const res = await fetch('/api/partners');
+      if (res.ok) {
+        const data = await res.json();
+        setPartners(data);
+        setPartnersLoaded(true);
+      }
+    } catch {}
+  };
+
+  const loadFlyerPrices = async (partnerId: number) => {
+    try {
+      const res = await fetch(`/api/partners/${partnerId}/flyer-prices`);
+      if (res.ok) {
+        const data = await res.json();
+        setFlyerPrices(data);
+        setPriceCount(data.length);
+      }
+    } catch {}
+  };
+
+  const lookupPrice = (flyerName: string, customerCode: string | null, flyerCode: string | null): number | null => {
+    if (flyerPrices.length === 0 || !flyerName) return null;
+    const fn = flyerName.trim();
+    const cc = customerCode ? customerCode.trim() : null;
+    const fc = flyerCode ? flyerCode.trim() : null;
+    let match = flyerPrices.find(p => p.flyerName === fn && p.customerCode === cc && p.flyerCode === fc);
+    if (!match && cc) {
+      match = flyerPrices.find(p => p.flyerName === fn && p.customerCode === cc && p.flyerCode === null);
+    }
+    if (!match) {
+      match = flyerPrices.find(p => p.flyerName === fn && p.customerCode === null && p.flyerCode === null);
+    }
+    return match ? match.unitPrice : null;
+  };
+
+  const importPriceData = async () => {
+    if (!selectedPartnerId || !pricePasteText.trim()) return;
+    const lines = pricePasteText.split(/\r?\n/).filter(l => l.trim());
+    const items = lines.map(line => {
+      const cols = line.split('\t');
+      return {
+        flyerName: (cols[0] || '').trim(),
+        customerCode: (cols[1] || '').trim() || null,
+        flyerCode: (cols[2] || '').trim() || null,
+        unitPrice: parseFloat(cols[3]) || 0,
+      };
+    }).filter(item => item.flyerName && item.unitPrice > 0);
+
+    if (items.length === 0) return;
+
+    try {
+      const res = await fetch(`/api/partners/${selectedPartnerId}/flyer-prices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(items),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPriceMessage(`✨ ${ts('price_master_import_success', { count: data.count })}`);
+        setPricePasteText('');
+        setShowPriceInput(false);
+        await loadFlyerPrices(selectedPartnerId);
+      } else {
+        setPriceMessage(`❌ ${ts('price_master_import_error')}`);
+      }
+    } catch {
+      setPriceMessage(`❌ ${ts('price_master_import_error')}`);
+    }
+  };
+
+  const t = dataType === 'branch' ? tb : ts;
 
   const resetState = () => {
     setParsedData([]);
     setMessage('');
     setPasteText('');
+    setSelectedPartnerId(null);
+    setOrderTitle('');
+    setFlyerPrices([]);
+    setPriceCount(0);
+    setShowPriceInput(false);
+    setPricePasteText('');
+    setPriceMessage('');
   };
 
   /* ────── スケジュール パース ────── */
@@ -235,9 +328,9 @@ export default function DataImportPage() {
   };
 
   /* ────── 入力ハンドラ ────── */
-  const processRows = dataType === 'schedule' ? processScheduleRows : processBranchRows;
-  const loadingMsg = dataType === 'schedule' ? ts('loading_file') : tb('import_loading');
-  const errorReadMsg = dataType === 'schedule' ? ts('error_file_read') : tb('import_error_read');
+  const processRows = dataType === 'branch' ? processBranchRows : processScheduleRows;
+  const loadingMsg = dataType === 'branch' ? tb('import_loading') : ts('loading_file');
+  const errorReadMsg = dataType === 'branch' ? tb('import_error_read') : ts('error_file_read');
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -267,16 +360,28 @@ export default function DataImportPage() {
 
   /* ────── インポート実行 ────── */
   const executeImport = async () => {
+    if (dataType === 'partner' && !selectedPartnerId) {
+      setMessage(`❌ ${ts('partner_required')}`);
+      return;
+    }
+
     setIsImporting(true);
-    setMessage(dataType === 'schedule' ? ts('importing') : tb('import_registering'));
-    const apiUrl = dataType === 'schedule' ? '/api/schedules/import' : '/api/branches/import';
+    setMessage(dataType === 'branch' ? tb('import_registering') : ts('importing'));
+    const apiUrl = dataType === 'branch' ? '/api/branches/import' : '/api/schedules/import';
+
+    const requestBody = dataType === 'partner'
+      ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: parsedData }
+      : parsedData;
 
     try {
-      const res = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedData) });
+      const res = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
       const data = await res.json();
       if (res.ok) {
         let msg = '';
-        if (dataType === 'schedule') {
+        if (dataType === 'partner') {
+          msg = `✨ ${ts('import_partner_success', { orderNo: data.orderNo, count: data.count })}`;
+          if (data.newDistributorCount > 0) msg += ` ${ts('import_new_distributors', { count: data.newDistributorCount })}`;
+        } else if (dataType === 'schedule') {
           msg = `✨ ${ts('import_success', { count: data.count })}`;
           if (data.newDistributorCount > 0) msg += ` ${ts('import_new_distributors', { count: data.newDistributorCount })}`;
         } else {
@@ -288,13 +393,15 @@ export default function DataImportPage() {
         setMessage(`❌ エラー: ${data.error}`);
       }
     } catch {
-      setMessage(`❌ ${dataType === 'schedule' ? ts('error_import_failed') : tb('import_error_comm')}`);
+      setMessage(`❌ ${dataType === 'branch' ? tb('import_error_comm') : ts('error_import_failed')}`);
     }
     setIsImporting(false);
   };
 
   /* ────── UI ────── */
   const isSchedule = dataType === 'schedule';
+  const isPartner = dataType === 'partner';
+  const accentColor = isPartner ? 'purple' : isSchedule ? 'emerald' : 'blue';
 
   return (
     <div className="space-y-6">
@@ -308,7 +415,7 @@ export default function DataImportPage() {
       {/* ── データ種別タブ ── */}
       <div className="flex gap-2">
         <button
-          onClick={() => { if (!isSchedule) { setDataType('schedule'); resetState(); } }}
+          onClick={() => { if (dataType !== 'schedule') { setDataType('schedule'); resetState(); } }}
           className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
             isSchedule ? 'bg-emerald-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
@@ -317,15 +424,120 @@ export default function DataImportPage() {
           スケジュール
         </button>
         <button
-          onClick={() => { if (isSchedule) { setDataType('branch'); resetState(); } }}
+          onClick={() => { if (dataType !== 'branch') { setDataType('branch'); resetState(); } }}
           className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
-            !isSchedule ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+            dataType === 'branch' ? 'bg-blue-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
           }`}
         >
           <i className="bi bi-shop mr-1.5"></i>
           支店
         </button>
+        <button
+          onClick={() => { if (dataType !== 'partner') { setDataType('partner'); resetState(); loadPartners(); } }}
+          className={`px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+            isPartner ? 'bg-purple-600 text-white shadow' : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+          }`}
+        >
+          <i className="bi bi-briefcase mr-1.5"></i>
+          {ts('partner_project')}
+        </button>
       </div>
+
+      {/* ── パートナー案件設定 ── */}
+      {isPartner && (
+        <div className="bg-white rounded-xl shadow-sm border border-purple-200 p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">{ts('select_partner')} <span className="text-red-500">*</span></label>
+            <select
+              value={selectedPartnerId || ''}
+              onChange={(e) => {
+                const id = e.target.value ? Number(e.target.value) : null;
+                setSelectedPartnerId(id);
+                if (id) {
+                  if (!orderTitle) {
+                    const partner = partners.find(p => p.id === id);
+                    if (partner) {
+                      const today = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
+                      setOrderTitle(`${partner.name} ${today}`);
+                    }
+                  }
+                  loadFlyerPrices(id);
+                } else {
+                  setFlyerPrices([]);
+                  setPriceCount(0);
+                }
+              }}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            >
+              <option value="">{ts('select_partner')}...</option>
+              {partners.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1">{ts('order_title')}</label>
+            <input
+              type="text"
+              value={orderTitle}
+              onChange={(e) => setOrderTitle(e.target.value)}
+              placeholder={ts('order_title_placeholder')}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+            />
+          </div>
+
+          {/* 単価マスタセクション */}
+          {selectedPartnerId && (
+            <div className="border-t border-purple-100 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700">
+                    <i className="bi bi-currency-yen mr-1"></i>
+                    {ts('price_master')}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {ts('price_master_count', { count: priceCount })}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPriceInput(!showPriceInput)}
+                  className="text-sm font-semibold text-purple-600 hover:text-purple-800 transition-colors"
+                >
+                  <i className={`bi ${showPriceInput ? 'bi-chevron-up' : 'bi-plus-circle'} mr-1`}></i>
+                  {ts('price_master_import')}
+                </button>
+              </div>
+
+              {showPriceInput && (
+                <div className="space-y-2">
+                  <textarea
+                    value={pricePasteText}
+                    onChange={(e) => setPricePasteText(e.target.value)}
+                    placeholder={ts('price_master_placeholder')}
+                    className="w-full h-32 p-3 border border-purple-200 rounded-lg text-sm font-mono resize-y focus:ring-2 focus:ring-purple-500 focus:border-purple-500 placeholder:text-slate-400"
+                  />
+                  <button
+                    onClick={importPriceData}
+                    disabled={!pricePasteText.trim()}
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors"
+                  >
+                    <i className="bi bi-upload mr-1"></i>
+                    {ts('price_master_import')}
+                  </button>
+                </div>
+              )}
+
+              {priceMessage && (
+                <div className={`p-2 rounded-lg text-sm font-semibold ${
+                  priceMessage.includes('❌') ? 'bg-rose-50 text-rose-700' : 'bg-purple-50 text-purple-700'
+                }`}>
+                  {priceMessage}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 入力エリア ── */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -334,7 +546,8 @@ export default function DataImportPage() {
             onClick={() => setInputMode('file')}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
               inputMode === 'file'
-                ? isSchedule ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-600' : 'text-blue-700 bg-blue-50 border-b-2 border-blue-600'
+                ? isPartner ? 'text-purple-700 bg-purple-50 border-b-2 border-purple-600'
+                  : isSchedule ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-600' : 'text-blue-700 bg-blue-50 border-b-2 border-blue-600'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
@@ -345,7 +558,8 @@ export default function DataImportPage() {
             onClick={() => setInputMode('paste')}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
               inputMode === 'paste'
-                ? isSchedule ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-600' : 'text-blue-700 bg-blue-50 border-b-2 border-blue-600'
+                ? isPartner ? 'text-purple-700 bg-purple-50 border-b-2 border-purple-600'
+                  : isSchedule ? 'text-emerald-700 bg-emerald-50 border-b-2 border-emerald-600' : 'text-blue-700 bg-blue-50 border-b-2 border-blue-600'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
             }`}
           >
@@ -376,7 +590,7 @@ export default function DataImportPage() {
               {pasteText && (
                 <button
                   onClick={handleParsePasteText}
-                  className={`mt-3 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${isSchedule ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                  className={`mt-3 text-white px-5 py-2 rounded-lg text-sm font-semibold transition-colors ${isPartner ? 'bg-purple-600 hover:bg-purple-700' : isSchedule ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                 >
                   <i className="bi bi-arrow-repeat mr-1.5"></i>
                   {ts('paste_parse_btn')}
@@ -389,6 +603,7 @@ export default function DataImportPage() {
             <div className={`mt-4 p-3 rounded-lg font-bold border whitespace-pre-wrap ${
               message.includes('エラー') || message.includes('❌')
                 ? 'bg-rose-50 text-rose-700 border-rose-200'
+                : isPartner ? 'bg-purple-50 text-purple-700 border-purple-200'
                 : isSchedule ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-blue-50 text-blue-700 border-blue-200'
             }`}>
               {message}
@@ -402,19 +617,19 @@ export default function DataImportPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
             <div>
-              <h3 className="font-bold text-slate-700">{isSchedule ? ts('preview_title') : tb('preview_title')}</h3>
+              <h3 className="font-bold text-slate-700">{dataType === 'branch' ? tb('preview_title') : ts('preview_title')}</h3>
               <p className="text-sm text-slate-500 mt-1">
-                {isSchedule ? ts('preview_count') : tb('preview_count')}:{' '}
-                <span className={`font-bold ${isSchedule ? 'text-emerald-600' : 'text-blue-600'}`}>{parsedData.length} {isSchedule ? ts('preview_unit') : tb('preview_unit')}</span>
+                {dataType === 'branch' ? tb('preview_count') : ts('preview_count')}:{' '}
+                <span className={`font-bold ${isPartner ? 'text-purple-600' : isSchedule ? 'text-emerald-600' : 'text-blue-600'}`}>{parsedData.length} {dataType === 'branch' ? tb('preview_unit') : ts('preview_unit')}</span>
               </p>
             </div>
             <button onClick={executeImport} disabled={isImporting} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow disabled:opacity-50 transition-all">
-              {isImporting ? (isSchedule ? ts('btn_registering') : tb('btn_registering')) : (isSchedule ? ts('btn_register') : tb('btn_register'))}
+              {isImporting ? (dataType === 'branch' ? tb('btn_registering') : ts('btn_registering')) : (dataType === 'branch' ? tb('btn_register') : ts('btn_register'))}
             </button>
           </div>
 
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-            {dataType === 'schedule' ? (
+            {dataType !== 'branch' ? (
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-100 text-slate-500 sticky top-0 shadow-sm">
                   <tr>
@@ -427,6 +642,7 @@ export default function DataImportPage() {
                     {[1,2,3,4,5,6].map(n => (
                       <th key={n} className="px-4 py-3">チラシ{n}</th>
                     ))}
+                    {isPartner && <th className="px-4 py-3">{ts('col_billing_unit_price')}</th>}
                     <th className="px-4 py-3">{ts('col_status')}</th>
                   </tr>
                 </thead>
@@ -459,6 +675,20 @@ export default function DataImportPage() {
                             </td>
                           );
                         })}
+                        {isPartner && (
+                          <td className="px-4 py-3 text-xs">
+                            {s.items?.map((item: any, ii: number) => {
+                              const price = lookupPrice(item.flyerName, item.customerCode, item.flyerCode);
+                              return (
+                                <div key={ii}>
+                                  {price != null
+                                    ? <span className="text-emerald-600 font-semibold">¥{price}</span>
+                                    : <span className="text-orange-400">{ts('price_not_found')}</span>}
+                                </div>
+                              );
+                            })}
+                          </td>
+                        )}
                         <td className="px-4 py-3">
                           {hasActual
                             ? <span className="text-blue-600 font-bold"><i className="bi bi-check-circle-fill"></i> {ts('status_completed')}</span>

@@ -76,5 +76,22 @@
   "paste_parse_btn": "貼り付けデータを読み込む",
   "or_divider": "または",
   "tab_file": "ファイルアップロード",
-  "tab_paste": "クリップボード貼り付け"
+  "tab_paste": "クリップボード貼り付け",
+
+  "partner_project": "パートナー案件",
+  "select_partner": "パートナーを選択",
+  "order_title": "受注タイトル",
+  "order_title_placeholder": "例: ケイ・アンド・パートナーズ 2025年7月分",
+  "import_partner_success": "パートナー案件を登録しました（受注番号: {orderNo}）。{count}件のスケジュールを登録。",
+  "partner_required": "パートナーを選択してください",
+
+  "price_master": "単価マスタ",
+  "price_master_count": "登録済み: {count}件",
+  "price_master_import": "単価データを貼り付け",
+  "price_master_import_success": "単価マスタを更新しました（{count}件）",
+  "price_master_placeholder": "チラシ名\t顧客コード\tチラシコード\t単価",
+  "price_master_loading": "単価マスタを読み込み中...",
+  "price_master_import_error": "単価マスタの登録に失敗しました",
+  "col_billing_unit_price": "請求単価",
+  "price_not_found": "単価未設定"
 }

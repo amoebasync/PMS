@@ -76,5 +76,22 @@
   "paste_parse_btn": "Parse Pasted Data",
   "or_divider": "or",
   "tab_file": "File Upload",
-  "tab_paste": "Clipboard Paste"
+  "tab_paste": "Clipboard Paste",
+
+  "partner_project": "Partner Project",
+  "select_partner": "Select Partner",
+  "order_title": "Order Title",
+  "order_title_placeholder": "e.g. K&Partners July 2025",
+  "import_partner_success": "Partner project imported (Order: {orderNo}). {count} schedules registered.",
+  "partner_required": "Please select a partner",
+
+  "price_master": "Price Master",
+  "price_master_count": "Registered: {count} entries",
+  "price_master_import": "Paste Price Data",
+  "price_master_import_success": "Price master updated ({count} entries)",
+  "price_master_placeholder": "FlyerName\tCustomerCode\tFlyerCode\tUnitPrice",
+  "price_master_loading": "Loading price master...",
+  "price_master_import_error": "Failed to import price master",
+  "col_billing_unit_price": "Billing Unit Price",
+  "price_not_found": "Price not set"
 }
