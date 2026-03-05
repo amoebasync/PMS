@@ -71,13 +71,36 @@ export default function DataImportPage() {
   };
 
   /* ────── スケジュール パース ────── */
+  const SCHEDULE_KNOWN_HEADERS = ['年月日', '店舗', 'ｽﾀｯﾌ管理番号', '仕事管理番号', '丁目番号', 'ｴﾘｱ単価', '市・区', 'Staff', '開始時間', '終了時間', '備考', 'チラシ1'];
+  // ヘッダー無し時の固定カラムインデックス
+  const SCHEDULE_FIXED: Record<string, number> = {
+    '店舗': 2, '年月日': 5, '仕事管理番号': 6, 'ｽﾀｯﾌ管理番号': 8, 'Staff': 9,
+    'ｴﾘｱ単価': 18, '市・区': 19, '丁目番号': 21, '備考': 25,
+    'チラシ1': 26, 'チラシ2': 35, 'チラシ3': 44, 'チラシ4': 53, 'チラシ5': 62, 'チラシ6': 71,
+    '開始時間': 80, '500枚時間': 81, '1000枚時間': 82, '1500枚時間': 83, '2000枚時間': 84, '2500枚時間': 85, '終了時間': 86,
+  };
+
   const processScheduleRows = async (rows: any[][]) => {
-    if (rows.length < 2) { setMessage(`エラー: ${ts('error_empty_file')}`); return; }
+    if (rows.length < 1) { setMessage(`エラー: ${ts('error_empty_file')}`); return; }
 
-    const headers = rows[0].map((h: any) => String(h ?? '').trim());
-    const dataRows = rows.slice(1);
+    // ヘッダー行の有無を自動判定
+    const firstRow = rows[0].map((h: any) => String(h ?? '').trim());
+    const matchCount = firstRow.filter(cell => SCHEDULE_KNOWN_HEADERS.includes(cell)).length;
+    const hasHeader = matchCount >= 2;
 
-    const idx = (n: string) => headers.indexOf(n);
+    let colIndex: Record<string, number>;
+    let dataRows: any[][];
+
+    if (hasHeader) {
+      colIndex = {};
+      firstRow.forEach((h, i) => { colIndex[h] = i; });
+      dataRows = rows.slice(1);
+    } else {
+      colIndex = { ...SCHEDULE_FIXED };
+      dataRows = rows;
+    }
+
+    const idx = (n: string) => colIndex[n] ?? -1;
     const idxJobNum = idx('仕事管理番号'), idxDate = idx('年月日'), idxBranch = idx('店舗');
     const idxStaff = idx('ｽﾀｯﾌ管理番号'), idxAreaCode = idx('丁目番号');
     const idxAreaUnitPrice = idx('ｴﾘｱ単価'), idxSizeUnitPrice = idx('ｻｲｽﾞ単価');
@@ -91,7 +114,7 @@ export default function DataImportPage() {
     }
 
     const rawSchedules = dataRows.map((row, index) => {
-      const excelRowNumber = index + 2;
+      const excelRowNumber = index + (hasHeader ? 2 : 1);
       if (!row || row.length < 10) return null;
 
       const items = [];
