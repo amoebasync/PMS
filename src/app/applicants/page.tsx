@@ -525,6 +525,8 @@ export default function ApplicantsPage() {
   const [showLinkPopover, setShowLinkPopover] = useState(false);
   const [linkLang, setLinkLang] = useState('ja');
   const [linkMediaId, setLinkMediaId] = useState('');
+  const linkBtnRef = useRef<HTMLButtonElement>(null);
+  const [linkPopoverPos, setLinkPopoverPos] = useState({ top: 0, right: 0 });
 
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
@@ -1772,9 +1774,16 @@ export default function ApplicantsPage() {
             {/* スペーサー + アクションボタン */}
             <div className="hidden md:block flex-1" />
             <div className="flex items-center gap-2 px-3 md:px-4 py-2 md:py-0 overflow-x-auto scrollbar-hide">
-              <div className="relative">
+              <div>
                 <button
-                  onClick={() => setShowLinkPopover(v => !v)}
+                  ref={linkBtnRef}
+                  onClick={() => {
+                    if (!showLinkPopover && linkBtnRef.current) {
+                      const rect = linkBtnRef.current.getBoundingClientRect();
+                      setLinkPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                    }
+                    setShowLinkPopover(v => !v);
+                  }}
                   className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-slate-50 transition-colors shrink-0 whitespace-nowrap"
                 >
                   <i className="bi bi-link-45deg text-indigo-500"></i>
@@ -1784,7 +1793,7 @@ export default function ApplicantsPage() {
                 {showLinkPopover && (
                   <>
                     <div className="fixed inset-0 z-[200]" onClick={() => setShowLinkPopover(false)} />
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[210] p-4 space-y-3">
+                    <div style={{ top: linkPopoverPos.top, right: linkPopoverPos.right }} className="fixed w-80 bg-white rounded-xl shadow-xl border border-slate-200 z-[210] p-4 space-y-3">
                       <div className="text-xs font-black text-slate-700 mb-1">{t('apply_link_title')}</div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_language')}</label>
