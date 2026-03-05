@@ -86,9 +86,9 @@
   "partner_required": "パートナーを選択してください",
 
   "price_master": "単価マスタ",
-  "price_master_count": "登録済み: {count}件",
+  "price_master_count": "登録済み: {{count}}件",
   "price_master_import": "単価データを貼り付け",
-  "price_master_import_success": "単価マスタを更新しました（{count}件）",
+  "price_master_import_success": "単価マスタを更新しました（{{count}}件）",
   "price_master_placeholder": "チラシ名\t顧客コード\tチラシコード\t単価",
   "price_master_loading": "単価マスタを読み込み中...",
   "price_master_import_error": "単価マスタの登録に失敗しました",

@@ -86,9 +86,9 @@
   "partner_required": "Please select a partner",
 
   "price_master": "Price Master",
-  "price_master_count": "Registered: {count} entries",
+  "price_master_count": "Registered: {{count}} entries",
   "price_master_import": "Paste Price Data",
-  "price_master_import_success": "Price master updated ({count} entries)",
+  "price_master_import_success": "Price master updated ({{count}} entries)",
   "price_master_placeholder": "FlyerName\tCustomerCode\tFlyerCode\tUnitPrice",
   "price_master_loading": "Loading price master...",
   "price_master_import_error": "Failed to import price master",
