@@ -145,6 +145,12 @@ type Applicant = {
   trainingNotes: string | null;
   gender: string | null;
   registeredDistributorId: number | null;
+  reminderLogs?: Array<{
+    id: number;
+    description: string;
+    afterData: { type?: string; status?: string; email?: string } | null;
+    createdAt: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 };
@@ -516,10 +522,11 @@ export default function ApplicantsPage() {
   // ── 配布員登録 ──
   const [branches, setBranches] = useState<{ id: number; nameJa: string; prefix: string | null }[]>([]);
   const [showDistributorForm, setShowDistributorForm] = useState(false);
-  const [distForm, setDistForm] = useState({ branchId: '', staffId: '' });
+  const [distForm, setDistForm] = useState({ branchId: '', staffId: '', sendWelcomeEmail: true });
   const [staffIdLoading, setStaffIdLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
+  const [sendingPortalInfo, setSendingPortalInfo] = useState(false);
 
   // ── 応募ページリンク生成 ──
   const [showLinkPopover, setShowLinkPopover] = useState(false);
@@ -759,6 +766,7 @@ export default function ApplicantsPage() {
         body: JSON.stringify({
           branchId: Number(distForm.branchId),
           staffId: distForm.staffId || undefined,
+          sendWelcomeEmail: distForm.sendWelcomeEmail,
         }),
       });
       const data = await res.json();
@@ -773,6 +781,28 @@ export default function ApplicantsPage() {
       showToast(t('eval_distributor_failed'), 'error');
     } finally {
       setRegistering(false);
+    }
+  };
+
+  // 配布員ポータル案内メール再送信
+  const handleSendPortalInfo = async () => {
+    if (!selectedApplicant) return;
+    setSendingPortalInfo(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/send-portal-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(t('eval_distributor_portal_sent'), 'success');
+      } else {
+        showToast(data.error || t('eval_distributor_portal_failed'), 'error');
+      }
+    } catch {
+      showToast(t('eval_distributor_portal_failed'), 'error');
+    } finally {
+      setSendingPortalInfo(false);
     }
   };
 
@@ -1164,7 +1194,7 @@ export default function ApplicantsPage() {
     setSelectedTrainingSlotId('');
     setTrainingBookingMode('now');
     setShowDistributorForm(false);
-    setDistForm({ branchId: '', staffId: '' });
+    setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true });
     setRegisteredDistributorId(null);
     try {
       const res = await fetch(`/api/applicants/${applicantId}`);
@@ -3142,6 +3172,29 @@ export default function ApplicantsPage() {
                         );
                       })()}
 
+                      {/* 面接リマインダー送信状況 */}
+                      {(() => {
+                        const interviewReminder = selectedApplicant.reminderLogs?.find(
+                          (log) => (log.afterData as any)?.type === 'interview_reminder'
+                        );
+                        if (!interviewReminder) return null;
+                        const isSuccess = (interviewReminder.afterData as any)?.status === 'success';
+                        const sentAt = new Date(interviewReminder.createdAt).toLocaleString('ja-JP', {
+                          month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                        });
+                        return (
+                          <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
+                            isSuccess ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                          }`}>
+                            <i className={`bi ${isSuccess ? 'bi-envelope-check-fill' : 'bi-envelope-x-fill'} text-xs`}></i>
+                            {isSuccess
+                              ? `${t('reminder_interview_sent')}（${sentAt}）`
+                              : `${t('reminder_interview_failed')}（${sentAt}）`
+                            }
+                          </div>
+                        );
+                      })()}
+
                       {/* 面接操作ボタン */}
                       {(getApplicantInterviewSlot(selectedApplicant)) && (
                         <div className="flex gap-2 mt-3 pt-3 border-t border-slate-200">
@@ -3512,6 +3565,29 @@ export default function ApplicantsPage() {
                               </div>
                             </div>
 
+                            {/* 研修リマインダー送信状況 */}
+                            {(() => {
+                              const trainingReminder = selectedApplicant.reminderLogs?.find(
+                                (log) => (log.afterData as any)?.type === 'training_reminder'
+                              );
+                              if (!trainingReminder) return null;
+                              const isSuccess = (trainingReminder.afterData as any)?.status === 'success';
+                              const sentAt = new Date(trainingReminder.createdAt).toLocaleString('ja-JP', {
+                                month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                              });
+                              return (
+                                <div className={`flex items-center gap-1.5 mt-2 px-2.5 py-1.5 rounded-lg text-xs font-medium ${
+                                  isSuccess ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                                }`}>
+                                  <i className={`bi ${isSuccess ? 'bi-envelope-check-fill' : 'bi-envelope-x-fill'} text-xs`}></i>
+                                  {isSuccess
+                                    ? `${t('reminder_training_sent')}（${sentAt}）`
+                                    : `${t('reminder_training_failed')}（${sentAt}）`
+                                  }
+                                </div>
+                              );
+                            })()}
+
                             <div className="flex gap-2 pt-2 border-t border-slate-200">
                               <button
                                 type="button"
@@ -3791,18 +3867,31 @@ export default function ApplicantsPage() {
                 </button>
                 <div className="flex gap-3">
                   {registeredDistributorId ? (
-                    <button
-                      disabled
-                      className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
-                    >
-                      <i className="bi bi-check-circle-fill"></i>
-                      {t('eval_distributor_registered_btn')}
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        disabled
+                        className="px-4 py-2.5 bg-slate-100 text-slate-400 rounded-xl font-bold text-sm border border-slate-200 flex items-center gap-1.5 cursor-not-allowed"
+                      >
+                        <i className="bi bi-check-circle-fill"></i>
+                        {t('eval_distributor_registered_btn')}
+                      </button>
+                      <button
+                        onClick={handleSendPortalInfo}
+                        disabled={sendingPortalInfo}
+                        className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                      >
+                        {sendingPortalInfo
+                          ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          : <i className="bi bi-envelope-fill"></i>
+                        }
+                        {t('eval_distributor_send_portal')}
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={() => {
                         setShowDistributorForm(true);
-                        setDistForm({ branchId: '', staffId: '' });
+                        setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true });
                         if (branches.length === 0) fetchBranches();
                       }}
                       className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
@@ -3894,6 +3983,16 @@ export default function ApplicantsPage() {
                 </div>
                 <p className="text-[10px] text-slate-400 mt-1">{t('eval_distributor_staff_note')}</p>
               </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={distForm.sendWelcomeEmail}
+                  onChange={e => setDistForm(f => ({ ...f, sendWelcomeEmail: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700">{t('eval_distributor_send_welcome')}</span>
+              </label>
+              <p className="text-[10px] text-slate-400 -mt-2 ml-6.5">{t('eval_distributor_send_welcome_note')}</p>
             </div>
             {/* フッター */}
             <div className="flex gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">

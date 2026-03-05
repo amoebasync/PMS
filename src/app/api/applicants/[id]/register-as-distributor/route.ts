@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { sendDistributorWelcomeEmail } from '@/lib/mailer';
 import crypto from 'crypto';
 
 function buildInitialPassword(birthday: Date): string {
@@ -26,7 +27,7 @@ export async function POST(
     const { id } = await params;
     const applicantId = parseInt(id);
     const body = await request.json();
-    const { branchId, staffId } = body;
+    const { branchId, staffId, sendWelcomeEmail = false } = body;
 
     if (!branchId) {
       return NextResponse.json({ error: '所属支店は必須です' }, { status: 400 });
@@ -107,11 +108,35 @@ export async function POST(
       return distributor;
     });
 
+    // 案内メール送信
+    let emailSent = false;
+    if (sendWelcomeEmail && applicant.email) {
+      const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
+      const loginUrl = `${siteUrl}/staff/login`;
+      const birthday = applicant.birthday!;
+      const birthdayPassword = `${birthday.getFullYear()}${String(birthday.getMonth() + 1).padStart(2, '0')}${String(birthday.getDate()).padStart(2, '0')}`;
+
+      try {
+        await sendDistributorWelcomeEmail(
+          applicant.email,
+          applicant.name,
+          applicant.language || 'ja',
+          newDistributor.staffId,
+          birthdayPassword,
+          loginUrl,
+        );
+        emailSent = true;
+      } catch (err) {
+        console.error('Distributor welcome email failed:', err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       distributorId: newDistributor.id,
       staffId: newDistributor.staffId,
       name: newDistributor.name,
+      emailSent,
     });
   } catch (error: any) {
     console.error('Register As Distributor Error:', error);

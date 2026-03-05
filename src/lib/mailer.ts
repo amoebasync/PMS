@@ -1722,3 +1722,425 @@ export const sendWorkspaceNotificationEmail = async (
     text: `${lastName} ${firstName} さん\n\nGoogle Workspace（@tiramis.co.jp）のアカウントが作成されました。\n\nメールアドレス: ${workspaceEmail}\n初期パスワード: ${initialPassword}\n\n初回ログイン時に必ずパスワードを変更してください。\nGoogleログイン: https://accounts.google.com\n\n【重要】PMS Pro（社内管理システム）のログインメールアドレスも変更されました。今後は ${workspaceEmail} でPMS Proにログインしてください。以前のメールアドレスではログインできなくなります。\n\nご不明な点は管理者までお問い合わせください。`,
   });
 };
+
+// ─────────────────────────────────────────────────────────
+// 17. 配布員ポータル案内メール（配布員登録時）
+// ─────────────────────────────────────────────────────────
+export async function sendDistributorWelcomeEmail(
+  toEmail: string,
+  name: string,
+  language: string,
+  staffId: string,
+  birthdayPassword: string,
+  loginUrl: string,
+): Promise<void> {
+  const isEn = language === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${name},</p>
+    <p style="margin:0 0 16px;">
+      Your distributor account has been created. You can now access the Distributor Portal using the login information below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">Login Information</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:160px;">Portal URL</td>
+            <td style="padding:8px 0;"><a href="${loginUrl}" style="color:#6366f1;font-weight:bold;">${loginUrl}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Staff ID</td>
+            <td style="padding:8px 0;font-weight:bold;font-family:monospace;font-size:15px;">${staffId}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Email</td>
+            <td style="padding:8px 0;font-weight:bold;">${toEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">Initial Password</td>
+            <td style="padding:8px 0;font-weight:bold;font-family:monospace;font-size:15px;">${birthdayPassword}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>⚠ Please change your password after your first login.</strong><br>
+        Your initial password is your date of birth (YYYYMMDD format).
+      </p>
+    </div>
+
+    <div style="text-align:center;margin:32px 0 24px;">
+      <a href="${loginUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Go to Portal</a>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact your manager or HR department.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${name} 様</p>
+    <p style="margin:0 0 16px;">
+      配布員ポータルのアカウントが作成されました。<br>
+      以下のログイン情報でポータルにアクセスしてください。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#475569;">ログイン情報</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#64748b;width:160px;">ポータルURL</td>
+            <td style="padding:8px 0;"><a href="${loginUrl}" style="color:#6366f1;font-weight:bold;">${loginUrl}</a></td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">スタッフID</td>
+            <td style="padding:8px 0;font-weight:bold;font-family:monospace;font-size:15px;">${staffId}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">メールアドレス</td>
+            <td style="padding:8px 0;font-weight:bold;">${toEmail}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#64748b;">初期パスワード</td>
+            <td style="padding:8px 0;font-weight:bold;font-family:monospace;font-size:15px;">${birthdayPassword}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
+      <p style="margin:0;font-size:13px;color:#854d0e;">
+        <strong>⚠ 初回ログイン時に必ずパスワードを変更してください。</strong><br>
+        初期パスワードは生年月日（YYYYMMDD形式）です。
+      </p>
+    </div>
+
+    <div style="text-align:center;margin:32px 0 24px;">
+      <a href="${loginUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">ポータルにログイン</a>
+    </div>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点は担当者または管理者までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Your Distributor Portal Account'
+    : '【Tiramis】配布員ポータルのご案内';
+
+  const textContent = isEn
+    ? `Dear ${name},\n\nYour distributor account has been created.\n\nPortal URL: ${loginUrl}\nStaff ID: ${staffId}\nEmail: ${toEmail}\nInitial Password: ${birthdayPassword}\n\nPlease change your password after your first login.\nYour initial password is your date of birth (YYYYMMDD format).\n\nIf you have any questions, please contact your manager.`
+    : `${name} 様\n\n配布員ポータルのアカウントが作成されました。\n\nポータルURL: ${loginUrl}\nスタッフID: ${staffId}\nメールアドレス: ${toEmail}\n初期パスワード: ${birthdayPassword}\n\n初回ログイン時に必ずパスワードを変更してください。\n初期パスワードは生年月日（YYYYMMDD形式）です。\n\nご不明な点は担当者または管理者までお問い合わせください。`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml),
+    text: textContent,
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// 18. 面接リマインダーメール（当日朝に自動送信）
+// ─────────────────────────────────────────────────────────
+export async function sendInterviewReminderEmail(
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  interviewDate: string,
+  interviewTime: string,
+  meetUrl: string | null,
+  jobCategoryName: string,
+  meetingType?: string,
+  zoomMeetingNumber?: string | null,
+  zoomPassword?: string | null,
+): Promise<void> {
+  const isEn = language === 'en';
+  const isZoom = meetingType === 'ZOOM';
+
+  const meetSection = meetUrl
+    ? isZoom
+      ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Type' : '面接方法'}</td>
+          <td style="padding:6px 0;font-weight:bold;">Zoom</td>
+         </tr>
+         <tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Zoom URL' : 'Zoom URL'}</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>
+         ${zoomMeetingNumber ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Number' : 'ミーティング番号'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomMeetingNumber}</td>
+         </tr>` : ''}
+         ${zoomPassword ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Password' : 'パスワード'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomPassword}</td>
+         </tr>` : ''}`
+      : `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>`
+    : '';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      This is a reminder that your interview is scheduled for <strong>today</strong>. Please review the details below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">⏰ Today's Interview</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Date</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Time</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Join Zoom Meeting' : 'Join Google Meet'}</a>
+    </div>` : ''}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      Please be on time for your interview. If you have any questions, please contact us at recruit@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      本日の面接についてリマインドいたします。<br>
+      以下の内容をご確認ください。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">⏰ 本日の面接</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接日</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">面接時間</td>
+            <td style="padding:6px 0;font-weight:bold;">${interviewTime}</td>
+          </tr>
+          ${meetSection}
+        </table>
+      </td></tr>
+    </table>
+
+    ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Zoomミーティングに参加する' : 'Google Meetに参加する'}</a>
+    </div>` : ''}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      面接当日はお時間に余裕を持ってご参加ください。<br>
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Interview Reminder - Today'
+    : '【Tiramis】本日の面接のご確認';
+
+  const meetLabel = isZoom ? 'Zoom' : 'Google Meet';
+  const meetTextDetails = meetUrl
+    ? isZoom
+      ? `${meetLabel}: ${meetUrl}\n${zoomMeetingNumber ? `${isEn ? 'Meeting Number' : 'ミーティング番号'}: ${zoomMeetingNumber}\n` : ''}${zoomPassword ? `${isEn ? 'Password' : 'パスワード'}: ${zoomPassword}\n` : ''}`
+      : `${meetLabel}: ${meetUrl}\n`
+    : '';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nThis is a reminder that your interview is scheduled for today.\n\nPosition: ${jobCategoryName}\nDate: ${interviewDate}\nTime: ${interviewTime}\n${meetTextDetails}\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\n本日の面接についてリマインドいたします。\n\n応募職種: ${jobCategoryName}\n面接日: ${interviewDate}\n面接時間: ${interviewTime}\n${meetTextDetails}\n面接当日はお時間に余裕を持ってご参加ください。`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    subject,
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
+    text: textContent,
+  });
+}
+
+// ─────────────────────────────────────────────────────────
+// 18. 研修リマインダーメール（当日朝に自動送信）
+// ─────────────────────────────────────────────────────────
+export async function sendTrainingReminderEmail(
+  to: string,
+  name: string,
+  lang: string,
+  trainingDate: string,
+  trainingTime: string,
+  location: string | null,
+  jobCategoryName?: string,
+): Promise<void> {
+  const isEn = lang === 'en';
+
+  const jobRow = jobCategoryName
+    ? `<tr>
+        <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Position' : '応募職種'}</td>
+        <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+       </tr>`
+    : '';
+
+  const locationRow = location
+    ? `<tr>
+        <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Location' : '研修場所'}</td>
+        <td style="padding:6px 0;font-weight:bold;">${location}</td>
+       </tr>`
+    : '';
+
+  const venueSection = isEn
+    ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#1d4ed8;">📍 Venue</p>
+        <p style="margin:0 0 2px;font-size:14px;font-weight:bold;color:#1e293b;">K&amp;Partners Takadanobaba Branch</p>
+        <p style="margin:0 0 12px;font-size:13px;color:#475569;">〒169-0075 Tokyo, Shinjuku-ku, Takadanobaba 4-39-6 K&amp;P Bldg.</p>
+        <a href="https://maps.app.goo.gl/Prh66BPb2iLG2t4v9" target="_blank" style="display:inline-block;background:#ffffff;border:1px solid #bfdbfe;color:#2563eb;font-size:13px;font-weight:600;padding:7px 16px;border-radius:20px;text-decoration:none;margin-bottom:12px;">
+          🗺️ Open in Google Maps
+        </a>
+        <p style="margin:0;font-size:13px;color:#374151;">
+          When you arrive at the office, please come up to the 2nd floor by stairs or elevator.
+        </p>
+      </div>`
+    : `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#1d4ed8;">📍 研修場所</p>
+        <p style="margin:0 0 2px;font-size:14px;font-weight:bold;color:#1e293b;">K&amp;Partners 高田馬場支店</p>
+        <p style="margin:0 0 12px;font-size:13px;color:#475569;">〒169-0075 東京都新宿区高田馬場4-39-6 K&amp;Pビル</p>
+        <a href="https://maps.app.goo.gl/Prh66BPb2iLG2t4v9" target="_blank" style="display:inline-block;background:#ffffff;border:1px solid #bfdbfe;color:#2563eb;font-size:13px;font-weight:600;padding:7px 16px;border-radius:20px;text-decoration:none;margin-bottom:12px;">
+          🗺️ Googleマップで開く
+        </a>
+        <p style="margin:0;font-size:13px;color:#374151;">
+          到着されましたら、階段またはエレベーターで2階にお越しください。
+        </p>
+      </div>`;
+
+  const preparationSection = isEn
+    ? `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">🎒 What to Bring &amp; Dress Code</p>
+        <p style="margin:0 0 8px;font-size:13px;color:#1e293b;font-weight:600;">Please bring the following items with you for the training:</p>
+        <ul style="margin:0 0 12px;padding-left:20px;font-size:13px;color:#374151;line-height:1.8;">
+          <li>Residence card（在留カード）</li>
+          <li>Bank cash card（if you have one）</li>
+        </ul>
+        <p style="margin:0;font-size:13px;color:#374151;">
+          👟 Please wear comfortable clothing and shoes suitable for walking.
+        </p>
+      </div>`
+    : `<div style="background:#fefce8;border:1px solid #fde68a;border-radius:10px;padding:16px 20px;margin:24px 0;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">🎒 持ち物・服装</p>
+        <p style="margin:0 0 8px;font-size:13px;color:#1e293b;font-weight:600;">研修当日は以下のものをお持ちください：</p>
+        <ul style="margin:0 0 12px;padding-left:20px;font-size:13px;color:#374151;line-height:1.8;">
+          <li>在留カード（Residence card）</li>
+          <li>銀行のキャッシュカード（お持ちの方）</li>
+        </ul>
+        <p style="margin:0;font-size:13px;color:#374151;">
+          👟 動きやすい服装・歩きやすい靴でお越しください。
+        </p>
+      </div>`;
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${name},</p>
+    <p style="margin:0 0 16px;">
+      This is a reminder that your training session is scheduled for <strong>today</strong>. Please review the details below.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">⏰ Today's Training</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          ${jobRow}
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Date</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Time</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingTime}</td>
+          </tr>
+          ${locationRow}
+        </table>
+      </td></tr>
+    </table>
+
+    ${venueSection}
+    ${preparationSection}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      Please be on time. If you have any questions, please contact us at recruit@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${name} 様</p>
+    <p style="margin:0 0 16px;">
+      本日の研修についてリマインドいたします。<br>
+      以下の内容をご確認ください。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef3c7;border:1px solid #fde68a;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#92400e;">⏰ 本日の研修</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          ${jobRow}
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">研修日</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingDate}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">研修時間</td>
+            <td style="padding:6px 0;font-weight:bold;">${trainingTime}</td>
+          </tr>
+          ${locationRow}
+        </table>
+      </td></tr>
+    </table>
+
+    ${venueSection}
+    ${preparationSection}
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      研修当日はお時間に余裕を持ってお越しください。<br>
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Training Reminder - Today'
+    : '【Tiramis】本日の研修のご確認';
+
+  const textContent = isEn
+    ? `Dear ${name},\n\nThis is a reminder that your training session is scheduled for today.\n\n${jobCategoryName ? `Position: ${jobCategoryName}\n` : ''}Date: ${trainingDate}\nTime: ${trainingTime}\n${location ? `Location: ${location}\n` : ''}\n---\nVenue: K&Partners Takadanobaba Branch\n〒169-0075 Tokyo, Shinjuku-ku, Takadanobaba 4-39-6 K&P Bldg.\nGoogle Maps: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\nWhen you arrive, please come up to the 2nd floor by stairs or elevator.\n\nWhat to Bring:\n- Residence card (在留カード)\n- Bank cash card (if you have one)\n\nDress Code: Please wear comfortable clothing and shoes suitable for walking.\n---\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
+    : `${name} 様\n\n本日の研修についてリマインドいたします。\n\n${jobCategoryName ? `応募職種: ${jobCategoryName}\n` : ''}研修日: ${trainingDate}\n研修時間: ${trainingTime}\n${location ? `研修場所: ${location}\n` : ''}\n---\n研修場所: K&Partners 高田馬場支店\n〒169-0075 東京都新宿区高田馬場4-39-6 K&Pビル\nGoogleマップ: https://maps.app.goo.gl/Prh66BPb2iLG2t4v9\n到着されましたら、階段またはエレベーターで2階にお越しください。\n\n持ち物:\n- 在留カード（Residence card）\n- 銀行のキャッシュカード（お持ちの方）\n\n服装: 動きやすい服装・歩きやすい靴でお越しください。\n---\n研修当日はお時間に余裕を持ってお越しください。\nお問い合わせ: recruit@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to,
+    subject,
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
+    text: textContent,
+  });
+}

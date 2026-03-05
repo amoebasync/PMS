@@ -263,6 +263,11 @@
   "eval_distributor_birthday_required": "生年月日を入力してから配布員登録を行ってください",
   "eval_distributor_success": "配布員として登録しました",
   "eval_distributor_failed": "登録に失敗しました",
+  "eval_distributor_send_welcome": "配布員ポータルの案内メールを送信する",
+  "eval_distributor_send_welcome_note": "ログインURL・スタッフID・初期パスワードを記載したメールを送信します",
+  "eval_distributor_send_portal": "ポータル案内送信",
+  "eval_distributor_portal_sent": "配布員ポータル案内メールを送信しました",
+  "eval_distributor_portal_failed": "ポータル案内メールの送信に失敗しました",
 
   "eval_btn_delete": "削除",
   "eval_btn_save": "保存",
@@ -336,5 +341,9 @@
   "filter_master": "マスタ",
   "all_masters": "すべてのマスタ",
   "booked_count": "予約済",
-  "remaining": "残り"
+  "remaining": "残り",
+  "reminder_interview_sent": "面接リマインダー送信済",
+  "reminder_interview_failed": "面接リマインダー送信失敗",
+  "reminder_training_sent": "研修リマインダー送信済",
+  "reminder_training_failed": "研修リマインダー送信失敗"
 }

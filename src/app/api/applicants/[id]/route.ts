@@ -59,9 +59,28 @@ export async function GET(
         })
       : null;
 
+    // リマインダーメール送信履歴を取得（直近5件）
+    const reminderLogs = await prisma.auditLog.findMany({
+      where: {
+        targetModel: 'Applicant',
+        targetId: applicantId,
+        actorType: 'SYSTEM',
+        description: { contains: 'リマインダーメール送信' },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      select: {
+        id: true,
+        description: true,
+        afterData: true,
+        createdAt: true,
+      },
+    });
+
     return NextResponse.json({
       ...applicant,
       registeredDistributorId: registeredDistributor?.id ?? null,
+      reminderLogs,
     });
   } catch (error) {
     console.error('Applicant Detail Error:', error);

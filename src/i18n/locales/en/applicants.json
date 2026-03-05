@@ -263,6 +263,11 @@
   "eval_distributor_birthday_required": "Please enter date of birth before registering as distributor",
   "eval_distributor_success": "Registered as distributor",
   "eval_distributor_failed": "Registration failed",
+  "eval_distributor_send_welcome": "Send distributor portal welcome email",
+  "eval_distributor_send_welcome_note": "Sends an email with login URL, staff ID, and initial password",
+  "eval_distributor_send_portal": "Send Portal Info",
+  "eval_distributor_portal_sent": "Distributor portal info email sent",
+  "eval_distributor_portal_failed": "Failed to send portal info email",
 
   "eval_btn_delete": "Delete",
   "eval_btn_save": "Save",
@@ -336,5 +341,9 @@
   "filter_master": "Master",
   "all_masters": "All Masters",
   "booked_count": "Booked",
-  "remaining": "remaining"
+  "remaining": "remaining",
+  "reminder_interview_sent": "Interview reminder sent",
+  "reminder_interview_failed": "Interview reminder failed",
+  "reminder_training_sent": "Training reminder sent",
+  "reminder_training_failed": "Training reminder failed"
 }

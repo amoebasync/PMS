@@ -42,6 +42,7 @@ export function middleware(request: NextRequest) {
     path === '/api/cron/evaluate-distributors' ||
     path === '/api/cron/check-visa-expiry' ||
     path === '/api/cron/check-alert-definitions' ||
+    path === '/api/cron/send-reminders' ||
     path === '/api/training-slots/available' ||
     path === '/api/training-booking' ||
     path === '/training-booking' ||
