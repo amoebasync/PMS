@@ -173,6 +173,7 @@
   "eval_interviewer": "Interviewer",
   "eval_interviewer_unset": "Not set",
   "eval_interview_not_booked": "Not Booked",
+  "eval_book_interview": "Book Interview",
   "eval_reschedule": "Reschedule",
   "eval_cancel_interview": "Cancel Interview",
   "eval_send_invitation": "Send Interview Invitation",

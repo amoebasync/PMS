@@ -173,6 +173,7 @@
   "eval_interviewer": "面接担当者",
   "eval_interviewer_unset": "未設定",
   "eval_interview_not_booked": "面接未予約",
+  "eval_book_interview": "面接予約",
   "eval_reschedule": "日程変更",
   "eval_cancel_interview": "面接キャンセル",
   "eval_send_invitation": "面接案内メールを送信",

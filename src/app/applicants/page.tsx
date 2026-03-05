@@ -3103,7 +3103,16 @@ export default function ApplicantsPage() {
                                     })()}
                                   </div>
                                 ) : (
-                                  <p className="text-sm text-slate-400">{t('interview_unset')}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="text-sm text-slate-400">{t('interview_unset')}</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => openReschedulePanel()}
+                                      className="text-indigo-600 hover:bg-indigo-50 px-2 py-1 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
+                                    >
+                                      <i className="bi bi-calendar-plus"></i>{t('eval_book_interview')}
+                                    </button>
+                                  </div>
                                 )}
                               </div>
                               <div>
