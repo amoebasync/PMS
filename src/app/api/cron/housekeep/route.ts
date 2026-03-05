@@ -25,6 +25,11 @@ const GPS_BATCH_SIZE = 10000;   // GPS座標（軽量レコード）
 //   gps-points → 1年
 
 export async function GET(request: Request) {
+  // 2台構成の重複実行防止: CRON_PRIMARY=true のサーバーのみ実行
+  if (process.env.CRON_PRIMARY !== 'true') {
+    return NextResponse.json({ skipped: true, reason: 'not primary' });
+  }
+
   // Bearer トークン認証
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');

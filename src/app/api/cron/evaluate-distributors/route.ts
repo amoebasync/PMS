@@ -20,6 +20,11 @@ const SETTING_DEFAULTS: Record<string, string> = {
 // GET /api/cron/evaluate-distributors
 // CRON: 配布員の評価スコアを自動計算
 export async function GET(request: Request) {
+  // 2台構成の重複実行防止: CRON_PRIMARY=true のサーバーのみ実行
+  if (process.env.CRON_PRIMARY !== 'true') {
+    return NextResponse.json({ skipped: true, reason: 'not primary' });
+  }
+
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');
 

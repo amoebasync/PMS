@@ -8,6 +8,11 @@ const DAYS_AHEAD = 14; // 何日先まで生成するか
 // GET /api/cron/generate-training-slots
 // CRON ジョブ: デフォルト設定に基づいて研修スロットを自動生成
 export async function GET(request: Request) {
+  // 2台構成の重複実行防止: CRON_PRIMARY=true のサーバーのみ実行
+  if (process.env.CRON_PRIMARY !== 'true') {
+    return NextResponse.json({ skipped: true, reason: 'not primary' });
+  }
+
   // Bearer トークン認証
   const authHeader = request.headers.get('authorization');
   const token = authHeader?.replace('Bearer ', '');

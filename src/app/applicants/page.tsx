@@ -1716,7 +1716,7 @@ export default function ApplicantsPage() {
 
       <div className="space-y-6">
         {/* ── タブ + アクションボタン ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
           <div className="flex flex-col md:flex-row md:items-center border-b border-slate-200">
             <div className="flex overflow-x-auto md:overflow-visible scrollbar-hide">
             <button

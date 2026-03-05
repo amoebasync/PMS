@@ -5,6 +5,11 @@ import { createAlert } from '@/lib/alerts';
 // GET /api/cron/check-visa-expiry
 // CRON: ビザ期限30日以内チェック（Bearer CRON_SECRET 認証）
 export async function GET(request: Request) {
+  // 2台構成の重複実行防止: CRON_PRIMARY=true のサーバーのみ実行
+  if (process.env.CRON_PRIMARY !== 'true') {
+    return NextResponse.json({ skipped: true, reason: 'not primary' });
+  }
+
   // Bearer CRON_SECRET 認証
   const authHeader = request.headers.get('Authorization');
   const cronSecret = process.env.CRON_SECRET;
