@@ -525,6 +525,7 @@ export default function ApplicantsPage() {
   const [showLinkPopover, setShowLinkPopover] = useState(false);
   const [linkLang, setLinkLang] = useState('ja');
   const [linkMediaId, setLinkMediaId] = useState('');
+  const [linkJobCategoryId, setLinkJobCategoryId] = useState('');
   const linkBtnRef = useRef<HTMLButtonElement>(null);
   const [linkPopoverPos, setLinkPopoverPos] = useState({ top: 0, right: 0 });
 
@@ -780,6 +781,7 @@ export default function ApplicantsPage() {
     const base = `${window.location.origin}/apply`;
     const params = new URLSearchParams();
     if (linkLang === 'en') params.set('lang', 'en');
+    if (linkJobCategoryId) params.set('job', linkJobCategoryId);
     const media = recruitingMediaList.find(m => m.id === Number(linkMediaId));
     if (media) params.set('source', media.code);
     const qs = params.toString();
@@ -1778,9 +1780,12 @@ export default function ApplicantsPage() {
                 <button
                   ref={linkBtnRef}
                   onClick={() => {
-                    if (!showLinkPopover && linkBtnRef.current) {
-                      const rect = linkBtnRef.current.getBoundingClientRect();
-                      setLinkPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                    if (!showLinkPopover) {
+                      if (linkBtnRef.current) {
+                        const rect = linkBtnRef.current.getBoundingClientRect();
+                        setLinkPopoverPos({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+                      }
+                      if (jobCategories.length === 0) fetchJobCategories();
                     }
                     setShowLinkPopover(v => !v);
                   }}
@@ -1811,6 +1816,19 @@ export default function ApplicantsPage() {
                             English
                           </button>
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_job_category')}</label>
+                        <select
+                          value={linkJobCategoryId}
+                          onChange={e => setLinkJobCategoryId(e.target.value)}
+                          className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none bg-white"
+                        >
+                          <option value="">{t('apply_link_job_all')}</option>
+                          {jobCategories.map(jc => (
+                            <option key={jc.id} value={jc.id}>{jc.nameJa}{jc.nameEn ? ` (${jc.nameEn})` : ''}</option>
+                          ))}
+                        </select>
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-500 mb-1">{t('apply_link_media')}</label>

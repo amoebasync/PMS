@@ -23,6 +23,8 @@
   "apply_link_title": "応募ページリンク生成",
   "apply_link_language": "言語",
   "apply_link_lang_ja": "日本語",
+  "apply_link_job_category": "職種",
+  "apply_link_job_all": "すべての職種",
   "apply_link_media": "求人媒体",
   "apply_link_media_none": "なし",
   "apply_link_copy": "コピー",
