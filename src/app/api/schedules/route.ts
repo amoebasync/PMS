@@ -41,7 +41,7 @@ export async function GET(request: Request) {
           orderBy: { slotIndex: 'asc' },
           include: { flyer: { include: { size: true } } }
         },
-        sessions: { select: { id: true, startedAt: true, finishedAt: true } },
+        session: { select: { id: true, startedAt: true, finishedAt: true } },
       },
       orderBy: { createdAt: 'desc' }
     });
