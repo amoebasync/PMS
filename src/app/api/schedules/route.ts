@@ -29,11 +29,19 @@ export async function GET(request: Request) {
       where: whereClause,
       include: {
         branch: true, distributor: true, city: true,
-        area: { include: { prefecture: true, city: true } },
-        items: { 
+        area: {
+          select: {
+            id: true, address_code: true, town_name: true, chome_name: true,
+            door_to_door_count: true, multi_family_count: true,
+            prefecture: { select: { id: true, name: true } },
+            city: { select: { id: true, name: true } },
+          },
+        },
+        items: {
           orderBy: { slotIndex: 'asc' },
-          include: { flyer: { include: { size: true } } } // ★ サイズ情報を追加
-        }
+          include: { flyer: { include: { size: true } } }
+        },
+        sessions: { select: { id: true, startedAt: true, finishedAt: true } },
       },
       orderBy: { createdAt: 'desc' }
     });
