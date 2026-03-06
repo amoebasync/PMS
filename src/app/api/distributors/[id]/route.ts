@@ -46,12 +46,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const totalWorkDays = Number(daysResult[0]?.days ?? 0);
 
     // 平均配布率: AVG(actualCount / plannedCount) for this distributor's items
+    // planned_count = 1 のダミーデータは除外
     const rateResult = await prisma.$queryRaw<[{ avgRate: number | null }]>`
       SELECT AVG(di.actual_count / di.planned_count) as avgRate
       FROM distribution_items di
       JOIN distribution_schedules ds ON ds.id = di.schedule_id
       WHERE ds.distributor_id = ${distId}
-        AND di.planned_count > 0 AND di.actual_count IS NOT NULL
+        AND di.planned_count > 1 AND di.actual_count IS NOT NULL
     `;
     const avgDistributionRate = rateResult[0]?.avgRate != null
       ? Math.round(rateResult[0].avgRate * 1000) / 10

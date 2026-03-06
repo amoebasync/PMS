@@ -54,7 +54,7 @@ export async function GET(request: Request) {
         COUNT(DISTINCT DATE(ds.date)) as workDays,
         AVG(di.actual_count / di.planned_count) as avgRate
       FROM distribution_schedules ds
-      LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 0 AND di.actual_count IS NOT NULL
+      LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1 AND di.actual_count IS NOT NULL
       WHERE ds.status = 'COMPLETED' AND ds.distributor_id IS NOT NULL
       GROUP BY ds.distributor_id
     `;

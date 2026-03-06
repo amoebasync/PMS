@@ -15,6 +15,7 @@ model Prefecture {
   name_en   String? @db.VarChar(50)
   areas     Area[] // リレーション
   prohibitedProperties ProhibitedProperty[]
+  partnerAreaPrices    PartnerAreaPrice[]
 
   @@map("prefectures") // 実際のテーブル名が複数形なら合わせる
 }
@@ -29,6 +30,7 @@ model City {
   areas                 Area[] // リレーション
   distributionSchedules DistributionSchedule[]
   prohibitedProperties  ProhibitedProperty[]
+  partnerAreaPrices     PartnerAreaPrice[]
 
   @@map("cities")
 }
@@ -68,6 +70,7 @@ model Area {
   distributionSchedules DistributionSchedule[]
   orderDistributions OrderDistributionArea[]
   prohibitedProperties ProhibitedProperty[]
+  partnerCoverageAreas PartnerCoverageArea[]
 
   @@map("areas")
 }
@@ -222,6 +225,9 @@ model Employee {
 
   // 巡回記録（巡回員として）
   fieldInspections            FieldInspection[]
+
+  // パートナーインシデント解決
+  resolvedPartnerIncidents    PartnerIncident[] @relation("PartnerIncidentResolver")
 
   @@map("employees")
 }
@@ -1003,7 +1009,8 @@ model FlyerSize {
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
-  flyers           Flyer[]
+  flyers             Flyer[]
+  partnerAreaPrices  PartnerAreaPrice[]
   @@map("flyer_sizes")
 }
 
@@ -1107,6 +1114,15 @@ model Partner {
   partnerTypeId Int         @map("partner_type_id")
   partnerType   PartnerType @relation(fields: [partnerTypeId], references: [id])
 
+  // ★ Phase1 拡張フィールド
+  hasGpsTracking  Boolean   @default(false) @map("has_gps_tracking")
+  contactPerson   String?   @map("contact_person") @db.VarChar(100)
+  phone           String?   @db.VarChar(20)
+  email           String?   @db.VarChar(100)
+  address         String?   @db.VarChar(500)
+  isActive        Boolean   @default(true) @map("is_active")
+  note            String?   @db.Text
+
   createdAt     DateTime    @default(now()) @map("created_at")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
@@ -1116,6 +1132,11 @@ model Partner {
   complaints        Complaint[]
   orders            Order[]
   flyerPrices       PartnerFlyerPrice[]
+
+  // ★ Phase1 新リレーション
+  coverageAreas     PartnerCoverageArea[]
+  areaPrices        PartnerAreaPrice[]
+  incidents         PartnerIncident[]
 
   @@map("partners")
 }
@@ -1146,6 +1167,82 @@ model PartnerType {
   partners  Partner[]
 
   @@map("partner_types")
+}
+
+// --- パートナー対応エリア（パートナー×エリア紐付け） ---
+model PartnerCoverageArea {
+  id        Int      @id @default(autoincrement())
+  partnerId Int      @map("partner_id")
+  areaId    Int      @map("area_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  area    Area    @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, areaId])
+  @@index([partnerId])
+  @@index([areaId])
+  @@map("partner_coverage_areas")
+}
+
+// --- パートナー配布単価マスタ ---
+model PartnerAreaPrice {
+  id             Int      @id @default(autoincrement())
+  partnerId      Int      @map("partner_id")
+  prefectureId   Int      @map("prefecture_id")
+  cityId         Int?     @map("city_id")
+  flyerSizeId    Int      @map("flyer_size_id")
+  periodDaysMin  Int      @map("period_days_min")
+  periodDaysMax  Int      @map("period_days_max")
+  unitPrice      Float    @map("unit_price")
+  note           String?  @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  partner    Partner    @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  prefecture Prefecture @relation(fields: [prefectureId], references: [id])
+  city       City?      @relation(fields: [cityId], references: [id])
+  flyerSize  FlyerSize  @relation(fields: [flyerSizeId], references: [id])
+
+  @@index([partnerId])
+  @@map("partner_area_prices")
+}
+
+// --- パートナーインシデント管理 ---
+enum PartnerIncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum PartnerIncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model PartnerIncident {
+  id          Int                      @id @default(autoincrement())
+  partnerId   Int                      @map("partner_id")
+  title       String                   @db.VarChar(200)
+  description String                   @db.Text
+  severity    PartnerIncidentSeverity  @default(MEDIUM)
+  status      PartnerIncidentStatus    @default(OPEN)
+  occurredAt  DateTime                 @map("occurred_at") @db.Date
+  resolvedAt  DateTime?                @map("resolved_at")
+  resolvedBy  Int?                     @map("resolved_by")
+  note        String?                  @db.Text
+  createdAt   DateTime                 @default(now()) @map("created_at")
+  updatedAt   DateTime                 @updatedAt @map("updated_at")
+
+  partner  Partner   @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+  resolver Employee? @relation("PartnerIncidentResolver", fields: [resolvedBy], references: [id])
+
+  @@index([partnerId])
+  @@index([status])
+  @@map("partner_incidents")
 }
 
 // ==========================================

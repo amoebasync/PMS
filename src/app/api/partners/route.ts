@@ -6,16 +6,32 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
+    const isActive = searchParams.get('isActive');
+    const typeId = searchParams.get('typeId');
 
     const where: Record<string, unknown> = {};
     if (search) {
       where.name = { contains: search };
     }
+    if (isActive !== null && isActive !== undefined && isActive !== '') {
+      where.isActive = isActive === 'true';
+    }
+    if (typeId) {
+      where.partnerTypeId = parseInt(typeId, 10);
+    }
 
     const partners = await prisma.partner.findMany({
       where,
       orderBy: { id: 'desc' },
-      include: { partnerType: true } // ★ マスタの名前も一緒に取得する
+      include: {
+        partnerType: true,
+        _count: {
+          select: {
+            coverageAreas: true,
+            incidents: true,
+          }
+        }
+      }
     });
     return NextResponse.json(partners);
   } catch (error) {

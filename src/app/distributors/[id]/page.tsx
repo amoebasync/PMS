@@ -985,55 +985,96 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       )}
 
       {/* ─── 配布履歴タブ ─── */}
-      {activeTab === 'schedules' && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-          {schedulesLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          ) : schedules.length === 0 ? (
-            <div className="p-8 text-center">
-              <i className="bi bi-calendar-x text-4xl text-slate-200 block mb-2"></i>
-              <p className="text-sm text-slate-400">配布履歴がありません</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">日付</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">エリア</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
-                    <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">チラシ</th>
-                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">予定枚数</th>
-                    <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">実績枚数</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {schedules.map((s: any) => (
-                    <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-4 py-3 text-slate-700 font-medium">{s.date ? new Date(s.date).toLocaleDateString('ja-JP') : '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{s.area?.name || s.city?.name || '—'}</td>
-                      <td className="px-4 py-3"><ScheduleStatusBadge status={s.status} /></td>
-                      <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">
-                        {s.items?.map((it: any) => it.flyerName).filter(Boolean).join(', ') || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right text-slate-600">
-                        {s.items?.reduce((sum: number, it: any) => sum + (it.plannedCount || 0), 0).toLocaleString() || '—'}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-slate-800">
-                        {s.items?.some((it: any) => it.actualCount != null)
-                          ? s.items.reduce((sum: number, it: any) => sum + (it.actualCount || 0), 0).toLocaleString()
-                          : '—'}
-                      </td>
+      {activeTab === 'schedules' && (() => {
+        // エリア別にグループ化: 日付→エリア単位で行を生成
+        const grouped = schedules.reduce((acc: { dateKey: string; date: string; areaName: string; scheduleIds: number[]; statuses: string[]; flyers: string[]; totalPlanned: number; totalActual: number | null }[], s: any) => {
+          const dateKey = s.date ? new Date(s.date).toLocaleDateString('ja-JP') : '—';
+          const areaName = s.area
+            ? `${s.area.city?.name || ''} ${s.area.town_name || ''}${s.area.chome_name || ''}`.trim()
+            : s.city?.name || '—';
+          // 同日・同エリアの既存行を検索
+          let row = acc.find(r => r.dateKey === dateKey && r.areaName === areaName);
+          if (!row) {
+            row = { dateKey, date: s.date, areaName, scheduleIds: [], statuses: [], flyers: [], totalPlanned: 0, totalActual: null };
+            acc.push(row);
+          }
+          row.scheduleIds.push(s.id);
+          if (!row.statuses.includes(s.status)) row.statuses.push(s.status);
+          const flyerNames = s.items?.map((it: any) => it.flyerName).filter(Boolean) || [];
+          flyerNames.forEach((fn: string) => { if (!row!.flyers.includes(fn)) row!.flyers.push(fn); });
+          const planned = s.items?.reduce((sum: number, it: any) => sum + (it.plannedCount || 0), 0) || 0;
+          row.totalPlanned += planned;
+          if (s.items?.some((it: any) => it.actualCount != null)) {
+            const actual = s.items.reduce((sum: number, it: any) => sum + (it.actualCount || 0), 0);
+            row.totalActual = (row.totalActual ?? 0) + actual;
+          }
+          return acc;
+        }, []);
+        // 日付でソート（降順）
+        grouped.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+
+        // 日付ごとの行数を計算してrowSpan用に
+        const dateRowCounts = new Map<string, number>();
+        grouped.forEach((r: any) => dateRowCounts.set(r.dateKey, (dateRowCounts.get(r.dateKey) || 0) + 1));
+        let prevDateKey = '';
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+            {schedulesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : grouped.length === 0 ? (
+              <div className="p-8 text-center">
+                <i className="bi bi-calendar-x text-4xl text-slate-200 block mb-2"></i>
+                <p className="text-sm text-slate-400">配布履歴がありません</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">日付</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">エリア</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">チラシ</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">予定枚数</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">実績枚数</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {grouped.map((row: any, idx: number) => {
+                      const showDate = row.dateKey !== prevDateKey;
+                      const rowSpan = showDate ? dateRowCounts.get(row.dateKey) || 1 : 0;
+                      prevDateKey = row.dateKey;
+                      // 代表ステータス: COMPLETED > DISTRIBUTING > IN_PROGRESS > UNSTARTED
+                      const bestStatus = row.statuses.includes('COMPLETED') ? 'COMPLETED'
+                        : row.statuses.includes('DISTRIBUTING') ? 'DISTRIBUTING'
+                        : row.statuses.includes('IN_PROGRESS') ? 'IN_PROGRESS' : 'UNSTARTED';
+                      return (
+                        <tr key={`${row.dateKey}-${row.areaName}-${idx}`} className="hover:bg-slate-50 transition-colors">
+                          {showDate && (
+                            <td className="px-4 py-3 text-slate-700 font-medium align-top border-r border-slate-100" rowSpan={rowSpan}>
+                              {row.dateKey}
+                            </td>
+                          )}
+                          <td className="px-4 py-3 text-slate-600">{row.areaName}</td>
+                          <td className="px-4 py-3"><ScheduleStatusBadge status={bestStatus} /></td>
+                          <td className="px-4 py-3 text-slate-600 truncate max-w-[250px]">{row.flyers.join(', ') || '—'}</td>
+                          <td className="px-4 py-3 text-right text-slate-600">{row.totalPlanned.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-right font-bold text-slate-800">
+                            {row.totalActual != null ? row.totalActual.toLocaleString() : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ─── タスクタブ ─── */}
       {activeTab === 'tasks' && (
