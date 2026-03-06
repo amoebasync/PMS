@@ -633,21 +633,21 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
             <p className="text-sm text-slate-400 font-mono mt-0.5">{d.staffId}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={openAppDist}
-            className="flex items-center gap-2 bg-white hover:bg-indigo-50 text-indigo-600 hover:text-indigo-700 border border-indigo-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-            <i className="bi bi-phone-fill"></i> 配布アプリ配信
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={openAppDist} title="配布アプリ配信"
+            className="flex items-center gap-1.5 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 px-3 py-2 rounded-lg font-bold text-xs transition-colors whitespace-nowrap">
+            <i className="bi bi-phone-fill"></i><span className="hidden lg:inline">アプリ配信</span>
           </button>
-          <button onClick={() => { setResetPwMsg(null); setIsResetPasswordOpen(true); }}
-            className="flex items-center gap-2 bg-white hover:bg-amber-50 text-amber-600 hover:text-amber-700 border border-amber-300 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
-            <i className="bi bi-key-fill"></i> PW リセット
+          <button onClick={() => { setResetPwMsg(null); setIsResetPasswordOpen(true); }} title="PWリセット"
+            className="flex items-center gap-1.5 bg-white hover:bg-amber-50 text-amber-600 border border-amber-300 px-3 py-2 rounded-lg font-bold text-xs transition-colors whitespace-nowrap">
+            <i className="bi bi-key-fill"></i><span className="hidden lg:inline">PW</span>
           </button>
-          <button onClick={openEdit}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-sm transition-colors">
-            <i className="bi bi-pencil-square"></i> 編集
+          <button onClick={openEdit} title="編集"
+            className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg font-bold text-xs shadow-sm transition-colors whitespace-nowrap">
+            <i className="bi bi-pencil-square"></i><span className="hidden lg:inline">編集</span>
           </button>
-          <button onClick={() => setIsDeleteOpen(true)}
-            className="flex items-center gap-2 bg-white hover:bg-rose-50 text-rose-500 hover:text-rose-600 border border-rose-200 px-4 py-2 rounded-lg font-bold text-sm transition-colors">
+          <button onClick={() => setIsDeleteOpen(true)} title="削除"
+            className="flex items-center bg-white hover:bg-rose-50 text-rose-500 border border-rose-200 px-2.5 py-2 rounded-lg text-xs transition-colors">
             <i className="bi bi-trash"></i>
           </button>
         </div>
@@ -691,17 +691,17 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
             <i className="bi bi-calendar-check text-emerald-500 text-xl"></i>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">今月出勤</p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">累計出勤</p>
             <p className="text-lg font-black text-slate-800">{d._count?.schedules ?? 0}<span className="text-xs text-slate-400 ml-0.5">回</span></p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">
-          <div className="w-12 h-12 bg-rose-50 rounded-lg flex items-center justify-center">
-            <i className="bi bi-exclamation-triangle text-rose-500 text-xl"></i>
+          <div className="w-12 h-12 bg-violet-50 rounded-lg flex items-center justify-center">
+            <i className="bi bi-pie-chart-fill text-violet-500 text-xl"></i>
           </div>
           <div>
-            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">未対応クレーム</p>
-            <p className="text-lg font-black text-slate-800">{d._count?.complaints ?? 0}<span className="text-xs text-slate-400 ml-0.5">件</span></p>
+            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">平均配布率</p>
+            <p className="text-lg font-black text-slate-800">{d.avgDistributionRate != null ? <>{d.avgDistributionRate}<span className="text-xs text-slate-400 ml-0.5">%</span></> : '—'}</p>
           </div>
         </div>
       </div>

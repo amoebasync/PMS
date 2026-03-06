@@ -20,18 +20,15 @@ function buildInitialPassword(birthday: string | null | undefined): string | nul
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const distId = parseInt(id);
 
     const distributor = await prisma.flyerDistributor.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: distId },
       include: {
         branch: true, country: true, visaType: true,
         _count: {
           select: {
-            schedules: { where: { status: 'COMPLETED', date: { gte: firstOfMonth, lt: firstOfNextMonth } } },
-            complaints: { where: { status: 'UNRESOLVED' } },
+            schedules: { where: { status: 'COMPLETED' } },
             tasks: { where: { status: { in: ['PENDING', 'IN_PROGRESS'] } } },
           },
         },
@@ -40,13 +37,25 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { passwordHash, ...safe } = distributor;
 
+    // 平均配布率: AVG(actualCount / plannedCount) for this distributor's items
+    const rateResult = await prisma.$queryRaw<[{ avgRate: number | null }]>`
+      SELECT AVG(di.actual_count / di.planned_count) as avgRate
+      FROM distribution_items di
+      JOIN distribution_schedules ds ON ds.id = di.schedule_id
+      WHERE ds.distributor_id = ${distId}
+        AND di.planned_count > 0 AND di.actual_count IS NOT NULL
+    `;
+    const avgDistributionRate = rateResult[0]?.avgRate != null
+      ? Math.round(rateResult[0].avgRate * 1000) / 10
+      : null;
+
     // Check if AI verification is enabled
     const aiVerificationSetting = await prisma.systemSetting.findUnique({
       where: { key: 'residenceCardAiVerification' },
     });
     const aiVerificationEnabled = aiVerificationSetting?.value === 'true';
 
-    return NextResponse.json({ ...safe, aiVerificationEnabled });
+    return NextResponse.json({ ...safe, aiVerificationEnabled, avgDistributionRate });
   } catch (error) {
     console.error('Get Error:', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
