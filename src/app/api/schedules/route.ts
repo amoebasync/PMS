@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
+  const date = searchParams.get('date');
   const from = searchParams.get('from');
   const to = searchParams.get('to');
 
@@ -13,7 +14,12 @@ export async function GET(request: Request) {
     if (distributorId) {
       whereClause.distributorId = parseInt(distributorId);
     }
-    if (from || to) {
+    if (date) {
+      const d = new Date(date);
+      const nextDay = new Date(d);
+      nextDay.setDate(nextDay.getDate() + 1);
+      whereClause.date = { gte: d, lt: nextDay };
+    } else if (from || to) {
       whereClause.date = {};
       if (from) whereClause.date.gte = new Date(from);
       if (to) whereClause.date.lte = new Date(to);
