@@ -77,7 +77,7 @@ export default function DistributorPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ACTIVE' | 'INACTIVE' | 'ALL'>('ACTIVE');
   const [filterBranchId, setFilterBranchId] = useState('');
-  const [sortKey, setSortKey] = useState<'id' | 'code' | 'branch' | 'rank' | ''>('');
+  const [sortKey, setSortKey] = useState<'id' | 'code' | 'branch' | 'rank' | 'workDays' | 'rate' | ''>('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -197,6 +197,10 @@ export default function DistributorPage() {
           const aR = RANK_ORDER[a.rank] ?? 99;
           const bR = RANK_ORDER[b.rank] ?? 99;
           cmp = aR - bR;
+        } else if (sortKey === 'workDays') {
+          cmp = (a.totalWorkDays ?? 0) - (b.totalWorkDays ?? 0);
+        } else if (sortKey === 'rate') {
+          cmp = (a.avgDistributionRate ?? -1) - (b.avgDistributionRate ?? -1);
         }
         return sortDir === 'desc' ? -cmp : cmp;
       });
@@ -204,7 +208,7 @@ export default function DistributorPage() {
     return list;
   }, [distributors, searchTerm, filterStatus, filterBranchId, sortKey, sortDir]);
 
-  const handleSort = (key: 'id' | 'code' | 'branch' | 'rank') => {
+  const handleSort = (key: 'id' | 'code' | 'branch' | 'rank' | 'workDays' | 'rate') => {
     if (sortKey === key) {
       setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
     } else {
@@ -364,7 +368,8 @@ export default function DistributorPage() {
               <th className="px-5 py-3 cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('branch')}>{t('th_branch')}<SortIcon col="branch" /></th>
               <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('rank')}>{t('th_rank')}<SortIcon col="rank" /></th>
               <th className="px-5 py-3 text-center">{t('th_score')}</th>
-              <th className="px-5 py-3 text-center">{t('th_monthly_attendance')}</th>
+              <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('workDays')}>{t('th_total_attendance')}<SortIcon col="workDays" /></th>
+              <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('rate')}>{t('th_distribution_rate')}<SortIcon col="rate" /></th>
               <th className="px-5 py-3">{t('th_nationality')}</th>
               <th className="px-5 py-3 text-center">{t('th_status')}</th>
               <th className="px-5 py-3 text-right">{t('th_actions')}</th>
@@ -372,12 +377,13 @@ export default function DistributorPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={8} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
+              <tr><td colSpan={9} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
             ) : filteredDistributors.length === 0 ? (
-              <tr><td colSpan={8} className="p-8 text-center text-slate-400">{t('no_results')}</td></tr>
+              <tr><td colSpan={9} className="p-8 text-center text-slate-400">{t('no_results')}</td></tr>
             ) : filteredDistributors.map(d => {
               const rankColorMap: Record<string, string> = { S: 'bg-yellow-500', A: 'bg-blue-500', B: 'bg-green-500', C: 'bg-slate-400', D: 'bg-red-400' };
-              const monthlyAttendance = d._count?.schedules ?? 0;
+              const workDays = d.totalWorkDays ?? 0;
+              const distRate = d.avgDistributionRate;
               return (
               <tr
                 key={d.id}
@@ -420,8 +426,15 @@ export default function DistributorPage() {
                   )}
                 </td>
                 <td className="px-5 py-3 text-center">
-                  <span className="text-sm font-bold text-slate-700">{monthlyAttendance}</span>
+                  <span className="text-sm font-bold text-slate-700">{workDays}</span>
                   <span className="text-[10px] text-slate-400 ml-0.5">{t('days_unit')}</span>
+                </td>
+                <td className="px-5 py-3 text-center">
+                  {distRate != null ? (
+                    <span className={`text-sm font-bold ${distRate >= 90 ? 'text-emerald-600' : distRate >= 70 ? 'text-amber-600' : 'text-rose-600'}`}>{distRate}%</span>
+                  ) : (
+                    <span className="text-sm text-slate-300">—</span>
+                  )}
                 </td>
                 <td className="px-5 py-3 text-sm text-slate-700">
                   {d.country ? d.country.name : '—'}

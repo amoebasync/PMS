@@ -18,6 +18,8 @@
   "th_rank": "Rank",
   "th_score": "Score",
   "th_monthly_attendance": "This Month",
+  "th_total_attendance": "Work Days",
+  "th_distribution_rate": "Dist. Rate",
   "th_nationality": "Nationality",
   "th_status": "Status",
   "th_actions": "Actions",

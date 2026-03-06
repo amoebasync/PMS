@@ -38,30 +38,45 @@ export async function GET(request: Request) {
       return NextResponse.json(distributors);
     }
 
-    // 今月の初日
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
     const distributors = await prisma.flyerDistributor.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
         branch: true,
         country: true,
         visaType: true,
-        _count: {
-          select: {
-            schedules: {
-              where: {
-                status: 'COMPLETED',
-                date: { gte: firstOfMonth, lt: firstOfNextMonth },
-              },
-            },
-          },
-        },
       },
     });
-    return NextResponse.json(distributors);
+
+    // 累計出勤日数（1日=1出勤）と平均配布率を一括取得
+    const statsRows = await prisma.$queryRaw<{ distributor_id: number; workDays: bigint; avgRate: number | null }[]>`
+      SELECT
+        ds.distributor_id,
+        COUNT(DISTINCT DATE(ds.date)) as workDays,
+        AVG(di.actual_count / di.planned_count) as avgRate
+      FROM distribution_schedules ds
+      LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 0 AND di.actual_count IS NOT NULL
+      WHERE ds.status = 'COMPLETED' AND ds.distributor_id IS NOT NULL
+      GROUP BY ds.distributor_id
+    `;
+    const statsMap = new Map(statsRows.map(r => [
+      r.distributor_id,
+      {
+        totalWorkDays: Number(r.workDays),
+        avgDistributionRate: r.avgRate != null ? Math.round(r.avgRate * 1000) / 10 : null,
+      },
+    ]));
+
+    const result = distributors.map(d => {
+      const stats = statsMap.get(d.id);
+      const { passwordHash, ...safe } = d;
+      return {
+        ...safe,
+        totalWorkDays: stats?.totalWorkDays ?? 0,
+        avgDistributionRate: stats?.avgDistributionRate ?? null,
+      };
+    });
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Fetch Error:', error);
     return NextResponse.json({ error: 'Failed to fetch distributors' }, { status: 500 });

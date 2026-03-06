@@ -18,6 +18,8 @@
   "th_rank": "ランク",
   "th_score": "スコア",
   "th_monthly_attendance": "今月出勤",
+  "th_total_attendance": "累計出勤",
+  "th_distribution_rate": "配布率",
   "th_nationality": "国籍",
   "th_status": "状態",
   "th_actions": "操作",
