@@ -692,7 +692,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
           </div>
           <div>
             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">累計出勤</p>
-            <p className="text-lg font-black text-slate-800">{d._count?.schedules ?? 0}<span className="text-xs text-slate-400 ml-0.5">回</span></p>
+            <p className="text-lg font-black text-slate-800">{d.totalWorkDays ?? 0}<span className="text-xs text-slate-400 ml-0.5">日</span></p>
           </div>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4 flex items-center gap-3">

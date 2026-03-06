@@ -37,6 +37,14 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { passwordHash, ...safe } = distributor;
 
+    // 累計出勤日数: 同日に複数スケジュールがあっても1日=1出勤
+    const daysResult = await prisma.$queryRaw<[{ days: bigint }]>`
+      SELECT COUNT(DISTINCT DATE(date)) as days
+      FROM distribution_schedules
+      WHERE distributor_id = ${distId} AND status = 'COMPLETED'
+    `;
+    const totalWorkDays = Number(daysResult[0]?.days ?? 0);
+
     // 平均配布率: AVG(actualCount / plannedCount) for this distributor's items
     const rateResult = await prisma.$queryRaw<[{ avgRate: number | null }]>`
       SELECT AVG(di.actual_count / di.planned_count) as avgRate
@@ -55,7 +63,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
     const aiVerificationEnabled = aiVerificationSetting?.value === 'true';
 
-    return NextResponse.json({ ...safe, aiVerificationEnabled, avgDistributionRate });
+    return NextResponse.json({ ...safe, aiVerificationEnabled, avgDistributionRate, totalWorkDays });
   } catch (error) {
     console.error('Get Error:', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
