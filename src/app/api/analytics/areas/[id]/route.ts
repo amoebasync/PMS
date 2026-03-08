@@ -76,7 +76,7 @@ export async function GET(
           COALESCE(SUM(di.actual_count), 0) AS total_actual,
           dsess.incomplete_reason
         FROM distribution_schedules ds
-        LEFT JOIN distribution_items di ON di.schedule_id = ds.id
+        LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1
         LEFT JOIN distribution_sessions dsess ON dsess.schedule_id = ds.id
         WHERE ds.status = 'COMPLETED'
           AND ds.area_id = ${areaId}
@@ -91,7 +91,7 @@ export async function GET(
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         SUM(CASE WHEN ss.incomplete_reason = 'GIVE_UP' THEN 1 ELSE 0 END) AS give_up_count,
         SUM(CASE WHEN ss.incomplete_reason = 'OTHER' THEN 1 ELSE 0 END) AS other_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN ss.total_actual * 100.0 / ss.total_planned ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
         MAX(ss.date) AS last_distributed,
         MIN(ss.date) AS first_distributed
       FROM schedule_stats ss
@@ -145,7 +145,7 @@ export async function GET(
           COALESCE(SUM(di.actual_count), 0) AS total_actual,
           dsess.incomplete_reason
         FROM distribution_schedules ds
-        LEFT JOIN distribution_items di ON di.schedule_id = ds.id
+        LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1
         LEFT JOIN distribution_sessions dsess ON dsess.schedule_id = ds.id
         WHERE ds.status = 'COMPLETED'
           AND ds.area_id = ${areaId}
@@ -158,7 +158,7 @@ export async function GET(
         DATE_FORMAT(ss.date, '%Y-%m') AS period,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
         SUM(ss.total_actual) AS total_actual,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN ss.total_actual * 100.0 / ss.total_planned ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count
       FROM schedule_stats ss
@@ -233,7 +233,7 @@ export async function GET(
       );
       const completionRate =
         totalPlanned > 0
-          ? Math.round((totalActual / totalPlanned) * 1000) / 10
+          ? Math.min(100, Math.round((totalActual / totalPlanned) * 1000) / 10)
           : 0;
 
       let completionType: 'all_distributed' | 'area_done' | 'give_up' | 'other';
@@ -275,7 +275,7 @@ export async function GET(
     return NextResponse.json({
       area: {
         id: area.id,
-        areaName: `${area.town_name || ''}${area.chome_name || ''}`.trim() || '-',
+        areaName: `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name || ''}`.trim() || '-',
         prefecture: area.prefecture.name,
         city: area.city.name,
         doorToDoorCount: area.door_to_door_count,

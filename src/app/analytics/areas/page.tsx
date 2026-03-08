@@ -181,8 +181,7 @@ export default function AreaAnalyticsPage() {
                 className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-slate-100 last:border-0 flex items-center justify-between"
                 onClick={() => setSelectedAreaId(area.id)}>
                 <div>
-                  <span className="text-sm font-medium text-slate-700">{area.town_name}{area.chome_name ? ` ${area.chome_name}` : ''}</span>
-                  {area.prefecture && <span className="text-xs text-slate-400 ml-2">{area.prefecture.name} {area.city?.name}</span>}
+                  <span className="text-sm font-medium text-slate-700">{area.prefecture?.name}{area.city?.name}{area.chome_name || area.town_name || ''}</span>
                 </div>
                 <i className="bi bi-chevron-right text-slate-300"></i>
               </div>

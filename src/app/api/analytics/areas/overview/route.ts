@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma';
 
 interface ScheduleStatsRow {
   area_id: number;
-  town_name: string | null;
+  prefecture_name: string | null;
+  city_name: string | null;
   chome_name: string | null;
   schedules_count: bigint;
   avg_completion_rate: number | null;
@@ -39,7 +40,7 @@ export async function GET() {
           COALESCE(SUM(di.actual_count), 0) AS total_actual,
           dsess.incomplete_reason
         FROM distribution_schedules ds
-        LEFT JOIN distribution_items di ON di.schedule_id = ds.id
+        LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1
         LEFT JOIN distribution_sessions dsess ON dsess.schedule_id = ds.id
         WHERE ds.status = 'COMPLETED'
           AND ds.area_id IS NOT NULL
@@ -79,7 +80,7 @@ export async function GET() {
           COALESCE(SUM(di.actual_count), 0) AS total_actual,
           dsess.incomplete_reason
         FROM distribution_schedules ds
-        LEFT JOIN distribution_items di ON di.schedule_id = ds.id
+        LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1
         LEFT JOIN distribution_sessions dsess ON dsess.schedule_id = ds.id
         WHERE ds.status = 'COMPLETED'
           AND ds.area_id IS NOT NULL
@@ -88,16 +89,19 @@ export async function GET() {
       )
       SELECT
         ss.area_id,
-        a.town_name,
+        p.name AS prefecture_name,
+        c.name AS city_name,
         a.chome_name,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN ss.total_actual * 100.0 / ss.total_planned ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         MAX(ss.date) AS last_distributed
       FROM schedule_stats ss
       JOIN areas a ON a.id = ss.area_id
-      GROUP BY ss.area_id, a.town_name, a.chome_name
+      JOIN prefectures p ON p.id = a.prefecture_id
+      JOIN cities c ON c.id = a.city_id
+      GROUP BY ss.area_id, p.name, c.name, a.chome_name
       ORDER BY avg_completion_rate ASC
       LIMIT 10
     `;
@@ -113,7 +117,7 @@ export async function GET() {
           COALESCE(SUM(di.actual_count), 0) AS total_actual,
           dsess.incomplete_reason
         FROM distribution_schedules ds
-        LEFT JOIN distribution_items di ON di.schedule_id = ds.id
+        LEFT JOIN distribution_items di ON di.schedule_id = ds.id AND di.planned_count > 1
         LEFT JOIN distribution_sessions dsess ON dsess.schedule_id = ds.id
         WHERE ds.status = 'COMPLETED'
           AND ds.area_id IS NOT NULL
@@ -122,23 +126,26 @@ export async function GET() {
       )
       SELECT
         ss.area_id,
-        a.town_name,
+        p.name AS prefecture_name,
+        c.name AS city_name,
         a.chome_name,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN ss.total_actual * 100.0 / ss.total_planned ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         MAX(ss.date) AS last_distributed
       FROM schedule_stats ss
       JOIN areas a ON a.id = ss.area_id
-      GROUP BY ss.area_id, a.town_name, a.chome_name
+      JOIN prefectures p ON p.id = a.prefecture_id
+      JOIN cities c ON c.id = a.city_id
+      GROUP BY ss.area_id, p.name, c.name, a.chome_name
       ORDER BY schedules_count DESC
       LIMIT 10
     `;
 
     const mapRow = (row: ScheduleStatsRow) => ({
       areaId: row.area_id,
-      areaName: `${row.town_name || ''}${row.chome_name || ''}`.trim() || '-',
+      areaName: `${row.prefecture_name || ''}${row.city_name || ''}${row.chome_name || ''}`.trim() || '-',
       schedulesCount: Number(row.schedules_count),
       avgCompletionRate: row.avg_completion_rate != null ? Number(row.avg_completion_rate) : 0,
       allDistributedCount: Number(row.all_distributed_count),
