@@ -640,6 +640,7 @@ model FlyerDistributor {
   joinDate    DateTime? @map("join_date") @db.Date // 入社日
   leaveDate   DateTime? @map("leave_date") @db.Date // 退社日
   leaveReason String?   @map("leave_reason") @db.Text // 退社理由
+  leaveType   String?   @map("leave_type") @db.VarChar(30) // 退職タイプ (RESIGNATION/TERMINATED/NO_CONTACT)
 
   // 支払い・口座情報
   paymentMethod       String? @map("payment_method") @db.VarChar(20) // 支払い方法 (現金, 振込など)

@@ -547,6 +547,7 @@ export default function ApplicantsPage() {
   const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'en', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
   const [manualRegSaving, setManualRegSaving] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
+  const [sendingRescheduleEmail, setSendingRescheduleEmail] = useState(false);
 
   // ── スロット作成フォーム ──
   const [slotForm, setSlotForm] = useState({
@@ -880,6 +881,32 @@ export default function ApplicantsPage() {
       showToast(e.message || t('eval_distributor_failed'), 'error');
     } finally {
       setManualRegSaving(false);
+    }
+  };
+
+  // 面接日程変更メール送信（スロット解放+リンク送信）
+  const handleSendInterviewRescheduleEmail = async () => {
+    if (!selectedApplicant) return;
+    const ok = await showConfirm(
+      t('eval_reschedule_email_confirm', { name: selectedApplicant.name }),
+      { variant: 'warning', confirmLabel: t('eval_reschedule_email_confirm_label') }
+    );
+    if (!ok) return;
+    setSendingRescheduleEmail(true);
+    try {
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/send-reschedule-email`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || t('eval_reschedule_email_failed'));
+      showToast(t('eval_reschedule_email_sent'), 'success');
+      openEvalModal(selectedApplicant.id);
+      fetchSlots();
+      fetchApplicants(page);
+    } catch (e: any) {
+      showToast(e.message || t('eval_reschedule_email_failed'), 'error');
+    } finally {
+      setSendingRescheduleEmail(false);
     }
   };
 
@@ -3219,6 +3246,19 @@ export default function ApplicantsPage() {
                             className="text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-indigo-200 transition-colors inline-flex items-center gap-1"
                           >
                             <i className="bi bi-calendar-plus"></i>{t('eval_reschedule')}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSendInterviewRescheduleEmail}
+                            disabled={sendingRescheduleEmail}
+                            className="text-amber-600 hover:bg-amber-50 px-3 py-1.5 rounded-lg text-xs font-bold border border-amber-200 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {sendingRescheduleEmail ? (
+                              <span className="w-3 h-3 border border-amber-600 border-t-transparent rounded-full animate-spin inline-block"></span>
+                            ) : (
+                              <i className="bi bi-envelope-arrow-up"></i>
+                            )}
+                            {t('eval_reschedule_email_send')}
                           </button>
                           <button
                             type="button"

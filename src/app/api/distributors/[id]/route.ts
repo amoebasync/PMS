@@ -104,6 +104,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         joinDate: parseDate(body.joinDate),
         leaveDate: parseDate(body.leaveDate),
         leaveReason: body.leaveReason,
+        leaveType: body.leaveType || null,
         paymentMethod: body.paymentMethod,
         bankName: body.bankName,
         bankBranchCode: body.bankBranchCode,

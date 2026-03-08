@@ -91,6 +91,10 @@ export default function DistributorPage() {
   const [bankInputText, setBankInputText] = useState('');
   const [showBankDropdown, setShowBankDropdown] = useState(false);
 
+  // 退職モーダル
+  const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({ date: todayStr(), type: 'RESIGNATION' as string, reason: '', note: '' });
+
   // ゆうちょ変換モーダル
   const [showYuchoModal, setShowYuchoModal] = useState(false);
   const [yuchoKigo, setYuchoKigo] = useState('');
@@ -311,6 +315,44 @@ export default function DistributorPage() {
     } catch { showToast(t('delete_error'), 'error'); }
   };
 
+  const openLeaveModal = (d: Distributor) => {
+    setCurrentId(d.id);
+    setLeaveForm({ date: todayStr(), type: 'RESIGNATION', reason: '', note: '' });
+    setIsLeaveModalOpen(true);
+  };
+
+  const LEAVE_REASONS = [
+    'leave_reason_physical', 'leave_reason_other_job', 'leave_reason_pay',
+    'leave_reason_location', 'leave_reason_relationship', 'leave_reason_family',
+    'leave_reason_study', 'leave_reason_other',
+  ] as const;
+
+  const executeLeave = async () => {
+    if (!currentId) return;
+    const reasonText = leaveForm.reason ? t(leaveForm.reason as any) : '';
+    const leaveReason = leaveForm.note ? `${reasonText}\n${leaveForm.note}` : reasonText;
+    try {
+      const target = distributors.find((d: Distributor) => d.id === currentId);
+      const res = await fetch(`/api/distributors/${currentId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...target,
+          branchId: target?.branchId?.toString() || '',
+          countryId: target?.countryId?.toString() || '',
+          visaTypeId: target?.visaTypeId?.toString() || '',
+          leaveDate: leaveForm.date,
+          leaveType: leaveForm.type,
+          leaveReason,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setIsLeaveModalOpen(false);
+      showToast(t('leave_success'), 'success');
+      loadData();
+    } catch { showToast(t('leave_error'), 'error'); }
+  };
+
   const curTabIdx = FORM_TABS.findIndex(t => t.key === formTab);
 
   return (
@@ -445,6 +487,11 @@ export default function DistributorPage() {
                     : <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">{t('status_active')}</span>}
                 </td>
                 <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
+                  {!d.leaveDate && (
+                    <button onClick={() => openLeaveModal(d)} className="p-1.5 text-slate-400 hover:text-amber-600 transition-colors" title={t('btn_leave')}>
+                      <i className="bi bi-box-arrow-right"></i>
+                    </button>
+                  )}
                   <button onClick={() => openForm(d)} className="p-1.5 text-slate-400 hover:text-emerald-600 transition-colors">
                     <i className="bi bi-pencil-square"></i>
                   </button>
@@ -1047,6 +1094,92 @@ export default function DistributorPage() {
                   className="flex-1 py-2.5 font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
                   <i className="bi bi-check2"></i>{t('btn_apply_form')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 退職モーダル */}
+      {isLeaveModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="bg-amber-50 border-b border-amber-200 px-5 py-4 flex items-center justify-between">
+              <h2 className="font-black text-amber-800 flex items-center gap-2 text-base">
+                <i className="bi bi-box-arrow-right text-amber-600"></i>
+                {t('leave_modal_title')}
+              </h2>
+              <button onClick={() => setIsLeaveModalOpen(false)}
+                className="w-7 h-7 bg-amber-100 hover:bg-amber-200 rounded-full flex items-center justify-center transition-colors">
+                <i className="bi bi-x text-amber-700 text-lg"></i>
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-xs text-slate-500">{t('leave_modal_description')}</p>
+
+              {/* 退職日 */}
+              <div>
+                <Label required>{t('label_leave_date_modal')}</Label>
+                <input type="date" value={leaveForm.date}
+                  onChange={e => setLeaveForm(p => ({ ...p, date: e.target.value }))}
+                  className={inputCls} />
+              </div>
+
+              {/* 退職タイプ */}
+              <div>
+                <Label required>{t('label_leave_type')}</Label>
+                <div className="flex gap-2 mt-1">
+                  {([
+                    { value: 'RESIGNATION', labelKey: 'leave_type_resignation', color: 'blue' },
+                    { value: 'TERMINATED', labelKey: 'leave_type_terminated', color: 'rose' },
+                    { value: 'NO_CONTACT', labelKey: 'leave_type_no_contact', color: 'slate' },
+                  ] as const).map(opt => (
+                    <button key={opt.value} type="button"
+                      onClick={() => setLeaveForm(p => ({ ...p, type: opt.value }))}
+                      className={`flex-1 px-3 py-2 text-xs font-bold rounded-lg border-2 transition-all ${
+                        leaveForm.type === opt.value
+                          ? opt.color === 'blue' ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : opt.color === 'rose' ? 'border-rose-500 bg-rose-50 text-rose-700'
+                            : 'border-slate-500 bg-slate-50 text-slate-700'
+                          : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                      }`}>
+                      {t(opt.labelKey)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 退職理由 */}
+              <div>
+                <Label>{t('label_leave_reason_select')}</Label>
+                <select value={leaveForm.reason}
+                  onChange={e => setLeaveForm(p => ({ ...p, reason: e.target.value }))}
+                  className={selectCls}>
+                  <option value="">{t('leave_reason_select_placeholder')}</option>
+                  {LEAVE_REASONS.map(key => (
+                    <option key={key} value={key}>{t(key)}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 補足メモ */}
+              <div>
+                <Label>{t('label_leave_note')}</Label>
+                <textarea value={leaveForm.note}
+                  onChange={e => setLeaveForm(p => ({ ...p, note: e.target.value }))}
+                  className={inputCls + ' resize-none'} rows={3} placeholder={t('leave_note_placeholder')} />
+              </div>
+
+              {/* ボタン */}
+              <div className="flex gap-3 pt-2">
+                <button type="button" onClick={() => setIsLeaveModalOpen(false)}
+                  className="flex-1 py-2.5 font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl text-sm transition-colors">
+                  {t('cancel')}
+                </button>
+                <button type="button" onClick={executeLeave} disabled={!leaveForm.date}
+                  className="flex-1 py-2.5 font-bold text-white bg-amber-600 hover:bg-amber-700 rounded-xl text-sm transition-colors disabled:opacity-40 flex items-center justify-center gap-1.5">
+                  <i className="bi bi-check2"></i>{t('btn_execute_leave')}
                 </button>
               </div>
             </div>
