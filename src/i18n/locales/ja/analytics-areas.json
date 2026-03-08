@@ -1,0 +1,68 @@
+{
+  "page_title": "エリア別配布分析",
+  "kpi": {
+    "total_areas": "配布エリア数",
+    "completed_schedules": "完了スケジュール数",
+    "all_distributed": "配り切り回数",
+    "area_done": "エリア終了回数",
+    "total_schedules": "配布回数",
+    "give_up_count": "ギブアップ",
+    "other_count": "その他/未完了",
+    "avg_completion_rate": "平均完了率",
+    "frequency_per_month": "月間配布頻度",
+    "last_distributed": "最終配布日"
+  },
+  "sections": {
+    "needs_review": "要確認エリア（低完了率Top10）",
+    "most_frequent": "配布頻度が高いエリア（Top10）",
+    "area_search": "エリア検索",
+    "delivery_trend": "配布枚数推移",
+    "completion_trend": "完了率推移",
+    "completion_breakdown": "完了タイプ内訳",
+    "distribution_history": "配布履歴"
+  },
+  "table": {
+    "area_name": "エリア名",
+    "schedules_count": "配布回数",
+    "avg_completion_rate": "平均完了率",
+    "all_distributed": "配り切り",
+    "area_done": "エリア終了",
+    "last_distributed": "最終配布日",
+    "date": "日付",
+    "distributor": "配布員",
+    "planned": "予定",
+    "actual": "実績",
+    "completion_rate": "完了率",
+    "type": "タイプ",
+    "duration": "作業時間"
+  },
+  "completion_type": {
+    "all_distributed": "配り切り",
+    "area_done": "エリア終了",
+    "give_up": "ギブアップ",
+    "other": "その他"
+  },
+  "area_info": {
+    "title": "エリア分析",
+    "households": "世帯数",
+    "door_to_door": "戸建",
+    "multi_family": "集合",
+    "posting_cap": "配布可能数"
+  },
+  "chart": {
+    "count": "枚数",
+    "rate": "完了率(%)",
+    "schedules": "配布回数",
+    "actual_count": "配布枚数"
+  },
+  "filter": {
+    "from": "開始日",
+    "to": "終了日",
+    "search_placeholder": "エリア名で検索...",
+    "apply": "適用"
+  },
+  "no_data": "データがありません",
+  "minutes": "分",
+  "times_per_month": "回/月",
+  "loading": "読み込み中..."
+}

@@ -1,0 +1,68 @@
+{
+  "page_title": "Area Distribution Analytics",
+  "kpi": {
+    "total_areas": "Distribution Areas",
+    "completed_schedules": "Completed Schedules",
+    "all_distributed": "All Distributed",
+    "area_done": "Area Finished",
+    "total_schedules": "Total Distributions",
+    "give_up_count": "Give Up",
+    "other_count": "Other/Incomplete",
+    "avg_completion_rate": "Avg Completion Rate",
+    "frequency_per_month": "Monthly Frequency",
+    "last_distributed": "Last Distributed"
+  },
+  "sections": {
+    "needs_review": "Areas Needing Review (Low Completion Top 10)",
+    "most_frequent": "Most Frequently Distributed Areas (Top 10)",
+    "area_search": "Area Search",
+    "delivery_trend": "Distribution Volume Trend",
+    "completion_trend": "Completion Rate Trend",
+    "completion_breakdown": "Completion Type Breakdown",
+    "distribution_history": "Distribution History"
+  },
+  "table": {
+    "area_name": "Area Name",
+    "schedules_count": "Distributions",
+    "avg_completion_rate": "Avg Completion Rate",
+    "all_distributed": "All Distributed",
+    "area_done": "Area Finished",
+    "last_distributed": "Last Distributed",
+    "date": "Date",
+    "distributor": "Distributor",
+    "planned": "Planned",
+    "actual": "Actual",
+    "completion_rate": "Completion Rate",
+    "type": "Type",
+    "duration": "Duration"
+  },
+  "completion_type": {
+    "all_distributed": "All Distributed",
+    "area_done": "Area Finished",
+    "give_up": "Give Up",
+    "other": "Other"
+  },
+  "area_info": {
+    "title": "Area Analysis",
+    "households": "Households",
+    "door_to_door": "Detached",
+    "multi_family": "Apartments",
+    "posting_cap": "Posting Capacity"
+  },
+  "chart": {
+    "count": "Count",
+    "rate": "Completion Rate (%)",
+    "schedules": "Distributions",
+    "actual_count": "Distributed"
+  },
+  "filter": {
+    "from": "From",
+    "to": "To",
+    "search_placeholder": "Search by area name...",
+    "apply": "Apply"
+  },
+  "no_data": "No data available",
+  "minutes": "min",
+  "times_per_month": "times/mo",
+  "loading": "Loading..."
+}

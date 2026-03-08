@@ -90,6 +90,12 @@ const MENU_GROUPS: MenuGroup[] = [
     ],
   },
   {
+    title: 'ANALYTICS',
+    items: [
+      { nameKey: 'area_analytics', href: '/analytics/areas', icon: 'bi-bar-chart-line-fill' },
+    ],
+  },
+  {
     title: 'SYSTEM',
     items: [
       { nameKey: 'system_settings', href: '/settings', icon: 'bi-gear-fill' },

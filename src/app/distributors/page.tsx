@@ -247,9 +247,9 @@ export default function DistributorPage() {
         visaExpiryDate: d.visaExpiryDate ? d.visaExpiryDate.split('T')[0] : '',
         joinDate: d.joinDate ? d.joinDate.split('T')[0] : todayStr(),
         leaveDate: d.leaveDate ? d.leaveDate.split('T')[0] : '',
-        rate1Type: d.rate1Type?.toString() || '',
-        rate2Type: d.rate2Type?.toString() || '',
-        rate3Type: d.rate3Type?.toString() || '',
+        rate1Type: d.rate1Type != null ? Number(d.rate1Type).toFixed(2) : '',
+        rate2Type: d.rate2Type != null ? Number(d.rate2Type).toFixed(2) : '',
+        rate3Type: d.rate3Type != null ? Number(d.rate3Type).toFixed(2) : '',
         attendanceCount: d.attendanceCount?.toString() || '0',
         bankName: d.bankName || '',
       });

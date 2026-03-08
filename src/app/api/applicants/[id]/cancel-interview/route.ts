@@ -22,6 +22,13 @@ export async function POST(
     const { actorId, actorName } = await getAdminActorInfo();
     const ip = getIpAddress(request);
 
+    // リクエストボディからキャンセル理由を取得
+    let cancelReason: string | null = null;
+    try {
+      const body = await request.json();
+      cancelReason = body.cancelReason || null;
+    } catch { /* bodyが無い場合は無視 */ }
+
     // 応募者+スロット取得
     const applicant = await prisma.applicant.findUnique({
       where: { id: applicantId },
@@ -50,16 +57,25 @@ export async function POST(
       // スロット解放（中間テーブル + レガシー）
       await unbookSlotForApplicant(tx, slotId, applicantId);
 
+      // ステータスをキャンセルに変更 + キャンセル理由保存
+      await tx.applicant.update({
+        where: { id: applicantId },
+        data: {
+          flowStatus: 'CANCELLED',
+          cancelReason,
+        },
+      });
+
       // 監査ログ
       await writeAuditLog({
         actorType: 'EMPLOYEE',
         actorId,
         actorName,
         action: 'UPDATE',
-        targetModel: 'InterviewSlot',
-        targetId: slotId,
+        targetModel: 'Applicant',
+        targetId: applicantId,
         ipAddress: ip,
-        description: `応募者「${applicant.name}」の面接をキャンセル（スロットID: ${slotId} を解放）`,
+        description: `応募者「${applicant.name}」の面接をキャンセル（スロットID: ${slotId} を解放）${cancelReason ? `理由: ${cancelReason}` : ''}`,
         tx,
       });
 

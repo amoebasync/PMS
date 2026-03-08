@@ -184,6 +184,10 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [evalRankForm, setEvalRankForm] = useState({ determinedRank: '', note: '' });
   const [evalSaving, setEvalSaving] = useState(false);
 
+  // 得意エリアランキング
+  const [areaRankings, setAreaRankings] = useState<any[]>([]);
+  const [areaRankingsLoading, setAreaRankingsLoading] = useState(false);
+
   const initialForm = {
     staffId: '', name: '', branchId: '', phone: '', email: '',
     language: 'ja',
@@ -269,6 +273,15 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       }
     } catch { /* ignore */ }
     setEvalLoading(false);
+  };
+
+  const loadAreaRankings = async () => {
+    setAreaRankingsLoading(true);
+    try {
+      const res = await fetch(`/api/distributors/${id}/area-rankings`);
+      if (res.ok) setAreaRankings(await res.json());
+    } catch { /* ignore */ }
+    setAreaRankingsLoading(false);
   };
 
   const loadSchedules = async () => {
@@ -364,6 +377,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     loadDistributor();
     loadDistHistory();
     loadEvaluation();
+    loadAreaRankings();
     // ランク別単価マスタ読み込み
     fetch('/api/settings/system').then(r => r.json()).then(d => {
       if (d.rankRates) {
@@ -415,12 +429,12 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       visaExpiryDate: distributor.visaExpiryDate ? distributor.visaExpiryDate.split('T')[0] : '',
       joinDate: distributor.joinDate ? distributor.joinDate.split('T')[0] : todayStr(),
       leaveDate: distributor.leaveDate ? distributor.leaveDate.split('T')[0] : '',
-      rate1Type: distributor.rate1Type?.toString() || '',
-      rate2Type: distributor.rate2Type?.toString() || '',
-      rate3Type: distributor.rate3Type?.toString() || '',
-      rate4Type: distributor.rate4Type?.toString() || '',
-      rate5Type: distributor.rate5Type?.toString() || '',
-      rate6Type: distributor.rate6Type?.toString() || '',
+      rate1Type: distributor.rate1Type != null ? Number(distributor.rate1Type).toFixed(2) : '',
+      rate2Type: distributor.rate2Type != null ? Number(distributor.rate2Type).toFixed(2) : '',
+      rate3Type: distributor.rate3Type != null ? Number(distributor.rate3Type).toFixed(2) : '',
+      rate4Type: distributor.rate4Type != null ? Number(distributor.rate4Type).toFixed(2) : '',
+      rate5Type: distributor.rate5Type != null ? Number(distributor.rate5Type).toFixed(2) : '',
+      rate6Type: distributor.rate6Type != null ? Number(distributor.rate6Type).toFixed(2) : '',
       attendanceCount: distributor.attendanceCount?.toString() || '0',
       minTypes: distributor.minTypes?.toString() || '',
       maxTypes: distributor.maxTypes?.toString() || '',
@@ -904,6 +918,53 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               )}
             </div>
           </div>
+
+          {/* ─── 得意エリアランキング ─── */}
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 md:col-span-2">
+            <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
+              <i className="bi bi-trophy-fill text-amber-500"></i> 得意エリアランキング
+            </h2>
+            {areaRankingsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-5 h-5 border-2 border-amber-500 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : areaRankings.length === 0 ? (
+              <p className="text-sm text-slate-400 text-center py-6">配布データがありません</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="px-4 py-2.5 text-center text-xs font-bold text-slate-500 w-14">#</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-bold text-slate-500">エリア</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500">配布回数</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500">平均配布率</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-bold text-slate-500">スコア</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {areaRankings.map((r: any) => (
+                      <tr key={r.areaId} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-2.5 text-center">
+                          {r.rank <= 3 ? (
+                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-black text-white ${
+                              r.rank === 1 ? 'bg-amber-400' : r.rank === 2 ? 'bg-slate-400' : 'bg-amber-700'
+                            }`}>{r.rank}</span>
+                          ) : (
+                            <span className="text-slate-400 font-bold">{r.rank}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-700 font-medium">{r.areaName}</td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">{r.distributionCount}<span className="text-xs text-slate-400 ml-0.5">回</span></td>
+                        <td className="px-4 py-2.5 text-right text-slate-600">{r.avgDistributionRate != null ? <>{r.avgDistributionRate}<span className="text-xs text-slate-400 ml-0.5">%</span></> : '—'}</td>
+                        <td className="px-4 py-2.5 text-right font-bold text-slate-800">{r.score}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -933,12 +994,12 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="レートプラン" value={d.ratePlan} />
               <InfoRow label="出勤回数" value={d.attendanceCount} />
               <InfoRow label="単価モード" value={d.rateMode === 'auto' ? '自動（ランク連動）' : '手動'} />
-              <InfoRow label="1 Type Rate" value={d.rate1Type} />
-              <InfoRow label="2 Type Rate" value={d.rate2Type} />
-              <InfoRow label="3 Type Rate" value={d.rate3Type} />
-              <InfoRow label="4 Type Rate" value={d.rate4Type} />
-              <InfoRow label="5 Type Rate" value={d.rate5Type} />
-              <InfoRow label="6 Type Rate" value={d.rate6Type} />
+              <InfoRow label="1 Type Rate" value={d.rate1Type != null ? Number(d.rate1Type).toFixed(2) : null} />
+              <InfoRow label="2 Type Rate" value={d.rate2Type != null ? Number(d.rate2Type).toFixed(2) : null} />
+              <InfoRow label="3 Type Rate" value={d.rate3Type != null ? Number(d.rate3Type).toFixed(2) : null} />
+              <InfoRow label="4 Type Rate" value={d.rate4Type != null ? Number(d.rate4Type).toFixed(2) : null} />
+              <InfoRow label="5 Type Rate" value={d.rate5Type != null ? Number(d.rate5Type).toFixed(2) : null} />
+              <InfoRow label="6 Type Rate" value={d.rate6Type != null ? Number(d.rate6Type).toFixed(2) : null} />
               <InfoRow label="交通費" value={d.transportationFee} />
               <InfoRow label="研修手当" value={d.trainingAllowance} />
             </div>
@@ -986,36 +1047,31 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
 
       {/* ─── 配布履歴タブ ─── */}
       {activeTab === 'schedules' && (() => {
-        // エリア別にグループ化: 日付→エリア単位で行を生成
-        const grouped = schedules.reduce((acc: { dateKey: string; date: string; areaName: string; scheduleIds: number[]; statuses: string[]; flyers: string[]; totalPlanned: number; totalActual: number | null }[], s: any) => {
+        // エリア別にグループ化: 日付→エリア(chome_name)単位で行を生成
+        type GroupedRow = { dateKey: string; date: string; areaName: string; scheduleIds: number[]; statuses: string[]; slots: Record<number, { name: string; planned: number; actual: number | null }[]>; totalPlanned: number; totalActual: number | null };
+        const grouped = schedules.reduce((acc: GroupedRow[], s: any) => {
           const dateKey = s.date ? new Date(s.date).toLocaleDateString('ja-JP') : '—';
-          const areaName = s.area
-            ? `${s.area.city?.name || ''} ${s.area.town_name || ''}${s.area.chome_name || ''}`.trim()
-            : s.city?.name || '—';
-          // 同日・同エリアの既存行を検索
+          const areaName = s.area?.chome_name || s.area?.town_name || '—';
           let row = acc.find(r => r.dateKey === dateKey && r.areaName === areaName);
           if (!row) {
-            row = { dateKey, date: s.date, areaName, scheduleIds: [], statuses: [], flyers: [], totalPlanned: 0, totalActual: null };
+            row = { dateKey, date: s.date, areaName, scheduleIds: [], statuses: [], slots: {}, totalPlanned: 0, totalActual: null };
             acc.push(row);
           }
           row.scheduleIds.push(s.id);
           if (!row.statuses.includes(s.status)) row.statuses.push(s.status);
-          const flyerNames = s.items?.map((it: any) => it.flyerName).filter(Boolean) || [];
-          flyerNames.forEach((fn: string) => { if (!row!.flyers.includes(fn)) row!.flyers.push(fn); });
-          const planned = s.items?.reduce((sum: number, it: any) => sum + (it.plannedCount || 0), 0) || 0;
-          row.totalPlanned += planned;
-          if (s.items?.some((it: any) => it.actualCount != null)) {
-            const actual = s.items.reduce((sum: number, it: any) => sum + (it.actualCount || 0), 0);
-            row.totalActual = (row.totalActual ?? 0) + actual;
-          }
+          (s.items || []).forEach((it: any) => {
+            const idx = it.slotIndex || 1;
+            if (!row!.slots[idx]) row!.slots[idx] = [];
+            row!.slots[idx].push({ name: it.flyerName || '', planned: it.plannedCount || 0, actual: it.actualCount });
+            row!.totalPlanned += it.plannedCount || 0;
+            if (it.actualCount != null) row!.totalActual = (row!.totalActual ?? 0) + it.actualCount;
+          });
           return acc;
         }, []);
-        // 日付でソート（降順）
-        grouped.sort((a: any, b: any) => (b.date || '').localeCompare(a.date || ''));
+        grouped.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
 
-        // 日付ごとの行数を計算してrowSpan用に
         const dateRowCounts = new Map<string, number>();
-        grouped.forEach((r: any) => dateRowCounts.set(r.dateKey, (dateRowCounts.get(r.dateKey) || 0) + 1));
+        grouped.forEach(r => dateRowCounts.set(r.dateKey, (dateRowCounts.get(r.dateKey) || 0) + 1));
         let prevDateKey = '';
 
         return (
@@ -1031,36 +1087,42 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm whitespace-nowrap">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">日付</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 sticky left-0 bg-slate-50 z-10">日付</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">エリア</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">ステータス</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-slate-500">チラシ</th>
+                      {[1,2,3,4,5,6].map(i => (
+                        <th key={i} className="px-3 py-3 text-left text-xs font-bold text-slate-500 min-w-[160px]">チラシ{i}</th>
+                      ))}
                       <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">予定枚数</th>
                       <th className="px-4 py-3 text-right text-xs font-bold text-slate-500">実績枚数</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {grouped.map((row: any, idx: number) => {
+                    {grouped.map((row, idx) => {
                       const showDate = row.dateKey !== prevDateKey;
                       const rowSpan = showDate ? dateRowCounts.get(row.dateKey) || 1 : 0;
                       prevDateKey = row.dateKey;
-                      // 代表ステータス: COMPLETED > DISTRIBUTING > IN_PROGRESS > UNSTARTED
                       const bestStatus = row.statuses.includes('COMPLETED') ? 'COMPLETED'
                         : row.statuses.includes('DISTRIBUTING') ? 'DISTRIBUTING'
                         : row.statuses.includes('IN_PROGRESS') ? 'IN_PROGRESS' : 'UNSTARTED';
                       return (
                         <tr key={`${row.dateKey}-${row.areaName}-${idx}`} className="hover:bg-slate-50 transition-colors">
                           {showDate && (
-                            <td className="px-4 py-3 text-slate-700 font-medium align-top border-r border-slate-100" rowSpan={rowSpan}>
+                            <td className="px-4 py-3 text-slate-700 font-medium align-top border-r border-slate-100 sticky left-0 bg-white z-10" rowSpan={rowSpan}>
                               {row.dateKey}
                             </td>
                           )}
                           <td className="px-4 py-3 text-slate-600">{row.areaName}</td>
                           <td className="px-4 py-3"><ScheduleStatusBadge status={bestStatus} /></td>
-                          <td className="px-4 py-3 text-slate-600 truncate max-w-[250px]">{row.flyers.join(', ') || '—'}</td>
+                          {[1,2,3,4,5,6].map(i => {
+                            const items = row.slots[i];
+                            if (!items || items.length === 0) return <td key={i} className="px-3 py-3 text-slate-300">—</td>;
+                            const name = items.map(it => it.name).filter(Boolean).join(', ');
+                            return <td key={i} className="px-3 py-3 text-slate-600 text-xs truncate max-w-[200px]" title={name}>{name || '—'}</td>;
+                          })}
                           <td className="px-4 py-3 text-right text-slate-600">{row.totalPlanned.toLocaleString()}</td>
                           <td className="px-4 py-3 text-right font-bold text-slate-800">
                             {row.totalActual != null ? row.totalActual.toLocaleString() : '—'}

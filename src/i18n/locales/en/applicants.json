@@ -1,6 +1,7 @@
 {
   "flow_interview_waiting": "Interview Waiting",
   "flow_no_show": "NO SHOW",
+  "flow_cancelled": "Cancelled",
   "flow_training_waiting": "Training Waiting",
   "flow_training_completed": "Training Completed",
 
@@ -193,6 +194,11 @@
   "eval_cancel_interview_title": "Cancel Interview",
   "eval_cancel_interview_success": "Interview cancelled",
   "eval_cancel_interview_failed": "Failed to cancel interview",
+
+  "cancel_reason_label": "Cancel Reason",
+  "cancel_reason_other_job": "Found another job",
+  "cancel_reason_not_fit": "Job doesn't seem like a good fit",
+  "cancel_reason_other": "Other",
 
   "eval_no_show_confirm": "Record \"{{name}}\" as no-show for the interview?",
   "eval_no_show_confirm_label": "Record NO SHOW",

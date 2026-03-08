@@ -161,6 +161,7 @@ type Applicant = {
 const FLOW_STATUS_MAP: Record<string, { labelKey: string; color: string }> = {
   INTERVIEW_WAITING:   { labelKey: 'flow_interview_waiting',   color: 'bg-amber-100 text-amber-700' },
   NO_SHOW:             { labelKey: 'flow_no_show',    color: 'bg-rose-100 text-rose-700' },
+  CANCELLED:           { labelKey: 'flow_cancelled',  color: 'bg-slate-100 text-slate-600' },
   TRAINING_WAITING:    { labelKey: 'flow_training_waiting',   color: 'bg-blue-100 text-blue-700' },
   TRAINING_COMPLETED:  { labelKey: 'flow_training_completed',   color: 'bg-emerald-100 text-emerald-700' },
 };
@@ -483,6 +484,11 @@ export default function ApplicantsPage() {
   const [availableSlots, setAvailableSlots] = useState<{id: number; startTime: string; endTime: string}[]>([]);
   const [selectedNewSlotId, setSelectedNewSlotId] = useState<number | null>(null);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+
+  // ── 面接キャンセル理由 ──
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelSubmitting, setCancelSubmitting] = useState(false);
 
   // ── 研修スロット ──
   const [trainingSlots, setTrainingSlots] = useState<TrainingSlotOption[]>([]);
@@ -1324,26 +1330,34 @@ export default function ApplicantsPage() {
   };
 
   // 面接キャンセル（管理者）
-  const handleCancelInterview = async () => {
+  const handleCancelInterview = () => {
     if (!selectedApplicant) return;
-    const ok = await showConfirm(
-      t('eval_cancel_interview_confirm', { name: selectedApplicant.name }),
-      { variant: 'danger', confirmLabel: t('eval_cancel_interview_confirm_label'), title: t('eval_cancel_interview_title') }
-    );
-    if (!ok) return;
+    setCancelReason('');
+    setShowCancelModal(true);
+  };
+
+  const submitCancelInterview = async () => {
+    if (!selectedApplicant || !cancelReason) return;
+    setCancelSubmitting(true);
     try {
-      const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-interview`, { method: 'POST' });
+      const res = await fetch(`/api/applicants/${selectedApplicant.id}/cancel-interview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cancelReason }),
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.error || t('eval_cancel_interview_failed'));
       }
       showToast(t('eval_cancel_interview_success'), 'success');
+      setShowCancelModal(false);
       openEvalModal(selectedApplicant.id);
       fetchSlots();
       fetchApplicants(page);
     } catch (e: any) {
       showToast(e.message || t('eval_cancel_interview_failed'), 'error');
     }
+    setCancelSubmitting(false);
   };
 
   // 面接NO SHOW記録
@@ -2022,6 +2036,7 @@ export default function ApplicantsPage() {
                       <option value="">{t('list_filter_flow_all')}</option>
                       <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
                       <option value="NO_SHOW">{t('flow_no_show')}</option>
+                      <option value="CANCELLED">{t('flow_cancelled')}</option>
                       <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
                       <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
                     </select>
@@ -3483,6 +3498,7 @@ export default function ApplicantsPage() {
                         >
                           <option value="INTERVIEW_WAITING">{t('flow_interview_waiting')}</option>
                           <option value="NO_SHOW">{t('flow_no_show')}</option>
+                          <option value="CANCELLED">{t('flow_cancelled')}</option>
                           <option value="TRAINING_WAITING">{t('flow_training_waiting')}</option>
                           <option value="TRAINING_COMPLETED">{t('flow_training_completed')}</option>
                         </select>
@@ -4403,6 +4419,69 @@ export default function ApplicantsPage() {
                 className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
               >
                 {t('close')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 面接キャンセル理由モーダル ── */}
+      {showCancelModal && selectedApplicant && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b flex justify-between items-center bg-rose-50 rounded-t-xl">
+              <h3 className="font-bold text-rose-800 flex items-center gap-2">
+                <i className="bi bi-x-circle"></i> {t('eval_cancel_interview_title')}
+              </h3>
+              <button onClick={() => setShowCancelModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-slate-600">
+                {t('eval_cancel_interview_confirm', { name: selectedApplicant.name })}
+              </p>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-2">{t('cancel_reason_label')} <span className="text-rose-500">*</span></label>
+                <div className="space-y-2">
+                  {[
+                    { value: '別の仕事が決まった', labelKey: 'cancel_reason_other_job' },
+                    { value: '仕事が合わなそう', labelKey: 'cancel_reason_not_fit' },
+                    { value: 'その他', labelKey: 'cancel_reason_other' },
+                  ].map(opt => (
+                    <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      cancelReason === opt.value ? 'border-rose-300 bg-rose-50' : 'border-slate-200 hover:bg-slate-50'
+                    }`}>
+                      <input
+                        type="radio"
+                        name="cancelReason"
+                        value={opt.value}
+                        checked={cancelReason === opt.value}
+                        onChange={e => setCancelReason(e.target.value)}
+                        className="accent-rose-500"
+                      />
+                      <span className="text-sm font-medium text-slate-700">{t(opt.labelKey)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelModal(false)}
+                className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                {t('close')}
+              </button>
+              <button
+                type="button"
+                onClick={submitCancelInterview}
+                disabled={!cancelReason || cancelSubmitting}
+                className="px-4 py-2 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+              >
+                {cancelSubmitting && <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></span>}
+                {t('eval_cancel_interview_confirm_label')}
               </button>
             </div>
           </div>

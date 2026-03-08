@@ -84,6 +84,15 @@ body {
   scrollbar-width: none;
 }
 
+/* Slide-in animation for right panels */
+@keyframes slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+.animate-slide-in-right {
+  animation: slide-in-right 0.3s ease-out;
+}
+
 /* Mobile touch scroll improvements */
 @media (max-width: 767px) {
   .overflow-x-auto {

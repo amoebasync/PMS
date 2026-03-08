@@ -1,6 +1,7 @@
 {
   "flow_interview_waiting": "面接待ち",
   "flow_no_show": "NO SHOW",
+  "flow_cancelled": "キャンセル",
   "flow_training_waiting": "研修待ち",
   "flow_training_completed": "研修完了",
 
@@ -193,6 +194,11 @@
   "eval_cancel_interview_title": "面接キャンセル",
   "eval_cancel_interview_success": "面接をキャンセルしました",
   "eval_cancel_interview_failed": "面接キャンセルに失敗しました",
+
+  "cancel_reason_label": "キャンセル理由",
+  "cancel_reason_other_job": "別の仕事が決まった",
+  "cancel_reason_not_fit": "仕事が合わなそう",
+  "cancel_reason_other": "その他",
 
   "eval_no_show_confirm": "「{{name}}」を面接不参加（NO SHOW）として記録しますか？",
   "eval_no_show_confirm_label": "NO SHOWを記録",

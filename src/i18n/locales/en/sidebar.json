@@ -31,6 +31,7 @@
   "announcements": "Announcements",
   "pricing": "Pricing",
   "company_settings": "Company Settings",
+  "area_analytics": "Area Analytics",
   "profile_edit": "Edit Profile",
   "page_titles": {
     "dashboard": "Dashboard",
@@ -64,6 +65,7 @@
     "profile_edit": "Edit Profile",
     "announcements": "Announcements",
     "pricing": "Pricing",
+    "area_analytics": "Area Distribution Analytics",
     "company_settings": "Company Settings"
   }
 }

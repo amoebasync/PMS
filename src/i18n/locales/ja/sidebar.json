@@ -31,6 +31,7 @@
   "announcements": "全体お知らせ",
   "pricing": "価格設定",
   "company_settings": "自社情報設定",
+  "area_analytics": "エリア分析",
   "profile_edit": "プロフィール編集",
   "page_titles": {
     "dashboard": "ダッシュボード",
@@ -64,6 +65,7 @@
     "profile_edit": "プロフィール編集",
     "announcements": "全体お知らせ",
     "pricing": "価格設定",
+    "area_analytics": "エリア別配布分析",
     "company_settings": "自社情報設定"
   }
 }
