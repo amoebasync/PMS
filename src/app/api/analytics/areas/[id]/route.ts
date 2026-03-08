@@ -5,11 +5,13 @@ import { Prisma } from '@prisma/client';
 
 interface AreaKpiRow {
   total_schedules: bigint;
+  valid_count: bigint;
   all_distributed_count: bigint;
   area_done_count: bigint;
   give_up_count: bigint;
   other_count: bigint;
   avg_completion_rate: number | null;
+  avg_distribution_rate: number | null;
   last_distributed: Date | null;
   first_distributed: Date | null;
 }
@@ -17,8 +19,10 @@ interface AreaKpiRow {
 interface TimeSeriesRow {
   period: string;
   schedules_count: bigint;
+  valid_count: bigint;
   total_actual: bigint;
   avg_completion_rate: number | null;
+  avg_distribution_rate: number | null;
   all_distributed_count: bigint;
   area_done_count: bigint;
 }
@@ -67,6 +71,9 @@ export async function GET(
     const dateFilterTo = toDate ? Prisma.sql`AND ds.date <= ${toDate}` : Prisma.empty;
 
     // 2. KPI aggregation for this area
+    // "valid" = all_distributed OR area_done (excludes give_up, 0-actual, other noise)
+    // 平均完了率 = all_distributed / valid * 100 (回数ベース)
+    // 平均配布率 = AVG(actual/planned) for valid only (枚数ベース)
     const kpiRows = await prisma.$queryRaw<AreaKpiRow[]>`
       WITH schedule_stats AS (
         SELECT
@@ -87,11 +94,20 @@ export async function GET(
       )
       SELECT
         COUNT(DISTINCT ss.schedule_id) AS total_schedules,
+        SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS valid_count,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         SUM(CASE WHEN ss.incomplete_reason = 'GIVE_UP' THEN 1 ELSE 0 END) AS give_up_count,
         SUM(CASE WHEN ss.incomplete_reason = 'OTHER' THEN 1 ELSE 0 END) AS other_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(
+          SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END), 0)
+        , 1) AS avg_completion_rate,
+        ROUND(AVG(
+          CASE WHEN ((ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE') AND ss.total_planned > 0
+          THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0)
+          ELSE NULL END
+        ), 1) AS avg_distribution_rate,
         MAX(ss.date) AS last_distributed,
         MIN(ss.date) AS first_distributed
       FROM schedule_stats ss
@@ -99,11 +115,13 @@ export async function GET(
 
     const kpiRow = kpiRows[0] || {
       total_schedules: BigInt(0),
+      valid_count: BigInt(0),
       all_distributed_count: BigInt(0),
       area_done_count: BigInt(0),
       give_up_count: BigInt(0),
       other_count: BigInt(0),
       avg_completion_rate: null,
+      avg_distribution_rate: null,
       last_distributed: null,
       first_distributed: null,
     };
@@ -124,11 +142,13 @@ export async function GET(
 
     const kpi = {
       totalSchedules,
+      validCount: Number(kpiRow.valid_count),
       allDistributedCount: Number(kpiRow.all_distributed_count),
       areaDoneCount: Number(kpiRow.area_done_count),
       giveUpCount: Number(kpiRow.give_up_count),
       otherCount: Number(kpiRow.other_count),
       avgCompletionRate: kpiRow.avg_completion_rate != null ? Number(kpiRow.avg_completion_rate) : 0,
+      avgDistributionRate: kpiRow.avg_distribution_rate != null ? Number(kpiRow.avg_distribution_rate) : 0,
       frequencyPerMonth,
       lastDistributed: kpiRow.last_distributed
         ? new Date(kpiRow.last_distributed).toISOString().split('T')[0]
@@ -157,8 +177,17 @@ export async function GET(
       SELECT
         DATE_FORMAT(ss.date, '%Y-%m') AS period,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
+        SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS valid_count,
         SUM(ss.total_actual) AS total_actual,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
+        ROUND(
+          SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END), 0)
+        , 1) AS avg_completion_rate,
+        ROUND(AVG(
+          CASE WHEN ((ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE') AND ss.total_planned > 0
+          THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0)
+          ELSE NULL END
+        ), 1) AS avg_distribution_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count
       FROM schedule_stats ss
@@ -169,8 +198,10 @@ export async function GET(
     const timeSeries = timeSeriesRows.map((row) => ({
       period: row.period,
       schedulesCount: Number(row.schedules_count),
+      validCount: Number(row.valid_count),
       totalActual: Number(row.total_actual),
       avgCompletionRate: row.avg_completion_rate != null ? Number(row.avg_completion_rate) : 0,
+      avgDistributionRate: row.avg_distribution_rate != null ? Number(row.avg_distribution_rate) : 0,
       allDistributedCount: Number(row.all_distributed_count),
       areaDoneCount: Number(row.area_done_count),
     }));
@@ -223,15 +254,17 @@ export async function GET(
     ]);
 
     const history = historySchedules.map((schedule) => {
-      const totalPlanned = schedule.items.reduce(
+      // Only aggregate items with plannedCount > 1
+      const validItems = schedule.items.filter(i => (i.plannedCount || 0) > 1);
+      const totalPlanned = validItems.reduce(
         (sum, item) => sum + (item.plannedCount || 0),
         0
       );
-      const totalActual = schedule.items.reduce(
+      const totalActual = validItems.reduce(
         (sum, item) => sum + (item.actualCount || 0),
         0
       );
-      const completionRate =
+      const distributionRate =
         totalPlanned > 0
           ? Math.min(100, Math.round((totalActual / totalPlanned) * 1000) / 10)
           : 0;
@@ -264,7 +297,7 @@ export async function GET(
         distributorName: schedule.distributor?.name || '-',
         totalPlanned,
         totalActual,
-        completionRate,
+        distributionRate,
         completionType,
         sessionDuration,
       };

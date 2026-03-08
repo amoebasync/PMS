@@ -136,8 +136,8 @@ export default function AreaAnalyticsPanel({ areaId, onClose }: AreaAnalyticsPan
               <KpiCard icon="bi-calendar-check" label={t('kpi.total_schedules')} value={data.kpi.totalSchedules} />
               <KpiCard icon="bi-check-circle-fill" label={t('kpi.all_distributed')} value={data.kpi.allDistributedCount} />
               <KpiCard icon="bi-flag-fill" label={t('kpi.area_done')} value={data.kpi.areaDoneCount} />
-              <KpiCard icon="bi-x-circle" label={t('kpi.give_up_count')} value={data.kpi.giveUpCount} />
               <KpiCard icon="bi-percent" label={t('kpi.avg_completion_rate')} value={data.kpi.avgCompletionRate} suffix="%" />
+              <KpiCard icon="bi-bar-chart-fill" label={t('kpi.avg_distribution_rate')} value={data.kpi.avgDistributionRate} suffix="%" />
               <KpiCard icon="bi-arrow-repeat" label={t('kpi.frequency_per_month')} value={data.kpi.frequencyPerMonth} suffix={t('times_per_month')} />
             </div>
 
@@ -159,7 +159,7 @@ export default function AreaAnalyticsPanel({ areaId, onClose }: AreaAnalyticsPan
                 ) : <p className="text-sm text-slate-400 text-center py-8">{t('no_data')}</p>}
               </div>
 
-              {/* Completion Rate Trend (Line) */}
+              {/* Rate Trends (Line) */}
               <div className="bg-white rounded-xl border border-slate-200 p-4">
                 <h3 className="text-sm font-semibold text-slate-700 mb-3">{t('sections.completion_trend')}</h3>
                 {data.timeSeries?.length > 0 ? (
@@ -169,7 +169,8 @@ export default function AreaAnalyticsPanel({ areaId, onClose }: AreaAnalyticsPan
                       <XAxis dataKey="period" tick={{ fontSize: 10 }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                       <Tooltip contentStyle={{ fontSize: 11 }} />
-                      <Line type="monotone" dataKey="avgCompletionRate" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name={t('chart.rate')} />
+                      <Line type="monotone" dataKey="avgCompletionRate" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name={t('chart.completion_rate')} />
+                      <Line type="monotone" dataKey="avgDistributionRate" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} name={t('chart.distribution_rate')} />
                     </LineChart>
                   </ResponsiveContainer>
                 ) : <p className="text-sm text-slate-400 text-center py-8">{t('no_data')}</p>}
@@ -215,7 +216,7 @@ export default function AreaAnalyticsPanel({ areaId, onClose }: AreaAnalyticsPan
                           <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500">{t('table.distributor')}</th>
                           <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500 text-right">{t('table.planned')}</th>
                           <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500 text-right">{t('table.actual')}</th>
-                          <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500 text-right">{t('table.completion_rate')}</th>
+                          <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500 text-right">{t('table.distribution_rate')}</th>
                           <th className="pb-2 pr-3 text-[11px] font-semibold text-slate-500">{t('table.type')}</th>
                           <th className="pb-2 text-[11px] font-semibold text-slate-500 text-right">{t('table.duration')}</th>
                         </tr>
@@ -227,7 +228,7 @@ export default function AreaAnalyticsPanel({ areaId, onClose }: AreaAnalyticsPan
                             <td className="py-2 pr-3 text-xs">{h.distributorName}</td>
                             <td className="py-2 pr-3 text-xs text-right">{h.totalPlanned?.toLocaleString()}</td>
                             <td className="py-2 pr-3 text-xs text-right">{h.totalActual?.toLocaleString()}</td>
-                            <td className="py-2 pr-3 text-xs text-right font-medium">{h.completionRate}%</td>
+                            <td className="py-2 pr-3 text-xs text-right font-medium">{h.distributionRate}%</td>
                             <td className="py-2 pr-3"><CompletionBadge type={h.completionType} t={t} /></td>
                             <td className="py-2 text-xs text-right">{h.sessionDuration != null ? `${h.sessionDuration}${t('minutes')}` : '-'}</td>
                           </tr>

@@ -24,6 +24,7 @@ interface AreaRow {
   areaName: string;
   schedulesCount: number;
   avgCompletionRate: number;
+  avgDistributionRate: number;
   allDistributedCount: number;
   areaDoneCount: number;
   lastDistributed: string | null;
@@ -65,7 +66,10 @@ export default function AreaAnalyticsPage() {
     return () => clearTimeout(timer);
   }, [searchQuery, handleSearch]);
 
-  // Area table row component (renamed from AreaRow to avoid conflict with interface)
+  const rateColor = (rate: number) =>
+    rate < 70 ? 'text-red-600' : rate < 90 ? 'text-amber-600' : 'text-green-600';
+
+  // Area table row component
   const AreaTableRow = ({ area, rank }: { area: AreaRow; rank?: number }) => (
     <tr className="border-b border-slate-100 hover:bg-blue-50/50 cursor-pointer transition-colors"
       onClick={() => setSelectedAreaId(area.areaId)}>
@@ -73,9 +77,10 @@ export default function AreaAnalyticsPage() {
       <td className="py-2.5 pr-3 text-sm font-medium text-slate-700">{area.areaName}</td>
       <td className="py-2.5 pr-3 text-sm text-center">{area.schedulesCount}</td>
       <td className="py-2.5 pr-3 text-sm text-center">
-        <span className={`font-medium ${area.avgCompletionRate < 70 ? 'text-red-600' : area.avgCompletionRate < 90 ? 'text-amber-600' : 'text-green-600'}`}>
-          {area.avgCompletionRate}%
-        </span>
+        <span className={`font-medium ${rateColor(area.avgCompletionRate)}`}>{area.avgCompletionRate}%</span>
+      </td>
+      <td className="py-2.5 pr-3 text-sm text-center">
+        <span className={`font-medium ${rateColor(area.avgDistributionRate)}`}>{area.avgDistributionRate}%</span>
       </td>
       <td className="py-2.5 pr-3 text-sm text-center text-green-600">{area.allDistributedCount}</td>
       <td className="py-2.5 pr-3 text-sm text-center text-blue-600">{area.areaDoneCount}</td>
@@ -118,6 +123,7 @@ export default function AreaAnalyticsPage() {
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-left">{t('table.area_name')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.schedules_count')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.avg_completion_rate')}</th>
+                    <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.avg_distribution_rate')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.all_distributed')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.area_done')}</th>
                     <th className="pb-2 text-[10px] font-semibold text-slate-400">{t('table.last_distributed')}</th>
@@ -146,6 +152,7 @@ export default function AreaAnalyticsPage() {
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-left">{t('table.area_name')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.schedules_count')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.avg_completion_rate')}</th>
+                    <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.avg_distribution_rate')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.all_distributed')}</th>
                     <th className="pb-2 pr-3 text-[10px] font-semibold text-slate-400 text-center">{t('table.area_done')}</th>
                     <th className="pb-2 text-[10px] font-semibold text-slate-400">{t('table.last_distributed')}</th>

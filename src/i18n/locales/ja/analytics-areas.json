@@ -9,11 +9,12 @@
     "give_up_count": "ギブアップ",
     "other_count": "その他/未完了",
     "avg_completion_rate": "平均完了率",
+    "avg_distribution_rate": "平均配布率",
     "frequency_per_month": "月間配布頻度",
     "last_distributed": "最終配布日"
   },
   "sections": {
-    "needs_review": "要確認エリア（低完了率Top10）",
+    "needs_review": "要確認エリア（低配布率Top10）",
     "most_frequent": "配布頻度が高いエリア（Top10）",
     "area_search": "エリア検索",
     "delivery_trend": "配布枚数推移",
@@ -24,7 +25,8 @@
   "table": {
     "area_name": "エリア名",
     "schedules_count": "配布回数",
-    "avg_completion_rate": "平均完了率",
+    "avg_completion_rate": "完了率",
+    "avg_distribution_rate": "配布率",
     "all_distributed": "配り切り",
     "area_done": "エリア終了",
     "last_distributed": "最終配布日",
@@ -32,7 +34,7 @@
     "distributor": "配布員",
     "planned": "予定",
     "actual": "実績",
-    "completion_rate": "完了率",
+    "distribution_rate": "配布率",
     "type": "タイプ",
     "duration": "作業時間"
   },
@@ -51,7 +53,8 @@
   },
   "chart": {
     "count": "枚数",
-    "rate": "完了率(%)",
+    "completion_rate": "完了率(%)",
+    "distribution_rate": "配布率(%)",
     "schedules": "配布回数",
     "actual_count": "配布枚数"
   },

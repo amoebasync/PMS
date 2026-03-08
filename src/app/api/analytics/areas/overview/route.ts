@@ -8,7 +8,9 @@ interface ScheduleStatsRow {
   city_name: string | null;
   chome_name: string | null;
   schedules_count: bigint;
+  valid_count: bigint;
   avg_completion_rate: number | null;
+  avg_distribution_rate: number | null;
   all_distributed_count: bigint;
   area_done_count: bigint;
   last_distributed: Date | null;
@@ -22,7 +24,6 @@ interface KpiRow {
 }
 
 // GET /api/analytics/areas/overview
-// Dashboard overview: KPI totals, top 10 areas needing review, top 10 most frequent areas
 export async function GET() {
   const cookieStore = await cookies();
   if (!cookieStore.get('pms_session')?.value) {
@@ -69,7 +70,9 @@ export async function GET() {
       totalAreaDone: Number(kpiRow.total_area_done),
     };
 
-    // Areas needing review (lowest avg completion rate, limit 10)
+    // Areas needing review (lowest avg distribution rate, limit 10)
+    // Only considers "valid" schedules: all_distributed OR area_done
+    // Excludes give_up, 0-actual, and other noise
     const needsReviewRows = await prisma.$queryRaw<ScheduleStatsRow[]>`
       WITH schedule_stats AS (
         SELECT
@@ -93,7 +96,16 @@ export async function GET() {
         c.name AS city_name,
         a.chome_name,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
+        SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS valid_count,
+        ROUND(
+          SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END), 0)
+        , 1) AS avg_completion_rate,
+        ROUND(AVG(
+          CASE WHEN ((ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE') AND ss.total_planned > 0
+          THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0)
+          ELSE NULL END
+        ), 1) AS avg_distribution_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         MAX(ss.date) AS last_distributed
@@ -102,7 +114,8 @@ export async function GET() {
       JOIN prefectures p ON p.id = a.prefecture_id
       JOIN cities c ON c.id = a.city_id
       GROUP BY ss.area_id, p.name, c.name, a.chome_name
-      ORDER BY avg_completion_rate ASC
+      HAVING SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) > 0
+      ORDER BY avg_distribution_rate ASC
       LIMIT 10
     `;
 
@@ -130,7 +143,16 @@ export async function GET() {
         c.name AS city_name,
         a.chome_name,
         COUNT(DISTINCT ss.schedule_id) AS schedules_count,
-        ROUND(AVG(CASE WHEN ss.total_planned > 0 THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0) ELSE 0 END), 1) AS avg_completion_rate,
+        SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS valid_count,
+        ROUND(
+          SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) * 100.0
+          / NULLIF(SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END), 0)
+        , 1) AS avg_completion_rate,
+        ROUND(AVG(
+          CASE WHEN ((ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE') AND ss.total_planned > 0
+          THEN LEAST(ss.total_actual * 100.0 / ss.total_planned, 100.0)
+          ELSE NULL END
+        ), 1) AS avg_distribution_rate,
         SUM(CASE WHEN ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned THEN 1 ELSE 0 END) AS all_distributed_count,
         SUM(CASE WHEN ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) AS area_done_count,
         MAX(ss.date) AS last_distributed
@@ -139,6 +161,7 @@ export async function GET() {
       JOIN prefectures p ON p.id = a.prefecture_id
       JOIN cities c ON c.id = a.city_id
       GROUP BY ss.area_id, p.name, c.name, a.chome_name
+      HAVING SUM(CASE WHEN (ss.incomplete_reason IS NULL AND ss.total_actual >= ss.total_planned) OR ss.incomplete_reason = 'AREA_DONE' THEN 1 ELSE 0 END) > 0
       ORDER BY schedules_count DESC
       LIMIT 10
     `;
@@ -147,7 +170,9 @@ export async function GET() {
       areaId: row.area_id,
       areaName: `${row.prefecture_name || ''}${row.city_name || ''}${row.chome_name || ''}`.trim() || '-',
       schedulesCount: Number(row.schedules_count),
+      validCount: Number(row.valid_count),
       avgCompletionRate: row.avg_completion_rate != null ? Number(row.avg_completion_rate) : 0,
+      avgDistributionRate: row.avg_distribution_rate != null ? Number(row.avg_distribution_rate) : 0,
       allDistributedCount: Number(row.all_distributed_count),
       areaDoneCount: Number(row.area_done_count),
       lastDistributed: row.last_distributed

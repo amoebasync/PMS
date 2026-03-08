@@ -9,11 +9,12 @@
     "give_up_count": "Give Up",
     "other_count": "Other/Incomplete",
     "avg_completion_rate": "Avg Completion Rate",
+    "avg_distribution_rate": "Avg Distribution Rate",
     "frequency_per_month": "Monthly Frequency",
     "last_distributed": "Last Distributed"
   },
   "sections": {
-    "needs_review": "Areas Needing Review (Low Completion Top 10)",
+    "needs_review": "Areas Needing Review (Low Distribution Rate Top 10)",
     "most_frequent": "Most Frequently Distributed Areas (Top 10)",
     "area_search": "Area Search",
     "delivery_trend": "Distribution Volume Trend",
@@ -24,7 +25,8 @@
   "table": {
     "area_name": "Area Name",
     "schedules_count": "Distributions",
-    "avg_completion_rate": "Avg Completion Rate",
+    "avg_completion_rate": "Completion Rate",
+    "avg_distribution_rate": "Distribution Rate",
     "all_distributed": "All Distributed",
     "area_done": "Area Finished",
     "last_distributed": "Last Distributed",
@@ -32,7 +34,7 @@
     "distributor": "Distributor",
     "planned": "Planned",
     "actual": "Actual",
-    "completion_rate": "Completion Rate",
+    "distribution_rate": "Distribution Rate",
     "type": "Type",
     "duration": "Duration"
   },
@@ -51,7 +53,8 @@
   },
   "chart": {
     "count": "Count",
-    "rate": "Completion Rate (%)",
+    "completion_rate": "Completion Rate (%)",
+    "distribution_rate": "Distribution Rate (%)",
     "schedules": "Distributions",
     "actual_count": "Distributed"
   },
