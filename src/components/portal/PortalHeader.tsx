@@ -82,6 +82,7 @@ export function PortalHeader() {
     { name: 'マイページ', href: '/portal/mypage', icon: 'bi-grid-1x2-fill' },
     { name: '新規発注', href: '/portal/orders/new', icon: 'bi-cart-plus-fill' },
     { name: '発注履歴', href: '/portal/orders', icon: 'bi-clock-history' },
+    { name: '配布レポート', href: '/portal/reports', icon: 'bi-file-earmark-bar-graph' },
     { name: 'QR管理', href: '/portal/qrcodes', icon: 'bi-qr-code' },
     { name: '反響分析', href: '/portal/analytics', icon: 'bi-graph-up-arrow' },
     { name: '設定', href: '/portal/settings', icon: 'bi-gear-fill' },
