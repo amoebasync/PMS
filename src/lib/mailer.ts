@@ -860,16 +860,37 @@ export const sendInterviewChangeEmail = async (
   meetUrl: string | null,
   jobCategoryName: string,
   managementToken: string,
+  meetingType?: string,
+  zoomMeetingNumber?: string | null,
+  zoomPassword?: string | null,
 ) => {
   const isEn = language === 'en';
+  const isZoom = meetingType === 'ZOOM';
   const siteUrl = process.env.NEXTAUTH_URL || 'https://pms.tiramis.co.jp';
   const manageUrl = `${siteUrl}/apply/manage/${managementToken}`;
 
   const meetSection = meetUrl
-    ? `<tr>
-        <td style="padding:6px 0;color:#64748b;width:160px;">Google Meet URL</td>
-        <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
-       </tr>`
+    ? isZoom
+      ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Type' : '面接方法'}</td>
+          <td style="padding:6px 0;font-weight:bold;">Zoom</td>
+         </tr>
+         <tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">Zoom URL</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>
+         ${zoomMeetingNumber ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Meeting Number' : 'ミーティング番号'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomMeetingNumber}</td>
+         </tr>` : ''}
+         ${zoomPassword ? `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Password' : 'パスワード'}</td>
+          <td style="padding:6px 0;font-weight:bold;">${zoomPassword}</td>
+         </tr>` : ''}`
+      : `<tr>
+          <td style="padding:6px 0;color:#64748b;width:160px;">${isEn ? 'Google Meet URL' : 'Google Meet URL'}</td>
+          <td style="padding:6px 0;"><a href="${meetUrl}" style="color:#6366f1;font-weight:bold;">${isEn ? 'Join Meeting' : '面接に参加する'}</a></td>
+         </tr>`
     : '';
 
   const contentHtml = isEn
@@ -904,7 +925,7 @@ export const sendInterviewChangeEmail = async (
     </table>
 
     ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
-      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Join Google Meet</a>
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Join Zoom Meeting' : 'Join Google Meet'}</a>
     </div>` : ''}
 
     <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
@@ -949,7 +970,7 @@ export const sendInterviewChangeEmail = async (
     </table>
 
     ${meetUrl ? `<div style="text-align:center;margin:32px 0 24px;">
-      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Meetに参加する</a>
+      <a href="${meetUrl}" style="display:inline-block;background:#6366f1;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">${isZoom ? 'Zoomミーティングに参加する' : 'Google Meetに参加する'}</a>
     </div>` : ''}
 
     <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:16px 20px;margin:24px 0;">
@@ -968,9 +989,10 @@ export const sendInterviewChangeEmail = async (
     ? '[Tiramis] Interview Rescheduled'
     : '【Tiramis】面接日時が変更されました';
 
+  const meetLabel = isZoom ? 'Zoom' : 'Google Meet';
   const textContent = isEn
-    ? `Dear ${applicantName},\n\nYour interview has been rescheduled.\n\nPosition: ${jobCategoryName}\nNew Date: ${newDate}\nNew Time: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\nManage your interview: ${manageUrl}\n\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
-    : `${applicantName} 様\n\n面接日時の変更が完了しました。\n\n応募職種: ${jobCategoryName}\n新しい面接日: ${newDate}\n新しい面接時間: ${newTime}\n${meetUrl ? `Google Meet: ${meetUrl}\n` : ''}\n面接の変更・キャンセル: ${manageUrl}\n\n面接当日はお時間に余裕を持ってご参加ください。`;
+    ? `Dear ${applicantName},\n\nYour interview has been rescheduled.\n\nPosition: ${jobCategoryName}\nNew Date: ${newDate}\nNew Time: ${newTime}\n${meetUrl ? `${meetLabel}: ${meetUrl}\n` : ''}${isZoom && zoomMeetingNumber ? `Meeting Number: ${zoomMeetingNumber}\n` : ''}${isZoom && zoomPassword ? `Password: ${zoomPassword}\n` : ''}\nManage your interview: ${manageUrl}\n\nPlease be on time. Contact recruit@tiramis.co.jp for questions.`
+    : `${applicantName} 様\n\n面接日時の変更が完了しました。\n\n応募職種: ${jobCategoryName}\n新しい面接日: ${newDate}\n新しい面接時間: ${newTime}\n${meetUrl ? `${meetLabel}: ${meetUrl}\n` : ''}${isZoom && zoomMeetingNumber ? `ミーティング番号: ${zoomMeetingNumber}\n` : ''}${isZoom && zoomPassword ? `パスワード: ${zoomPassword}\n` : ''}\n面接の変更・キャンセル: ${manageUrl}\n\n面接当日はお時間に余裕を持ってご参加ください。`;
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',

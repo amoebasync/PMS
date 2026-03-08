@@ -19,12 +19,23 @@ export async function GET(request: Request) {
       startTime: { gte: tomorrow },
     };
 
-    // 職種IDが指定されている場合、その職種用 OR 全職種対応（null）のスロットを返す
+    // 職種IDが指定されている場合、その職種に紐付くマスタのスロットのみ返す
     if (jobCategoryIdParam) {
-      where.OR = [
-        { jobCategoryId: Number(jobCategoryIdParam) },
-        { jobCategoryId: null },
-      ];
+      const jobCategory = await prisma.jobCategory.findUnique({
+        where: { id: Number(jobCategoryIdParam) },
+        select: { interviewSlotMasterId: true },
+      });
+
+      if (jobCategory?.interviewSlotMasterId) {
+        // 職種にマスタが紐付いている → そのマスタのスロットのみ
+        where.interviewSlotMasterId = jobCategory.interviewSlotMasterId;
+      } else {
+        // マスタ紐付けがない → 従来通り職種IDまたはnullでフィルタ
+        where.OR = [
+          { jobCategoryId: Number(jobCategoryIdParam) },
+          { jobCategoryId: null },
+        ];
+      }
     }
 
     const allSlots = await prisma.interviewSlot.findMany({

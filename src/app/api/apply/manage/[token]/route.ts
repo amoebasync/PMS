@@ -162,7 +162,7 @@ export async function PUT(
       // 新スロットの空き確認
       const newSlot = await tx.interviewSlot.findUnique({
         where: { id: Number(newSlotId) },
-        include: { interviewer: { select: { email: true } } },
+        include: { interviewer: { select: { email: true } }, interviewSlotMaster: true },
       });
 
       if (!newSlot) {
@@ -178,10 +178,15 @@ export async function PUT(
         throw new Error('SLOT_EXPIRED');
       }
 
-      // Google Meet イベントを作成（設定されている場合のみ）
+      // ミーティングURL決定（マスタのmeetingTypeに応じて分岐）
+      const slotMaster = newSlot.interviewSlotMaster;
       let meetUrl = newSlot.meetUrl;
       let calendarEventId: string | null = null;
-      if (!meetUrl && isGoogleMeetConfigured()) {
+
+      if (slotMaster?.meetingType === 'ZOOM') {
+        // Zoom: マスタに設定された固定URLを使用
+        meetUrl = slotMaster.zoomUrl || null;
+      } else if (!meetUrl && isGoogleMeetConfigured()) {
         const isEn = applicant.language === 'en';
         const jobName = isEn
           ? (applicant.jobCategory.nameEn || applicant.jobCategory.nameJa)
@@ -223,7 +228,7 @@ export async function PUT(
         tx,
       });
 
-      return updatedSlot!;
+      return { slot: updatedSlot!, slotMaster };
     });
 
     // 旧 Google Calendar イベントを削除（トランザクション外で非同期実行）
@@ -233,14 +238,14 @@ export async function PUT(
 
     // 変更後の面接日時フォーマット
     const isEn = applicant.language === 'en';
-    const newDate = new Date(result.startTime).toLocaleDateString(
+    const newDate = new Date(result.slot.startTime).toLocaleDateString(
       isEn ? 'en-US' : 'ja-JP',
       { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
     );
-    const newTime = `${new Date(result.startTime).toLocaleTimeString(
+    const newTime = `${new Date(result.slot.startTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
       { hour: '2-digit', minute: '2-digit' }
-    )} - ${new Date(result.endTime).toLocaleTimeString(
+    )} - ${new Date(result.slot.endTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
       { hour: '2-digit', minute: '2-digit' }
     )}`;
@@ -256,9 +261,12 @@ export async function PUT(
       applicant.language,
       newDate,
       newTime,
-      result.meetUrl,
+      result.slot.meetUrl,
       jobCategoryName,
       applicant.managementToken!,
+      (result.slotMaster?.meetingType as string) || undefined,
+      result.slotMaster?.zoomMeetingNumber || undefined,
+      result.slotMaster?.zoomPassword || undefined,
     ).catch((err) => console.error('Interview change email failed:', err));
 
     return NextResponse.json({
@@ -266,8 +274,8 @@ export async function PUT(
       interview: {
         date: newDate,
         time: newTime,
-        meetUrl: result.meetUrl,
-        startTime: result.startTime,
+        meetUrl: result.slot.meetUrl,
+        startTime: result.slot.startTime,
       },
     });
   } catch (error: any) {

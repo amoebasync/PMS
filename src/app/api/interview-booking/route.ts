@@ -47,6 +47,7 @@ export async function GET(request: Request) {
         email: true,
         language: true,
         jobCategoryId: true,
+        jobCategory: { select: { interviewSlotMasterId: true } },
         interviewSlot: { select: { id: true } },
       },
     });
@@ -67,15 +68,28 @@ export async function GET(request: Request) {
     // 4時間後以降のスロットのみ表示
     const fourHoursLater = new Date(now.getTime() + 4 * 60 * 60 * 1000);
 
+    // 応募者の職種に紐付いたマスタIDを取得
+    const targetMasterId = applicant.jobCategory?.interviewSlotMasterId;
+
+    // スロット取得: 職種のマスタが指定されている場合はそのマスタのスロットのみ表示
+    const slotFilter: Record<string, unknown> = {
+      startTime: { gt: fourHoursLater },
+    };
+
+    if (targetMasterId) {
+      // 職種にマスタが紐付いている → そのマスタのスロットのみ
+      slotFilter.interviewSlotMasterId = targetMasterId;
+    } else {
+      // マスタ紐付けがない → 従来通り職種IDまたはnullでフィルタ
+      slotFilter.OR = [
+        { jobCategoryId: applicant.jobCategoryId },
+        { jobCategoryId: null },
+      ];
+    }
+
     // 全スロット取得（容量ベースで空き判定）
     const allSlots = await prisma.interviewSlot.findMany({
-      where: {
-        startTime: { gt: fourHoursLater },
-        OR: [
-          { jobCategoryId: applicant.jobCategoryId },
-          { jobCategoryId: null },
-        ],
-      },
+      where: slotFilter,
       orderBy: { startTime: 'asc' },
       select: {
         id: true,
@@ -237,6 +251,9 @@ export async function POST(request: Request) {
       interviewTime,
       meetUrl,
       jobName,
+      (slotMaster?.meetingType as string) || 'GOOGLE_MEET',
+      slotMaster?.zoomMeetingNumber,
+      slotMaster?.zoomPassword,
     ).catch(err => console.error('Admin notification email failed:', err));
 
     return NextResponse.json({
