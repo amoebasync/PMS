@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { createGoogleMeetEvent, isGoogleMeetConfigured, deleteGoogleCalendarEvent } from '@/lib/google-meet';
 import { isSlotAvailable, bookSlotForApplicant, unbookSlotForApplicant } from '@/lib/interview-slot-helpers';
+import { sendApplicantConfirmationEmail } from '@/lib/mailer';
 
 // POST /api/applicants/[id]/reschedule
 // 管理者: 面接日程を変更（旧スロット解放 → 新スロット予約）
@@ -137,6 +138,39 @@ export async function POST(
     if (oldCalendarEventId && slotMaster?.meetingType !== 'ZOOM') {
       deleteGoogleCalendarEvent(oldCalendarEventId).catch(() => {});
     }
+
+    // 面接日程変更の確認メールを送信
+    const lang = applicant.language || 'ja';
+    const isEn = lang === 'en';
+    const finalMeetUrl = meetUrl || newSlot.meetUrl;
+    const interviewDate = new Date(newSlot.startTime).toLocaleDateString(
+      isEn ? 'en-US' : 'ja-JP',
+      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }
+    );
+    const interviewTime = `${new Date(newSlot.startTime).toLocaleTimeString(
+      isEn ? 'en-US' : 'ja-JP',
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
+    )} - ${new Date(newSlot.endTime).toLocaleTimeString(
+      isEn ? 'en-US' : 'ja-JP',
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
+    )}`;
+    const jobName = isEn
+      ? (applicant.jobCategory?.nameEn || applicant.jobCategory?.nameJa || '')
+      : (applicant.jobCategory?.nameJa || '');
+
+    sendApplicantConfirmationEmail(
+      applicant.email,
+      applicant.name,
+      lang,
+      interviewDate,
+      interviewTime,
+      finalMeetUrl,
+      jobName,
+      applicant.managementToken,
+      (slotMaster?.meetingType as string) || 'GOOGLE_MEET',
+      slotMaster?.zoomMeetingNumber,
+      slotMaster?.zoomPassword,
+    ).catch((err) => console.error('Reschedule confirmation email failed:', err));
 
     return NextResponse.json(updated);
   } catch (error) {

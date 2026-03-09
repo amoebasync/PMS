@@ -24,32 +24,37 @@ export function isGooglePlayTesterConfigured(): boolean {
 }
 
 /**
+ * Admin SDK 用の OAuth2 クライアントを生成
+ */
+function getAdminClient() {
+  const oauth2Client = new google.auth.OAuth2(
+    CLIENT_ID,
+    CLIENT_SECRET,
+    'https://developers.google.com/oauthplayground',
+  );
+  oauth2Client.setCredentials({
+    refresh_token: ADMIN_REFRESH_TOKEN,
+  });
+  return google.admin({ version: 'directory_v1', auth: oauth2Client });
+}
+
+/**
  * Google グループにメンバーを追加する（Play Console 内部テスト用）
  *
  * @param email - 追加するメンバーのメールアドレス
- * @returns { success, error?, alreadyExists? }
+ * @returns { success, error?, alreadyExists?, memberStatus? }
  */
 export async function addToGoogleGroup(
   email: string,
-): Promise<{ success: boolean; error?: string; alreadyExists?: boolean }> {
+): Promise<{ success: boolean; error?: string; alreadyExists?: boolean; memberStatus?: string }> {
   if (!isGooglePlayTesterConfigured()) {
     return { success: false, error: 'Google Play テスター管理APIが設定されていません' };
   }
 
   try {
-    const oauth2Client = new google.auth.OAuth2(
-      CLIENT_ID,
-      CLIENT_SECRET,
-      'https://developers.google.com/oauthplayground',
-    );
+    const admin = getAdminClient();
 
-    oauth2Client.setCredentials({
-      refresh_token: ADMIN_REFRESH_TOKEN,
-    });
-
-    const admin = google.admin({ version: 'directory_v1', auth: oauth2Client });
-
-    await admin.members.insert({
+    const insertRes = await admin.members.insert({
       groupKey: GROUP_EMAIL!,
       requestBody: {
         email,
@@ -57,25 +62,117 @@ export async function addToGoogleGroup(
       },
     });
 
-    console.log(`[GooglePlayTester] Successfully added ${email} to group ${GROUP_EMAIL}`);
+    const memberStatus = insertRes.data.status || 'ACTIVE';
+    console.log(`[GooglePlayTester] Added ${email} to group ${GROUP_EMAIL} (status: ${memberStatus}, role: ${insertRes.data.role})`);
+
+    // 招待状態（INVITED）の場合は警告ログ
+    if (memberStatus === 'INVITED') {
+      console.warn(`[GooglePlayTester] ${email} is in INVITED state - they need to accept the invitation to join the group`);
+    }
+
+    return { success: true, memberStatus };
+  } catch (error: any) {
+    const status = error.code || error.response?.status;
+    const message = error.errors?.[0]?.message || error.message || '不明なエラー';
+
+    // 409: メンバーが既に存在する → 現在のステータスを確認
+    if (status === 409) {
+      console.log(`[GooglePlayTester] ${email} is already a member of ${GROUP_EMAIL}`);
+      const currentStatus = await getGroupMemberStatus(email);
+      return { success: true, alreadyExists: true, memberStatus: currentStatus || undefined };
+    }
+
+    // 認証エラー
+    if (status === 401 || status === 403) {
+      console.error(`[GooglePlayTester] Authentication error (${status}):`, message);
+      return { success: false, error: `認証に失敗しました (${status}): ${message}` };
+    }
+
+    console.error(`[GooglePlayTester] Error adding member (${status}):`, message);
+    return { success: false, error: `${message} (${status || 'unknown'})` };
+  }
+}
+
+/**
+ * グループメンバーの現在のステータスを取得
+ */
+async function getGroupMemberStatus(email: string): Promise<string | null> {
+  try {
+    const admin = getAdminClient();
+    const res = await admin.members.get({
+      groupKey: GROUP_EMAIL!,
+      memberKey: email,
+    });
+    return res.data.status || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Google グループからメンバーを削除する
+ *
+ * @param email - 削除するメンバーのメールアドレス
+ * @returns { success, error?, notFound? }
+ */
+export async function removeFromGoogleGroup(
+  email: string,
+): Promise<{ success: boolean; error?: string; notFound?: boolean }> {
+  if (!isGooglePlayTesterConfigured()) {
+    return { success: false, error: 'Google Play テスター管理APIが設定されていません' };
+  }
+
+  try {
+    const admin = getAdminClient();
+
+    await admin.members.delete({
+      groupKey: GROUP_EMAIL!,
+      memberKey: email,
+    });
+
+    console.log(`[GooglePlayTester] Removed ${email} from group ${GROUP_EMAIL}`);
     return { success: true };
   } catch (error: any) {
     const status = error.code || error.response?.status;
     const message = error.errors?.[0]?.message || error.message || '不明なエラー';
 
-    // 409: メンバーが既に存在する
-    if (status === 409) {
-      console.log(`[GooglePlayTester] ${email} is already a member of ${GROUP_EMAIL}`);
-      return { success: true, alreadyExists: true };
+    // 404: メンバーが存在しない（既に削除済み等）
+    if (status === 404) {
+      console.log(`[GooglePlayTester] ${email} is not a member of ${GROUP_EMAIL} (already removed)`);
+      return { success: true, notFound: true };
     }
 
-    // 認証エラー
-    if (status === 401 || status === 403) {
-      console.error('[GooglePlayTester] Authentication error:', message);
-      return { success: false, error: '認証に失敗しました。GOOGLE_ADMIN_REFRESH_TOKENを確認してください' };
-    }
+    console.error(`[GooglePlayTester] Error removing member (${status}):`, message);
+    return { success: false, error: `${message} (${status || 'unknown'})` };
+  }
+}
 
-    console.error('[GooglePlayTester] Error adding member:', message);
+/**
+ * グループの全メンバーを取得（デバッグ・管理用）
+ */
+export async function listGoogleGroupMembers(): Promise<{ success: boolean; members?: any[]; error?: string }> {
+  if (!isGooglePlayTesterConfigured()) {
+    return { success: false, error: 'Google Play テスター管理APIが設定されていません' };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const res = await admin.members.list({
+      groupKey: GROUP_EMAIL!,
+      maxResults: 200,
+    });
+    return {
+      success: true,
+      members: (res.data.members || []).map(m => ({
+        email: m.email,
+        role: m.role,
+        status: m.status,
+        type: m.type,
+      })),
+    };
+  } catch (error: any) {
+    const message = error.errors?.[0]?.message || error.message || '不明なエラー';
+    console.error('[GooglePlayTester] Error listing members:', message);
     return { success: false, error: message };
   }
 }

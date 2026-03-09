@@ -165,6 +165,8 @@ export async function POST(
       }
     }
 
+    const memberStatus = (result as any).memberStatus;
+
     const messages = {
       APPLE: {
         success: 'TestFlight招待を送信しました',
@@ -177,9 +179,15 @@ export async function POST(
     };
     const msg = messages[platform as 'APPLE' | 'ANDROID'];
 
+    let message = result.alreadyExists ? msg.exists : msg.success;
+    if (platform === 'ANDROID' && memberStatus === 'INVITED') {
+      message = 'Googleグループに招待しました。メンバーが招待メールを承認する必要があります';
+    }
+
     return NextResponse.json({
-      message: result.alreadyExists ? msg.exists : msg.success,
+      message,
       alreadyExists: result.alreadyExists || false,
+      memberStatus,
       log: updatedLog,
     });
   } catch (error) {
