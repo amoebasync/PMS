@@ -2003,6 +2003,7 @@ export async function sendInterviewReminderEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -2162,6 +2163,7 @@ export async function sendTrainingReminderEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
