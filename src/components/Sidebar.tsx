@@ -290,7 +290,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                   >
                     {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
                     <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'}`} />
-                    <span className="text-[13px] flex-1">{label}</span>
+                    <span className="text-[13px] flex-1 truncate">{label}</span>
                     {badgeCount > 0 && (
                       <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                         {badgeCount}
@@ -356,7 +356,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
                           >
                             {active && <div className="absolute left-0 top-1.5 bottom-1.5 w-[3px] bg-blue-600 rounded-r-full" />}
                             <i className={`${item.icon} text-[15px] w-5 text-center shrink-0 ${active ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-500 transition-colors'}`} />
-                            <span className="text-[13px] flex-1">{t(item.nameKey)}</span>
+                            <span className="text-[13px] flex-1 truncate">{t(item.nameKey)}</span>
                             {badgeCount > 0 && (
                               <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
                                 {badgeCount}

@@ -607,6 +607,7 @@ export const sendApplicantConfirmationEmail = async (
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -704,6 +705,7 @@ export const sendHiringNotificationEmail = async (
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -800,6 +802,7 @@ export const sendRejectionNotificationEmail = async (
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -997,6 +1000,7 @@ export const sendInterviewChangeEmail = async (
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1097,6 +1101,7 @@ export const sendInterviewCancelEmail = async (
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1363,6 +1368,7 @@ export async function sendTrainingConfirmationEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1457,6 +1463,7 @@ export async function sendTrainingInviteEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1529,6 +1536,7 @@ export async function sendInterviewInvitationEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1675,6 +1683,7 @@ export async function sendTrainingCancellationEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
     text: textContent,
@@ -1863,6 +1872,7 @@ export async function sendDistributorWelcomeEmail(
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
     subject,
     html: htmlWrapper(contentHtml),
     text: textContent,
