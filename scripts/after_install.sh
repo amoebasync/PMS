@@ -48,10 +48,10 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- 配布員評価 CRON 登録（重複時はスキップ） ---
-  EVAL_CRON_JOB="0 15 * * 1 curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/evaluate-distributors >> /tmp/pms-cron-evaluate-distributors.log 2>&1"
+  EVAL_CRON_JOB="0 18 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/evaluate-distributors >> /tmp/pms-cron-evaluate-distributors.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "evaluate-distributors"; then
     (crontab -l 2>/dev/null; echo "$EVAL_CRON_JOB") | crontab -
-    echo "CRON登録: 配布員評価（毎週月曜04:00）"
+    echo "CRON登録: 配布員評価（毎日03:00 JST）"
   else
     echo "CRON既存: 配布員評価（スキップ）"
   fi

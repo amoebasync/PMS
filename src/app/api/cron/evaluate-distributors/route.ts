@@ -55,40 +55,18 @@ export async function GET(request: Request) {
     const evalRankA = parseInt(settings.evalRankA);
     const evalRankB = parseInt(settings.evalRankB);
     const evalRankC = parseInt(settings.evalRankC);
-    const evalCycleDay = parseInt(settings.evalCycleDay); // 0=Sun..6=Sat
+    // evalCycleDay is no longer used (kept in settings for backward compatibility)
 
-    // 2. Calculate the most recent completed week based on evalCycleDay
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayDay = today.getDay(); // 0=Sun..6=Sat
+    // 2. Calculate rolling 7-day window (JST-aware, EC2 runs in UTC)
+    const jstNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    const todayJST = new Date(jstNow.getFullYear(), jstNow.getMonth(), jstNow.getDate());
 
-    // Find the most recent cycle start day that has a full week completed
-    // periodEnd = the most recent evalCycleDay (exclusive end, i.e. the day before is the last day of the period)
-    let daysBack = (todayDay - evalCycleDay + 7) % 7;
-    if (daysBack === 0) daysBack = 7; // If today is the cycle day, use the previous completed week
-    const periodEnd = new Date(today);
-    periodEnd.setDate(periodEnd.getDate() - daysBack + 7);
-    // periodEnd is the next cycle start = exclusive end
-
-    const periodStart = new Date(periodEnd);
+    // Rolling 7 days: 7 days ago ~ yesterday
+    const periodStart = new Date(todayJST);
     periodStart.setDate(periodStart.getDate() - 7);
-
-    // Actual period end date (inclusive) for display
-    const periodEndInclusive = new Date(periodEnd);
+    const periodEnd = new Date(todayJST); // exclusive upper bound (= today 00:00)
+    const periodEndInclusive = new Date(todayJST);
     periodEndInclusive.setDate(periodEndInclusive.getDate() - 1);
-
-    // Check for duplicate: if evaluations already exist for this periodStart
-    const existingEval = await prisma.distributorEvaluation.findFirst({
-      where: { periodStart },
-    });
-    if (existingEval) {
-      return NextResponse.json({
-        success: true,
-        message: `この評価期間（${periodStart.toISOString().slice(0, 10)} ~ ${periodEndInclusive.toISOString().slice(0, 10)}）は既に評価済みです`,
-        evaluated: 0,
-        skipped: true,
-      });
-    }
 
     // 3. Get all active distributors
     const distributors = await prisma.flyerDistributor.findMany({
