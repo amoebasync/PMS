@@ -1155,8 +1155,8 @@ export default function ApplicantsPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEventClick = async (arg: any) => {
     const { slot, isBooked, capacity } = arg.event.extendedProps as { slot: InterviewSlot; isBooked: boolean; capacity: number };
-    // Multi-capacity slot → show detail popup with applicant list
-    if (capacity > 1) {
+    // Multi-capacity slot (capacity > 1 or unlimited=0) → show detail popup with applicant list
+    if (capacity !== 1) {
       setSelectedSlotDetail(slot);
       return;
     }
