@@ -450,7 +450,7 @@ function PortalOrdersContent() {
                         <div className="flex flex-col gap-0.5">
                           <div className="font-bold text-slate-800 text-base truncate">{order.title || '名称未設定'}</div>
                           <div className="flex items-center gap-2 text-[10px] text-slate-500 mt-0.5">
-                            <span className="shrink-0">{new Date(order.orderDate).toLocaleDateString('ja-JP')}</span>
+                            <span className="shrink-0">{new Date(order.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-end mt-1 text-xs text-slate-600">
@@ -474,7 +474,7 @@ function PortalOrdersContent() {
                           {order.title || '名称未設定'}
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                          <span className="shrink-0">{new Date(order.orderDate).toLocaleDateString('ja-JP')}</span>
+                          <span className="shrink-0">{new Date(order.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                         </div>
                       </div>
 
@@ -575,7 +575,7 @@ function PortalOrdersContent() {
                       </div>
                       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
                         <div className="text-[10px] font-bold text-slate-400 uppercase mb-1">発注日 / 支払方法</div>
-                        <div className="font-bold text-slate-800 mb-1">{new Date(selectedOrder.orderDate).toLocaleDateString('ja-JP')}</div>
+                        <div className="font-bold text-slate-800 mb-1">{new Date(selectedOrder.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                         <div className="text-sm text-slate-600 font-medium">{selectedOrder.paymentMethod || '未定'}</div>
                       </div>
                       <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center text-right">
@@ -601,8 +601,8 @@ function PortalOrdersContent() {
                                 <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm">
                                   <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布プラン</span><span className="font-bold text-slate-800">{isPrinting ? '印刷＋配布' : '配布のみ'} ({dist.method})</span></div>
                                   <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布枚数</span><span className="font-black text-indigo-600 text-base">{dist.plannedCount?.toLocaleString()}</span> 枚</div>
-                                  <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布開始日</span><span className="font-bold text-slate-800">{dist.startDate ? new Date(dist.startDate).toLocaleDateString() : '未定'}</span></div>
-                                  <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">完了期限日</span><span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString() : '未定'}</span></div>
+                                  <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布開始日</span><span className="font-bold text-slate-800">{dist.startDate ? new Date(dist.startDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未定'}</span></div>
+                                  <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">完了期限日</span><span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未定'}</span></div>
                                 </div>
                                 {isPrinting && printInfo && (
                                   <div className="bg-fuchsia-50/50 p-4 rounded-lg border border-fuchsia-100 text-sm">
@@ -736,7 +736,7 @@ function PortalOrdersContent() {
                                     <div className="font-mono text-[10px] text-slate-400 truncate mt-0.5">/q/{qr.alias}</div>
                                     <div className="text-[11px] text-slate-500 mt-1">
                                       <i className="bi bi-calendar3 mr-1"></i>
-                                      作成日：{new Date(qr.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })}
+                                      作成日：{new Date(qr.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' })}
                                     </div>
                                   </div>
                                   <button
@@ -914,7 +914,7 @@ function PortalOrdersContent() {
                                           </div>
                                         </div>
                                         <div className="ml-auto text-[9px] text-slate-400">
-                                          作成: {new Date(qr.createdAt).toLocaleDateString('ja-JP')}
+                                          作成: {new Date(qr.createdAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                                         </div>
                                       </div>
                                     </>

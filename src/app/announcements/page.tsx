@@ -17,13 +17,14 @@ interface Announcement {
   title: string;
   content: string;
   category: string;
+  isBlocking: boolean;
   createdById: number;
   createdBy: { lastNameJa: string; firstNameJa: string };
   createdAt: string;
   updatedAt: string;
 }
 
-const initialForm = { title: '', content: '', category: 'OTHER' };
+const initialForm = { title: '', content: '', category: 'OTHER', isBlocking: false };
 
 // カテゴリバッジコンポーネント
 const CategoryBadge = ({ category, t }: { category: string; t: (key: string) => string }) => {
@@ -102,7 +103,7 @@ export default function AnnouncementsPage() {
 
   const openEdit = (a: Announcement) => {
     setCurrentId(a.id);
-    setFormData({ title: a.title, content: a.content, category: a.category });
+    setFormData({ title: a.title, content: a.content, category: a.category, isBlocking: a.isBlocking });
     setIsFormModalOpen(true);
   };
 
@@ -223,7 +224,14 @@ export default function AnnouncementsPage() {
               {announcements.map(a => (
                 <tr key={a.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
-                    <CategoryBadge category={a.category} t={t} />
+                    <div className="flex items-center gap-1.5">
+                      <CategoryBadge category={a.category} t={t} />
+                      {a.isBlocking && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-600 border border-red-200">
+                          <i className="bi bi-lock-fill"></i> {t('blocking_badge')}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="font-medium text-slate-800 text-sm">{a.title}</div>
@@ -233,7 +241,7 @@ export default function AnnouncementsPage() {
                     {a.createdBy.lastNameJa} {a.createdBy.firstNameJa}
                   </td>
                   <td className="px-6 py-4 text-xs text-slate-500 font-mono">
-                    {new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/')}
+                    {new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' }).replace(/\//g, '/')}
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -325,6 +333,23 @@ export default function AnnouncementsPage() {
                     placeholder={t('placeholder_content')}
                     required
                   />
+                </div>
+
+                {/* 強制表示トグル */}
+                <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-xl border border-slate-200">
+                  <div>
+                    <div className="text-sm font-bold text-slate-700 flex items-center gap-1.5">
+                      <i className="bi bi-lock-fill text-red-500"></i> {t('is_blocking')}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{t('is_blocking_desc')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, isBlocking: !prev.isBlocking }))}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${formData.isBlocking ? 'bg-red-500' : 'bg-slate-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${formData.isBlocking ? 'translate-x-5' : ''}`} />
+                  </button>
                 </div>
               </div>
             </form>

@@ -139,7 +139,7 @@ export default function NotificationBell() {
       if (diffMin < 1) return t('notification_just_now');
       if (diffMin < 60) return t('notification_minutes_ago', { count: diffMin });
       if (diffMin < 1440) return t('notification_hours_ago', { count: Math.floor(diffMin / 60) });
-      return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' });
+      return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', timeZone: 'Asia/Tokyo' });
     } catch {
       return '';
     }

@@ -226,7 +226,7 @@ export const sendScanNotification = async (
           </tr>
           <tr>
             <td style="padding:6px 0;color:#64748b;">スキャン日時</td>
-            <td style="padding:6px 0;">${new Date().toLocaleString('ja-JP')}</td>
+            <td style="padding:6px 0;">${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
           </tr>
           <tr>
             <td style="padding:6px 0;color:#64748b;">推定エリア</td>
@@ -248,7 +248,7 @@ export const sendScanNotification = async (
     to: emails.join(', '),
     subject: `【速報】チラシ「${flyerName}」のQRコードがスキャンされました！`,
     html: htmlWrapper(contentHtml),
-    text: `チラシのQRコードがスキャンされました。\n\n対象チラシ: ${flyerName}\nQRメモ: ${qrCode.memo || 'なし'}\nスキャン日時: ${new Date().toLocaleString('ja-JP')}\n推定エリア: ${location || '不明'}\n使用端末: ${device}`,
+    text: `チラシのQRコードがスキャンされました。\n\n対象チラシ: ${flyerName}\nQRメモ: ${qrCode.memo || 'なし'}\nスキャン日時: ${new Date().toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}\n推定エリア: ${location || '不明'}\n使用端末: ${device}`,
   });
 };
 

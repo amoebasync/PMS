@@ -976,8 +976,8 @@ export default function EmployeePage() {
 
               <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3"><i className="bi bi-person-lines-fill mr-1 text-blue-500"></i> {t('detail_personal_info')}</h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HIRE DATE</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-calendar-event text-blue-500"></i>{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString('ja-JP') : '-'}</div></div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BIRTHDAY</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-cake text-rose-400"></i>{selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString('ja-JP') : '-'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">HIRE DATE</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-calendar-event text-blue-500"></i>{selectedEmployee.hireDate ? new Date(selectedEmployee.hireDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</div></div>
+                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BIRTHDAY</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-cake text-rose-400"></i>{selectedEmployee.birthday ? new Date(selectedEmployee.birthday).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GENDER</div><div className="text-sm font-bold text-slate-700 capitalize">{selectedEmployee.gender === 'male' ? t('detail_gender_male') : selectedEmployee.gender === 'female' ? t('detail_gender_female') : t('detail_gender_other')}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PHONE NUMBER</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-telephone text-emerald-500"></i>{selectedEmployee.phone || t('detail_phone_not_set')}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-2"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : t('detail_country_not_set')}</div></div>
@@ -1084,7 +1084,7 @@ export default function EmployeePage() {
                             ) : (
                               leaveLedgers.map((l: any) => (
                                 <tr key={l.id} className="hover:bg-slate-50 transition-colors">
-                                  <td className="px-4 py-3 font-mono font-bold text-slate-600">{new Date(l.date).toLocaleDateString('ja-JP')}</td>
+                                  <td className="px-4 py-3 font-mono font-bold text-slate-600">{new Date(l.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                                   <td className="px-4 py-3 text-center">
                                     <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${LEAVE_TYPE_STYLE[l.type] || 'bg-slate-100 border-slate-200'}`}>
                                       {t(LEAVE_TYPE_LABEL_KEYS[l.type] || '') || l.type}
@@ -1100,7 +1100,7 @@ export default function EmployeePage() {
                                     <div className="truncate max-w-[250px] font-medium text-slate-700" title={l.note}>{l.note || '-'}</div>
                                     {l.type === 'GRANTED' && l.validUntil && (
                                       <div className="text-[10px] text-emerald-600 font-mono mt-1 font-bold">
-                                        <i className="bi bi-clock-history"></i> {t('leave_valid_until')}{new Date(l.validUntil).toLocaleDateString('ja-JP')}
+                                        <i className="bi bi-clock-history"></i> {t('leave_valid_until')}{new Date(l.validUntil).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                                       </div>
                                     )}
                                   </td>

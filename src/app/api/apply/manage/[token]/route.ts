@@ -28,14 +28,14 @@ function canModify(applicant: { flowStatus: string; hiringStatus: string }) {
   );
 }
 
-// 面接日が前日以前かチェック（当日変更は不可）
+// 面接日が前日以前かチェック（当日変更は不可）- JST基準で比較
 function isBeforeInterviewDay(slotStartTime: Date): boolean {
   const now = new Date();
-  const interviewDate = new Date(slotStartTime);
-  interviewDate.setHours(0, 0, 0, 0);
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  return today < interviewDate;
+  const jstNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  const jstInterview = new Date(new Date(slotStartTime).toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  jstNow.setHours(0, 0, 0, 0);
+  jstInterview.setHours(0, 0, 0, 0);
+  return jstNow < jstInterview;
 }
 
 // GET /api/apply/manage/[token]
@@ -66,14 +66,14 @@ export async function GET(
     if (slot) {
       interviewDate = new Date(slot.startTime).toLocaleDateString(
         isEn ? 'en-US' : 'ja-JP',
-        { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
+        { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }
       );
       interviewTime = `${new Date(slot.startTime).toLocaleTimeString(
         isEn ? 'en-US' : 'ja-JP',
-        { hour: '2-digit', minute: '2-digit' }
+        { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
       )} - ${new Date(slot.endTime).toLocaleTimeString(
         isEn ? 'en-US' : 'ja-JP',
-        { hour: '2-digit', minute: '2-digit' }
+        { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
       )}`;
     }
 
@@ -240,14 +240,14 @@ export async function PUT(
     const isEn = applicant.language === 'en';
     const newDate = new Date(result.slot.startTime).toLocaleDateString(
       isEn ? 'en-US' : 'ja-JP',
-      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }
+      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Tokyo' }
     );
     const newTime = `${new Date(result.slot.startTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
-      { hour: '2-digit', minute: '2-digit' }
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
     )} - ${new Date(result.slot.endTime).toLocaleTimeString(
       isEn ? 'en-US' : 'ja-JP',
-      { hour: '2-digit', minute: '2-digit' }
+      { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }
     )}`;
 
     const jobCategoryName = isEn

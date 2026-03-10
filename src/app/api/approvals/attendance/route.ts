@@ -83,7 +83,7 @@ export async function PUT(request: Request) {
                   date: new Date(),
                   type: 'ADJUSTED',
                   days: 1,
-                  note: `勤怠申請(${new Date(att.date).toLocaleDateString('ja-JP')})の却下による有給返還`
+                  note: `勤怠申請(${new Date(att.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })})の却下による有給返還`
                 }
              });
              await tx.employeeFinancial.update({

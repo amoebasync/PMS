@@ -28,5 +28,8 @@
   "delete_confirm_title": "本当に削除しますか？",
   "delete_confirm_message": "このお知らせは完全に削除され、ダッシュボードから表示されなくなります。",
   "deleting": "削除中...",
-  "btn_delete": "削除する"
+  "btn_delete": "削除する",
+  "is_blocking": "強制表示",
+  "is_blocking_desc": "ONにすると、全ユーザーが既読するまでダッシュボードに強制表示されます",
+  "blocking_badge": "強制表示"
 }

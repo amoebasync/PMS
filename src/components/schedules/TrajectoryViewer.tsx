@@ -118,7 +118,7 @@ const extractPaths = (geojsonStr: string) => {
 
 const fmtTime = (dateStr: string) => {
   try {
-    return new Date(dateStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return new Date(dateStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'Asia/Tokyo' });
   } catch {
     return '';
   }
@@ -319,7 +319,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               <span className="text-slate-400 font-normal text-sm ml-2">({data.schedule.distributorStaffId})</span>
             </h2>
             <p className="text-xs text-slate-500">
-              {data.area ? `${data.area.townName}${data.area.chomeName}` : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP')}
+              {data.area ? `${data.area.townName}${data.area.chomeName}` : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               {isLive && (
                 <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 font-bold">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>

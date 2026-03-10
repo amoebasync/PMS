@@ -750,7 +750,7 @@ function IncidentsTab({ partnerId, t, showToast, showConfirm }: { partnerId: num
                   </td>
                   <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${SEVERITY_COLORS[inc.severity]}`}>{severityLabel(inc.severity)}</span></td>
                   <td className="px-4 py-3"><span className={`px-2 py-0.5 text-xs font-bold rounded-full ${STATUS_COLORS[inc.status]}`}>{statusLabel(inc.status)}</span></td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{new Date(inc.occurredAt).toLocaleDateString('ja-JP')}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">{new Date(inc.occurredAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                   <td className="px-4 py-3 text-slate-600 text-xs">{inc.resolver ? `${inc.resolver.lastNameJa} ${inc.resolver.firstNameJa}` : '-'}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => openEdit(inc)} className="p-1.5 text-slate-400 hover:text-teal-600"><i className="bi bi-pencil"></i></button>

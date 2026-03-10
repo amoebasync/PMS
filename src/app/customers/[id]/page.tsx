@@ -637,7 +637,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                           </button>
                         </div>
                         <div className="text-[11px] text-slate-400 mt-0.5">
-                          {date.toLocaleDateString('ja-JP')} {date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                          {date.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} {date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}
                           {activity.employee && ` · ${activity.employee.lastNameJa} ${activity.employee.firstNameJa}`}
                         </div>
                         {activity.body && <p className="text-sm text-slate-600 mt-2 leading-relaxed whitespace-pre-wrap">{activity.body}</p>}
@@ -740,7 +740,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
                       <div className="flex-1 min-w-0">
                         <p className={`font-medium truncate ${task.status === 'DONE' ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.title}</p>
                         <p className={`text-[11px] ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
-                          {new Date(task.dueDate).toLocaleDateString('ja-JP')}{isOverdue && ' ⚠ 期限超過'}
+                          {new Date(task.dueDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}{isOverdue && ' ⚠ 期限超過'}
                         </p>
                       </div>
                       <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${statusCfg.cls}`}>{statusCfg.label}</span>

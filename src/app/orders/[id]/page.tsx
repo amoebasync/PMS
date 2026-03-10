@@ -1261,7 +1261,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-600 text-xs">
-                          {new Date(doc.issuedAt).toLocaleDateString('ja-JP')}
+                          {new Date(doc.issuedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-indigo-600">
                           ¥{doc.totalAmount.toLocaleString('ja-JP')}

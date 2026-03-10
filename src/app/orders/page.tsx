@@ -345,7 +345,7 @@ export default function OrdersListPage() {
                           <span className="px-1 py-0.5 rounded text-[9px] font-bold bg-slate-100 text-slate-600 border border-slate-200" title={t('badge_sales_tooltip')}>{t('badge_sales')}</span>
                         )}
                       </div>
-                      <div className="text-[11px] text-slate-400 mt-0.5">{new Date(o.orderDate).toLocaleDateString()}</div>
+                      <div className="text-[11px] text-slate-400 mt-0.5">{new Date(o.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                     </td>
 
                     <td className="px-3 py-3 max-w-[160px]">
@@ -439,7 +439,7 @@ export default function OrdersListPage() {
                     <div className="font-bold text-slate-700 text-sm truncate mb-1">{o.customer?.name}</div>
                     {o.title && <div className="text-xs text-slate-500 truncate mb-1">{o.title}</div>}
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400">{new Date(o.orderDate).toLocaleDateString()}</span>
+                      <span className="text-slate-400">{new Date(o.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</span>
                       <span className="font-bold text-slate-800">{o.totalAmount ? `¥${o.totalAmount.toLocaleString()}` : '-'}</span>
                     </div>
                   </Link>
@@ -477,7 +477,7 @@ export default function OrdersListPage() {
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Order No. / Date</div>
                       <div className="font-mono font-bold text-slate-700">{reviewOrderData.orderNo}</div>
-                      <div className="text-sm text-slate-500">{new Date(reviewOrderData.orderDate).toLocaleDateString()}</div>
+                      <div className="text-sm text-slate-500">{new Date(reviewOrderData.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</div>
                     </div>
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Total Amount</div>
@@ -502,7 +502,7 @@ export default function OrdersListPage() {
                                 <div><span className="text-slate-400">{t('review_plan_label')}</span> {isPrinting ? t('review_plan_print_posting') : t('review_plan_posting_only')} ({dist.method})</div>
                                 <div><span className="text-slate-400">{t('review_planned_count')}</span> <span className="font-bold">{dist.plannedCount?.toLocaleString()}</span> {t('review_count_unit')}</div>
                                 <div><span className="text-slate-400">{t('review_area_count')}</span> {dist.areas?.length || 0} {t('review_area_unit')}</div>
-                                <div><span className="text-slate-400">{t('review_period')}</span> {dist.startDate ? new Date(dist.startDate).toLocaleDateString() : t('review_unset')} ~ <span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString() : t('review_unset')}</span></div>
+                                <div><span className="text-slate-400">{t('review_period')}</span> {dist.startDate ? new Date(dist.startDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : t('review_unset')} ~ <span className="font-bold text-rose-600">{dist.endDate ? new Date(dist.endDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : t('review_unset')}</span></div>
                               </div>
                             </div>
                           </div>

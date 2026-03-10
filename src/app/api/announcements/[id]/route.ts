@@ -36,7 +36,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { title, content, category } = body;
+    const { title, content, category, isBlocking } = body;
 
     if (!title || !content || !category) {
       return NextResponse.json({ error: 'title, content, category は必須です' }, { status: 400 });
@@ -44,7 +44,7 @@ export async function PUT(
 
     const updated = await prisma.announcement.update({
       where: { id: announcementId },
-      data: { title, content, category },
+      data: { title, content, category, isBlocking: isBlocking === true },
       include: {
         createdBy: {
           select: { lastNameJa: true, firstNameJa: true },

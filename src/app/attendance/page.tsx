@@ -129,7 +129,7 @@ export default function AttendancePage() {
 
   const handleDeleteAttendance = async (dateStr: string) => {
     const targetName = selectedEmployee ? `${selectedEmployee.lastNameJa} ${selectedEmployee.firstNameJa}` : '';
-    const dateFormatted = new Date(dateStr).toLocaleDateString();
+    const dateFormatted = new Date(dateStr).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
     const confirmMsg = selectedEmployeeId
       ? `${targetName}${t('delete_confirm_other', { date: dateFormatted })}`
       : t('delete_confirm_self', { date: dateFormatted });
@@ -399,7 +399,7 @@ export default function AttendancePage() {
                     {attendances.map((att: any) => (
                       <tr key={att.id} className="hover:bg-slate-50 transition-colors">
                         <td className="py-3 font-mono font-bold text-slate-700">
-                          {new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' })}
+                          {new Date(att.date).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' })}
                         </td>
                         <td className="py-3">
                           {att.attendanceType?.isWorking ? (
@@ -461,7 +461,7 @@ export default function AttendancePage() {
                   {expenses.length === 0 && (<tr><td colSpan={5} className="py-8 text-center text-slate-400">{t('expense_no_history')}</td></tr>)}
                   {expenses.map((exp: any) => (
                     <tr key={exp.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="py-3 font-mono text-slate-700">{new Date(exp.date).toLocaleDateString('ja-JP')}</td>
+                      <td className="py-3 font-mono text-slate-700">{new Date(exp.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                       <td className="py-3"><span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded font-bold">{exp.type === 'TRANSPORTATION' ? t('expense_transportation') : t('expense_other')}</span></td>
                       <td className="py-3 max-w-[200px] truncate text-slate-600" title={exp.description}>{exp.description}</td>
                       <td className="py-3 text-right font-mono font-bold text-slate-800">¥{exp.amount.toLocaleString()}</td>

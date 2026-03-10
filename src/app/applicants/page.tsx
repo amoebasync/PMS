@@ -2395,10 +2395,10 @@ export default function ApplicantsPage() {
                   </div>
                   <div>
                     <h2 className="text-lg font-black text-slate-800">
-                      {start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' })}
+                      {start.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' })}
                     </h2>
                     <p className="text-xs text-slate-500">
-                      {start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} 〜 {end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}
+                      {start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} 〜 {end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}
                       {slot.location && <span className="ml-2"><i className="bi bi-geo-alt mr-0.5"></i>{slot.location}</span>}
                     </p>
                   </div>
@@ -3326,8 +3326,8 @@ export default function ApplicantsPage() {
                               <div className="max-h-48 overflow-y-auto space-y-1">
                                 {availableSlots.map(slot => {
                                   const d = new Date(slot.startTime);
-                                  const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
-                                  const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                  const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' });
+                                  const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`;
                                   return (
                                     <button
                                       key={slot.id}
@@ -3603,7 +3603,7 @@ export default function ApplicantsPage() {
                                     <i className="bi bi-calendar-event text-slate-400 text-xs"></i>
                                     <p className="text-sm font-bold text-slate-800">
                                       {new Date(selectedApplicant.trainingSlot.startTime).toLocaleDateString('ja-JP', {
-                                        year: 'numeric', month: 'long', day: 'numeric', weekday: 'short',
+                                        year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo',
                                       })}
                                     </p>
                                   </div>
@@ -3611,11 +3611,11 @@ export default function ApplicantsPage() {
                                     <i className="bi bi-clock text-slate-400 text-xs"></i>
                                     <p className="text-sm text-slate-700">
                                       {new Date(selectedApplicant.trainingSlot.startTime).toLocaleTimeString('ja-JP', {
-                                        hour: '2-digit', minute: '2-digit',
+                                        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
                                       })}
                                       {' 〜 '}
                                       {new Date(selectedApplicant.trainingSlot.endTime).toLocaleTimeString('ja-JP', {
-                                        hour: '2-digit', minute: '2-digit',
+                                        hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo',
                                       })}
                                     </p>
                                   </div>
@@ -3700,8 +3700,8 @@ export default function ApplicantsPage() {
                                         .filter(slot => slot.id !== selectedApplicant?.trainingSlot?.id)
                                         .map(slot => {
                                           const d = new Date(slot.startTime);
-                                          const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
-                                          const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                          const dateStr = d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' });
+                                          const timeStr = `${d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} - ${new Date(slot.endTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`;
                                           return (
                                             <button
                                               key={slot.id}
@@ -3784,7 +3784,7 @@ export default function ApplicantsPage() {
                               // スロットを日付ごとにグループ化
                               const slotsByDate: Record<string, TrainingSlotOption[]> = {};
                               trainingSlots.forEach(slot => {
-                                const key = new Date(slot.startTime).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                                const key = new Date(slot.startTime).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' });
                                 if (!slotsByDate[key]) slotsByDate[key] = [];
                                 slotsByDate[key].push(slot);
                               });
@@ -3867,7 +3867,7 @@ export default function ApplicantsPage() {
                                       {slotsForSelected.map(slot => {
                                         const start = new Date(slot.startTime);
                                         const end = new Date(slot.endTime);
-                                        const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+                                        const timeStr = `${start.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} - ${end.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`;
                                         const isSlotSelected = selectedTrainingSlotId === slot.id;
                                         return (
                                           <button
@@ -4543,8 +4543,8 @@ export default function ApplicantsPage() {
         const applicants = slot.interviewSlotApplicants?.map(a => a.applicant) || (slot.applicant ? [slot.applicant] : []);
         const startDate = new Date(slot.startTime);
         const endDate = new Date(slot.endTime);
-        const dateStr = startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
-        const timeStr = `${startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+        const dateStr = startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' });
+        const timeStr = `${startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} - ${endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })}`;
         const interviewerName = slot.interviewer ? `${slot.interviewer.lastNameJa} ${slot.interviewer.firstNameJa}` : null;
         return (
           <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSelectedSlotDetail(null)}>

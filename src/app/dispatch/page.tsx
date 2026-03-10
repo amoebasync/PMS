@@ -426,7 +426,7 @@ export default function DispatchPage() {
                      
                      <div className="pt-2 border-t border-slate-100 text-[10px] space-y-1">
                        <div className="text-slate-500 font-mono">
-                         {od.startDate ? new Date(od.startDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'} 〜 <span className="font-bold text-rose-600">{od.endDate ? new Date(od.endDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric'}) : '-'}</span>
+                         {od.startDate ? new Date(od.startDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric',timeZone:'Asia/Tokyo'}) : '-'} 〜 <span className="font-bold text-rose-600">{od.endDate ? new Date(od.endDate).toLocaleDateString('ja-JP',{month:'short',day:'numeric',timeZone:'Asia/Tokyo'}) : '-'}</span>
                        </div>
                        <div className="flex justify-between text-slate-500">
                          <span>{t('unassigned_total_requested')}</span><span className="font-bold">{od.plannedCount?.toLocaleString()}{t('unassigned_sheets')}</span>
@@ -555,7 +555,7 @@ export default function DispatchPage() {
                                     <div className="flex justify-between items-center font-mono mt-1">
                                       <span className="truncate">
                                         {t('flyer_deadline')} <span className={`font-bold ${item.isOverSpareDate ? 'text-rose-600' : item.isOverEndDate ? 'text-amber-600' : 'text-slate-600'}`}>
-                                          {item.endDate ? new Date(item.endDate).toLocaleDateString('ja-JP', {month:'short', day:'numeric'}) : '-'}
+                                          {item.endDate ? new Date(item.endDate).toLocaleDateString('ja-JP', {month:'short', day:'numeric', timeZone:'Asia/Tokyo'}) : '-'}
                                         </span>
                                       </span>
                                       {item.shortAlert && (
@@ -649,7 +649,7 @@ export default function DispatchPage() {
                     })
                     .map(s => (
                     <option key={s.id} value={s.id}>
-                      {new Date(s.date).toLocaleDateString('ja-JP')} - {s.distributor?.name || t('unassigned_distributor')}
+                      {new Date(s.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} - {s.distributor?.name || t('unassigned_distributor')}
                     </option>
                   ))}
                 </select>

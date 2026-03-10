@@ -224,7 +224,7 @@ export default function ApprovalsPage() {
                     </div>
                   </td>
                   
-                  <td className="px-4 py-4 font-mono font-bold text-slate-600">{new Date(item.date).toLocaleDateString('ja-JP')}</td>
+                  <td className="px-4 py-4 font-mono font-bold text-slate-600">{new Date(item.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}</td>
                   
                   {activeTab === 'ATTENDANCE' ? (
                     <>
@@ -268,7 +268,7 @@ export default function ApprovalsPage() {
                           {item.approver ? `${item.approver.lastNameJa} ${item.approver.firstNameJa}` : t('auto_processed')}
                         </div>
                         <div className="text-[9px] text-slate-400 font-mono">
-                          {item.approvedAt ? new Date(item.approvedAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                          {item.approvedAt ? new Date(item.approvedAt).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }) : '-'}
                         </div>
                       </div>
                     </td>

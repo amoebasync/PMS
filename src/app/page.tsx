@@ -104,13 +104,20 @@ export default function Dashboard() {
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
+  // ブロッキングアナウンスメント
+  const [blockingAnnouncements, setBlockingAnnouncements] = useState<any[]>([]);
+  const [blockingIndex, setBlockingIndex] = useState(0);
+  const [showBlocking, setShowBlocking] = useState(false);
+  const [markingRead, setMarkingRead] = useState(false);
+
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const [dashRes, announcementsRes, profileRes] = await Promise.all([
+        const [dashRes, announcementsRes, profileRes, blockingRes] = await Promise.all([
           fetch('/api/dashboard'),
           fetch('/api/announcements'),
           fetch('/api/profile'),
+          fetch('/api/announcements/blocking'),
         ]);
         if (dashRes.ok) setData(await dashRes.json());
         if (announcementsRes.ok) {
@@ -122,6 +129,20 @@ export default function Dashboard() {
           const roles: string[] = profile?.roles?.map((r: any) => r.role?.code) || [];
           const primaryRoleCode: string = profile?.role?.code || '';
           setIsSuperAdmin(roles.includes('SUPER_ADMIN') || primaryRoleCode === 'SUPER_ADMIN');
+        }
+        if (blockingRes.ok) {
+          const blockingData = await blockingRes.json();
+          const items = blockingData.announcements || [];
+          if (items.length > 0) {
+            // sessionStorage で「次回読む」を管理
+            const dismissed = JSON.parse(sessionStorage.getItem('blocking_dismissed') || '[]');
+            const filtered = items.filter((a: any) => !dismissed.includes(a.id));
+            setBlockingAnnouncements(filtered);
+            if (filtered.length > 0) {
+              setBlockingIndex(0);
+              setShowBlocking(true);
+            }
+          }
         }
       } catch (e) { console.error(e); }
     };
@@ -144,8 +165,110 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  const handleMarkRead = async () => {
+    const current = blockingAnnouncements[blockingIndex];
+    if (!current) return;
+    setMarkingRead(true);
+    try {
+      await fetch(`/api/announcements/${current.id}/read`, { method: 'POST' });
+      const remaining = blockingAnnouncements.filter((_: any, i: number) => i !== blockingIndex);
+      setBlockingAnnouncements(remaining);
+      if (remaining.length === 0) {
+        setShowBlocking(false);
+      } else {
+        setBlockingIndex(Math.min(blockingIndex, remaining.length - 1));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setMarkingRead(false);
+    }
+  };
+
+  const handleReadLater = () => {
+    // sessionStorage に保存してセッション中はスキップ
+    const dismissed = JSON.parse(sessionStorage.getItem('blocking_dismissed') || '[]');
+    const ids = blockingAnnouncements.map((a: any) => a.id);
+    sessionStorage.setItem('blocking_dismissed', JSON.stringify([...dismissed, ...ids]));
+    setShowBlocking(false);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300 pb-10 max-w-7xl mx-auto">
+
+      {/* ── Blocking Announcement Overlay ── */}
+      {showBlocking && blockingAnnouncements.length > 0 && (() => {
+        const current = blockingAnnouncements[blockingIndex];
+        const cfg = CATEGORY_STYLE[current.category] || CATEGORY_STYLE.OTHER;
+        const dateStr = new Date(current.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' }).replace(/\//g, '/');
+        return (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="px-6 py-5 border-b border-slate-100 bg-gradient-to-r from-indigo-50 to-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                    <i className="bi bi-megaphone-fill text-lg"></i>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-slate-800 text-lg">{t('blocking_announcement_title')}</h3>
+                    {blockingAnnouncements.length > 1 && (
+                      <span className="text-xs text-slate-400 font-mono">
+                        {t('blocking_page_indicator', { current: blockingIndex + 1, total: blockingAnnouncements.length })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className={`text-[10px] font-bold ${cfg.badgeText} ${cfg.badgeBg} px-2 py-0.5 rounded`}>{t(cfg.labelKey)}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">{dateStr}</span>
+                </div>
+                <h4 className="font-bold text-slate-800 text-xl mb-4">{current.title}</h4>
+                <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{current.content}</p>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={handleReadLater}
+                  className="px-4 py-2.5 text-slate-500 hover:text-slate-700 hover:bg-slate-200 rounded-xl font-bold text-sm transition-colors"
+                >
+                  {t('blocking_read_later')}
+                </button>
+                <div className="flex items-center gap-2">
+                  {blockingAnnouncements.length > 1 && (
+                    <div className="flex gap-1 mr-2">
+                      {blockingAnnouncements.map((_: any, i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => setBlockingIndex(i)}
+                          className={`w-2 h-2 rounded-full transition-colors ${i === blockingIndex ? 'bg-indigo-500' : 'bg-slate-300'}`}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleMarkRead}
+                    disabled={markingRead}
+                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-md shadow-indigo-200 transition-all"
+                  >
+                    {markingRead ? (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    ) : (
+                      <i className="bi bi-check-lg"></i>
+                    )}
+                    {t('blocking_mark_read')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Alerts ── */}
       {data && (data.alerts.orders > 0 || data.alerts.approvals > 0 || data.crm?.overdueTaskCount > 0 || data.quality?.unresolvedComplaintCount > 0 || data.alertSummary?.openAlertCount > 0) && (
@@ -251,7 +374,7 @@ export default function Dashboard() {
             ) : (
               announcements.map((a, i) => {
                 const cfg = CATEGORY_STYLE[a.category] || CATEGORY_STYLE.OTHER;
-                const dateStr = new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '/');
+                const dateStr = new Date(a.createdAt).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Asia/Tokyo' }).replace(/\//g, '/');
                 return (
                   <React.Fragment key={a.id}>
                     {i > 0 && <div className="w-full h-px bg-slate-100" />}
@@ -309,7 +432,7 @@ export default function Dashboard() {
                           <div className="flex items-center gap-1.5 mt-0.5">
                             <span className={`text-[10px] font-medium ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
                               {isOverdue && <i className="bi bi-exclamation-triangle-fill mr-0.5" />}
-                              {dueDate.toLocaleDateString('ja-JP')}
+                              {dueDate.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                             </span>
                             {task.customer && (
                               <span className="text-[10px] text-slate-400">· {task.customer.name}</span>

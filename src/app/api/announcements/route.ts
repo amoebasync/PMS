@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { title, content, category } = body;
+    const { title, content, category, isBlocking } = body;
 
     if (!title || !content || !category) {
       return NextResponse.json({ error: 'title, content, category は必須です' }, { status: 400 });
@@ -60,6 +60,7 @@ export async function POST(request: Request) {
         title,
         content,
         category,
+        isBlocking: isBlocking === true,
         createdById: empId,
       },
       include: {

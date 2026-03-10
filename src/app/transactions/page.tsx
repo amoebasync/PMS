@@ -262,7 +262,7 @@ export default function TransactionsPage() {
                return (
                 <tr key={tx.id} className="hover:bg-slate-50">
                   <td className="px-6 py-4 font-mono font-bold text-slate-700 text-base">
-                    {new Date(tx.expectedAt).toLocaleDateString('ja-JP')}
+                    {new Date(tx.expectedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                   </td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold rounded-md border ${type.color}`}>

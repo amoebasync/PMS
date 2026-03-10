@@ -1050,7 +1050,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
         // エリア別にグループ化: 日付→エリア(chome_name)単位で行を生成
         type GroupedRow = { dateKey: string; date: string; areaName: string; scheduleIds: number[]; statuses: string[]; slots: Record<number, { name: string; planned: number; actual: number | null }[]>; totalPlanned: number; totalActual: number | null };
         const grouped = schedules.reduce((acc: GroupedRow[], s: any) => {
-          const dateKey = s.date ? new Date(s.date).toLocaleDateString('ja-JP') : '—';
+          const dateKey = s.date ? new Date(s.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—';
           const areaName = s.area?.chome_name || s.area?.town_name || '—';
           let row = acc.find(r => r.dateKey === dateKey && r.areaName === areaName);
           if (!row) {
@@ -1175,7 +1175,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                           </span>
                         ) : '—'}
                       </td>
-                      <td className="px-4 py-3 text-slate-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString('ja-JP') : '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{t.dueDate ? new Date(t.dueDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}</td>
                       <td className="px-4 py-3 text-slate-600">
                         {t.assignee ? `${t.assignee.lastNameJa}${t.assignee.firstNameJa}` : '—'}
                       </td>
@@ -1217,7 +1217,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                   {complaints.map((c: any) => (
                     <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-4 py-3"><ComplaintStatusBadge status={c.status} /></td>
-                      <td className="px-4 py-3 text-slate-600">{c.occurredAt ? new Date(c.occurredAt).toLocaleDateString('ja-JP') : '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{c.occurredAt ? new Date(c.occurredAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '—'}</td>
                       <td className="px-4 py-3 text-slate-700 font-medium">{c.complaintType?.name || '—'}</td>
                       <td className="px-4 py-3 text-slate-600 truncate max-w-[200px]">{c.title}</td>
                       <td className="px-4 py-3 text-slate-600 truncate max-w-[180px]">{c.address || '—'}</td>

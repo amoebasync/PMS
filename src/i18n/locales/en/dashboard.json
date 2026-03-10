@@ -53,5 +53,10 @@
   "ec_active_users_unit": "",
   "ec_new_registrations": "New Registrations This Month",
   "ec_total_accounts": "Total Accounts",
-  "ec_count_unit": ""
+  "ec_count_unit": "",
+
+  "blocking_announcement_title": "Important Announcement",
+  "blocking_mark_read": "Mark as Read",
+  "blocking_read_later": "Read Later",
+  "blocking_page_indicator": "{{current}} / {{total}}"
 }

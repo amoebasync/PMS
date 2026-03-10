@@ -173,7 +173,7 @@ export default function InterviewSlotManager() {
       return;
     }
     const confirmed = await showConfirm(
-      `${new Date(slot.startTime).toLocaleDateString('ja-JP')} ${new Date(slot.startTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} のスロットを削除しますか？`,
+      `${new Date(slot.startTime).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} ${new Date(slot.startTime).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' })} のスロットを削除しますか？`,
       { variant: 'danger', confirmLabel: '削除' }
     );
     if (!confirmed) return;
@@ -194,12 +194,12 @@ export default function InterviewSlotManager() {
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short' });
+    return d.toLocaleDateString('ja-JP', { month: 'short', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' });
   };
 
   const formatTime = (dateStr: string) => {
     const d = new Date(dateStr);
-    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
   };
 
   return (

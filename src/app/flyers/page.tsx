@@ -256,8 +256,8 @@ export default function FlyerPage() {
                   ) : <span className="text-slate-400">-</span>}
                 </td>
                 <td className="px-6 py-4 text-xs text-slate-600 font-mono">
-                  {f.startDate ? new Date(f.startDate).toLocaleDateString() : t('undecided')} <br/>
-                  〜 {f.endDate ? new Date(f.endDate).toLocaleDateString() : t('undecided')}
+                  {f.startDate ? new Date(f.startDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : t('undecided')} <br/>
+                  〜 {f.endDate ? new Date(f.endDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : t('undecided')}
                 </td>
                 <td className="px-6 py-4 text-right bg-slate-50">
                   <div className="font-bold text-lg text-fuchsia-600">{f.stockCount.toLocaleString()} <span className="text-xs text-slate-500 font-normal">{t('sheets')}</span></div>
@@ -458,7 +458,7 @@ export default function FlyerPage() {
                               )}
                               
                               <div className="mt-auto flex flex-wrap items-center justify-between pt-4 border-t border-slate-100 gap-4">
-                                <div className="text-[10px] text-slate-400 font-medium">{t('qr_created', { date: new Date(qr.createdAt).toLocaleDateString() })}</div>
+                                <div className="text-[10px] text-slate-400 font-medium">{t('qr_created', { date: new Date(qr.createdAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) })}</div>
                                 
                                 <div className="flex gap-5">
                                   <div className="flex flex-col items-end" title="総スキャン回数 (延べアクセス数)">

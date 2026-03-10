@@ -215,7 +215,7 @@ export default function PortalMyPage() {
                     <div>
                       <h3 className="font-black text-slate-800 text-lg">{order.title || '無題の案件'}</h3>
                       <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
-                        <i className="bi bi-calendar-event"></i> 発注日: {new Date(order.orderDate).toLocaleDateString('ja-JP')}
+                        <i className="bi bi-calendar-event"></i> 発注日: {new Date(order.orderDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                       </p>
                     </div>
 

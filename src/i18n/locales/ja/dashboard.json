@@ -53,5 +53,10 @@
   "ec_active_users_unit": "人",
   "ec_new_registrations": "今月の新規登録",
   "ec_total_accounts": "累計登録アカウント",
-  "ec_count_unit": "件"
+  "ec_count_unit": "件",
+
+  "blocking_announcement_title": "重要なお知らせ",
+  "blocking_mark_read": "既読にする",
+  "blocking_read_later": "次回読む",
+  "blocking_page_indicator": "{{current}} / {{total}}"
 }

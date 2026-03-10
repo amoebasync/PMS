@@ -28,5 +28,8 @@
   "delete_confirm_title": "Are you sure you want to delete?",
   "delete_confirm_message": "This announcement will be permanently deleted and removed from the dashboard.",
   "deleting": "Deleting...",
-  "btn_delete": "Delete"
+  "btn_delete": "Delete",
+  "is_blocking": "Blocking Display",
+  "is_blocking_desc": "When ON, this announcement will be forced-displayed to all users until read",
+  "blocking_badge": "Blocking"
 }

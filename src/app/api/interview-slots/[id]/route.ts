@@ -116,7 +116,7 @@ export async function DELETE(
         targetId: slotId,
         beforeData: slot as unknown as Record<string, unknown>,
         ipAddress: ip,
-        description: `面接スロットを削除（${new Date(slot.startTime).toLocaleString('ja-JP')}）`,
+        description: `面接スロットを削除（${new Date(slot.startTime).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}）`,
         tx,
       });
     });

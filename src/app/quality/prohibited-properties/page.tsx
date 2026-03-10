@@ -152,7 +152,7 @@ const parseImageUrls = (raw: string | null): string[] => {
 const fmtDate = (d: string | null) => {
   if (!d) return '-';
   try {
-    return new Date(d).toLocaleDateString('ja-JP');
+    return new Date(d).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
   } catch {
     return d;
   }

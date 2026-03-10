@@ -114,10 +114,11 @@ function formatRecurrence(type: string, value: string | null, t: (key: string) =
 
 function formatDueDate(dueDate: string): string {
   const d = new Date(dueDate);
-  const dateStr = d.toLocaleDateString('ja-JP');
-  const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+  const dateStr = d.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' });
+  const jst = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  const hasTime = jst.getHours() !== 0 || jst.getMinutes() !== 0;
   if (hasTime) {
-    return `${dateStr} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${dateStr} ${String(jst.getHours()).padStart(2, '0')}:${String(jst.getMinutes()).padStart(2, '0')}`;
   }
   return dateStr;
 }
@@ -923,7 +924,7 @@ export default function CrmTasksPage() {
                           </button>
                         </td>
                         <td className="px-4 py-3 text-xs text-slate-400">
-                          {tmpl.lastGeneratedAt ? new Date(tmpl.lastGeneratedAt).toLocaleDateString('ja-JP') : t('not_executed')}
+                          {tmpl.lastGeneratedAt ? new Date(tmpl.lastGeneratedAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : t('not_executed')}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

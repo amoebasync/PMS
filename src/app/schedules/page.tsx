@@ -242,7 +242,7 @@ export default function ScheduleListPage() {
                     {flyers.map((flyer, idx) => (
                       <React.Fragment key={`flyer-${s.id}-${idx}`}>
                         <td className="border border-slate-200 px-2 py-2 truncate max-w-[200px]" title={flyer?.flyerName}>{flyer?.flyerName || '-'}</td>
-                        <td className="border border-slate-200 px-2 py-2 text-slate-500">{flyer?.endDate ? new Date(flyer.endDate).toLocaleDateString() : '-'}</td>
+                        <td className="border border-slate-200 px-2 py-2 text-slate-500">{flyer?.endDate ? new Date(flyer.endDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '-'}</td>
                         <td className="border border-slate-200 px-2 py-2">{flyer?.method || '-'}</td>
                         <td className="border border-slate-200 px-2 py-2 text-right">{flyer?.plannedCount?.toLocaleString() || '-'}</td>
                         <td className="border border-slate-200 px-2 py-2 text-right font-bold text-indigo-600">

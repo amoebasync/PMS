@@ -365,7 +365,7 @@ export default function PayrollPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
-                    {new Date(r.periodStart).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric'})}〜{new Date(r.periodEnd).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric'})}
+                    {new Date(r.periodStart).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}〜{new Date(r.periodEnd).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}
                   </td>
                   <td className="px-3 py-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{fmt(r.grossPay)}</td>
                   <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
@@ -408,7 +408,7 @@ export default function PayrollPage() {
                 <div className="text-lg font-black">{editRecord.employee.lastNameJa} {editRecord.employee.firstNameJa}</div>
                 <div className="text-xs opacity-80 mt-0.5">
                   {t(EMP_TYPE_LABEL_KEYS[editRecord.employmentType])} /
-                  {new Date(editRecord.periodStart).toLocaleDateString('ja-JP')} 〜 {new Date(editRecord.periodEnd).toLocaleDateString('ja-JP')}
+                  {new Date(editRecord.periodStart).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })} 〜 {new Date(editRecord.periodEnd).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                 </div>
               </div>
               <button onClick={() => setEditRecord(null)} className="text-white/70 hover:text-white"><i className="bi bi-x-lg text-xl"></i></button>
