@@ -199,13 +199,14 @@ export default function ManageInterviewPage() {
       month: 'short',
       day: 'numeric',
       weekday: 'short',
+      timeZone: 'Asia/Tokyo',
     });
   };
 
   const formatTime = (startStr: string, endStr: string) => {
     const s = new Date(startStr);
     const e = new Date(endStr);
-    const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+    const opts: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' };
     return `${s.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ja-JP', opts)} - ${e.toLocaleTimeString(lang === 'en' ? 'en-US' : 'ja-JP', opts)}`;
   };
 
@@ -215,6 +216,7 @@ export default function ManageInterviewPage() {
       month: 'long',
       day: 'numeric',
       weekday: 'long',
+      timeZone: 'Asia/Tokyo',
     });
   };
 

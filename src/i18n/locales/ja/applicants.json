@@ -146,6 +146,8 @@
   "slot_create_failed": "スロットの作成に失敗しました",
   "slot_fetch_failed": "スロットの取得に失敗しました",
 
+  "slot_detail_title": "面接スロット詳細",
+  "slot_detail_no_applicants": "予約者はいません",
   "slot_delete_confirm": "この空きスロットを削除しますか？\n{{dateTime}}",
   "slot_delete_title": "スロット削除",
   "slot_deleted": "スロットを削除しました",

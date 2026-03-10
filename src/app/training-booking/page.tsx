@@ -101,12 +101,13 @@ function formatDate(dateStr: string, lang: Lang) {
     month: 'long',
     day: 'numeric',
     weekday: 'long',
+    timeZone: 'Asia/Tokyo',
   });
 }
 
 function formatTime(startStr: string, endStr: string) {
-  const start = new Date(startStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
-  const end = new Date(endStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+  const start = new Date(startStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+  const end = new Date(endStr).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
   return `${start} - ${end}`;
 }
 

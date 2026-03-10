@@ -542,6 +542,9 @@ export default function ApplicantsPage() {
   const linkBtnRef = useRef<HTMLButtonElement>(null);
   const [linkPopoverPos, setLinkPopoverPos] = useState({ top: 0, right: 0 });
 
+  // ── スロット詳細ポップアップ（複数人スロット用）──
+  const [selectedSlotDetail, setSelectedSlotDetail] = useState<InterviewSlot | null>(null);
+
   // ── 手動登録 ──
   const [showManualRegisterModal, setShowManualRegisterModal] = useState(false);
   const [manualRegForm, setManualRegForm] = useState({ name: '', email: '', phone: '', jobCategoryId: '', language: 'en', recruitingMediaId: '', birthday: '', gender: '', countryId: '', visaTypeId: '', sendInterviewEmail: true });
@@ -1151,8 +1154,13 @@ export default function ApplicantsPage() {
   // イベントクリック
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleEventClick = async (arg: any) => {
-    const { slot, isBooked } = arg.event.extendedProps as { slot: InterviewSlot; isBooked: boolean };
-    // Try junction table first, then legacy applicant
+    const { slot, isBooked, capacity } = arg.event.extendedProps as { slot: InterviewSlot; isBooked: boolean; capacity: number };
+    // Multi-capacity slot → show detail popup with applicant list
+    if (capacity > 1) {
+      setSelectedSlotDetail(slot);
+      return;
+    }
+    // Single-capacity slot → open eval modal directly
     const firstApplicant = slot.interviewSlotApplicants?.[0]?.applicant || slot.applicant;
     if (isBooked && firstApplicant) {
       openEvalModal(firstApplicant.id);
@@ -4527,6 +4535,100 @@ export default function ApplicantsPage() {
           </div>
         </div>
       )}
+
+      {/* ── スロット詳細モーダル（複数人スロット用）── */}
+      {selectedSlotDetail && (() => {
+        const slot = selectedSlotDetail;
+        const capacity = slot.interviewSlotMaster?.capacity ?? 1;
+        const applicants = slot.interviewSlotApplicants?.map(a => a.applicant) || (slot.applicant ? [slot.applicant] : []);
+        const startDate = new Date(slot.startTime);
+        const endDate = new Date(slot.endTime);
+        const dateStr = startDate.toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
+        const timeStr = `${startDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })} - ${endDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}`;
+        const interviewerName = slot.interviewer ? `${slot.interviewer.lastNameJa} ${slot.interviewer.firstNameJa}` : null;
+        return (
+          <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setSelectedSlotDetail(null)}>
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+              <div className="p-5 border-b flex justify-between items-center bg-indigo-50 rounded-t-xl">
+                <div>
+                  <h3 className="font-bold text-indigo-800 flex items-center gap-2">
+                    <i className="bi bi-people-fill"></i> {t('slot_detail_title')}
+                  </h3>
+                  <p className="text-xs text-indigo-600 mt-1">{dateStr} {timeStr}</p>
+                </div>
+                <button onClick={() => setSelectedSlotDetail(null)} className="text-slate-400 hover:text-slate-600">
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="p-5 space-y-4">
+                {/* スロット情報 */}
+                <div className="flex items-center gap-4 text-sm text-slate-600">
+                  {interviewerName && (
+                    <span className="flex items-center gap-1.5">
+                      <i className="bi bi-person-badge text-indigo-500"></i> {interviewerName}
+                    </span>
+                  )}
+                  {slot.interviewSlotMaster && (
+                    <span className="flex items-center gap-1.5">
+                      <i className="bi bi-tag text-indigo-500"></i> {slot.interviewSlotMaster.name}
+                    </span>
+                  )}
+                  <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold ${
+                    applicants.length >= capacity ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {applicants.length}/{capacity === 0 ? '\u221E' : capacity}{lang === 'ja' ? '名' : ''}
+                  </span>
+                </div>
+
+                {/* 応募者一覧 */}
+                {applicants.length === 0 ? (
+                  <div className="text-center py-6 text-slate-400">
+                    <i className="bi bi-inbox text-3xl"></i>
+                    <p className="text-sm mt-2">{t('slot_detail_no_applicants')}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {applicants.map((app, idx) => {
+                      const flowInfo = FLOW_STATUS_MAP[app.flowStatus] || { labelKey: app.flowStatus, color: 'bg-slate-100 text-slate-600' };
+                      const hiringInfo = HIRING_STATUS_MAP[app.hiringStatus] || { labelKey: app.hiringStatus, color: 'bg-slate-100 text-slate-600' };
+                      return (
+                        <button
+                          key={app.id}
+                          onClick={() => { setSelectedSlotDetail(null); openEvalModal(app.id); }}
+                          className="w-full text-left p-3 rounded-lg border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors group"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="text-xs text-slate-400 font-mono w-5">{idx + 1}.</span>
+                              <span className="font-semibold text-sm text-slate-800 truncate">{app.name}</span>
+                            </div>
+                            <i className="bi bi-chevron-right text-slate-300 group-hover:text-indigo-500 transition-colors"></i>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1.5 ml-7">
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${flowInfo.color}`}>{t(flowInfo.labelKey)}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${hiringInfo.color}`}>{t(hiringInfo.labelKey)}</span>
+                            {app.jobCategory && (
+                              <span className="text-[10px] text-slate-500">{lang === 'ja' ? app.jobCategory.nameJa : (app.jobCategory.nameEn || app.jobCategory.nameJa)}</span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="p-4 border-t flex justify-end">
+                <button
+                  onClick={() => setSelectedSlotDetail(null)}
+                  className="px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  {t('close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
   );
 }

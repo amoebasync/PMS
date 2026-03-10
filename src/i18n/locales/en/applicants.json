@@ -146,6 +146,8 @@
   "slot_create_failed": "Failed to create slots",
   "slot_fetch_failed": "Failed to fetch slots",
 
+  "slot_detail_title": "Interview Slot Details",
+  "slot_detail_no_applicants": "No applicants booked",
   "slot_delete_confirm": "Delete this open slot?\n{{dateTime}}",
   "slot_delete_title": "Delete Slot",
   "slot_deleted": "Slot deleted",

@@ -500,7 +500,7 @@ function ApplyForm() {
   selectableSlots.forEach((slot) => {
     const dateStr = new Date(slot.startTime).toLocaleDateString(
       isEn ? 'en-US' : 'ja-JP',
-      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }
+      { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short', timeZone: 'Asia/Tokyo' }
     );
     if (!slotsByDate[dateStr]) slotsByDate[dateStr] = [];
     slotsByDate[dateStr].push(slot);
@@ -1083,11 +1083,11 @@ function ApplyForm() {
                     {slotsByDate[selectedDate].map((slot) => {
                       const start = new Date(slot.startTime).toLocaleTimeString(
                         isEn ? 'en-US' : 'ja-JP',
-                        { hour: '2-digit', minute: '2-digit', hour12: false }
+                        { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }
                       );
                       const end = new Date(slot.endTime).toLocaleTimeString(
                         isEn ? 'en-US' : 'ja-JP',
-                        { hour: '2-digit', minute: '2-digit', hour12: false }
+                        { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }
                       );
                       const isSelected =
                         form.interviewSlotId === String(slot.id);
