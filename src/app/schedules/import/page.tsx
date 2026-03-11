@@ -368,6 +368,10 @@ export default function DataImportPage() {
   /* ────── インポート実行（チャンク分割送信） ────── */
   const CHUNK_SIZE = 50;
 
+  /** 送信用にデータをクリーンアップ（表示専用フィールドを除去） */
+  const cleanForSend = (items: any[]) =>
+    items.map(({ excelRowNumber, dbPrefectureName, dbFullAreaName, ...rest }) => rest);
+
   const executeImport = async () => {
     if (dataType === 'partner' && !selectedPartnerId) {
       setMessage(`❌ ${ts('partner_required')}`);
@@ -389,9 +393,38 @@ export default function DataImportPage() {
         } else {
           setMessage(`❌ エラー: ${data.error}`);
         }
-      } catch {
-        setMessage(`❌ ${tb('import_error_comm')}`);
+      } catch (e) {
+        const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        setMessage(`❌ ${tb('import_error_comm')} [${detail}]`);
       }
+      setIsImporting(false);
+      return;
+    }
+
+    // ── 接続テスト（空データ送信でAPI到達を確認）──
+    try {
+      setMessage('⏳ API接続確認中...');
+      const testBody = JSON.stringify({ schedules: [], importStatus });
+      const testRes = await fetch('/api/schedules/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: testBody,
+      });
+      if (!testRes.ok) {
+        let errorMsg: string;
+        try {
+          const errData = await testRes.json();
+          errorMsg = errData.error || `HTTP ${testRes.status}`;
+        } catch {
+          errorMsg = `HTTP ${testRes.status} ${testRes.statusText}`;
+        }
+        setMessage(`❌ API接続エラー: ${errorMsg}`);
+        setIsImporting(false);
+        return;
+      }
+    } catch (e) {
+      const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      setMessage(`❌ API接続失敗: ${detail}`);
       setIsImporting(false);
       return;
     }
@@ -402,19 +435,26 @@ export default function DataImportPage() {
     let orderId: number | null = null;
     let orderNo = '';
 
-    const totalChunks = Math.ceil(parsedData.length / CHUNK_SIZE);
+    const cleanData = cleanForSend(parsedData);
+    const totalChunks = Math.ceil(cleanData.length / CHUNK_SIZE);
 
     for (let ci = 0; ci < totalChunks; ci++) {
-      const chunk = parsedData.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
-      const progress = Math.min((ci + 1) * CHUNK_SIZE, parsedData.length);
-      setMessage(`⏳ ${ts('importing')} ${progress} / ${parsedData.length} 件 (${ci + 1}/${totalChunks})`);
+      const chunk = cleanData.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
+      const progress = Math.min((ci + 1) * CHUNK_SIZE, cleanData.length);
+      setMessage(`⏳ ${ts('importing')} ${progress} / ${cleanData.length} 件 (${ci + 1}/${totalChunks})`);
 
       const requestBody = dataType === 'partner'
         ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}) }
         : { schedules: chunk, importStatus };
 
+      const bodyStr = JSON.stringify(requestBody);
+
       try {
-        const res = await fetch('/api/schedules/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+        const res = await fetch('/api/schedules/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: bodyStr,
+        });
 
         if (!res.ok) {
           let errorMsg: string;
@@ -422,10 +462,10 @@ export default function DataImportPage() {
             const errData = await res.json();
             errorMsg = errData.error || `HTTP ${res.status}`;
           } catch {
-            errorMsg = `HTTP ${res.status}`;
+            errorMsg = `HTTP ${res.status} ${res.statusText}`;
           }
           const partialMsg = totalImported > 0 ? ` (${totalImported}件は登録済み)` : '';
-          setMessage(`❌ エラー: ${errorMsg}${partialMsg}`);
+          setMessage(`❌ サーバーエラー (${res.status}): ${errorMsg}${partialMsg} [bodySize=${bodyStr.length}]`);
           setIsImporting(false);
           return;
         }
@@ -437,8 +477,8 @@ export default function DataImportPage() {
         if (data.orderNo) orderNo = data.orderNo;
       } catch (e) {
         const partialMsg = totalImported > 0 ? ` (${totalImported}件は登録済み)` : '';
-        const detail = e instanceof Error ? e.message : '';
-        setMessage(`❌ ${ts('error_import_failed')} [${detail}]${partialMsg}`);
+        const detail = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        setMessage(`❌ ネットワークエラー: ${detail}${partialMsg} [bodySize=${bodyStr.length}, chunk=${ci + 1}/${totalChunks}]`);
         setIsImporting(false);
         return;
       }

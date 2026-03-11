@@ -22,9 +22,10 @@ function parseDayString(baseDateStr: string, dayStr: string) {
 }
 
 export async function POST(request: Request) {
-  const { error } = await requireAdminSession();
-  if (error) return error;
   try {
+    const { error } = await requireAdminSession();
+    if (error) return error;
+
     const body = await request.json();
 
     // パートナー案件かどうか判定（配列 = 通常（後方互換）、オブジェクト = 新形式 or パートナー案件）
