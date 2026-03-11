@@ -55,6 +55,7 @@
   "error_import_failed": "通信エラーが発生しました。",
   "importing": "データベースへ登録中です...",
   "import_success": "インポート成功！ {{count}}件のスケジュールを登録しました。",
+  "import_updated": "（うち{{count}}件は既存スケジュールを更新）",
   "import_new_distributors": "（新規配布員 {{count}}名を自動登録）",
   "preview_title": "インポート内容プレビュー",
   "preview_count": "読み込み件数",

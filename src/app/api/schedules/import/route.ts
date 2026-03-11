@@ -127,7 +127,36 @@ export async function POST(request: Request) {
       newDistributorCount = newDists.length;
     }
 
-    // ── トランザクションで一括処理（Prisma Client使用） ──
+    // ── 既存スケジュールの検索（date + jobNumber で upsert 判定） ──
+    const jobDatePairs: { jobNumber: string; date: string }[] = [];
+    for (const s of schedules) {
+      if (s.jobNumber && s.date) {
+        jobDatePairs.push({ jobNumber: String(s.jobNumber), date: s.date });
+      }
+    }
+
+    const existingSchedules = jobDatePairs.length > 0
+      ? await prisma.distributionSchedule.findMany({
+          where: {
+            OR: jobDatePairs.map(p => ({
+              jobNumber: p.jobNumber,
+              date: new Date(p.date),
+            })),
+          },
+          select: { id: true, jobNumber: true, date: true },
+        })
+      : [];
+
+    // date+jobNumber → existing schedule id のマップ
+    const existingMap = new Map<string, number>();
+    for (const es of existingSchedules) {
+      if (es.jobNumber && es.date) {
+        const key = `${es.date.toISOString().split('T')[0]}_${es.jobNumber}`;
+        existingMap.set(key, es.id);
+      }
+    }
+
+    // ── トランザクションで一括処理（upsert対応） ──
     const result = await prisma.$transaction(async (tx) => {
       // パートナー案件時: 受注を作成 or 既存IDを使用（チャンク送信対応）
       let createdOrder: { id: number; orderNo: string } | null = null;
@@ -151,15 +180,16 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── スケジュール作成（10件ずつ並列） ──
+      // ── スケジュール作成/更新（10件ずつ並列） ──
       const allItemsData: any[] = [];
       const pendingSessions: { scheduleId: number; distributorId: number; startedAt: Date; finishedAt: Date | null; milestones: { count: number; time: string | null }[]; dateStr: string }[] = [];
       let importedCount = 0;
+      let updatedCount = 0;
 
       const BATCH = 10;
       for (let i = 0; i < schedules.length; i += BATCH) {
         const batch = schedules.slice(i, i + BATCH);
-        const created = await Promise.all(
+        const results = await Promise.all(
           batch.map(async (s: any) => {
             const branch = s.branchName
               ? branches.find(b => b.nameJa.includes(s.branchName) || s.branchName.includes(b.nameJa))
@@ -171,25 +201,51 @@ export async function POST(request: Request) {
             const area = s.areaCode ? areaMap.get(String(s.areaCode)) || null : null;
             const baseDate = s.date ? new Date(s.date) : null;
 
-            const schedule = await tx.distributionSchedule.create({
-              data: {
-                jobNumber: s.jobNumber || null,
-                date: baseDate,
-                distributorId: distributor?.id || null,
-                branchId: branch?.id || null,
-                cityId: city?.id || null,
-                areaId: area?.id || null,
-                areaUnitPrice: s.areaUnitPrice != null ? Number(s.areaUnitPrice) : undefined,
-                sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
-                remarks: s.remarks || undefined,
-                status: importStatus,
+            const scheduleData = {
+              jobNumber: s.jobNumber || null,
+              date: baseDate,
+              distributorId: distributor?.id || null,
+              branchId: branch?.id || null,
+              cityId: city?.id || null,
+              areaId: area?.id || null,
+              areaUnitPrice: s.areaUnitPrice != null ? Number(s.areaUnitPrice) : undefined,
+              sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
+              remarks: s.remarks || undefined,
+              status: importStatus,
+            };
+
+            // upsert 判定: date + jobNumber で既存レコードを検索
+            const lookupKey = s.jobNumber && s.date ? `${s.date}_${s.jobNumber}` : null;
+            const existingId = lookupKey ? existingMap.get(lookupKey) : null;
+
+            let schedule: { id: number };
+            let isUpdate = false;
+
+            if (existingId) {
+              // ── 既存スケジュールを更新 ──
+              schedule = await tx.distributionSchedule.update({
+                where: { id: existingId },
+                data: scheduleData,
+                select: { id: true },
+              });
+              // 既存の items / session / progress を削除（再作成するため）
+              const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: existingId }, select: { id: true } });
+              if (oldSession) {
+                await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
+                await tx.distributionSession.delete({ where: { id: oldSession.id } });
               }
-            });
-            return { schedule, source: s, distributor, baseDate };
+              await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
+              isUpdate = true;
+            } else {
+              // ── 新規作成 ──
+              schedule = await tx.distributionSchedule.create({ data: scheduleData });
+            }
+
+            return { schedule, source: s, distributor, baseDate, isUpdate };
           })
         );
 
-        for (const { schedule, source: s, distributor, baseDate } of created) {
+        for (const { schedule, source: s, distributor, baseDate, isUpdate } of results) {
           for (const item of s.items || []) {
             const customer = item.customerCode ? customerMap.get(String(item.customerCode)) || null : null;
 
@@ -233,8 +289,9 @@ export async function POST(request: Request) {
               dateStr: s.date,
             });
           }
+
+          if (isUpdate) updatedCount++; else importedCount++;
         }
-        importedCount += created.length;
       }
 
       // DistributionItem 一括作成
@@ -283,12 +340,13 @@ export async function POST(request: Request) {
         }
       }
 
-      return { importedCount, createdOrder };
+      return { importedCount, updatedCount, createdOrder };
     }, { timeout: 120000 });
 
     return NextResponse.json({
       success: true,
       count: result.importedCount,
+      updatedCount: result.updatedCount,
       newDistributorCount,
       ...(result.createdOrder ? { orderNo: result.createdOrder.orderNo, orderId: result.createdOrder.id } : {}),
     });
