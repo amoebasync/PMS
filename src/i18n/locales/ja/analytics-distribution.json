@@ -19,7 +19,7 @@
     "distribution_rate": "配布率",
     "complaint_count": "クレーム件数",
     "fraud_count": "不正件数",
-    "schedules_count": "配布件数"
+    "schedules_count": "出勤人数"
   },
   "sections": {
     "trend": "配布推移",

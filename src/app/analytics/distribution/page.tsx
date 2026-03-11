@@ -89,6 +89,27 @@ function startOfWeek(d: Date): Date {
   return r;
 }
 
+function endOfWeek(d: Date): Date {
+  const s = startOfWeek(d);
+  const r = new Date(s);
+  r.setDate(r.getDate() + 6);
+  return r;
+}
+
+function formatDateLabel(d: Date): string {
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function formatWeekLabel(from: Date, to: Date): string {
+  const f = `${from.getMonth() + 1}/${from.getDate()}`;
+  const t = `${to.getMonth() + 1}/${to.getDate()}`;
+  return `${from.getFullYear()}年 ${f} ~ ${t}`;
+}
+
+function formatMonthLabel(d: Date): string {
+  return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+}
+
 // ---------- Sub-components ----------
 
 function KpiCard({ icon, label, value, sub, color }: {
@@ -131,9 +152,9 @@ function ProgressBar({ label, value, total }: { label: string; value: number; to
 export default function DistributionAnalyticsPage() {
   const { t } = useTranslation('analytics-distribution');
 
-  const [period, setPeriod] = useState<Period>('monthly');
-  const [dateFrom, setDateFrom] = useState(() => dateStr(new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1)));
-  const [dateTo, setDateTo] = useState(() => dateStr(endOfMonth(new Date())));
+  const [period, setPeriod] = useState<Period>('daily');
+  const [dateFrom, setDateFrom] = useState(() => dateStr(new Date()));
+  const [dateTo, setDateTo] = useState(() => dateStr(new Date()));
   const [branchId, setBranchId] = useState('');
   const [distributorId, setDistributorId] = useState('');
   const [distributorSearch, setDistributorSearch] = useState('');
@@ -151,23 +172,51 @@ export default function DistributionAnalyticsPage() {
       .catch(console.error);
   }, []);
 
+  // 期間に応じた日付範囲を算出
+  const computeDates = useCallback((p: Period, baseDate: Date) => {
+    if (p === 'daily') {
+      return { from: dateStr(baseDate), to: dateStr(baseDate) };
+    } else if (p === 'weekly') {
+      return { from: dateStr(startOfWeek(baseDate)), to: dateStr(endOfWeek(baseDate)) };
+    } else {
+      return { from: dateStr(startOfMonth(baseDate)), to: dateStr(endOfMonth(baseDate)) };
+    }
+  }, []);
+
   // Period change → auto compute dates
   const handlePeriodChange = useCallback((p: Period) => {
     setPeriod(p);
-    const now = new Date();
-    if (p === 'daily') {
-      setDateFrom(dateStr(startOfMonth(now)));
-      setDateTo(dateStr(endOfMonth(now)));
-    } else if (p === 'weekly') {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 12 * 7);
-      setDateFrom(dateStr(startOfWeek(from)));
-      setDateTo(dateStr(now));
+    const { from, to } = computeDates(p, new Date());
+    setDateFrom(from);
+    setDateTo(to);
+  }, [computeDates]);
+
+  // 前へ / 次へ ナビゲーション
+  const navigate = useCallback((direction: -1 | 1) => {
+    const base = new Date(dateFrom);
+    if (period === 'daily') {
+      base.setDate(base.getDate() + direction);
+    } else if (period === 'weekly') {
+      base.setDate(base.getDate() + direction * 7);
     } else {
-      setDateFrom(dateStr(new Date(now.getFullYear(), now.getMonth() - 11, 1)));
-      setDateTo(dateStr(endOfMonth(now)));
+      base.setMonth(base.getMonth() + direction);
     }
-  }, []);
+    const { from, to } = computeDates(period, base);
+    setDateFrom(from);
+    setDateTo(to);
+  }, [dateFrom, period, computeDates]);
+
+  // 日付表示ラベル
+  const dateLabel = useMemo(() => {
+    const from = new Date(dateFrom);
+    if (period === 'daily') {
+      return formatDateLabel(from);
+    } else if (period === 'weekly') {
+      return formatWeekLabel(from, new Date(dateTo));
+    } else {
+      return formatMonthLabel(from);
+    }
+  }, [dateFrom, dateTo, period]);
 
   // Distributor search
   useEffect(() => {
@@ -249,12 +298,22 @@ export default function DistributionAnalyticsPage() {
             ))}
           </div>
 
-          {/* Date range */}
-          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white" />
-          <span className="text-slate-400 text-xs">~</span>
-          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs bg-white" />
+          {/* Date navigation */}
+          <div className="inline-flex items-center gap-1 bg-white border border-slate-200 rounded-lg px-1 py-0.5">
+            <button onClick={() => navigate(-1)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-500 transition-colors">
+              <i className="bi bi-chevron-left text-sm" />
+            </button>
+            {period === 'daily' ? (
+              <input type="date" value={dateFrom}
+                onChange={e => { setDateFrom(e.target.value); setDateTo(e.target.value); }}
+                className="border-0 px-2 py-1 text-xs font-medium text-slate-700 bg-transparent focus:outline-none" />
+            ) : (
+              <span className="px-2 py-1 text-xs font-medium text-slate-700 whitespace-nowrap">{dateLabel}</span>
+            )}
+            <button onClick={() => navigate(1)} className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-slate-100 text-slate-500 transition-colors">
+              <i className="bi bi-chevron-right text-sm" />
+            </button>
+          </div>
 
           {/* Branch */}
           <select value={branchId} onChange={e => setBranchId(e.target.value)}
@@ -296,7 +355,7 @@ export default function DistributionAnalyticsPage() {
           <KpiCard icon="bi-percent" label={t('kpi.distribution_rate')} value={`${kpi.distributionRate}%`} color="bg-indigo-50 text-indigo-600" />
           <KpiCard icon="bi-exclamation-triangle" label={t('kpi.complaint_count')} value={fmt(kpi.complaintCount)} color="bg-amber-50 text-amber-600" />
           <KpiCard icon="bi-shield-x" label={t('kpi.fraud_count')} value={fmt(kpi.fraudCount)} color="bg-red-50 text-red-600" />
-          <KpiCard icon="bi-calendar-check" label={t('kpi.schedules_count')} value={fmt(kpi.schedulesCount)} color="bg-slate-100 text-slate-600" />
+          <KpiCard icon="bi-people" label={t('kpi.schedules_count')} value={fmt(kpi.schedulesCount)} color="bg-slate-100 text-slate-600" />
         </div>
       )}
 
