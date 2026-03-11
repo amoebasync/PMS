@@ -92,6 +92,10 @@
   "price_master_placeholder": "チラシ名\t顧客コード\tチラシコード\t単価",
   "price_master_loading": "単価マスタを読み込み中...",
   "price_master_import_error": "単価マスタの登録に失敗しました",
+  "import_status_label": "インポート時のステータス",
+  "import_status_completed": "完了済み",
+  "import_status_unstarted": "未完了（翌日以降）",
+
   "col_billing_unit_price": "請求単価",
   "price_not_found": "単価未設定",
 

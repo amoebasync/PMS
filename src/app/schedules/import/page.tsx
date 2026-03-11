@@ -60,6 +60,7 @@ export default function DataImportPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [pasteText, setPasteText] = useState('');
+  const [importStatus, setImportStatus] = useState<'COMPLETED' | 'UNSTARTED'>('COMPLETED');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // パートナー案件用
@@ -376,8 +377,8 @@ export default function DataImportPage() {
     const apiUrl = dataType === 'branch' ? '/api/branches/import' : '/api/schedules/import';
 
     const requestBody = dataType === 'partner'
-      ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: parsedData }
-      : parsedData;
+      ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: parsedData, importStatus }
+      : { schedules: parsedData, importStatus };
 
     try {
       const res = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
@@ -621,84 +622,112 @@ export default function DataImportPage() {
       {/* ── プレビュー ── */}
       {parsedData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 bg-slate-50 border-b flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-slate-700">{dataType === 'branch' ? tb('preview_title') : ts('preview_title')}</h3>
-              <p className="text-sm text-slate-500 mt-1">
-                {dataType === 'branch' ? tb('preview_count') : ts('preview_count')}:{' '}
-                <span className={`font-bold ${isPartner ? 'text-purple-600' : isSchedule ? 'text-emerald-600' : 'text-blue-600'}`}>{parsedData.length} {dataType === 'branch' ? tb('preview_unit') : ts('preview_unit')}</span>
-              </p>
+          {/* ヘッダー: 件数 + ステータス選択 + インポートボタン */}
+          <div className="p-4 bg-slate-50 border-b space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-slate-700">{dataType === 'branch' ? tb('preview_title') : ts('preview_title')}</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  {dataType === 'branch' ? tb('preview_count') : ts('preview_count')}:{' '}
+                  <span className={`font-bold ${isPartner ? 'text-purple-600' : isSchedule ? 'text-emerald-600' : 'text-blue-600'}`}>{parsedData.length} {dataType === 'branch' ? tb('preview_unit') : ts('preview_unit')}</span>
+                </p>
+              </div>
+              <button onClick={executeImport} disabled={isImporting} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg font-bold shadow disabled:opacity-50 transition-all whitespace-nowrap">
+                <i className={`bi ${isImporting ? 'bi-arrow-repeat animate-spin' : 'bi-database-add'} mr-1.5`}></i>
+                {isImporting ? (dataType === 'branch' ? tb('btn_registering') : ts('btn_registering')) : (dataType === 'branch' ? tb('btn_register') : ts('btn_register'))}
+              </button>
             </div>
-            <button onClick={executeImport} disabled={isImporting} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-bold shadow disabled:opacity-50 transition-all">
-              {isImporting ? (dataType === 'branch' ? tb('btn_registering') : ts('btn_registering')) : (dataType === 'branch' ? tb('btn_register') : ts('btn_register'))}
-            </button>
+            {dataType !== 'branch' && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 mr-1">{ts('import_status_label')}:</span>
+                <label
+                  className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    importStatus === 'COMPLETED'
+                      ? 'bg-blue-50 border-blue-300 text-blue-700'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <input type="radio" name="importStatus" checked={importStatus === 'COMPLETED'} onChange={() => setImportStatus('COMPLETED')} className="sr-only" />
+                  <i className="bi bi-check-circle-fill"></i> {ts('import_status_completed')}
+                </label>
+                <label
+                  className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                    importStatus === 'UNSTARTED'
+                      ? 'bg-orange-50 border-orange-300 text-orange-700'
+                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <input type="radio" name="importStatus" checked={importStatus === 'UNSTARTED'} onChange={() => setImportStatus('UNSTARTED')} className="sr-only" />
+                  <i className="bi bi-clock"></i> {ts('import_status_unstarted')}
+                </label>
+              </div>
+            )}
           </div>
 
-          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+          <div className="max-h-[500px] overflow-y-auto">
             {dataType !== 'branch' ? (
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-100 text-slate-500 sticky top-0 shadow-sm">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-100 text-slate-500 sticky top-0 shadow-sm text-xs">
                   <tr>
-                    <th className="px-4 py-3">{ts('col_date')}</th>
-                    <th className="px-4 py-3">{ts('col_branch')}</th>
-                    <th className="px-4 py-3">{ts('col_distributor_id')}</th>
-                    <th className="px-4 py-3">{ts('col_area_info')}</th>
-                    <th className="px-4 py-3">{ts('col_area_unit_price')}</th>
-                    <th className="px-4 py-3">{ts('col_size_unit_price')}</th>
-                    {[1,2,3,4,5,6].map(n => (
-                      <th key={n} className="px-4 py-3">チラシ{n}</th>
-                    ))}
-                    {isPartner && <th className="px-4 py-3">{ts('col_billing_unit_price')}</th>}
-                    <th className="px-4 py-3">{ts('col_status')}</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_date')}</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_branch')}</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_distributor_id')}</th>
+                    <th className="px-3 py-2.5">{ts('col_area_info')}</th>
+                    <th className="px-3 py-2.5 text-right whitespace-nowrap">{ts('col_area_unit_price')}</th>
+                    <th className="px-3 py-2.5">{ts('th_flyer')}</th>
+                    {isPartner && <th className="px-3 py-2.5 text-right whitespace-nowrap">{ts('col_billing_unit_price')}</th>}
+                    <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_status')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {parsedData.map((s, idx) => {
-                    const hasActual = s.items?.some((i: any) => i.actualCount !== null && !isNaN(i.actualCount));
-                    const itemsBySlot: Record<number, any> = {};
-                    s.items?.forEach((i: any) => { itemsBySlot[i.slotIndex] = i; });
+                    const activeItems = (s.items || []).filter((i: any) => i.flyerName);
                     return (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="px-4 py-3">{s.date}</td>
-                        <td className="px-4 py-3 font-bold">{s.branchName}</td>
-                        <td className="px-4 py-3 text-slate-500">{s.distributorStaffId}</td>
-                        <td className="px-4 py-3">{s.dbPrefectureName ? `${s.dbPrefectureName}, ` : ''}{s.dbFullAreaName}</td>
-                        <td className="px-4 py-3 text-right">{s.areaUnitPrice != null ? `¥${s.areaUnitPrice.toLocaleString()}` : '-'}</td>
-                        <td className="px-4 py-3 text-right">{s.sizeUnitPrice != null ? `¥${s.sizeUnitPrice.toLocaleString()}` : '-'}</td>
-                        {[1,2,3,4,5,6].map(n => {
-                          const item = itemsBySlot[n];
-                          return (
-                            <td key={n} className="px-4 py-3 text-xs">
-                              {item ? (
-                                <div>
-                                  <div className="font-semibold text-slate-700 truncate max-w-[120px]" title={item.flyerName}>{item.flyerName}</div>
-                                  <div className="text-slate-400">
-                                    {item.plannedCount != null ? `予${item.plannedCount.toLocaleString()}` : ''}
-                                    {item.actualCount != null ? ` / 実${item.actualCount.toLocaleString()}` : ''}
-                                  </div>
+                      <tr key={idx} className="hover:bg-slate-50 align-top">
+                        <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{s.date}</td>
+                        <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{s.branchName}</td>
+                        <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{s.distributorStaffId}</td>
+                        <td className="px-3 py-2.5 max-w-[200px]">
+                          <div className="truncate" title={`${s.dbPrefectureName || ''} ${s.dbFullAreaName || ''}`}>
+                            {s.dbPrefectureName ? <span className="text-slate-400">{s.dbPrefectureName} </span> : ''}{s.dbFullAreaName}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2.5 text-right whitespace-nowrap tabular-nums">{s.areaUnitPrice != null ? `¥${s.areaUnitPrice.toLocaleString()}` : <span className="text-slate-300">-</span>}</td>
+                        <td className="px-3 py-2.5">
+                          {activeItems.length > 0 ? (
+                            <div className="space-y-1">
+                              {activeItems.map((item: any, ii: number) => (
+                                <div key={ii} className="flex items-baseline gap-2 text-xs">
+                                  <span className="font-semibold text-slate-700 truncate max-w-[160px]" title={item.flyerName}>{item.flyerName}</span>
+                                  {(item.plannedCount != null || item.actualCount != null) && (
+                                    <span className="text-slate-400 whitespace-nowrap tabular-nums">
+                                      {item.plannedCount != null ? `${ts('th_planned')}${item.plannedCount.toLocaleString()}` : ''}
+                                      {item.actualCount != null ? ` / ${ts('th_actual')}${item.actualCount.toLocaleString()}` : ''}
+                                    </span>
+                                  )}
                                 </div>
-                              ) : <span className="text-slate-300">-</span>}
-                            </td>
-                          );
-                        })}
+                              ))}
+                            </div>
+                          ) : <span className="text-slate-300 text-xs">-</span>}
+                        </td>
                         {isPartner && (
-                          <td className="px-4 py-3 text-xs">
-                            {s.items?.map((item: any, ii: number) => {
+                          <td className="px-3 py-2.5 text-right">
+                            {activeItems.map((item: any, ii: number) => {
                               const price = lookupPrice(item.flyerName, item.customerCode, item.flyerCode);
                               return (
-                                <div key={ii}>
+                                <div key={ii} className="text-xs whitespace-nowrap">
                                   {price != null
-                                    ? <span className="text-emerald-600 font-semibold">¥{price}</span>
+                                    ? <span className="text-emerald-600 font-semibold tabular-nums">¥{price.toLocaleString()}</span>
                                     : <span className="text-orange-400">{ts('price_not_found')}</span>}
                                 </div>
                               );
                             })}
                           </td>
                         )}
-                        <td className="px-4 py-3">
-                          {hasActual
-                            ? <span className="text-blue-600 font-bold"><i className="bi bi-check-circle-fill"></i> {ts('status_completed')}</span>
-                            : <span className="text-slate-400 font-bold">{ts('status_unstarted')}</span>}
+                        <td className="px-3 py-2.5 whitespace-nowrap">
+                          {importStatus === 'COMPLETED'
+                            ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full"><i className="bi bi-check-circle-fill"></i> {ts('status_completed')}</span>
+                            : <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full"><i className="bi bi-clock"></i> {ts('status_unstarted')}</span>}
                         </td>
                       </tr>
                     );
@@ -706,32 +735,32 @@ export default function DataImportPage() {
                 </tbody>
               </table>
             ) : (
-              <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-slate-100 text-slate-500 sticky top-0 shadow-sm">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-100 text-slate-500 sticky top-0 shadow-sm text-xs">
                   <tr>
-                    <th className="px-4 py-3">{tb('col_name_ja')}</th>
-                    <th className="px-4 py-3">{tb('col_name_en')}</th>
-                    <th className="px-4 py-3">{tb('col_postal_code')}</th>
-                    <th className="px-4 py-3">{tb('col_address')}</th>
-                    <th className="px-4 py-3">{tb('col_manager')}</th>
-                    <th className="px-4 py-3">{tb('col_sub_manager')}</th>
-                    <th className="px-4 py-3">{tb('col_closed_on')}</th>
-                    <th className="px-4 py-3">{tb('col_open_time')}</th>
-                    <th className="px-4 py-3">{tb('col_close_time')}</th>
+                    <th className="px-3 py-2.5">{tb('col_name_ja')}</th>
+                    <th className="px-3 py-2.5">{tb('col_name_en')}</th>
+                    <th className="px-3 py-2.5">{tb('col_postal_code')}</th>
+                    <th className="px-3 py-2.5">{tb('col_address')}</th>
+                    <th className="px-3 py-2.5">{tb('col_manager')}</th>
+                    <th className="px-3 py-2.5">{tb('col_sub_manager')}</th>
+                    <th className="px-3 py-2.5">{tb('col_closed_on')}</th>
+                    <th className="px-3 py-2.5">{tb('col_open_time')}</th>
+                    <th className="px-3 py-2.5">{tb('col_close_time')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {parsedData.map((b, idx) => (
                     <tr key={idx} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-bold">{b.nameJa}</td>
-                      <td className="px-4 py-3">{b.nameEn || '-'}</td>
-                      <td className="px-4 py-3">{b.postalCode || '-'}</td>
-                      <td className="px-4 py-3 max-w-[200px] truncate" title={b.address || ''}>{b.address || '-'}</td>
-                      <td className="px-4 py-3">{b.managerName || '-'}</td>
-                      <td className="px-4 py-3">{b.subManagerName || '-'}</td>
-                      <td className="px-4 py-3">{b.closedDays || '-'}</td>
-                      <td className="px-4 py-3">{b.openTime || '-'}</td>
-                      <td className="px-4 py-3">{b.closeTime || '-'}</td>
+                      <td className="px-3 py-2.5 font-bold">{b.nameJa}</td>
+                      <td className="px-3 py-2.5">{b.nameEn || '-'}</td>
+                      <td className="px-3 py-2.5">{b.postalCode || '-'}</td>
+                      <td className="px-3 py-2.5 max-w-[200px] truncate" title={b.address || ''}>{b.address || '-'}</td>
+                      <td className="px-3 py-2.5">{b.managerName || '-'}</td>
+                      <td className="px-3 py-2.5">{b.subManagerName || '-'}</td>
+                      <td className="px-3 py-2.5">{b.closedDays || '-'}</td>
+                      <td className="px-3 py-2.5">{b.openTime || '-'}</td>
+                      <td className="px-3 py-2.5">{b.closeTime || '-'}</td>
                     </tr>
                   ))}
                 </tbody>

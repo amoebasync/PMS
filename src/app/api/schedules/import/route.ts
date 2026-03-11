@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ScheduleStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 
@@ -23,9 +24,10 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // パートナー案件かどうか判定（配列 = 通常、オブジェクト = パートナー案件）
+    // パートナー案件かどうか判定（配列 = 通常（後方互換）、オブジェクト = 新形式 or パートナー案件）
     const isPartnerImport = !Array.isArray(body) && body.partnerId;
-    const schedules = isPartnerImport ? body.schedules : body;
+    const schedules = Array.isArray(body) ? body : body.schedules;
+    const importStatus = ((!Array.isArray(body) && body.importStatus) || 'COMPLETED') as ScheduleStatus;
     let importedCount = 0;
 
     // ── インポートデータから必要なキーを事前収集（必要なレコードだけ取得するため） ──
@@ -165,7 +167,7 @@ export async function POST(request: Request) {
               areaUnitPrice: s.areaUnitPrice != null ? s.areaUnitPrice : undefined,
               sizeUnitPrice: s.sizeUnitPrice != null ? s.sizeUnitPrice : undefined,
               remarks: s.remarks || undefined,
-              status: 'COMPLETED',
+              status: importStatus,
             }
           });
           return { schedule: created, source: s, distributor, baseDate };
@@ -209,7 +211,7 @@ export async function POST(request: Request) {
           });
         }
 
-        if (s.startTime && distributor) {
+        if (s.startTime && distributor && importStatus === 'COMPLETED') {
           const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
           const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
           pendingSessions.push({

@@ -92,6 +92,10 @@
   "price_master_placeholder": "FlyerName\tCustomerCode\tFlyerCode\tUnitPrice",
   "price_master_loading": "Loading price master...",
   "price_master_import_error": "Failed to import price master",
+  "import_status_label": "Import Status",
+  "import_status_completed": "Completed",
+  "import_status_unstarted": "Not Started (future)",
+
   "col_billing_unit_price": "Billing Unit Price",
   "price_not_found": "Price not set",
 
