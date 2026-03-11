@@ -114,7 +114,10 @@ model Employee {
   personalEmail       String?   @unique @map("personal_email") @db.VarChar(100)
   workspaceNotifiedAt DateTime? @map("workspace_notified_at")
   phone               String?   @db.VarChar(20)
-  
+  postalCode          String?   @map("postal_code") @db.VarChar(8)
+  address             String?   @db.Text
+  buildingName        String?   @map("building_name") @db.VarChar(100)
+
   // ============================
   // ★ 新規追加: 組織・役職・権限情報
   // ============================

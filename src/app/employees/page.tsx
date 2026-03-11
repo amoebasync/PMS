@@ -54,6 +54,9 @@ type Employee = {
   residenceCardVerificationStatus?: string | null;
   residenceCardVerificationResult?: any;
   bankCardImageUrl?: string | null;
+  postalCode?: string | null;
+  address?: string | null;
+  buildingName?: string | null;
 };
 
 const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
@@ -151,6 +154,7 @@ export default function EmployeePage() {
   const initialForm = {
     employeeCode: '', lastNameJa: '', firstNameJa: '', lastNameKana: '', firstNameKana: '',
     lastNameEn: '', firstNameEn: '', email: '', personalEmail: '', phone: '',
+    postalCode: '', address: '', buildingName: '',
     createWorkspaceAccount: false,
     hireDate: new Date().toISOString().split('T')[0], birthday: '', gender: 'unknown' as 'male' | 'female' | 'other' | 'unknown',
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
@@ -302,6 +306,7 @@ export default function EmployeePage() {
         lastNameKana: employee.lastNameKana || '', firstNameKana: employee.firstNameKana || '',
         lastNameEn: employee.lastNameEn || '', firstNameEn: employee.firstNameEn || '',
         email: employee.email, personalEmail: employee.personalEmail || '', phone: employee.phone || '',
+        postalCode: employee.postalCode || '', address: employee.address || '', buildingName: employee.buildingName || '',
         createWorkspaceAccount: false,
         hireDate: employee.hireDate && !isNaN(new Date(employee.hireDate).getTime()) ? new Date(employee.hireDate).toISOString().split('T')[0] : '',
         birthday: employee.birthday && !isNaN(new Date(employee.birthday).getTime()) ? new Date(employee.birthday).toISOString().split('T')[0] : '', 
@@ -981,6 +986,9 @@ export default function EmployeePage() {
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">GENDER</div><div className="text-sm font-bold text-slate-700 capitalize">{selectedEmployee.gender === 'male' ? t('detail_gender_male') : selectedEmployee.gender === 'female' ? t('detail_gender_female') : t('detail_gender_other')}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">PHONE NUMBER</div><div className="flex items-center gap-2 font-mono text-sm font-bold text-slate-700"><i className="bi bi-telephone text-emerald-500"></i>{selectedEmployee.phone || t('detail_phone_not_set')}</div></div>
                 <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-2"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">COUNTRY / LOCATION</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-globe-asia-australia text-indigo-500"></i>{selectedEmployee.country ? `${selectedEmployee.country.name} (${selectedEmployee.country.code})` : t('detail_country_not_set')}</div></div>
+                {(selectedEmployee.postalCode || selectedEmployee.address) && (
+                  <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-1 sm:col-span-3"><div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{t('form_section_address').toUpperCase()}</div><div className="flex items-center gap-2 text-sm font-bold text-slate-700"><i className="bi bi-geo-alt text-rose-500"></i>{[selectedEmployee.postalCode && `〒${selectedEmployee.postalCode}`, selectedEmployee.address, selectedEmployee.buildingName].filter(Boolean).join(' ')}</div></div>
+                )}
               </div>
 
               {canViewSensitiveInfo ? (
@@ -1249,6 +1257,24 @@ export default function EmployeePage() {
                       <i className="bi bi-telephone absolute left-3 top-3 text-slate-400"></i>
                       <input type="tel" name="phone" value={formData.phone} onChange={e => handlePhoneChange(e.target.value, v => setFormData(prev => ({ ...prev, phone: v })))} className={`${inputClass} pl-9`} placeholder="090-1234-5678" maxLength={13} />
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className={sectionClass}>
+                <h4 className={sectionHeaderClass}><i className="bi bi-geo-alt text-blue-600"></i> {t('form_section_address')}</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelClass}>{t('form_postal_code')}</label>
+                    <input name="postalCode" value={formData.postalCode} onChange={handleInputChange} className={inputClass} placeholder="123-4567" maxLength={8} />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className={labelClass}>{t('form_address')}</label>
+                    <input name="address" value={formData.address} onChange={handleInputChange} className={inputClass} />
+                  </div>
+                  <div className="md:col-span-3">
+                    <label className={labelClass}>{t('form_building_name')}</label>
+                    <input name="buildingName" value={formData.buildingName} onChange={handleInputChange} className={inputClass} maxLength={100} />
                   </div>
                 </div>
               </div>
