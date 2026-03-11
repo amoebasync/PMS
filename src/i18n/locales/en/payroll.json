@@ -115,5 +115,13 @@
   "edit_note_label": "Notes",
   "btn_save": "Save",
   "btn_confirm": "Confirm",
-  "btn_mark_paid": "Mark as Paid"
+  "btn_mark_paid": "Mark as Paid",
+  "daily_date": "Date",
+  "daily_type": "Type",
+  "daily_time": "Time",
+  "daily_hours": "Hours",
+  "daily_wage": "Daily Wage",
+  "daily_total": "Total",
+  "daily_no_data": "No attendance data",
+  "daily_loading": "Loading..."
 }

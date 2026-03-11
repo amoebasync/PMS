@@ -23,22 +23,7 @@ interface BranchRow {
   actual: bigint;
 }
 
-interface DistributorRow {
-  distributor_id: number;
-  name: string;
-  staff_id: string | null;
-  branch_name: string | null;
-  planned: bigint;
-  actual: bigint;
-}
-
-interface ComplianceRow {
-  total: bigint;
-  flyer_photo: bigint;
-  app_operation: bigint;
-  gps: bigint;
-  map_photo: bigint;
-}
+// (StaffRow is defined inline in the handler)
 
 // ---------- Helpers ----------
 
@@ -213,89 +198,60 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // ---- Distributor ranking ----
-    const rankingBaseWhere = WHERE;
-    const distributorRows = await prisma.$queryRawUnsafe<DistributorRow[]>(`
+    // ---- Staff list ----
+    interface StaffRow {
+      distributor_id: number;
+      name: string;
+      staff_id: string | null;
+      branch_name: string | null;
+      area_names: string | null;
+      flyer_type_count: bigint;
+      planned: bigint;
+      actual: bigint;
+    }
+
+    const staffRows = await prisma.$queryRawUnsafe<StaffRow[]>(`
       SELECT
         ds.distributor_id,
         fd.name,
         fd.staff_id,
         b.name_ja AS branch_name,
+        GROUP_CONCAT(DISTINCT a.chome_name ORDER BY a.chome_name SEPARATOR ', ') AS area_names,
+        COUNT(DISTINCT di.id) AS flyer_type_count,
         COALESCE(SUM(di.planned_count), 0) AS planned,
         COALESCE(SUM(di.actual_count), 0) AS actual
       FROM distribution_schedules ds
       LEFT JOIN distribution_items di ON di.schedule_id = ds.id
       LEFT JOIN flyer_distributors fd ON fd.id = ds.distributor_id
       LEFT JOIN branches b ON b.id = fd.branch_id
-      WHERE ${rankingBaseWhere} AND ds.distributor_id IS NOT NULL
+      LEFT JOIN areas a ON a.id = ds.area_id
+      WHERE ${WHERE} AND ds.distributor_id IS NOT NULL
       GROUP BY ds.distributor_id, fd.name, fd.staff_id, b.name_ja
       HAVING SUM(di.planned_count) > 0
-      ORDER BY (SUM(di.actual_count) / SUM(di.planned_count)) DESC
+      ORDER BY fd.name ASC
     `);
 
-    // Complaints per distributor
-    const distributorComplaintRows = await prisma.$queryRawUnsafe<{ distributor_id: number; cnt: bigint; fraud_cnt: bigint }[]>(`
-      SELECT
-        c.distributor_id,
-        COUNT(*) AS cnt,
-        SUM(CASE WHEN c.is_fraud = true THEN 1 ELSE 0 END) AS fraud_cnt
-      FROM complaints c
-      WHERE ${CW} AND c.distributor_id IS NOT NULL
-      GROUP BY c.distributor_id
-    `);
-
-    const complaintMap = new Map<number, { complaints: number; frauds: number }>();
-    for (const r of distributorComplaintRows) {
-      complaintMap.set(r.distributor_id, { complaints: Number(r.cnt), frauds: Number(r.fraud_cnt) });
-    }
-
-    const mapDistributor = (r: DistributorRow) => {
+    const staffList = staffRows.map(r => {
       const planned = Number(r.planned);
       const actual = Number(r.actual);
-      const cm = complaintMap.get(r.distributor_id) || { complaints: 0, frauds: 0 };
       return {
         distributorId: r.distributor_id,
         name: r.name || '-',
         staffId: r.staff_id || '-',
         branchName: r.branch_name || '-',
+        areaNames: r.area_names || '-',
+        flyerTypeCount: Number(r.flyer_type_count),
         planned,
         actual,
         rate: planned > 0 ? Math.round((actual / planned) * 1000) / 10 : 0,
-        complaints: cm.complaints,
-        frauds: cm.frauds,
       };
-    };
-
-    const top = distributorRows.slice(0, 5).map(mapDistributor);
-    const worst = [...distributorRows].reverse().slice(0, 5).map(mapDistributor);
-
-    // ---- Compliance ----
-    const complianceRows = await prisma.$queryRawUnsafe<ComplianceRow[]>(`
-      SELECT
-        COUNT(*) AS total,
-        SUM(CASE WHEN ds.check_flyer_photo = true THEN 1 ELSE 0 END) AS flyer_photo,
-        SUM(CASE WHEN ds.check_app_operation = true THEN 1 ELSE 0 END) AS app_operation,
-        SUM(CASE WHEN ds.check_gps = true THEN 1 ELSE 0 END) AS gps,
-        SUM(CASE WHEN ds.check_map_photo = true THEN 1 ELSE 0 END) AS map_photo
-      FROM distribution_schedules ds
-      WHERE ${WHERE}
-    `);
-
-    const cr = complianceRows[0];
-    const compliance = {
-      total: Number(cr?.total ?? 0),
-      flyerPhoto: Number(cr?.flyer_photo ?? 0),
-      appOperation: Number(cr?.app_operation ?? 0),
-      gps: Number(cr?.gps ?? 0),
-      mapPhoto: Number(cr?.map_photo ?? 0),
-    };
+    });
 
     return NextResponse.json({
       kpi,
       trend,
       branchComparison,
-      ranking: { top, worst },
-      compliance,
+      staffList,
     });
   } catch (error) {
     console.error('Distribution analytics error:', error);

@@ -33,32 +33,23 @@ interface BranchItem {
   rate: number;
 }
 
-interface DistributorItem {
+interface StaffItem {
   distributorId: number;
   name: string;
   staffId: string;
   branchName: string;
+  areaNames: string;
+  flyerTypeCount: number;
   planned: number;
   actual: number;
   rate: number;
-  complaints: number;
-  frauds: number;
-}
-
-interface Compliance {
-  total: number;
-  flyerPhoto: number;
-  appOperation: number;
-  gps: number;
-  mapPhoto: number;
 }
 
 interface AnalyticsData {
   kpi: Kpi;
   trend: TrendItem[];
   branchComparison: BranchItem[];
-  ranking: { top: DistributorItem[]; worst: DistributorItem[] };
-  compliance: Compliance;
+  staffList: StaffItem[];
 }
 
 type Period = 'daily' | 'weekly' | 'monthly';
@@ -129,24 +120,6 @@ function KpiCard({ icon, label, value, sub, color }: {
   );
 }
 
-function ProgressBar({ label, value, total }: { label: string; value: number; total: number }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  return (
-    <div className="mb-3 last:mb-0">
-      <div className="flex justify-between text-sm mb-1">
-        <span className="text-slate-600">{label}</span>
-        <span className="font-medium text-slate-800">{pct}% <span className="text-slate-400 text-xs">({fmt(value)}/{fmt(total)})</span></span>
-      </div>
-      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // ---------- Main Page ----------
 
 export default function DistributionAnalyticsPage() {
@@ -162,7 +135,6 @@ export default function DistributionAnalyticsPage() {
   const [branches, setBranches] = useState<{ id: number; nameJa: string }[]>([]);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [rankTab, setRankTab] = useState<'top' | 'worst'>('top');
 
   // Fetch branches on mount
   useEffect(() => {
@@ -359,7 +331,7 @@ export default function DistributionAnalyticsPage() {
         </div>
       )}
 
-      {/* Charts Row 1: Trend + Branch Comparison */}
+      {/* Charts Row: Trend + Branch Comparison */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Trend Chart */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
@@ -419,86 +391,58 @@ export default function DistributionAnalyticsPage() {
         </div>
       </div>
 
-      {/* Charts Row 2: Ranking + Compliance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Ranking Table */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-700">{t('sections.ranking')}</h2>
-            <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5">
-              <button
-                onClick={() => setRankTab('top')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  rankTab === 'top' ? 'bg-green-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {t('ranking.top5')}
-              </button>
-              <button
-                onClick={() => setRankTab('worst')}
-                className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  rankTab === 'worst' ? 'bg-red-600 text-white' : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                {t('ranking.worst5')}
-              </button>
-            </div>
-          </div>
-
-          {(!data?.ranking?.top?.length && !data?.ranking?.worst?.length) ? (
-            <div className="flex items-center justify-center h-40 text-slate-400 text-sm">{t('no_data')}</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-slate-200 text-slate-500">
-                    <th className="py-2 text-left font-medium">#</th>
-                    <th className="py-2 text-left font-medium">{t('ranking.name')}</th>
-                    <th className="py-2 text-left font-medium">{t('ranking.staff_id')}</th>
-                    <th className="py-2 text-left font-medium">{t('ranking.branch')}</th>
-                    <th className="py-2 text-right font-medium">{t('ranking.planned')}</th>
-                    <th className="py-2 text-right font-medium">{t('ranking.actual')}</th>
-                    <th className="py-2 text-right font-medium">{t('ranking.rate')}</th>
-                    <th className="py-2 text-right font-medium">{t('ranking.complaints')}</th>
-                    <th className="py-2 text-right font-medium">{t('ranking.frauds')}</th>
+      {/* Staff List Table */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+        <h2 className="text-sm font-semibold text-slate-700 mb-4">{t('sections.staff_list')}</h2>
+        {!data?.staffList?.length ? (
+          <div className="flex items-center justify-center h-40 text-slate-400 text-sm">{t('no_data')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500">
+                  <th className="py-2.5 text-left font-medium">{t('staff.name')}</th>
+                  <th className="py-2.5 text-left font-medium">{t('staff.branch')}</th>
+                  <th className="py-2.5 text-left font-medium">{t('staff.area')}</th>
+                  <th className="py-2.5 text-right font-medium">{t('staff.flyer_types')}</th>
+                  <th className="py-2.5 text-right font-medium">{t('staff.planned')}</th>
+                  <th className="py-2.5 text-right font-medium">{t('staff.actual')}</th>
+                  <th className="py-2.5 text-right font-medium">{t('staff.rate')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.staffList.map(s => (
+                  <tr key={s.distributorId} className="border-b border-slate-50 hover:bg-slate-50">
+                    <td className="py-2 font-medium text-slate-700">{s.name}</td>
+                    <td className="py-2 text-slate-500">{s.branchName}</td>
+                    <td className="py-2 text-slate-500 max-w-[200px] truncate" title={s.areaNames}>{s.areaNames}</td>
+                    <td className="py-2 text-right">{s.flyerTypeCount}</td>
+                    <td className="py-2 text-right font-mono">{fmt(s.planned)}</td>
+                    <td className="py-2 text-right font-mono">{fmt(s.actual)}</td>
+                    <td className={`py-2 text-right font-medium ${
+                      s.rate >= 95 ? 'text-green-600' : s.rate >= 80 ? 'text-amber-600' : 'text-red-600'
+                    }`}>{s.rate}%</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {(rankTab === 'top' ? data?.ranking?.top : data?.ranking?.worst)?.map((d, i) => (
-                    <tr key={d.distributorId} className="border-b border-slate-50 hover:bg-slate-50">
-                      <td className="py-2 text-slate-400">{i + 1}</td>
-                      <td className="py-2 font-medium text-slate-700">{d.name}</td>
-                      <td className="py-2 text-slate-500">{d.staffId}</td>
-                      <td className="py-2 text-slate-500">{d.branchName}</td>
-                      <td className="py-2 text-right">{fmt(d.planned)}</td>
-                      <td className="py-2 text-right">{fmt(d.actual)}</td>
-                      <td className={`py-2 text-right font-medium ${
-                        d.rate >= 95 ? 'text-green-600' : d.rate >= 80 ? 'text-amber-600' : 'text-red-600'
-                      }`}>{d.rate}%</td>
-                      <td className="py-2 text-right">{d.complaints > 0 ? <span className="text-amber-600">{d.complaints}</span> : '0'}</td>
-                      <td className="py-2 text-right">{d.frauds > 0 ? <span className="text-red-600">{d.frauds}</span> : '0'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Compliance */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
-          <h2 className="text-sm font-semibold text-slate-700 mb-4">{t('sections.compliance')}</h2>
-          {!data?.compliance?.total ? (
-            <div className="flex items-center justify-center h-40 text-slate-400 text-sm">{t('no_data')}</div>
-          ) : (
-            <div className="space-y-1 pt-2">
-              <ProgressBar label={t('compliance_items.flyer_photo')} value={data.compliance.flyerPhoto} total={data.compliance.total} />
-              <ProgressBar label={t('compliance_items.app_operation')} value={data.compliance.appOperation} total={data.compliance.total} />
-              <ProgressBar label={t('compliance_items.gps')} value={data.compliance.gps} total={data.compliance.total} />
-              <ProgressBar label={t('compliance_items.map_photo')} value={data.compliance.mapPhoto} total={data.compliance.total} />
-            </div>
-          )}
-        </div>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-300 font-bold text-slate-700">
+                  <td className="py-2.5" colSpan={3}>{t('staff.total')}</td>
+                  <td className="py-2.5 text-right">{data.staffList.reduce((s, r) => s + r.flyerTypeCount, 0)}</td>
+                  <td className="py-2.5 text-right font-mono">{fmt(data.staffList.reduce((s, r) => s + r.planned, 0))}</td>
+                  <td className="py-2.5 text-right font-mono">{fmt(data.staffList.reduce((s, r) => s + r.actual, 0))}</td>
+                  <td className="py-2.5 text-right font-mono">
+                    {(() => {
+                      const tp = data.staffList.reduce((s, r) => s + r.planned, 0);
+                      const ta = data.staffList.reduce((s, r) => s + r.actual, 0);
+                      return tp > 0 ? `${Math.round((ta / tp) * 1000) / 10}%` : '-';
+                    })()}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Loading overlay */}

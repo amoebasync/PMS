@@ -24,8 +24,7 @@
   "sections": {
     "trend": "Distribution Trend",
     "branch_comparison": "Branch Comparison",
-    "ranking": "Distributor Ranking",
-    "compliance": "Compliance Check Rate"
+    "staff_list": "Staff Performance"
   },
   "chart": {
     "planned": "Planned",
@@ -33,23 +32,15 @@
     "rate": "Dist. Rate (%)",
     "count": "Count"
   },
-  "ranking": {
-    "top5": "Top 5",
-    "worst5": "Worst 5",
-    "name": "Name",
-    "staff_id": "Staff ID",
+  "staff": {
+    "name": "Staff Name",
     "branch": "Branch",
+    "area": "Distribution Area",
+    "flyer_types": "Types",
     "planned": "Planned",
     "actual": "Actual",
     "rate": "Dist. Rate",
-    "complaints": "Complaints",
-    "frauds": "Frauds"
-  },
-  "compliance_items": {
-    "flyer_photo": "Flyer Photo",
-    "app_operation": "App Operation",
-    "gps": "GPS Check",
-    "map_photo": "Map Photo"
+    "total": "Total"
   },
   "no_data": "No data available",
   "loading": "Loading..."

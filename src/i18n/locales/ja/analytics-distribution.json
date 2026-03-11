@@ -24,8 +24,7 @@
   "sections": {
     "trend": "配布推移",
     "branch_comparison": "支店別比較",
-    "ranking": "配布員ランキング",
-    "compliance": "コンプライアンスチェック率"
+    "staff_list": "スタッフ別実績"
   },
   "chart": {
     "planned": "予定",
@@ -33,23 +32,15 @@
     "rate": "配布率(%)",
     "count": "枚数"
   },
-  "ranking": {
-    "top5": "Top 5",
-    "worst5": "Worst 5",
-    "name": "氏名",
-    "staff_id": "スタッフID",
+  "staff": {
+    "name": "スタッフ名",
     "branch": "支店",
+    "area": "配布エリア",
+    "flyer_types": "種類数",
     "planned": "予定",
     "actual": "実績",
     "rate": "配布率",
-    "complaints": "クレーム",
-    "frauds": "不正"
-  },
-  "compliance_items": {
-    "flyer_photo": "チラシ写真",
-    "app_operation": "アプリ操作",
-    "gps": "GPS確認",
-    "map_photo": "地図写真"
+    "total": "合計"
   },
   "no_data": "データがありません",
   "loading": "読み込み中..."

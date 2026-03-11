@@ -54,6 +54,16 @@ type PayrollRecord = {
   };
 };
 
+type DailyRow = {
+  date: string;
+  attendanceType: string;
+  startTime: string | null;
+  endTime: string | null;
+  breakMinutes: number | null;
+  workHours: number;
+  wage: number;
+};
+
 const fmt = (n: number) => `¥${n.toLocaleString()}`;
 
 export default function PayrollPage() {
@@ -74,6 +84,23 @@ export default function PayrollPage() {
   const [editRecord, setEditRecord] = useState<PayrollRecord | null>(null);
   const [editForm, setEditForm] = useState<any>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // 日別展開
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [dailyRows, setDailyRows] = useState<DailyRow[]>([]);
+  const [dailyLoading, setDailyLoading] = useState(false);
+
+  const toggleExpand = async (id: number) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    setDailyLoading(true);
+    try {
+      const res = await fetch(`/api/payroll/${id}/daily`);
+      if (res.ok) setDailyRows(await res.json());
+      else setDailyRows([]);
+    } catch { setDailyRows([]); }
+    setDailyLoading(false);
+  };
 
   // システム設定の週開始曜日を取得して今週の開始日を初期値にセット
   useEffect(() => {
@@ -113,6 +140,9 @@ export default function PayrollPage() {
   };
 
   useEffect(() => { fetchRecords(); }, [cycle, year, month, weekStart, filterStatus]);
+
+  // 展開を閉じる（週・月切替時）
+  useEffect(() => { setExpandedId(null); }, [cycle, year, month, weekStart, filterStatus]);
 
   const handleCalculate = async () => {
     const label = cycle === 'MONTHLY' ? `${year}/${month}` : `${weekStart}~`;
@@ -342,55 +372,124 @@ export default function PayrollPage() {
               const socialTotal = r.healthInsurance + r.pensionInsurance + r.employmentInsurance;
               const statusStyle = STATUS_STYLE[r.status] || '';
               const statusLabelKey = STATUS_LABEL_KEYS[r.status] || r.status;
+              const isExpanded = expandedId === r.id;
               return (
-                <tr key={r.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-3 py-3">
-                    {r.status === 'DRAFT' && (
-                      <input type="checkbox" checked={selectedIds.has(r.id)}
-                        onChange={e => {
-                          const next = new Set(selectedIds);
-                          e.target.checked ? next.add(r.id) : next.delete(r.id);
-                          setSelectedIds(next);
-                        }} className="rounded" />
-                    )}
-                  </td>
-                  <td className="px-3 py-3">
-                    <div className="text-xs font-mono text-slate-400">{r.employee.employeeCode || '-'}</div>
-                    <div className="font-bold text-slate-800">{r.employee.lastNameJa} {r.employee.firstNameJa}</div>
-                    {r.employee.branch && <div className="text-[10px] text-slate-400">{r.employee.branch.nameJa}</div>}
-                  </td>
-                  <td className="px-3 py-3">
-                    <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${EMP_TYPE_COLOR[r.employmentType] || 'bg-slate-50 text-slate-500'}`}>
-                      {t(EMP_TYPE_LABEL_KEYS[r.employmentType] || r.employmentType)}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
-                    {new Date(r.periodStart).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}〜{new Date(r.periodEnd).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{fmt(r.grossPay)}</td>
-                  <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
-                    {r.absentDeduction > 0
-                      ? <span className="text-rose-600">-{fmt(r.absentDeduction)}</span>
-                      : r.totalWorkHours > 0
-                        ? <span className="text-slate-400 text-[10px]">{r.totalWorkHours.toFixed(1)}h</span>
-                        : '-'
-                    }
-                  </td>
-                  <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{socialTotal > 0 ? fmt(socialTotal) : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{r.incomeTax > 0 ? fmt(r.incomeTax) : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{r.residentTax > 0 ? fmt(r.residentTax) : '-'}</td>
-                  <td className="px-3 py-3 text-right font-mono font-black text-indigo-600 whitespace-nowrap">{fmt(r.netPay)}</td>
-                  <td className="px-3 py-3 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusStyle}`}>{t(statusLabelKey)}</span>
-                    {r.holidayWorkDays > 0 && <div className="text-[9px] text-orange-500 mt-0.5">{t('holiday_work_days', { days: r.holidayWorkDays })}</div>}
-                  </td>
-                  <td className="px-3 py-3 text-right whitespace-nowrap">
-                    <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"><i className="bi bi-pencil-square"></i></button>
-                    {r.status === 'DRAFT' && (
-                      <button onClick={() => handleDelete(r.id)} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"><i className="bi bi-trash"></i></button>
-                    )}
-                  </td>
-                </tr>
+                <React.Fragment key={r.id}>
+                  <tr className={`hover:bg-slate-50 transition-colors cursor-pointer ${isExpanded ? 'bg-indigo-50/50' : ''}`}
+                      onClick={() => toggleExpand(r.id)}>
+                    <td className="px-3 py-3" onClick={e => e.stopPropagation()}>
+                      {r.status === 'DRAFT' && (
+                        <input type="checkbox" checked={selectedIds.has(r.id)}
+                          onChange={e => {
+                            const next = new Set(selectedIds);
+                            e.target.checked ? next.add(r.id) : next.delete(r.id);
+                            setSelectedIds(next);
+                          }} className="rounded" />
+                      )}
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <i className={`bi ${isExpanded ? 'bi-chevron-down' : 'bi-chevron-right'} text-slate-400 text-[10px]`}></i>
+                        <div>
+                          <div className="text-xs font-mono text-slate-400">{r.employee.employeeCode || '-'}</div>
+                          <div className="font-bold text-slate-800">{r.employee.lastNameJa} {r.employee.firstNameJa}</div>
+                          {r.employee.branch && <div className="text-[10px] text-slate-400">{r.employee.branch.nameJa}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold ${EMP_TYPE_COLOR[r.employmentType] || 'bg-slate-50 text-slate-500'}`}>
+                        {t(EMP_TYPE_LABEL_KEYS[r.employmentType] || r.employmentType)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-slate-500 whitespace-nowrap">
+                      {new Date(r.periodStart).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}〜{new Date(r.periodEnd).toLocaleDateString('ja-JP', {month:'numeric',day:'numeric', timeZone:'Asia/Tokyo'})}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{fmt(r.grossPay)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {r.absentDeduction > 0
+                        ? <span className="text-rose-600">-{fmt(r.absentDeduction)}</span>
+                        : r.totalWorkHours > 0
+                          ? <span className="text-slate-400 text-[10px]">{r.totalWorkHours.toFixed(1)}h</span>
+                          : '-'
+                      }
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{socialTotal > 0 ? fmt(socialTotal) : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{r.incomeTax > 0 ? fmt(r.incomeTax) : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">{r.residentTax > 0 ? fmt(r.residentTax) : '-'}</td>
+                    <td className="px-3 py-3 text-right font-mono font-black text-indigo-600 whitespace-nowrap">{fmt(r.netPay)}</td>
+                    <td className="px-3 py-3 text-center">
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${statusStyle}`}>{t(statusLabelKey)}</span>
+                      {r.holidayWorkDays > 0 && <div className="text-[9px] text-orange-500 mt-0.5">{t('holiday_work_days', { days: r.holidayWorkDays })}</div>}
+                    </td>
+                    <td className="px-3 py-3 text-right whitespace-nowrap" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => openEdit(r)} className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"><i className="bi bi-pencil-square"></i></button>
+                      {r.status === 'DRAFT' && (
+                        <button onClick={() => handleDelete(r.id)} className="p-1.5 text-slate-400 hover:text-rose-600 transition-colors"><i className="bi bi-trash"></i></button>
+                      )}
+                    </td>
+                  </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={12} className="p-0">
+                        <div className="bg-slate-50 border-t border-b border-slate-200 px-8 py-4">
+                          {dailyLoading ? (
+                            <div className="text-center text-slate-400 text-sm py-3">
+                              <i className="bi bi-arrow-repeat animate-spin mr-1"></i>{t('daily_loading')}
+                            </div>
+                          ) : dailyRows.length === 0 ? (
+                            <div className="text-center text-slate-400 text-sm py-3">{t('daily_no_data')}</div>
+                          ) : (
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-[10px] text-slate-500 uppercase tracking-wider">
+                                  <th className="pb-2 text-left">{t('daily_date')}</th>
+                                  <th className="pb-2 text-left">{t('daily_type')}</th>
+                                  <th className="pb-2 text-center">{t('daily_time')}</th>
+                                  <th className="pb-2 text-right">{t('daily_hours')}</th>
+                                  <th className="pb-2 text-right">{t('daily_wage')}</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-200">
+                                {dailyRows.map((d, i) => {
+                                  const dayNames = ['日','月','火','水','木','金','土'];
+                                  const dateObj = new Date(d.date);
+                                  const dayOfWeek = dayNames[dateObj.getUTCDay()];
+                                  const isWeekend = dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6;
+                                  return (
+                                    <tr key={i} className={isWeekend ? 'text-rose-500' : ''}>
+                                      <td className="py-1.5 font-mono text-xs">
+                                        {dateObj.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric', timeZone:'UTC' })}
+                                        <span className="text-slate-400 ml-1">({dayOfWeek})</span>
+                                      </td>
+                                      <td className="py-1.5 text-xs text-slate-600">{d.attendanceType}</td>
+                                      <td className="py-1.5 text-xs text-center text-slate-500 font-mono">
+                                        {d.startTime && d.endTime ? `${d.startTime}〜${d.endTime}` : '-'}
+                                      </td>
+                                      <td className="py-1.5 text-right font-mono text-xs">{d.workHours.toFixed(1)}h</td>
+                                      <td className="py-1.5 text-right font-mono font-bold text-xs">{fmt(d.wage)}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                              <tfoot>
+                                <tr className="border-t-2 border-slate-300">
+                                  <td colSpan={3} className="pt-2 text-right font-bold text-xs text-slate-600">{t('daily_total')}</td>
+                                  <td className="pt-2 text-right font-mono font-bold text-xs">
+                                    {dailyRows.reduce((s, d) => s + (d.workHours || 0), 0).toFixed(1)}h
+                                  </td>
+                                  <td className="pt-2 text-right font-mono font-black text-indigo-600 text-xs">
+                                    {fmt(dailyRows.reduce((s, d) => s + (d.wage || 0), 0))}
+                                  </td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               );
             })}
           </tbody>

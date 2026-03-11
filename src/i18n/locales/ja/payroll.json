@@ -115,5 +115,13 @@
   "edit_note_label": "備考",
   "btn_save": "保存する",
   "btn_confirm": "確定する",
-  "btn_mark_paid": "支払済にする"
+  "btn_mark_paid": "支払済にする",
+  "daily_date": "日付",
+  "daily_type": "勤怠種別",
+  "daily_time": "時間",
+  "daily_hours": "労働時間",
+  "daily_wage": "日給額",
+  "daily_total": "合計",
+  "daily_no_data": "勤怠データなし",
+  "daily_loading": "読み込み中..."
 }
