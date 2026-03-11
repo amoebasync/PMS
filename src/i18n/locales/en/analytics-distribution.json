@@ -1,0 +1,56 @@
+{
+  "page_title": "Distribution Analytics",
+  "period": {
+    "daily": "Daily",
+    "weekly": "Weekly",
+    "monthly": "Monthly"
+  },
+  "filter": {
+    "from": "From",
+    "to": "To",
+    "branch": "Branch",
+    "all_branches": "All Branches",
+    "distributor_search": "Search distributor...",
+    "all_distributors": "All Distributors"
+  },
+  "kpi": {
+    "total_planned": "Planned",
+    "total_actual": "Actual",
+    "distribution_rate": "Dist. Rate",
+    "complaint_count": "Complaints",
+    "fraud_count": "Frauds",
+    "schedules_count": "Schedules"
+  },
+  "sections": {
+    "trend": "Distribution Trend",
+    "branch_comparison": "Branch Comparison",
+    "ranking": "Distributor Ranking",
+    "compliance": "Compliance Check Rate"
+  },
+  "chart": {
+    "planned": "Planned",
+    "actual": "Actual",
+    "rate": "Dist. Rate (%)",
+    "count": "Count"
+  },
+  "ranking": {
+    "top5": "Top 5",
+    "worst5": "Worst 5",
+    "name": "Name",
+    "staff_id": "Staff ID",
+    "branch": "Branch",
+    "planned": "Planned",
+    "actual": "Actual",
+    "rate": "Dist. Rate",
+    "complaints": "Complaints",
+    "frauds": "Frauds"
+  },
+  "compliance_items": {
+    "flyer_photo": "Flyer Photo",
+    "app_operation": "App Operation",
+    "gps": "GPS Check",
+    "map_photo": "Map Photo"
+  },
+  "no_data": "No data available",
+  "loading": "Loading..."
+}

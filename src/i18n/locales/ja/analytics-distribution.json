@@ -1,0 +1,56 @@
+{
+  "page_title": "配布分析",
+  "period": {
+    "daily": "日別",
+    "weekly": "週別",
+    "monthly": "月別"
+  },
+  "filter": {
+    "from": "開始日",
+    "to": "終了日",
+    "branch": "支店",
+    "all_branches": "全支店",
+    "distributor_search": "配布員検索...",
+    "all_distributors": "全配布員"
+  },
+  "kpi": {
+    "total_planned": "予定枚数",
+    "total_actual": "実績枚数",
+    "distribution_rate": "配布率",
+    "complaint_count": "クレーム件数",
+    "fraud_count": "不正件数",
+    "schedules_count": "配布件数"
+  },
+  "sections": {
+    "trend": "配布推移",
+    "branch_comparison": "支店別比較",
+    "ranking": "配布員ランキング",
+    "compliance": "コンプライアンスチェック率"
+  },
+  "chart": {
+    "planned": "予定",
+    "actual": "実績",
+    "rate": "配布率(%)",
+    "count": "枚数"
+  },
+  "ranking": {
+    "top5": "Top 5",
+    "worst5": "Worst 5",
+    "name": "氏名",
+    "staff_id": "スタッフID",
+    "branch": "支店",
+    "planned": "予定",
+    "actual": "実績",
+    "rate": "配布率",
+    "complaints": "クレーム",
+    "frauds": "不正"
+  },
+  "compliance_items": {
+    "flyer_photo": "チラシ写真",
+    "app_operation": "アプリ操作",
+    "gps": "GPS確認",
+    "map_photo": "地図写真"
+  },
+  "no_data": "データがありません",
+  "loading": "読み込み中..."
+}

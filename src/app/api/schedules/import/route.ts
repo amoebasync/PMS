@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { ScheduleStatus } from '@prisma/client';
+import { Prisma, ScheduleStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 
 
@@ -28,7 +28,10 @@ export async function POST(request: Request) {
     const isPartnerImport = !Array.isArray(body) && body.partnerId;
     const schedules = Array.isArray(body) ? body : body.schedules;
     const importStatus = ((!Array.isArray(body) && body.importStatus) || 'COMPLETED') as ScheduleStatus;
-    let importedCount = 0;
+
+    if (!schedules || schedules.length === 0) {
+      return NextResponse.json({ success: true, count: 0, newDistributorCount: 0 });
+    }
 
     // ── インポートデータから必要なキーを事前収集（必要なレコードだけ取得するため） ──
     const uniqueAreaCodes = new Set<string>();
@@ -88,32 +91,10 @@ export async function POST(request: Request) {
       });
     }
 
-    // パートナー案件時: 受注を自動作成
-    let createdOrder: { id: number; orderNo: string } | null = null;
-    if (isPartnerImport) {
-      const orderNo = `ORD-${Date.now()}`;
-      createdOrder = await prisma.order.create({
-        data: {
-          orderNo,
-          title: body.orderTitle || null,
-          orderSource: 'PARTNER_IMPORT',
-          partnerId: body.partnerId,
-          orderDate: new Date(),
-          status: 'COMPLETED',
-        },
-        select: { id: true, orderNo: true },
-      });
-    }
-
-    // インポート中に新規作成した配布員をキャッシュ（同一staffIdの重複作成防止）
+    // ── 新規配布員の事前一括作成 ──
     const newDistributorCache = new Map<string, { id: number }>();
     let newDistributorCount = 0;
 
-    // ── スケジュールをバッチ作成（20件ずつ並列） ──
-    const allItemsData: any[] = [];
-    const pendingSessions: { scheduleId: number; distributorId: number; startedAt: Date; finishedAt: Date | null; milestones: { count: number; time: string | null }[]; dateStr: string }[] = [];
-
-    // 新規配布員の事前一括作成（ループ内のawaitを削減）
     const staffIdsToCreate: { staffId: string; name: string; branchId: number | null }[] = [];
     for (const s of schedules) {
       if (s.distributorStaffId && !distributorMap.has(String(s.distributorStaffId))) {
@@ -130,52 +111,85 @@ export async function POST(request: Request) {
         }
       }
     }
-    // 新規配布員を一括作成
-    for (const sd of staffIdsToCreate) {
-      const newDist = await prisma.flyerDistributor.create({
-        data: sd,
+
+    // 新規配布員を一括作成 → findManyでID取得（createManyはMySQLでIDを返さないため）
+    if (staffIdsToCreate.length > 0) {
+      await prisma.flyerDistributor.createMany({
+        data: staffIdsToCreate,
+        skipDuplicates: true,
+      });
+      const newDists = await prisma.flyerDistributor.findMany({
+        where: { staffId: { in: staffIdsToCreate.map(s => s.staffId) } },
         select: { id: true, staffId: true },
       });
-      newDistributorCache.set(sd.staffId, newDist);
-      newDistributorCount++;
+      for (const nd of newDists) {
+        newDistributorCache.set(String(nd.staffId), { id: nd.id });
+      }
+      newDistributorCount = newDists.length;
     }
 
-    // スケジュールを20件ずつバッチ処理
-    const BATCH_SIZE = 20;
-    for (let i = 0; i < schedules.length; i += BATCH_SIZE) {
-      const batch = schedules.slice(i, i + BATCH_SIZE);
-      const createdSchedules = await Promise.all(
-        batch.map(async (s: any) => {
-          const branch = s.branchName
-            ? branches.find(b => b.nameJa.includes(s.branchName) || s.branchName.includes(b.nameJa))
-            : null;
-          const distributor = s.distributorStaffId
-            ? (distributorMap.get(String(s.distributorStaffId)) || newDistributorCache.get(String(s.distributorStaffId)) || null)
-            : null;
-          const city = s.cityName ? cityMap.get(String(s.cityName)) || null : null;
-          const area = s.areaCode ? areaMap.get(String(s.areaCode)) || null : null;
-          const baseDate = s.date ? new Date(s.date) : null;
+    // ── トランザクションで一括挿入（bulk INSERT + LAST_INSERT_ID） ──
+    const result = await prisma.$transaction(async (tx) => {
+      // パートナー案件時: 受注を自動作成（トランザクション内）
+      let createdOrder: { id: number; orderNo: string } | null = null;
+      if (isPartnerImport) {
+        const orderNo = `ORD-${Date.now()}`;
+        createdOrder = await tx.order.create({
+          data: {
+            orderNo,
+            title: body.orderTitle || null,
+            orderSource: 'PARTNER_IMPORT',
+            partnerId: body.partnerId,
+            orderDate: new Date(),
+            status: 'COMPLETED',
+          },
+          select: { id: true, orderNo: true },
+        });
+      }
 
-          const created = await prisma.distributionSchedule.create({
-            data: {
-              jobNumber: s.jobNumber,
-              date: baseDate,
-              distributorId: distributor?.id || null,
-              branchId: branch?.id || null,
-              cityId: city?.id || null,
-              areaId: area?.id || null,
-              areaUnitPrice: s.areaUnitPrice != null ? s.areaUnitPrice : undefined,
-              sizeUnitPrice: s.sizeUnitPrice != null ? s.sizeUnitPrice : undefined,
-              remarks: s.remarks || undefined,
-              status: importStatus,
-            }
-          });
-          return { schedule: created, source: s, distributor, baseDate };
-        })
+      // スケジュールデータを事前準備
+      const prepared = schedules.map((s: any) => {
+        const branch = s.branchName
+          ? branches.find(b => b.nameJa.includes(s.branchName) || s.branchName.includes(b.nameJa))
+          : null;
+        const distributor = s.distributorStaffId
+          ? (distributorMap.get(String(s.distributorStaffId)) || newDistributorCache.get(String(s.distributorStaffId)) || null)
+          : null;
+        const city = s.cityName ? cityMap.get(String(s.cityName)) || null : null;
+        const area = s.areaCode ? areaMap.get(String(s.areaCode)) || null : null;
+        const baseDate = s.date ? new Date(s.date) : null;
+        return { source: s, branch, distributor, city, area, baseDate };
+      });
+
+      // ── スケジュール bulk INSERT ──
+      const schedValues = prepared.map(p =>
+        Prisma.sql`(${p.source.jobNumber || null}, ${p.baseDate}, ${p.distributor?.id ?? null}, ${p.branch?.id ?? null}, ${p.city?.id ?? null}, ${p.area?.id ?? null}, ${p.source.areaUnitPrice != null ? Number(p.source.areaUnitPrice) : null}, ${p.source.sizeUnitPrice != null ? Number(p.source.sizeUnitPrice) : null}, ${p.source.remarks || null}, ${importStatus}, NOW(), NOW())`
       );
 
-      // バッチ結果からアイテムとセッションデータを収集
-      for (const { schedule, source: s, distributor, baseDate } of createdSchedules) {
+      await tx.$executeRaw(Prisma.sql`
+        INSERT INTO distribution_schedules (job_number, \`date\`, distributor_id, branch_id, city_id, area_id, area_unit_price, size_unit_price, remarks, status, created_at, updated_at)
+        VALUES ${Prisma.join(schedValues)}
+      `);
+
+      // LAST_INSERT_ID() で先頭IDを取得 → auto_increment連番でマッピング
+      const [{ fid }] = await tx.$queryRaw<[{ fid: bigint }]>(
+        Prisma.sql`SELECT LAST_INSERT_ID() AS fid`
+      );
+      const firstScheduleId = Number(fid);
+
+      // ── アイテム・セッションデータを収集 ──
+      const allItemsData: any[] = [];
+      const sessionPrep: {
+        scheduleId: number; distributorId: number;
+        startedAt: Date; finishedAt: Date | null;
+        milestones: { count: number; time: string | null }[];
+        dateStr: string;
+      }[] = [];
+
+      for (let i = 0; i < prepared.length; i++) {
+        const scheduleId = firstScheduleId + i;
+        const { source: s, distributor, baseDate } = prepared[i];
+
         for (const item of s.items || []) {
           const customer = item.customerCode ? customerMap.get(String(item.customerCode)) || null : null;
 
@@ -195,7 +209,7 @@ export async function POST(request: Request) {
           }
 
           allItemsData.push({
-            scheduleId: schedule.id,
+            scheduleId,
             slotIndex: item.slotIndex,
             flyerName: item.flyerName,
             flyerCode: item.flyerCode,
@@ -214,8 +228,8 @@ export async function POST(request: Request) {
         if (s.startTime && distributor && importStatus === 'COMPLETED') {
           const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
           const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
-          pendingSessions.push({
-            scheduleId: schedule.id,
+          sessionPrep.push({
+            scheduleId,
             distributorId: distributor.id,
             startedAt,
             finishedAt,
@@ -225,62 +239,54 @@ export async function POST(request: Request) {
         }
       }
 
-      importedCount += createdSchedules.length;
-    }
+      // ── DistributionItem 一括作成 ──
+      if (allItemsData.length > 0) {
+        await tx.distributionItem.createMany({ data: allItemsData });
+      }
 
-    // ── 一括挿入フェーズ ──
-
-    // DistributionItem を一括作成
-    if (allItemsData.length > 0) {
-      await prisma.distributionItem.createMany({ data: allItemsData });
-    }
-
-    // DistributionSession を20件ずつ並列作成 + ProgressEvent を一括作成
-    if (pendingSessions.length > 0) {
-      const allProgressData: any[] = [];
-
-      for (let i = 0; i < pendingSessions.length; i += BATCH_SIZE) {
-        const batch = pendingSessions.slice(i, i + BATCH_SIZE);
-        const sessions = await Promise.all(
-          batch.map(sess =>
-            prisma.distributionSession.create({
-              data: {
-                scheduleId: sess.scheduleId,
-                distributorId: sess.distributorId,
-                startedAt: sess.startedAt,
-                finishedAt: sess.finishedAt,
-              },
-              select: { id: true },
-            })
-          )
+      // ── DistributionSession bulk INSERT + ProgressEvent 一括作成 ──
+      if (sessionPrep.length > 0) {
+        const sessValues = sessionPrep.map(s =>
+          Prisma.sql`(${s.scheduleId}, ${s.distributorId}, ${s.startedAt}, ${s.finishedAt}, NOW(), NOW())`
         );
 
-        sessions.forEach((session, idx) => {
-          const sess = batch[idx];
-          if (sess.milestones && Array.isArray(sess.milestones)) {
-            for (const m of sess.milestones) {
-              if (m.time) {
-                allProgressData.push({
-                  sessionId: session.id,
-                  mailboxCount: m.count,
-                  timestamp: new Date(`${sess.dateStr}T${m.time}:00+09:00`),
-                });
-              }
+        await tx.$executeRaw(Prisma.sql`
+          INSERT INTO distribution_sessions (schedule_id, distributor_id, started_at, finished_at, created_at, updated_at)
+          VALUES ${Prisma.join(sessValues)}
+        `);
+
+        const [{ fid: firstSessId }] = await tx.$queryRaw<[{ fid: bigint }]>(
+          Prisma.sql`SELECT LAST_INSERT_ID() AS fid`
+        );
+        const firstSessionId = Number(firstSessId);
+
+        const allProgressData: any[] = [];
+        for (let i = 0; i < sessionPrep.length; i++) {
+          const sessionId = firstSessionId + i;
+          for (const m of sessionPrep[i].milestones) {
+            if (m.time) {
+              allProgressData.push({
+                sessionId,
+                mailboxCount: m.count,
+                timestamp: new Date(`${sessionPrep[i].dateStr}T${m.time}:00+09:00`),
+              });
             }
           }
-        });
+        }
+
+        if (allProgressData.length > 0) {
+          await tx.progressEvent.createMany({ data: allProgressData });
+        }
       }
 
-      if (allProgressData.length > 0) {
-        await prisma.progressEvent.createMany({ data: allProgressData });
-      }
-    }
+      return { importedCount: prepared.length, createdOrder };
+    }, { timeout: 120000 }); // 2分タイムアウト
 
     return NextResponse.json({
       success: true,
-      count: importedCount,
+      count: result.importedCount,
       newDistributorCount,
-      ...(createdOrder ? { orderNo: createdOrder.orderNo, orderId: createdOrder.id } : {}),
+      ...(result.createdOrder ? { orderNo: result.createdOrder.orderNo, orderId: result.createdOrder.id } : {}),
     });
   } catch (error) {
     console.error('Import Error:', error);
