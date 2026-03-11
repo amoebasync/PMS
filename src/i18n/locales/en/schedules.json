@@ -93,5 +93,13 @@
   "price_master_loading": "Loading price master...",
   "price_master_import_error": "Failed to import price master",
   "col_billing_unit_price": "Billing Unit Price",
-  "price_not_found": "Price not set"
+  "price_not_found": "Price not set",
+
+  "th_compliance": "Check",
+  "compliance_flyer_photo": "Flyer Photo Sent",
+  "compliance_app_operation": "App Operation",
+  "compliance_gps": "GPS Confirmed",
+  "compliance_map_photo": "Map Photo Sent",
+  "compliance_checked_by": "Checked by",
+  "compliance_checked_at": "Checked at"
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,10 +15,74 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (body.status !== undefined) data.status = body.status;
     if (body.date !== undefined) data.date = new Date(body.date);
 
+    // コンプライアンスチェックフィールド
+    const checkFields = ['checkFlyerPhoto', 'checkAppOperation', 'checkGps', 'checkMapPhoto'] as const;
+    let hasCheckChange = false;
+    for (const field of checkFields) {
+      if (body[field] !== undefined) {
+        data[field] = Boolean(body[field]);
+        hasCheckChange = true;
+      }
+    }
+
+    // チェック変更があれば確認者と日時を自動設定
+    if (hasCheckChange) {
+      try {
+        const { actorId } = await getAdminActorInfo();
+        data.checkedById = actorId;
+        data.checkedAt = new Date();
+      } catch {
+        // 認証情報取得失敗時もチェック更新は続行
+      }
+    }
+
+    const scheduleId = parseInt(id);
+
+    // 監査ログ用のbefore取得（チェック変更時のみ）
+    let beforeData = null;
+    if (hasCheckChange) {
+      beforeData = await prisma.distributionSchedule.findUnique({
+        where: { id: scheduleId },
+        select: { checkFlyerPhoto: true, checkAppOperation: true, checkGps: true, checkMapPhoto: true, checkedById: true, checkedAt: true }
+      });
+    }
+
     const updatedSchedule = await prisma.distributionSchedule.update({
-      where: { id: parseInt(id) },
-      data
+      where: { id: scheduleId },
+      data,
+      include: {
+        checkedBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+      }
     });
+
+    // 監査ログ記録（チェック変更時のみ）
+    if (hasCheckChange && beforeData) {
+      try {
+        const { actorId, actorName } = await getAdminActorInfo();
+        const ip = getIpAddress(request);
+        await writeAuditLog({
+          actorType: 'EMPLOYEE',
+          action: 'UPDATE',
+          targetModel: 'DistributionSchedule',
+          targetId: scheduleId,
+          actorId,
+          actorName,
+          ipAddress: ip,
+          beforeData,
+          afterData: {
+            checkFlyerPhoto: updatedSchedule.checkFlyerPhoto,
+            checkAppOperation: updatedSchedule.checkAppOperation,
+            checkGps: updatedSchedule.checkGps,
+            checkMapPhoto: updatedSchedule.checkMapPhoto,
+            checkedById: updatedSchedule.checkedById,
+            checkedAt: updatedSchedule.checkedAt,
+          },
+        });
+      } catch (e) {
+        console.error('Failed to write audit log:', e);
+      }
+    }
+
     return NextResponse.json(updatedSchedule);
   } catch (error) {
     console.error('Failed to update schedule:', error);

@@ -93,5 +93,13 @@
   "price_master_loading": "単価マスタを読み込み中...",
   "price_master_import_error": "単価マスタの登録に失敗しました",
   "col_billing_unit_price": "請求単価",
-  "price_not_found": "単価未設定"
+  "price_not_found": "単価未設定",
+
+  "th_compliance": "チェック",
+  "compliance_flyer_photo": "チラシ写真送信",
+  "compliance_app_operation": "アプリ操作確認",
+  "compliance_gps": "GPS確認",
+  "compliance_map_photo": "地図写真送信",
+  "compliance_checked_by": "確認者",
+  "compliance_checked_at": "確認日時"
 }

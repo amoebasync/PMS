@@ -229,6 +229,7 @@ model Employee {
 
   // パートナーインシデント解決
   resolvedPartnerIncidents    PartnerIncident[] @relation("PartnerIncidentResolver")
+  complianceChecks            DistributionSchedule[] @relation("ComplianceChecker")
 
   @@map("employees")
 }
@@ -843,6 +844,15 @@ model DistributionSchedule {
   areaUnitPrice Float?  @map("area_unit_price") // エリア単価
   sizeUnitPrice Float?  @map("size_unit_price") // サイズ単価
   remarks       String? @db.Text // 備考
+
+  // コンプライアンスチェック
+  checkFlyerPhoto   Boolean   @default(false) @map("check_flyer_photo")
+  checkAppOperation Boolean   @default(false) @map("check_app_operation")
+  checkGps          Boolean   @default(false) @map("check_gps")
+  checkMapPhoto     Boolean   @default(false) @map("check_map_photo")
+  checkedById       Int?      @map("checked_by_id")
+  checkedAt         DateTime? @map("checked_at")
+  checkedBy         Employee? @relation("ComplianceChecker", fields: [checkedById], references: [id])
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")

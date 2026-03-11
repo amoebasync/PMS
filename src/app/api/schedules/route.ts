@@ -42,6 +42,7 @@ export async function GET(request: Request) {
           include: { flyer: { include: { size: true } } }
         },
         session: { select: { id: true, startedAt: true, finishedAt: true } },
+        checkedBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
       },
       orderBy: { createdAt: 'desc' }
     });

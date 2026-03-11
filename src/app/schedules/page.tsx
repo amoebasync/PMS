@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
 
@@ -19,17 +19,91 @@ const getTodayStr = () => {
 const formatAreaName = (town?: string | null, chome?: string | null) => {
   const t = town || '';
   const c = chome || '';
-  
+
   if (!t && !c) return '-';
   if (t === c) return c; // 「富久町 富久町」なら「富久町」のみ
   if (c.includes(t)) return c; // 「西新宿」と「西新宿１丁目」なら「西新宿１丁目」のみ
-  
+
   // 「岩本町二丁目」と「岩本町２丁目」のような漢数字/算用数字の違いを吸収
-  const baseTown = t.replace(/[一二三四五六七八九十]+丁目$/, ''); 
+  const baseTown = t.replace(/[一二三四五六七八九十]+丁目$/, '');
   if (baseTown && c.includes(baseTown)) return c;
 
   return t && c ? `${t} ${c}` : (c || t); // 「神田」と「１丁目」のように全く違う場合は繋げる
 };
+
+// コンプライアンスチェック数を計算
+const getCheckCount = (s: any) => {
+  return (s.checkFlyerPhoto ? 1 : 0) + (s.checkAppOperation ? 1 : 0) + (s.checkGps ? 1 : 0) + (s.checkMapPhoto ? 1 : 0);
+};
+
+// コンプライアンスバッジの色
+const getCheckBadgeClass = (count: number) => {
+  if (count === 0) return 'bg-slate-100 text-slate-500';
+  if (count === 4) return 'bg-emerald-100 text-emerald-700';
+  return 'bg-amber-100 text-amber-700';
+};
+
+function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate: (updated: any) => void; t: (key: string) => string }) {
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const checks = [
+    { key: 'checkFlyerPhoto', icon: 'bi-camera', label: t('compliance_flyer_photo') },
+    { key: 'checkAppOperation', icon: 'bi-phone', label: t('compliance_app_operation') },
+    { key: 'checkGps', icon: 'bi-geo-alt', label: t('compliance_gps') },
+    { key: 'checkMapPhoto', icon: 'bi-map', label: t('compliance_map_photo') },
+  ];
+
+  const toggleCheck = useCallback(async (field: string) => {
+    const newValue = !schedule[field];
+    setSaving(field);
+    try {
+      const res = await fetch(`/api/schedules/${schedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: newValue }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onUpdate(data);
+      }
+    } catch {
+      // silent fail
+    }
+    setSaving(null);
+  }, [schedule, onUpdate]);
+
+  return (
+    <div ref={popoverRef} className="w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
+      {checks.map(({ key, icon, label }) => (
+        <label key={key} className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
+          <input
+            type="checkbox"
+            checked={!!schedule[key]}
+            onChange={() => toggleCheck(key)}
+            disabled={saving === key}
+            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
+          />
+          <i className={`bi ${icon} text-slate-500 text-sm`}></i>
+          <span className="text-xs text-slate-700 flex-1">{label}</span>
+          {saving === key && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
+        </label>
+      ))}
+      {schedule.checkedBy && (
+        <div className="border-t border-slate-100 pt-2 mt-1 px-2 space-y-0.5">
+          <div className="text-[10px] text-slate-400">
+            {t('compliance_checked_by')}: <span className="text-slate-600">{schedule.checkedBy.lastNameJa} {schedule.checkedBy.firstNameJa}</span>
+          </div>
+          {schedule.checkedAt && (
+            <div className="text-[10px] text-slate-400">
+              {t('compliance_checked_at')}: <span className="text-slate-600">{new Date(schedule.checkedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ScheduleListPage() {
   const { t } = useTranslation('schedules');
@@ -44,6 +118,20 @@ export default function ScheduleListPage() {
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [remarksInput, setRemarksInput] = useState('');
   const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(null);
+  const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
+  const popoverContainerRef = useRef<HTMLDivElement>(null);
+
+  // ポップオーバー外クリックで閉じる
+  useEffect(() => {
+    if (compliancePopoverId === null) return;
+    const handler = (e: MouseEvent) => {
+      if (popoverContainerRef.current && !popoverContainerRef.current.contains(e.target as Node)) {
+        setCompliancePopoverId(null);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [compliancePopoverId]);
 
   const fetchSchedules = async (dateStr: string) => {
     setIsLoading(true);
@@ -74,7 +162,7 @@ export default function ScheduleListPage() {
         body: JSON.stringify({ remarks: remarksInput })
       });
       if (res.ok) {
-        setSchedules(prev => prev.map(s => 
+        setSchedules(prev => prev.map(s =>
           s.id === editingSchedule.id ? { ...s, remarks: remarksInput } : s
         ));
         setEditingSchedule(null);
@@ -86,22 +174,30 @@ export default function ScheduleListPage() {
     }
   };
 
+  const handleComplianceUpdate = useCallback((updated: any) => {
+    setSchedules(prev => prev.map(s =>
+      s.id === updated.id
+        ? { ...s, checkFlyerPhoto: updated.checkFlyerPhoto, checkAppOperation: updated.checkAppOperation, checkGps: updated.checkGps, checkMapPhoto: updated.checkMapPhoto, checkedBy: updated.checkedBy, checkedAt: updated.checkedAt, checkedById: updated.checkedById }
+        : s
+    ));
+  }, []);
+
   const filteredSchedules = schedules.filter(s => {
     if (filterStatus !== 'ALL' && s.status !== filterStatus) return false;
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       const flyerNames = s.items.map((i:any) => i.flyerName).join(' ');
-      
+
       const searchTarget = `
-        ${s.distributor?.name || ''} 
+        ${s.distributor?.name || ''}
         ${s.distributor?.staffId || ''}
-        ${s.city?.name || s.area?.city?.name || ''} 
-        ${s.area?.town_name || ''} 
-        ${s.area?.chome_name || ''} 
+        ${s.city?.name || s.area?.city?.name || ''}
+        ${s.area?.town_name || ''}
+        ${s.area?.chome_name || ''}
         ${flyerNames}
       `.toLowerCase();
-      
+
       if (!searchTarget.includes(q)) return false;
     }
     return true;
@@ -173,6 +269,7 @@ export default function ScheduleListPage() {
             <thead className="bg-slate-100 text-slate-600 sticky top-0 z-20 shadow-sm">
               <tr>
                 <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 z-30 sticky left-0 text-center">{t('th_status')}</th>
+                <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 text-center">{t('th_compliance')}</th>
                 <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">{t('th_branch')}</th>
                 <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[100px]">{t('th_staff_code')}</th>
                 <th rowSpan={2} className="border border-slate-200 px-3 py-2 bg-slate-100 min-w-[150px]">{t('th_staff_name')}</th>
@@ -208,7 +305,7 @@ export default function ScheduleListPage() {
             <tbody className="bg-white">
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={43} className="px-6 py-10 text-center text-slate-500">
+                  <td colSpan={44} className="px-6 py-10 text-center text-slate-500">
                     {t('no_results')}
                   </td>
                 </tr>
@@ -219,6 +316,7 @@ export default function ScheduleListPage() {
                 const cityName = s.city?.name || s.area?.city?.name || '-';
                 // ★ 新しく作った関数で重複を排除したエリア名を取得
                 const displayAreaName = formatAreaName(s.area?.town_name, s.area?.chome_name);
+                const checkCount = getCheckCount(s);
 
                 return (
                   <tr key={s.id} className="hover:bg-indigo-50/30 transition-colors border-b border-slate-100">
@@ -227,6 +325,22 @@ export default function ScheduleListPage() {
                        s.status === 'DISTRIBUTING' ? <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{t('status_distributing')}</span> :
                        s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-1 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">{t('status_in_progress')}</span> :
                        <span className="inline-block px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-bold">{t('status_unstarted')}</span>}
+                    </td>
+
+                    {/* コンプライアンスチェック列 */}
+                    <td className="border border-slate-200 px-2 py-2 text-center relative">
+                      <button
+                        onClick={() => setCompliancePopoverId(compliancePopoverId === s.id ? null : s.id)}
+                        className={`inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-colors hover:opacity-80 ${getCheckBadgeClass(checkCount)}`}
+                      >
+                        <i className="bi bi-check2-square text-xs"></i>
+                        {checkCount}/4
+                      </button>
+                      {compliancePopoverId === s.id && (
+                        <div ref={popoverContainerRef} className="absolute top-full left-1/2 -translate-x-1/2 mt-1 z-50">
+                          <CompliancePopover schedule={s} onUpdate={handleComplianceUpdate} t={t} />
+                        </div>
+                      )}
                     </td>
 
                     <td className="border border-slate-200 px-3 py-2 font-bold text-slate-700">{s.branch?.nameJa || '-'}</td>
@@ -306,16 +420,20 @@ export default function ScheduleListPage() {
             const activeFlyers = flyers.filter((f: any) => f !== null);
             const cityName = s.city?.name || s.area?.city?.name || '-';
             const displayAreaName = formatAreaName(s.area?.town_name, s.area?.chome_name);
+            const checkCount = getCheckCount(s);
 
             return (
               <div key={s.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5">
-                {/* Row 1: Status + Distributor name + action buttons */}
+                {/* Row 1: Status + Compliance + Distributor name + action buttons */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
                     {s.status === 'COMPLETED' ? <span className="inline-block px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold shrink-0">{t('status_completed')}</span> :
                      s.status === 'DISTRIBUTING' ? <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold shrink-0"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{t('status_distributing')}</span> :
                      s.status === 'IN_PROGRESS' ? <span className="inline-block px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold shrink-0">{t('status_in_progress')}</span> :
                      <span className="inline-block px-2 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-bold shrink-0">{t('status_unstarted')}</span>}
+                    <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${getCheckBadgeClass(checkCount)}`}>
+                      <i className="bi bi-check2-square text-[10px]"></i>{checkCount}/4
+                    </span>
                     <span className="font-bold text-sm text-slate-800 truncate">{s.distributor?.name || '-'}</span>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
@@ -369,6 +487,40 @@ export default function ScheduleListPage() {
                     ))}
                   </div>
                 )}
+
+                {/* Row 5: Compliance checklist (inline for mobile) */}
+                <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-slate-100">
+                  {[
+                    { key: 'checkFlyerPhoto', icon: 'bi-camera', label: t('compliance_flyer_photo') },
+                    { key: 'checkAppOperation', icon: 'bi-phone', label: t('compliance_app_operation') },
+                    { key: 'checkGps', icon: 'bi-geo-alt', label: t('compliance_gps') },
+                    { key: 'checkMapPhoto', icon: 'bi-map', label: t('compliance_map_photo') },
+                  ].map(({ key, icon, label }) => (
+                    <label key={key} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={!!s[key]}
+                        onChange={async () => {
+                          const newValue = !s[key];
+                          try {
+                            const res = await fetch(`/api/schedules/${s.id}`, {
+                              method: 'PATCH',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ [key]: newValue }),
+                            });
+                            if (res.ok) {
+                              const data = await res.json();
+                              handleComplianceUpdate(data);
+                            }
+                          } catch {}
+                        }}
+                        className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 accent-indigo-600"
+                      />
+                      <i className={`bi ${icon} text-slate-400 text-[10px]`}></i>
+                      <span className="text-[10px] text-slate-600">{label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             );
           })}
@@ -384,12 +536,12 @@ export default function ScheduleListPage() {
             </div>
             <div className="p-4 md:p-6 flex-1 md:flex-none overflow-auto">
               <p className="text-sm text-slate-500 mb-2">
-                <span className="font-bold text-slate-700">{editingSchedule.distributor?.name}</span> さんの 
+                <span className="font-bold text-slate-700">{editingSchedule.distributor?.name}</span> さんの
                 <span className="font-bold text-slate-700 ml-1">
                   {formatAreaName(editingSchedule.area?.town_name, editingSchedule.area?.chome_name)}
                 </span> でのスケジュールに対する備考
               </p>
-              <textarea 
+              <textarea
                 value={remarksInput}
                 onChange={(e) => setRemarksInput(e.target.value)}
                 className="w-full h-32 border border-slate-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
