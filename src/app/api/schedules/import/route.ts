@@ -64,9 +64,15 @@ export async function POST(request: Request) {
     const newDistributorCache = new Map<string, { id: number }>();
     let newDistributorCount = 0;
 
+    // バッチ用の配列: アイテムとプログレスイベントをまとめて createMany で一括挿入
+    const allItemsData: any[] = [];
+    const pendingSessions: { scheduleId: number; distributorId: number; startedAt: Date; finishedAt: Date | null; milestones: { count: number; time: string | null }[]; dateStr: string }[] = [];
+
     for (const s of schedules) {
       // マスタとの紐付け（安全に文字列同士で比較）
-      const branch = branches.find(b => b.nameJa.includes(s.branchName) || s.branchName.includes(b.nameJa));
+      const branch = s.branchName
+        ? branches.find(b => b.nameJa.includes(s.branchName) || s.branchName.includes(b.nameJa))
+        : null;
       let distributor = distributors.find(d => String(d.staffId) === String(s.distributorStaffId));
 
       // 配布員が見つからない場合、staffId + staffName で自動登録
@@ -112,6 +118,7 @@ export async function POST(request: Request) {
         }
       });
 
+      // アイテムデータを収集（後で一括挿入）
       for (const item of s.items) {
         const customer = customers.find(c => String(c.customerCode) === String(item.customerCode));
 
@@ -134,56 +141,79 @@ export async function POST(request: Request) {
           if (match) billingUnitPrice = match.unitPrice;
         }
 
-        await prisma.distributionItem.create({
-          data: {
-            scheduleId: createdSchedule.id,
-            slotIndex: item.slotIndex,
-            flyerName: item.flyerName,
-            flyerCode: item.flyerCode,
-            customerId: customer?.id || null,
-            orderId: createdOrder?.id || null,
-            startDate: baseDate ? parseDayString(s.date, item.startDateStr) : null,
-            endDate: baseDate ? parseDayString(s.date, item.endDateStr) : null,
-            spareDate: baseDate ? parseDayString(s.date, item.spareDateStr) : null,
-            method: item.method,
-            plannedCount: item.plannedCount,
-            actualCount: item.actualCount,
-            billingUnitPrice,
-          }
+        allItemsData.push({
+          scheduleId: createdSchedule.id,
+          slotIndex: item.slotIndex,
+          flyerName: item.flyerName,
+          flyerCode: item.flyerCode,
+          customerId: customer?.id || null,
+          orderId: createdOrder?.id || null,
+          startDate: baseDate ? parseDayString(s.date, item.startDateStr) : null,
+          endDate: baseDate ? parseDayString(s.date, item.endDateStr) : null,
+          spareDate: baseDate ? parseDayString(s.date, item.spareDateStr) : null,
+          method: item.method,
+          plannedCount: item.plannedCount,
+          actualCount: item.actualCount,
+          billingUnitPrice,
         });
       }
 
-      // DistributionSession + ProgressEvent 作成
+      // セッション情報を収集（後でまとめて処理）
       if (s.startTime && distributor) {
         const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
         const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
+        pendingSessions.push({
+          scheduleId: createdSchedule.id,
+          distributorId: distributor.id,
+          startedAt,
+          finishedAt,
+          milestones: s.milestones || [],
+          dateStr: s.date,
+        });
+      }
 
+      importedCount++;
+    }
+
+    // ── 一括挿入フェーズ ──
+
+    // DistributionItem を一括作成（数百件を1クエリで処理）
+    if (allItemsData.length > 0) {
+      await prisma.distributionItem.createMany({ data: allItemsData });
+    }
+
+    // DistributionSession + ProgressEvent を処理
+    if (pendingSessions.length > 0) {
+      const allProgressData: any[] = [];
+
+      for (const sess of pendingSessions) {
         const session = await prisma.distributionSession.create({
           data: {
-            scheduleId: createdSchedule.id,
-            distributorId: distributor.id,
-            startedAt,
-            finishedAt,
+            scheduleId: sess.scheduleId,
+            distributorId: sess.distributorId,
+            startedAt: sess.startedAt,
+            finishedAt: sess.finishedAt,
           }
         });
 
-        // ProgressEvent（500〜2500枚マイルストーン）
-        if (s.milestones && Array.isArray(s.milestones)) {
-          for (const m of s.milestones) {
+        // ProgressEvent データを収集
+        if (sess.milestones && Array.isArray(sess.milestones)) {
+          for (const m of sess.milestones) {
             if (m.time) {
-              await prisma.progressEvent.create({
-                data: {
-                  sessionId: session.id,
-                  mailboxCount: m.count,
-                  timestamp: new Date(`${s.date}T${m.time}:00+09:00`),
-                }
+              allProgressData.push({
+                sessionId: session.id,
+                mailboxCount: m.count,
+                timestamp: new Date(`${sess.dateStr}T${m.time}:00+09:00`),
               });
             }
           }
         }
       }
 
-      importedCount++;
+      // ProgressEvent を一括作成
+      if (allProgressData.length > 0) {
+        await prisma.progressEvent.createMany({ data: allProgressData });
+      }
     }
 
     return NextResponse.json({
