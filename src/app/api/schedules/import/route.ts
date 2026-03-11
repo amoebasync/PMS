@@ -130,21 +130,28 @@ export async function POST(request: Request) {
 
     // ── トランザクションで一括挿入（bulk INSERT + LAST_INSERT_ID） ──
     const result = await prisma.$transaction(async (tx) => {
-      // パートナー案件時: 受注を自動作成（トランザクション内）
+      // パートナー案件時: 受注を作成 or 既存IDを使用（チャンク送信対応）
       let createdOrder: { id: number; orderNo: string } | null = null;
       if (isPartnerImport) {
-        const orderNo = `ORD-${Date.now()}`;
-        createdOrder = await tx.order.create({
-          data: {
-            orderNo,
-            title: body.orderTitle || null,
-            orderSource: 'PARTNER_IMPORT',
-            partnerId: body.partnerId,
-            orderDate: new Date(),
-            status: 'COMPLETED',
-          },
-          select: { id: true, orderNo: true },
-        });
+        if (body.orderId) {
+          // 2回目以降のチャンク: 既存受注IDを使用
+          const existing = await tx.order.findUnique({ where: { id: body.orderId }, select: { id: true, orderNo: true } });
+          createdOrder = existing;
+        } else {
+          // 1回目のチャンク: 受注を新規作成
+          const orderNo = `ORD-${Date.now()}`;
+          createdOrder = await tx.order.create({
+            data: {
+              orderNo,
+              title: body.orderTitle || null,
+              orderSource: 'PARTNER_IMPORT',
+              partnerId: body.partnerId,
+              orderDate: new Date(),
+              status: 'COMPLETED',
+            },
+            select: { id: true, orderNo: true },
+          });
+        }
       }
 
       // スケジュールデータを事前準備

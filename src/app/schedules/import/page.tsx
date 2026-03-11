@@ -365,7 +365,9 @@ export default function DataImportPage() {
 
   const resetInput = (e: React.MouseEvent<HTMLInputElement>) => { (e.target as HTMLInputElement).value = ''; };
 
-  /* ────── インポート実行 ────── */
+  /* ────── インポート実行（チャンク分割送信） ────── */
+  const CHUNK_SIZE = 50;
+
   const executeImport = async () => {
     if (dataType === 'partner' && !selectedPartnerId) {
       setMessage(`❌ ${ts('partner_required')}`);
@@ -373,35 +375,83 @@ export default function DataImportPage() {
     }
 
     setIsImporting(true);
-    setMessage(dataType === 'branch' ? tb('import_registering') : ts('importing'));
-    const apiUrl = dataType === 'branch' ? '/api/branches/import' : '/api/schedules/import';
 
-    const requestBody = dataType === 'partner'
-      ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: parsedData, importStatus }
-      : { schedules: parsedData, importStatus };
-
-    try {
-      const res = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
-      const data = await res.json();
-      if (res.ok) {
-        let msg = '';
-        if (dataType === 'partner') {
-          msg = `✨ ${ts('import_partner_success', { orderNo: data.orderNo, count: data.count })}`;
-          if (data.newDistributorCount > 0) msg += ` ${ts('import_new_distributors', { count: data.newDistributorCount })}`;
-        } else if (dataType === 'schedule') {
-          msg = `✨ ${ts('import_success', { count: data.count })}`;
-          if (data.newDistributorCount > 0) msg += ` ${ts('import_new_distributors', { count: data.newDistributorCount })}`;
-        } else {
-          msg = `✨ ${tb('import_success', { count: data.count })}`;
+    // 支店インポートはチャンク不要（小件数）
+    if (dataType === 'branch') {
+      setMessage(tb('import_registering'));
+      try {
+        const res = await fetch('/api/branches/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(parsedData) });
+        const data = await res.json();
+        if (res.ok) {
+          let msg = `✨ ${tb('import_success', { count: data.count })}`;
           if (data.updatedCount > 0) msg += ` ${tb('import_updated', { count: data.updatedCount })}`;
+          setMessage(msg); setParsedData([]); setPasteText('');
+        } else {
+          setMessage(`❌ エラー: ${data.error}`);
         }
-        setMessage(msg); setParsedData([]); setPasteText('');
-      } else {
-        setMessage(`❌ エラー: ${data.error}`);
+      } catch {
+        setMessage(`❌ ${tb('import_error_comm')}`);
       }
-    } catch {
-      setMessage(`❌ ${dataType === 'branch' ? tb('import_error_comm') : ts('error_import_failed')}`);
+      setIsImporting(false);
+      return;
     }
+
+    // スケジュール / パートナー案件: チャンク分割送信
+    let totalImported = 0;
+    let totalNewDistributors = 0;
+    let orderId: number | null = null;
+    let orderNo = '';
+
+    const totalChunks = Math.ceil(parsedData.length / CHUNK_SIZE);
+
+    for (let ci = 0; ci < totalChunks; ci++) {
+      const chunk = parsedData.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
+      const progress = Math.min((ci + 1) * CHUNK_SIZE, parsedData.length);
+      setMessage(`⏳ ${ts('importing')} ${progress} / ${parsedData.length} 件 (${ci + 1}/${totalChunks})`);
+
+      const requestBody = dataType === 'partner'
+        ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}) }
+        : { schedules: chunk, importStatus };
+
+      try {
+        const res = await fetch('/api/schedules/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
+
+        if (!res.ok) {
+          let errorMsg: string;
+          try {
+            const errData = await res.json();
+            errorMsg = errData.error || `HTTP ${res.status}`;
+          } catch {
+            errorMsg = `HTTP ${res.status}`;
+          }
+          const partialMsg = totalImported > 0 ? ` (${totalImported}件は登録済み)` : '';
+          setMessage(`❌ エラー: ${errorMsg}${partialMsg}`);
+          setIsImporting(false);
+          return;
+        }
+
+        const data = await res.json();
+        totalImported += data.count || 0;
+        totalNewDistributors += data.newDistributorCount || 0;
+        if (data.orderId) orderId = data.orderId;
+        if (data.orderNo) orderNo = data.orderNo;
+      } catch {
+        const partialMsg = totalImported > 0 ? ` (${totalImported}件は登録済み)` : '';
+        setMessage(`❌ ${ts('error_import_failed')}${partialMsg}`);
+        setIsImporting(false);
+        return;
+      }
+    }
+
+    // 全チャンク成功
+    let msg = '';
+    if (dataType === 'partner') {
+      msg = `✨ ${ts('import_partner_success', { orderNo, count: totalImported })}`;
+    } else {
+      msg = `✨ ${ts('import_success', { count: totalImported })}`;
+    }
+    if (totalNewDistributors > 0) msg += ` ${ts('import_new_distributors', { count: totalNewDistributors })}`;
+    setMessage(msg); setParsedData([]); setPasteText('');
     setIsImporting(false);
   };
 
