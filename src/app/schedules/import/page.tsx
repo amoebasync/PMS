@@ -366,7 +366,7 @@ export default function DataImportPage() {
   const resetInput = (e: React.MouseEvent<HTMLInputElement>) => { (e.target as HTMLInputElement).value = ''; };
 
   /* ────── インポート実行（チャンク分割送信） ────── */
-  const CHUNK_SIZE = 50;
+  const CHUNK_SIZE = 10;
 
   /** 送信用にデータをクリーンアップ（表示専用フィールドを除去） */
   const cleanForSend = (items: any[]) =>
