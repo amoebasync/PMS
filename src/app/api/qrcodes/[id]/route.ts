@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -27,6 +30,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     await prisma.qrCode.delete({

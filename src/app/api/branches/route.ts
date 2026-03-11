@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const branches = await prisma.branch.findMany({
       orderBy: { id: 'asc' },
@@ -24,6 +27,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await request.json();
 

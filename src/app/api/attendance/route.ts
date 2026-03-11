@@ -115,7 +115,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json(attendance);
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || '保存に失敗しました' }, { status: 500 });
+    console.error('Attendance save error:', error);
+    return NextResponse.json({ error: '保存に失敗しました' }, { status: 500 });
   }
 }
 

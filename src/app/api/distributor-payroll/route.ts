@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 // GET /api/distributor-payroll?distributorId=X&year=YYYY&month=MM
 // または ?weekStart=YYYY-MM-DD
 export async function GET(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { searchParams } = new URL(request.url);
     const distributorId = searchParams.get('distributorId');

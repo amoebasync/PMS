@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 // 一覧取得 (GET)
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const campaigns = await prisma.campaign.findMany({
       orderBy: [{ isActive: 'desc' }, { createdAt: 'desc' }],
@@ -17,6 +20,8 @@ export async function GET() {
 
 // 新規作成 (POST)
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await request.json();
 

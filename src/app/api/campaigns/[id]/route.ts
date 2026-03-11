@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 // 更新 (PUT)
@@ -7,6 +8,8 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const campaignId = parseInt(id);
@@ -35,6 +38,8 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const campaignId = parseInt(id);

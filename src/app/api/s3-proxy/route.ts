@@ -9,6 +9,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'key is required' }, { status: 400 });
   }
 
+  // セキュリティ: uploads/ プレフィックスのみ許可、パストラバーサル防止
+  if (!key.startsWith('uploads/') || key.includes('..')) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
+
   try {
     const presignedUrl = await getPresignedUrl(key, 3600);
     return NextResponse.redirect(presignedUrl, 302);

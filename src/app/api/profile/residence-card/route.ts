@@ -27,8 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ uploadUrl, s3Key });
   } catch (error) {
     console.error('Presign Error:', error);
-    const detail = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: `プリサインURL生成に失敗しました: ${detail}` }, { status: 500 });
+    return NextResponse.json({ error: 'プリサインURL生成に失敗しました' }, { status: 500 });
   }
 }
 
@@ -71,7 +70,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ url, side });
   } catch (error) {
     console.error('Residence Card Update Error:', error);
-    const detail = error instanceof Error ? error.message : String(error);
-    return NextResponse.json({ error: `更新に失敗しました: ${detail}` }, { status: 500 });
+    return NextResponse.json({ error: '更新に失敗しました' }, { status: 500 });
   }
 }

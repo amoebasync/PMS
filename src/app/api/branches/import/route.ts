@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const branches = await request.json();
     let importedCount = 0;

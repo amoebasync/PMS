@@ -1,10 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -36,6 +39,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     await prisma.branch.delete({

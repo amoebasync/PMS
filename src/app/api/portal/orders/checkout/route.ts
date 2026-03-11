@@ -5,6 +5,106 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { sendOrderConfirmationEmail } from '@/lib/mailer';
 
 
+// サーバー側で価格を再計算してクライアント送信値と照合する
+async function validateItemPrice(item: any): Promise<{ valid: boolean; serverPrice: number }> {
+  // 1. エリアランク加重平均単価
+  let areaRankUnitPrice = 5.0;
+  if (item.selectedAreas && item.selectedAreas.length > 0) {
+    const areaIds = item.selectedAreas.map((a: any) => a.id);
+    const areas = await prisma.area.findMany({
+      where: { id: { in: areaIds } },
+      include: { areaRank: true },
+    });
+
+    // 配布方法の取得（capacityType が必要）
+    const distMethod = await prisma.distributionMethod.findFirst({ where: { name: item.method } });
+    const capacityType = distMethod?.capacityType || 'all';
+
+    const getCapacity = (area: any) => {
+      const dtd = area.door_to_door_count || 0;
+      const mf = area.multi_family_count || 0;
+      if (capacityType === 'apartment') return mf;
+      if (capacityType === 'detached') return Math.floor(Math.max(0, dtd - mf) * 0.5);
+      return dtd; // 'all'
+    };
+
+    const totalCap = areas.reduce((sum: number, a: any) => sum + getCapacity(a), 0);
+    if (totalCap > 0) {
+      const weighted = areas.reduce((sum: number, a: any) => {
+        const cap = getCapacity(a);
+        const rankPrice = a.areaRank?.postingUnitPrice ?? 5.0;
+        return sum + cap * rankPrice;
+      }, 0);
+      areaRankUnitPrice = weighted / totalCap;
+    }
+  }
+
+  // 2. サイズ加算
+  const flyerSize = await prisma.flyerSize.findFirst({ where: { name: item.size } });
+  const sizeAddon = flyerSize?.basePriceAddon ?? 0;
+
+  // 3. 期間加算
+  let periodAddon = 0;
+  if (item.startDate && item.endDate) {
+    const start = new Date(item.startDate);
+    const end = new Date(item.endDate);
+    const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    if (days > 0) {
+      const periodPrices = await prisma.distributionPeriodPrice.findMany({ orderBy: { minDays: 'asc' } });
+      const match = periodPrices.find((p: any) => days >= p.minDays && days <= p.maxDays);
+      periodAddon = match?.priceAddon ?? 0;
+    }
+  }
+
+  // 4. 配布方法加算
+  const distMethod = await prisma.distributionMethod.findFirst({ where: { name: item.method } });
+  const methodPriceAddon = distMethod?.priceAddon ?? 0;
+  const capacityType = distMethod?.capacityType || 'all';
+
+  // 5. 配布単価
+  const postingUnitPrice = areaRankUnitPrice + sizeAddon + periodAddon + methodPriceAddon;
+
+  // 6. 請求枚数
+  let totalAreaCapacity = 0;
+  if (item.selectedAreas && item.selectedAreas.length > 0) {
+    const areaIds = item.selectedAreas.map((a: any) => a.id);
+    const areas = await prisma.area.findMany({ where: { id: { in: areaIds } } });
+    totalAreaCapacity = areas.reduce((sum: number, a: any) => {
+      const dtd = a.door_to_door_count || 0;
+      const mf = a.multi_family_count || 0;
+      if (capacityType === 'apartment') return sum + mf;
+      if (capacityType === 'detached') return sum + Math.floor(Math.max(0, dtd - mf) * 0.5);
+      return sum + dtd;
+    }, 0);
+  }
+  const billingCount = totalAreaCapacity > 0 ? Math.min(totalAreaCapacity, item.totalCount || 0) : 0;
+  const totalPosting = billingCount * postingUnitPrice;
+
+  // 7. 印刷単価（PRINT_AND_POSTING の場合のみ）
+  let totalPrint = 0;
+  if (item.type === 'PRINT_AND_POSTING') {
+    const printBase = flyerSize?.printUnitPrice ?? 3.0;
+    let foldingUnit = 0;
+    if (item.foldingTypeId) {
+      const foldingType = await prisma.foldingType.findUnique({ where: { id: item.foldingTypeId } });
+      foldingUnit = foldingType?.unitPrice ?? 0;
+    }
+    const printUnitPrice = printBase + foldingUnit;
+    const printCount = item.printCount || item.totalCount || 0;
+    totalPrint = printCount * printUnitPrice;
+  }
+
+  // 8. 合計（税抜）
+  const serverPrice = Math.floor(totalPosting + totalPrint);
+
+  // 許容誤差: 浮動小数点の丸め差を考慮して ±1円まで許容
+  const clientPrice = item.price || 0;
+  const valid = Math.abs(serverPrice - clientPrice) <= 1;
+
+  return { valid, serverPrice };
+}
+
+
 export async function POST(request: Request) {
   try {
     // 1. セッションとユーザー情報の確認
@@ -22,6 +122,20 @@ export async function POST(request: Request) {
 
     if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
+    }
+
+    // ★ サーバー側で価格を再計算・検証（下書き保存時も検証する）
+    for (const item of items) {
+      const { valid, serverPrice } = await validateItemPrice(item);
+      if (!valid) {
+        console.error(`Price mismatch: client=${item.price}, server=${serverPrice}, item=${item.projectName}`);
+        return NextResponse.json(
+          { error: '価格の検証に失敗しました。ページを再読み込みしてやり直してください。' },
+          { status: 400 }
+        );
+      }
+      // クライアント価格ではなくサーバー計算価格を使用
+      item.price = serverPrice;
     }
 
     // 2. ステータスの判定

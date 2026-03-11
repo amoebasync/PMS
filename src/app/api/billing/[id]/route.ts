@@ -2,9 +2,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calcLineItems } from '@/lib/pdf/calculator';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 // GET: 詳細（受注明細付き）
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const stmt = await prisma.billingStatement.findUnique({
@@ -44,6 +47,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 // PUT: ステータス更新・メモ更新・受注追加/削除
 // body: { status?, note?, paymentDueDate?, paymentMethod?, addOrderIds?, removeOrderIds? }
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const stmtId = parseInt(id);
@@ -139,6 +144,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 // DELETE: DRAFT のみ削除可
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const stmt = await prisma.billingStatement.findUnique({ where: { id: parseInt(id) } });

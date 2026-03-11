@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
@@ -18,6 +19,8 @@ function buildInitialPassword(birthday: string | null | undefined): string | nul
 }
 
 export async function GET(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
@@ -84,6 +87,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await request.json();
 

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 const parseDate = (d: any) => d ? new Date(d) : null;
 
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const flyers = await prisma.flyer.findMany({
       orderBy: { id: 'desc' },
@@ -21,6 +24,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await request.json();
 

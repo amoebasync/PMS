@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { scheduleId, slotIndex, odaId } = await request.json();
 
@@ -28,6 +31,8 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const { error: authError } = await requireAdminSession();
+  if (authError) return authError;
   try {
     const body = await request.json();
     const data: any = {};
@@ -46,6 +51,8 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 // POST /api/distributor-payroll/generate
 // Body: { distributorId: number, weekStart: string (ISO, Sunday) }
 // 週次給与を計算して DB に保存（既存レコードは上書き）
 export async function POST(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { distributorId, weekStart } = await request.json();
     if (!distributorId || !weekStart) {

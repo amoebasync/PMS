@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 
 // GET /api/distributor-payroll/[id] — 明細含む詳細取得
@@ -7,6 +8,8 @@ export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const record = await prisma.distributorPayrollRecord.findUnique({
@@ -29,6 +32,8 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     const body = await request.json();
@@ -52,6 +57,8 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { id } = await params;
     await prisma.distributorPayrollRecord.delete({ where: { id: parseInt(id) } });

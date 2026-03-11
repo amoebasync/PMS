@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { calcLineItems } from '@/lib/pdf/calculator';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 // 採番: BS-202602-0001
 async function generateStatementNo(month: string): Promise<string> {
@@ -16,6 +17,8 @@ async function generateStatementNo(month: string): Promise<string> {
 
 // GET: 一覧（フィルタ: month, customerId, status）
 export async function GET(req: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const { searchParams } = new URL(req.url);
     const month      = searchParams.get('month');      // "2026-02"
@@ -44,6 +47,8 @@ export async function GET(req: Request) {
 // POST: 新規まとめ請求を作成
 // body: { customerId, billingMonth, orderIds: number[], note?, paymentDueDate? }
 export async function POST(req: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await req.json();
     const { customerId, billingMonth, orderIds, note, paymentDueDate } = body;

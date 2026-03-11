@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAdminSession } from '@/lib/adminAuth';
 
 // 自社設定を取得（なければデフォルトを返す）
 export async function GET() {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const setting = await prisma.companySetting.findFirst({ orderBy: { id: 'asc' } });
     return NextResponse.json(setting ?? {});
@@ -14,6 +17,8 @@ export async function GET() {
 
 // 自社設定を保存（upsert: id=1 固定）
 export async function PUT(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
   try {
     const body = await request.json();
     const data = {
