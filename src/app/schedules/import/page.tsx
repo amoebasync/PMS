@@ -435,9 +435,10 @@ export default function DataImportPage() {
         totalNewDistributors += data.newDistributorCount || 0;
         if (data.orderId) orderId = data.orderId;
         if (data.orderNo) orderNo = data.orderNo;
-      } catch {
+      } catch (e) {
         const partialMsg = totalImported > 0 ? ` (${totalImported}件は登録済み)` : '';
-        setMessage(`❌ ${ts('error_import_failed')}${partialMsg}`);
+        const detail = e instanceof Error ? e.message : '';
+        setMessage(`❌ ${ts('error_import_failed')} [${detail}]${partialMsg}`);
         setIsImporting(false);
         return;
       }
