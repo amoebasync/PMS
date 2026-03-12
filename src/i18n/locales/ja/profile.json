@@ -84,5 +84,21 @@
   "bank_card_scan": "カードを撮影して自動入力",
   "bank_card_analyzing": "AI解析中...",
   "bank_card_scan_success": "口座情報を自動入力しました。内容を確認してください。",
-  "bank_card_scan_error": "カードの読み取りに失敗しました。手動で入力してください。"
+  "bank_card_scan_error": "カードの読み取りに失敗しました。手動で入力してください。",
+  "section_payment_method": "給料受取方法",
+  "payment_bank_transfer": "銀行振込",
+  "payment_cash": "現金手渡し",
+  "yucho_convert_btn": "ゆうちょ記号番号変換",
+  "yucho_title": "ゆうちょ銀行 記号番号変換",
+  "yucho_description": "通帳に記載の<strong>記号</strong>（5桁）と<strong>番号</strong>（8桁）を入力すると、振込に必要な<strong>支店番号</strong>と<strong>口座番号</strong>を自動算出します。",
+  "yucho_kigo": "記号",
+  "yucho_kigo_placeholder": "例: 14060",
+  "yucho_bango": "番号",
+  "yucho_bango_placeholder": "例: 12345671",
+  "yucho_result": "変換結果",
+  "yucho_result_branch": "支店番号",
+  "yucho_result_account": "口座番号",
+  "yucho_input_hint": "記号と番号を入力すると変換結果が表示されます",
+  "yucho_apply": "フォームに適用",
+  "save_error": "保存に失敗しました"
 }

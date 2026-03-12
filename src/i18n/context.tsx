@@ -4,6 +4,18 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 
 export type Language = 'ja' | 'en';
 
+const LANG_STORAGE_KEY = 'pms_lang';
+
+/** localStorage から同期的に言語を読み取る（FOUC防止） */
+function getStoredLang(): Language {
+  if (typeof window === 'undefined') return 'ja';
+  try {
+    const stored = localStorage.getItem(LANG_STORAGE_KEY);
+    if (stored === 'en' || stored === 'ja') return stored;
+  } catch { /* SSR or private browsing */ }
+  return 'ja';
+}
+
 interface LanguageContextType {
   lang: Language;
   setLang: (lang: Language) => void;
@@ -29,16 +41,18 @@ async function preloadCoreNamespaces(lang: Language): Promise<void> {
 
 export function LanguageProvider({
   children,
-  initialLang = 'ja',
+  initialLang,
 }: {
   children: ReactNode;
   initialLang?: Language;
 }) {
-  const [lang, setLangState] = useState<Language>(initialLang);
+  const [lang, setLangState] = useState<Language>(initialLang ?? getStoredLang);
   const [coreReady, setCoreReady] = useState(false);
 
   const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
+    // localStorage に即座に保存（次回マウント時に同期的に読める）
+    try { localStorage.setItem(LANG_STORAGE_KEY, newLang); } catch { /* ignore */ }
     // Persist to DB
     fetch('/api/profile/language', {
       method: 'PUT',

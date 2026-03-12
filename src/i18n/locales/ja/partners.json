@@ -143,5 +143,6 @@
   "loading_areas": "エリアを読み込み中...",
   "loading_prices": "単価を読み込み中...",
   "loading_incidents": "インシデントを読み込み中...",
-  "loading_evaluation": "評価データを読み込み中..."
+  "loading_evaluation": "評価データを読み込み中...",
+  "flyer_price_management": "チラシ配布単価管理"
 }

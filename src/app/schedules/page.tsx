@@ -113,6 +113,7 @@ export default function ScheduleListPage() {
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const popoverContainerRef = useRef<HTMLDivElement>(null);
+  const complianceBtnRef = useRef<HTMLButtonElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
   // ポップオーバー/メニュー外クリックで閉じる
@@ -357,19 +358,15 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Compliance */}
-                    <td className="px-3 py-2.5 text-center relative">
+                    <td className="px-3 py-2.5 text-center">
                       <button
+                        ref={compliancePopoverId === s.id ? complianceBtnRef : undefined}
                         onClick={() => setCompliancePopoverId(compliancePopoverId === s.id ? null : s.id)}
                         className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors hover:opacity-80 ${getCheckBadgeClass(checkCount)}`}
                       >
                         <i className="bi bi-check2-square text-[10px]"></i>
                         {checkCount}/4
                       </button>
-                      {compliancePopoverId === s.id && (
-                        <div ref={popoverContainerRef} className="absolute top-full right-0 mt-1 z-50">
-                          <CompliancePopover schedule={s} onUpdate={handleComplianceUpdate} t={t} />
-                        </div>
-                      )}
                     </td>
 
                     {/* Actions */}
@@ -429,6 +426,21 @@ export default function ScheduleListPage() {
           </table>
         </div>
       </div>
+
+      {/* Compliance Popover (fixed position portal) */}
+      {compliancePopoverId !== null && (() => {
+        const s = schedules.find(x => x.id === compliancePopoverId);
+        if (!s) return null;
+        const rect = complianceBtnRef.current?.getBoundingClientRect();
+        const style: React.CSSProperties = rect
+          ? { position: 'fixed', top: rect.bottom + 4, right: window.innerWidth - rect.right, zIndex: 100 }
+          : { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100 };
+        return (
+          <div ref={popoverContainerRef} style={style}>
+            <CompliancePopover schedule={s} onUpdate={handleComplianceUpdate} t={t} />
+          </div>
+        );
+      })()}
 
       {/* ===== Mobile card list ===== */}
       <div className="md:hidden flex-1 overflow-auto relative">

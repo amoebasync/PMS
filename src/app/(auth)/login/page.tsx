@@ -29,6 +29,8 @@ export default function LoginPage() {
 
       if (res.ok) {
         const data = await res.json();
+        // ログイン時の言語設定をlocalStorageに保存（FOUC防止）
+        try { localStorage.setItem('pms_lang', data.language || 'ja'); } catch { /* ignore */ }
         // 初回ログイン / 仮パスワードの場合はパスワード変更ページへ
         if (data.mustChangePassword) {
           router.push('/change-password');

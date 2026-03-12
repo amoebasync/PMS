@@ -527,7 +527,15 @@ function PricesTab({ partnerId, t, showToast, showConfirm }: { partnerId: number
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-end">
+      <div className="flex justify-between items-center">
+        <Link
+          href={`/partners/${partnerId}/prices`}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-bold rounded-lg border border-purple-200 transition-colors"
+        >
+          <i className="bi bi-currency-yen"></i>
+          {t('flyer_price_management')}
+          <i className="bi bi-arrow-right"></i>
+        </Link>
         <button onClick={openAdd} className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold rounded-lg shadow-md">
           <i className="bi bi-plus-lg mr-1"></i>{t('add_price')}
         </button>

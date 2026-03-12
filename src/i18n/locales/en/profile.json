@@ -84,5 +84,21 @@
   "bank_card_scan": "Scan Card for Auto-fill",
   "bank_card_analyzing": "AI analyzing...",
   "bank_card_scan_success": "Account info auto-filled. Please verify the details.",
-  "bank_card_scan_error": "Failed to read card. Please enter information manually."
+  "bank_card_scan_error": "Failed to read card. Please enter information manually.",
+  "section_payment_method": "Payment Method",
+  "payment_bank_transfer": "Bank Transfer",
+  "payment_cash": "Cash",
+  "yucho_convert_btn": "JP Post Bank Converter",
+  "yucho_title": "Japan Post Bank Number Converter",
+  "yucho_description": "Enter the <strong>symbol</strong> (5 digits) and <strong>number</strong> (8 digits) from the passbook to auto-calculate the <strong>branch code</strong> and <strong>account number</strong> needed for transfers.",
+  "yucho_kigo": "Symbol",
+  "yucho_kigo_placeholder": "e.g. 14060",
+  "yucho_bango": "Number",
+  "yucho_bango_placeholder": "e.g. 12345671",
+  "yucho_result": "Conversion Result",
+  "yucho_result_branch": "Branch Code",
+  "yucho_result_account": "Account Number",
+  "yucho_input_hint": "Enter symbol and number to see the conversion result",
+  "yucho_apply": "Apply to Form",
+  "save_error": "Failed to save"
 }

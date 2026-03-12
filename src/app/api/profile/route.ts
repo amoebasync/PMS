@@ -114,6 +114,7 @@ export async function PUT(request: Request) {
         accountNumber: body.accountNumber || null,
         accountName: body.accountName || null,
         accountNameKana: body.accountNameKana || null,
+        ...(body.paymentMethod && { paymentMethod: body.paymentMethod }),
       };
 
       // 3. EmployeeFinancial (口座情報) の更新または新規作成 (upsert)

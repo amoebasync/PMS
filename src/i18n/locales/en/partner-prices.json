@@ -1,0 +1,44 @@
+{
+  "page_title": "Partner Price Management",
+  "page_description": "View and edit flyer distribution unit prices for partner projects.",
+  "select_partner": "Select Partner",
+  "loading": "Loading...",
+  "no_items": "No imported items found for this partner.",
+  "all_priced": "All items have unit prices set.",
+
+  "tab_all": "All",
+  "tab_unpriced": "Unpriced",
+  "tab_priced": "Priced",
+
+  "th_date": "Date",
+  "th_branch": "Branch",
+  "th_distributor": "Distributor",
+  "th_flyer_name": "Flyer Name",
+  "th_flyer_code": "Flyer Code",
+  "th_planned": "Planned",
+  "th_actual": "Actual",
+  "th_unit_price": "Unit Price",
+  "th_source": "Source",
+  "th_amount": "Amount",
+
+  "source_price_master_exact": "Price Master (Exact)",
+  "source_price_master_customer": "Price Master (Customer)",
+  "source_price_master_name": "Price Master (Name)",
+  "source_external_api": "External API",
+  "source_manual": "Manual",
+  "source_not_found": "Not Set",
+
+  "btn_auto_resolve": "Auto-Resolve Prices",
+  "btn_resolving": "Resolving...",
+  "btn_save": "Save Prices",
+  "btn_saving": "Saving...",
+  "save_success": "{{count}} prices saved.",
+  "save_error": "Failed to save prices.",
+  "resolve_complete": "Auto-resolve complete: {{resolved}} resolved / {{total}} total",
+
+  "price_placeholder": "Price",
+  "summary_total": "Total Items",
+  "summary_priced": "Priced",
+  "summary_unpriced": "Unpriced",
+  "summary_total_amount": "Total Amount"
+}

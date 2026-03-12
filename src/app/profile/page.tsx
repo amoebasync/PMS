@@ -46,6 +46,16 @@ const formatToHalfWidthNumber = (str: string) => {
   return str.replace(/[０-９]/g, (s) => String.fromCharCode(s.charCodeAt(0) - 0xFEE0)).replace(/[^0-9]/g, '');
 };
 
+// ゆうちょ銀行：記号番号 → 支店番号・口座番号 変換
+function convertYuchoNumber(kigo: string, bango: string): { branchCode: string; accountNumber: string } | null {
+  if (!kigo || kigo.length < 3) return null;
+  const mid = parseInt(kigo.substring(1, 3), 10);
+  if (isNaN(mid)) return null;
+  const branchCode = String(mid * 10 + 8).padStart(3, '0');
+  const accountNumber = kigo.startsWith('1') ? bango.slice(0, -1) : bango;
+  return { branchCode, accountNumber };
+}
+
 async function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<Blob> {
   const image = new Image();
   image.src = imageSrc;
@@ -101,9 +111,15 @@ export default function ProfilePage() {
   const [isUploadingCard, setIsUploadingCard] = useState<string | null>(null);
   const [bankCardAnalyzing, setBankCardAnalyzing] = useState(false);
 
+  // ゆうちょ銀行変換用
+  const [yuchoModalOpen, setYuchoModalOpen] = useState(false);
+  const [yuchoKigo, setYuchoKigo] = useState('');
+  const [yuchoBango, setYuchoBango] = useState('');
+
   const [formData, setFormData] = useState({
     lastNameJa: '', firstNameJa: '', lastNameEn: '', firstNameEn: '',
     email: '', phone: '', avatarUrl: '',
+    paymentMethod: 'BANK_TRANSFER',
     bankId: '', branchName: '', branchCode: '', accountType: 'ORDINARY',
     accountNumber: '', accountName: '', accountNameKana: '',
     password: '', confirmPassword: ''
@@ -151,6 +167,7 @@ export default function ProfilePage() {
           lastNameJa: data.lastNameJa || '', firstNameJa: data.firstNameJa || '',
           lastNameEn: data.lastNameEn || '', firstNameEn: data.firstNameEn || '',
           email: data.email || '', phone: data.phone || '', avatarUrl: data.avatarUrl || '',
+          paymentMethod: data.financial?.paymentMethod || 'BANK_TRANSFER',
           bankId: data.financial?.bankId?.toString() || '',
           branchName: data.financial?.branchName || '',
           branchCode: data.financial?.branchCode || '',
@@ -225,13 +242,28 @@ export default function ProfilePage() {
           const matchedBank = banks.find((b: any) =>
             b.name === result.data.bankName || b.nameEn === result.data.bankName
           );
+
+          // ゆうちょ銀行の場合、記号番号→支店番号・口座番号に変換
+          const isYucho = result.data.bankName?.includes('ゆうちょ') || matchedBank?.name?.includes('ゆうちょ') || matchedBank?.code === '9900';
+          let branchCode = result.data.branchCode || '';
+          let accountNumber = result.data.accountNumber || '';
+
+          if (isYucho && branchCode && accountNumber) {
+            // AIが記号・番号をそのまま返した場合を変換
+            const converted = convertYuchoNumber(branchCode, accountNumber);
+            if (converted) {
+              branchCode = converted.branchCode;
+              accountNumber = converted.accountNumber;
+            }
+          }
+
           setFormData(prev => ({
             ...prev,
             ...(matchedBank ? { bankId: matchedBank.id.toString() } : {}),
             branchName: result.data.branchName || prev.branchName,
-            branchCode: result.data.branchCode || prev.branchCode,
+            branchCode: branchCode || prev.branchCode,
             accountType: result.data.accountType === '当座' ? 'CURRENT' : result.data.accountType === '貯蓄' ? 'SAVINGS' : 'ORDINARY',
-            accountNumber: result.data.accountNumber || prev.accountNumber,
+            accountNumber: accountNumber || prev.accountNumber,
             accountName: result.data.accountHolder || prev.accountName,
             accountNameKana: result.data.accountHolderKana || prev.accountNameKana,
           }));
@@ -726,15 +758,61 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* --- 給料受取方法 --- */}
             <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6 mt-10 border-t border-slate-200 pt-8">
+              <i className="bi bi-wallet2 text-slate-400"></i> {t('section_payment_method')}
+            </h3>
+            <div className="flex gap-4 mb-8">
+              {[
+                { value: 'BANK_TRANSFER', icon: 'bi-bank', label: t('payment_bank_transfer'), color: 'indigo' },
+                { value: 'CASH', icon: 'bi-cash-stack', label: t('payment_cash'), color: 'emerald' },
+              ].map(opt => (
+                <label
+                  key={opt.value}
+                  className={`flex-1 flex items-center gap-3 p-4 rounded-xl border-2 cursor-pointer transition-all ${
+                    formData.paymentMethod === opt.value
+                      ? `border-${opt.color}-500 bg-${opt.color}-50 shadow-sm`
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value={opt.value}
+                    checked={formData.paymentMethod === opt.value}
+                    onChange={handleInputChange}
+                    className="sr-only"
+                  />
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    formData.paymentMethod === opt.value ? `bg-${opt.color}-100 text-${opt.color}-600` : 'bg-slate-100 text-slate-400'
+                  }`}>
+                    <i className={`bi ${opt.icon} text-lg`}></i>
+                  </div>
+                  <div>
+                    <div className={`text-sm font-bold ${formData.paymentMethod === opt.value ? 'text-slate-800' : 'text-slate-600'}`}>{opt.label}</div>
+                  </div>
+                  {formData.paymentMethod === opt.value && (
+                    <i className={`bi bi-check-circle-fill text-${opt.color}-500 ml-auto`}></i>
+                  )}
+                </label>
+              ))}
+            </div>
+
+            {/* --- 銀行口座 --- */}
+            <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-6">
               <i className="bi bi-bank text-slate-400"></i> {t('section_bank_account')}
-              <button type="button" onClick={handleBankCardUpload} disabled={bankCardAnalyzing} className="ml-auto text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
-                {bankCardAnalyzing ? (
-                  <><span className="inline-block w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span> {t('bank_card_analyzing')}</>
-                ) : (
-                  <><i className="bi bi-camera"></i> {t('bank_card_scan')}</>
-                )}
-              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button type="button" onClick={() => { setYuchoKigo(''); setYuchoBango(''); setYuchoModalOpen(true); }} className="text-xs font-bold text-amber-600 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5">
+                  <i className="bi bi-arrow-repeat"></i> {t('yucho_convert_btn')}
+                </button>
+                <button type="button" onClick={handleBankCardUpload} disabled={bankCardAnalyzing} className="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1.5">
+                  {bankCardAnalyzing ? (
+                    <><span className="inline-block w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></span> {t('bank_card_analyzing')}</>
+                  ) : (
+                    <><i className="bi bi-camera"></i> {t('bank_card_scan')}</>
+                  )}
+                </button>
+              </div>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-xl border border-slate-200">
               <div className="md:col-span-2">
@@ -821,6 +899,75 @@ export default function ProfilePage() {
           </form>
         </div>
       </div>
+
+      {/* --- ゆうちょ変換モーダル --- */}
+      {yuchoModalOpen && (() => {
+        const converted = convertYuchoNumber(yuchoKigo, yuchoBango);
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setYuchoModalOpen(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden animate-in fade-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+              <div className="bg-amber-600 px-6 py-4 flex items-center justify-between">
+                <h3 className="text-white font-bold flex items-center gap-2">
+                  <i className="bi bi-arrow-repeat"></i> {t('yucho_title')}
+                </h3>
+                <button onClick={() => setYuchoModalOpen(false)} className="text-amber-200 hover:text-white transition-colors">
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+              <div className="p-6 space-y-5">
+                <p className="text-sm text-slate-600" dangerouslySetInnerHTML={{ __html: t('yucho_description') }} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('yucho_kigo')}</label>
+                    <input type="text" value={yuchoKigo} onChange={e => setYuchoKigo(e.target.value.replace(/[^0-9]/g, '').slice(0, 5))} placeholder={t('yucho_kigo_placeholder')} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-amber-400 outline-none" maxLength={5} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{t('yucho_bango')}</label>
+                    <input type="text" value={yuchoBango} onChange={e => setYuchoBango(e.target.value.replace(/[^0-9]/g, '').slice(0, 8))} placeholder={t('yucho_bango_placeholder')} className="w-full border border-slate-300 p-2.5 rounded-lg text-sm font-mono focus:ring-2 focus:ring-amber-400 outline-none" maxLength={8} />
+                  </div>
+                </div>
+                <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
+                  <p className="text-xs font-bold text-slate-500 mb-3">{t('yucho_result')}</p>
+                  {converted ? (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{t('yucho_result_branch')}</p>
+                        <p className="text-2xl font-black text-amber-600 font-mono">{converted.branchCode}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">{t('yucho_result_account')}</p>
+                        <p className="text-2xl font-black text-amber-600 font-mono">{converted.accountNumber}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400 text-center py-2">{t('yucho_input_hint')}</p>
+                  )}
+                </div>
+                {converted && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // ゆうちょ銀行をセット（bankId検索）
+                      const yuchoBank = banks.find((b: any) => b.code === '9900' || b.name?.includes('ゆうちょ'));
+                      setFormData(prev => ({
+                        ...prev,
+                        ...(yuchoBank ? { bankId: yuchoBank.id.toString() } : {}),
+                        branchCode: converted.branchCode,
+                        accountNumber: converted.accountNumber,
+                      }));
+                      setYuchoModalOpen(false);
+                      showToast(t('bank_card_scan_success'), 'success');
+                    }}
+                    className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg font-bold transition-colors flex items-center justify-center gap-2"
+                  >
+                    <i className="bi bi-check-lg"></i> {t('yucho_apply')}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* --- 社員プロフィール閲覧モーダル --- */}
       {viewingEmployee && (

@@ -1,0 +1,44 @@
+{
+  "page_title": "パートナー単価管理",
+  "page_description": "パートナー案件のチラシ配布単価を一覧・編集します。",
+  "select_partner": "パートナーを選択",
+  "loading": "読み込み中...",
+  "no_items": "このパートナーのインポート済みアイテムはありません。",
+  "all_priced": "すべてのアイテムに単価が設定されています。",
+
+  "tab_all": "すべて",
+  "tab_unpriced": "単価未設定",
+  "tab_priced": "単価設定済",
+
+  "th_date": "配布日",
+  "th_branch": "支店",
+  "th_distributor": "配布員",
+  "th_flyer_name": "チラシ名",
+  "th_flyer_code": "広告物管理番号",
+  "th_planned": "予定枚数",
+  "th_actual": "配布枚数",
+  "th_unit_price": "配布単価",
+  "th_source": "取得元",
+  "th_amount": "金額",
+
+  "source_price_master_exact": "単価マスタ(完全一致)",
+  "source_price_master_customer": "単価マスタ(顧客コード)",
+  "source_price_master_name": "単価マスタ(チラシ名)",
+  "source_external_api": "外部API",
+  "source_manual": "手入力",
+  "source_not_found": "未設定",
+
+  "btn_auto_resolve": "単価を自動取得",
+  "btn_resolving": "取得中...",
+  "btn_save": "単価を保存",
+  "btn_saving": "保存中...",
+  "save_success": "{{count}}件の単価を保存しました。",
+  "save_error": "単価の保存に失敗しました。",
+  "resolve_complete": "自動取得完了: {{resolved}}件解決 / {{total}}件中",
+
+  "price_placeholder": "単価",
+  "summary_total": "合計件数",
+  "summary_priced": "単価設定済",
+  "summary_unpriced": "単価未設定",
+  "summary_total_amount": "合計金額"
+}
