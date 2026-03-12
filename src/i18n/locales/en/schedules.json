@@ -106,5 +106,24 @@
   "compliance_gps": "GPS Confirmed",
   "compliance_map_photo": "Map Photo Sent",
   "compliance_checked_by": "Checked by",
-  "compliance_checked_at": "Checked at"
+  "compliance_checked_at": "Checked at",
+
+  "th_flyers": "Flyers (Planned/Actual)",
+  "th_actions": "Actions",
+  "th_capacity_unit": "",
+  "flyer_total": "Total",
+  "results_count": "results",
+  "unassigned": "Unassigned",
+
+  "unassign_distributor": "Remove Distributor",
+  "unassign_confirm": "Remove {{name}} from this schedule?",
+  "unassign_btn": "Remove",
+  "unassign_success": "Distributor removed from schedule",
+
+  "delete_schedule": "Delete Schedule",
+  "delete_confirm": "Delete this schedule? This cannot be undone.",
+  "delete_btn": "Delete",
+  "delete_success": "Schedule deleted",
+  "cancel": "Cancel",
+  "loading": "Loading..."
 }
