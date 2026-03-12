@@ -10,6 +10,7 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
+    console.error('[ErrorBoundary]', error.name, error.message, error.stack);
     // チャンク読み込み失敗（新デプロイ後に古いキャッシュが残っている場合）
     // → ページ全体をリロードして新しいチャンクを取得する
     if (
@@ -48,6 +49,9 @@ export default function Error({
         <p className="text-sm text-slate-500 mb-6">
           ページの読み込み中に問題が発生しました。
         </p>
+        <pre className="text-xs text-left bg-slate-100 p-3 rounded mb-4 overflow-auto max-h-40 text-red-600">
+          {error.name}: {error.message}
+        </pre>
         <button
           onClick={reset}
           className="bg-indigo-600 text-white px-5 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-colors"
