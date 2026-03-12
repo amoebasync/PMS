@@ -126,8 +126,9 @@ export default function ScheduleListPage() {
         setActionMenuId(null);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    // clickイベントで登録（mousedownだとメニュー内ボタンのonClickより先に発火してメニューが消える）
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
   }, [compliancePopoverId, actionMenuId]);
 
   const fetchSchedules = async (dateStr: string) => {
