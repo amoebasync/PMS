@@ -181,6 +181,7 @@ function NewOrderContent() {
     fetch('/api/portal/pricing')
       .then(r => r.json())
       .then(d => {
+        if (d.error || !d.flyerSizes) return; // 認証エラー等はスキップ
         setPricingData(d);
         // 初回ロード時にデフォルト配布方法をセット
         if (d.distributionMethods?.length > 0 && !method) {
