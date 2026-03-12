@@ -371,19 +371,32 @@ function NewOrderContent() {
         setAppliedRadiusKm(radiusKm);
 
         const r = Number(radiusKm);
-        // 右パネル分（約0.004度）だけ中心を左にずらして円全体が見えるようにする
-        const lngOffset = r === 1 ? 0.004 : r === 2 ? 0.008 : 0.012;
-        setMapCenter({ lat, lng: lng - lngOffset });
-        if (r === 1) setMapZoom(15); else if (r === 2) setMapZoom(14); else if (r === 3) setMapZoom(13); else setMapZoom(12);
 
-        // 中心座標 + 円周上の東西南北4点で逆ジオコーディングし、隣接する区のエリアも読み込む
-        const offsetDeg = r * 0.009; // 約1km ≒ 0.009度
+        // fitBoundsで円全体が収まるように自動ズーム（左右パネル分のパディング付き）
+        if (mapRef) {
+          const degOffset = r * 0.01; // 1km ≒ 0.01度
+          const bounds = new window.google.maps.LatLngBounds(
+            { lat: lat - degOffset, lng: lng - degOffset },
+            { lat: lat + degOffset, lng: lng + degOffset }
+          );
+          mapRef.fitBounds(bounds, { top: 20, bottom: 20, left: 40, right: 320 });
+        } else {
+          setMapCenter({ lat, lng });
+          if (r === 1) setMapZoom(14); else if (r === 2) setMapZoom(13); else if (r === 3) setMapZoom(12); else setMapZoom(11);
+        }
+
+        // 中心座標 + 円周上の8方向で逆ジオコーディングし、隣接する区のエリアも読み込む
+        const offsetDeg = r * 0.009;
         const points = [
           { lat, lng },
           { lat: lat + offsetDeg, lng },
           { lat: lat - offsetDeg, lng },
           { lat, lng: lng + offsetDeg },
           { lat, lng: lng - offsetDeg },
+          { lat: lat + offsetDeg * 0.7, lng: lng + offsetDeg * 0.7 },
+          { lat: lat + offsetDeg * 0.7, lng: lng - offsetDeg * 0.7 },
+          { lat: lat - offsetDeg * 0.7, lng: lng + offsetDeg * 0.7 },
+          { lat: lat - offsetDeg * 0.7, lng: lng - offsetDeg * 0.7 },
         ];
         await Promise.all(points.map(p => fetchAreasForLocation(p.lat, p.lng)));
 
