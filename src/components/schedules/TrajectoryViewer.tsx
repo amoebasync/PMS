@@ -282,12 +282,20 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   // Area polygon
   const areaPaths = data.area?.boundaryGeojson ? extractPaths(data.area.boundaryGeojson) : [];
 
-  // Map center
+  // エリアポリゴンの中心を計算（GPSデータがない場合のフォールバック用）
+  const areaCenter = areaPaths.length > 0 && areaPaths[0].length > 0
+    ? {
+        lat: areaPaths[0].reduce((s, p) => s + p.lat, 0) / areaPaths[0].length,
+        lng: areaPaths[0].reduce((s, p) => s + p.lng, 0) / areaPaths[0].length,
+      }
+    : null;
+
+  // Map center: GPSポイント > エリアポリゴン中心 > デフォルト の優先順
   const center = currentPoint
     ? { lat: currentPoint.lat, lng: currentPoint.lng }
     : points.length > 0
     ? { lat: points[0].lat, lng: points[0].lng }
-    : { lat: 35.68, lng: 139.76 };
+    : areaCenter || { lat: 35.68, lng: 139.76 };
 
   // PAUSE 中の合計時間を計算（作業時間から除外する）
   const totalPausedMs = (data.pauseEvents || []).reduce((sum, e) => {
@@ -319,7 +327,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               <span className="text-slate-400 font-normal text-sm ml-2">({data.schedule.distributorStaffId})</span>
             </h2>
             <p className="text-xs text-slate-500">
-              {data.area ? `${data.area.townName}${data.area.chomeName}` : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+              {data.area ? (data.area.chomeName || data.area.townName) : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               {isLive && (
                 <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 font-bold">
                   <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
