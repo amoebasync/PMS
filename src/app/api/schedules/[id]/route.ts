@@ -98,9 +98,20 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   if (error) return error;
   try {
     const { id } = await params;
-    await prisma.distributionSchedule.delete({ where: { id: parseInt(id) } });
+    const scheduleId = parseInt(id);
+
+    await prisma.$transaction(async (tx) => {
+      // FK制約のある関連レコードのscheduleIdをnullに（onDelete: SetNull がDBに反映されていない場合の安全策）
+      await tx.task.updateMany({ where: { scheduleId }, data: { scheduleId: null } });
+      await tx.taskTemplate.updateMany({ where: { scheduleId }, data: { scheduleId: null } });
+      await tx.complaint.updateMany({ where: { scheduleId }, data: { scheduleId: null } });
+      // Cascade対象（items, sessions, notifications）はDB側で自動削除
+      await tx.distributionSchedule.delete({ where: { id: scheduleId } });
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error('Failed to delete schedule:', error);
     return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 });
   }
 }

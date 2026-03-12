@@ -1917,7 +1917,7 @@ model Task {
   branchId       Int?              @map("branch_id")
   branch         Branch?           @relation("TaskBranch", fields: [branchId], references: [id])
   scheduleId     Int?              @map("schedule_id")
-  schedule       DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+  schedule       DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   templateId     Int?              @map("template_id")
   template       TaskTemplate?     @relation(fields: [templateId], references: [id])
 
@@ -1968,7 +1968,7 @@ model TaskTemplate {
   branchId         Int?               @map("branch_id")
   branch           Branch?            @relation("TaskTemplateBranch", fields: [branchId], references: [id])
   scheduleId       Int?               @map("schedule_id")
-  schedule         DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+  schedule         DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
   // サイクル設定
   recurrenceType   RecurrenceType     @default(ONCE) @map("recurrence_type")
@@ -2710,7 +2710,7 @@ model Complaint {
   complaintType        ComplaintType?        @relation(fields: [complaintTypeId], references: [id])
   customer             Customer?             @relation(fields: [customerId], references: [id])
   distributor          FlyerDistributor?     @relation(fields: [distributorId], references: [id])
-  schedule             DistributionSchedule? @relation(fields: [scheduleId], references: [id])
+  schedule             DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   branch               Branch?               @relation(fields: [branchId], references: [id])
   assignee             Employee?             @relation("ComplaintAssignee", fields: [assigneeId], references: [id])
   sourcePartner        Partner?              @relation(fields: [sourcePartnerId], references: [id])
