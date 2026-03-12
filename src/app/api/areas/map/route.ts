@@ -5,11 +5,19 @@ import { prisma } from '@/lib/prisma';
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const cityName = searchParams.get('cityName');
+  const prefName = searchParams.get('prefName');
 
   try {
     const whereClause: any = {
       boundary_geojson: { not: null }
     };
+
+    if (prefName) {
+      const cleanPrefName = prefName.replace(/(都|道|府|県)/g, '');
+      whereClause.prefecture = {
+        name: { contains: cleanPrefName }
+      };
+    }
 
     if (cityName) {
       const cleanCityName = cityName.replace(/(区|市|City|Ku|Ward|Town|Village|\s)/gi, '');
