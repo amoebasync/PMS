@@ -372,9 +372,18 @@ function NewOrderContent() {
         setAppliedRadiusKm(radiusKm);
 
         const r = Number(radiusKm);
-        if (r === 1) setMapZoom(14); else if (r === 2) setMapZoom(13); else if (r === 3) setMapZoom(12); else setMapZoom(11);
+        if (r === 1) setMapZoom(15); else if (r === 2) setMapZoom(14); else if (r === 3) setMapZoom(13); else setMapZoom(12);
 
-        await fetchAreasForLocation(lat, lng);
+        // 中心座標 + 円周上の東西南北4点で逆ジオコーディングし、隣接する区のエリアも読み込む
+        const offsetDeg = r * 0.009; // 約1km ≒ 0.009度
+        const points = [
+          { lat, lng },
+          { lat: lat + offsetDeg, lng },
+          { lat: lat - offsetDeg, lng },
+          { lat, lng: lng + offsetDeg },
+          { lat, lng: lng - offsetDeg },
+        ];
+        await Promise.all(points.map(p => fetchAreasForLocation(p.lat, p.lng)));
 
         setTimeout(() => {
           const newSelected = new Set<number>();
@@ -387,7 +396,7 @@ function NewOrderContent() {
             setSelectedAreaIds(newSelected);
             return currentAreas;
           });
-        }, 500);
+        }, 1000);
       } else showToast('住所が見つかりませんでした', 'warning');
     });
   };
