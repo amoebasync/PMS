@@ -395,10 +395,35 @@ function MobileHeader({
   onOpenTaskModal: () => void;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { t } = useTranslation('sidebar');
+  const { t: tCommon } = useTranslation('common');
+  const { lang, setLang } = useLanguage();
   const pageIcon = getPageIcon(pathname);
   const pageTitleKey = getPageTitleKey(pathname);
   const pageTitle = pageTitleKey ? t(pageTitleKey) : 'PMS Pro';
+  const [isMobileUserMenuOpen, setIsMobileUserMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => { setIsMobileUserMenuOpen(false); }, [pathname]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setIsMobileUserMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleMobileLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      router.push('/login');
+      router.refresh();
+    } catch {}
+  };
 
   return (
     <div className="md:hidden fixed top-0 left-0 right-0 h-[64px] bg-white/80 backdrop-blur-md border-b border-slate-200/60 z-[120] flex items-center px-3 gap-2">
@@ -422,7 +447,50 @@ function MobileHeader({
       >
         <i className="bi bi-plus-lg text-[16px]"></i>
       </button>
+
+      {/* 言語切替 */}
+      <button
+        onClick={() => setLang(lang === 'ja' ? 'en' : 'ja')}
+        className="relative flex items-center h-8 w-[60px] rounded-full bg-slate-100 p-0.5 transition-colors"
+      >
+        <span className={`absolute top-0.5 h-7 w-[29px] rounded-full bg-white shadow-sm ring-1 ring-black/[0.04] transition-all duration-200 ease-in-out ${lang === 'en' ? 'left-[29px]' : 'left-0.5'}`} />
+        <span className={`relative z-10 flex-1 flex items-center justify-center text-[10px] font-bold transition-colors duration-200 ${lang === 'ja' ? 'text-slate-800' : 'text-slate-400'}`}>JA</span>
+        <span className={`relative z-10 flex-1 flex items-center justify-center text-[10px] font-bold transition-colors duration-200 ${lang === 'en' ? 'text-slate-800' : 'text-slate-400'}`}>EN</span>
+      </button>
+
       <NotificationBell />
+
+      {/* ユーザーメニュー */}
+      <div className="relative" ref={mobileMenuRef}>
+        <button
+          onClick={() => setIsMobileUserMenuOpen(!isMobileUserMenuOpen)}
+          className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-blue-700 active:opacity-80"
+          aria-label="User menu"
+        >
+          <i className="bi bi-person-fill text-white text-sm"></i>
+        </button>
+        {isMobileUserMenuOpen && (
+          <div className="absolute right-0 top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-[50]">
+            <div className="py-1">
+              <Link
+                href="/profile"
+                onClick={() => setIsMobileUserMenuOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-[13px] text-slate-700 hover:bg-slate-50 transition-colors"
+              >
+                <i className="bi bi-person-gear text-slate-400 w-4 text-center"></i>
+                {tCommon('profile_edit')}
+              </Link>
+              <button
+                onClick={handleMobileLogout}
+                className="w-full flex items-center gap-3 px-4 py-3 text-[13px] text-rose-600 hover:bg-rose-50 transition-colors"
+              >
+                <i className="bi bi-box-arrow-right text-rose-400 w-4 text-center"></i>
+                {tCommon('logout')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

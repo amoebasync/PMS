@@ -212,6 +212,7 @@ export async function POST(request: Request) {
           managerId: body.managerId ? parseInt(body.managerId) : null,
           rank: body.rank || 'ASSOCIATE',
           jobTitle: body.jobTitle || null,
+          language: body.language || 'ja',
         },
       });
 

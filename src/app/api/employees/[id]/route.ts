@@ -82,6 +82,7 @@ export async function PUT(
           visaExpiryDate: body.visaExpiryDate ? new Date(body.visaExpiryDate) : null,
           rank: body.rank || 'ASSOCIATE',
           jobTitle: body.jobTitle || null,
+          language: body.language || 'ja',
           isActive: body.isActive,
         },
       });

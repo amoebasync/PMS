@@ -57,6 +57,7 @@ type Employee = {
   postalCode?: string | null;
   address?: string | null;
   buildingName?: string | null;
+  language?: string | null;
 };
 
 const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
@@ -160,6 +161,7 @@ export default function EmployeePage() {
     branchId: '', departmentId: '', countryId: '', status: 'ACTIVE',
     visaTypeId: '', visaExpiryDate: '',
     rank: 'ASSOCIATE', jobTitle: '', managerId: '',
+    language: 'ja',
     roleIds: [] as string[],
     employmentType: 'FULL_TIME', salaryType: 'MONTHLY',
     baseSalary: '', hourlyRate: '', dailyRate: '',
@@ -321,6 +323,7 @@ export default function EmployeePage() {
         rank: employee.rank || 'ASSOCIATE',
         jobTitle: employee.jobTitle || '',
         managerId: employee.managerId?.toString() || '', // ★ 上司情報を復元
+        language: employee.language || 'ja',
         
         roleIds: employee.roles?.map(r => r.roleId.toString()) || [],
 
@@ -1324,7 +1327,14 @@ export default function EmployeePage() {
                       {countries.map(country => <option key={country.id} value={country.id}>{country.name} ({country.code})</option>)}
                     </select>
                   </div>
-                  
+                  <div>
+                    <label className={labelClass}>{t('form_language')}</label>
+                    <select name="language" value={formData.language} onChange={handleInputChange} className={inputClass}>
+                      <option value="ja">{t('form_language_ja')}</option>
+                      <option value="en">{t('form_language_en')}</option>
+                    </select>
+                  </div>
+
                   <div className="md:col-span-3 pt-4 border-t border-slate-100">
                     <label className={labelClass}>{t('form_roles_label')}</label>
                     <div className="flex flex-wrap gap-3 mt-2">
