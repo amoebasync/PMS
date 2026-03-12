@@ -125,5 +125,15 @@
   "delete_btn": "Delete",
   "delete_success": "Schedule deleted",
   "cancel": "Cancel",
-  "loading": "Loading..."
+  "loading": "Loading...",
+
+  "assign_title": "Assign Distributor",
+  "assign_search_placeholder": "Search by name or staff ID...",
+  "assign_mode_shift": "Today's Shift",
+  "assign_mode_all": "All Search",
+  "assign_no_shift": "No distributors with shifts today",
+  "assign_no_results": "No matching distributors found",
+  "assign_success": "Distributor assigned",
+  "assign_loading": "Searching...",
+  "change_distributor": "Change"
 }

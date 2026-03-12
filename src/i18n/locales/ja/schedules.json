@@ -125,5 +125,15 @@
   "delete_btn": "削除する",
   "delete_success": "スケジュールを削除しました",
   "cancel": "キャンセル",
-  "loading": "読み込み中..."
+  "loading": "読み込み中...",
+
+  "assign_title": "配布員の割り当て",
+  "assign_search_placeholder": "名前またはスタッフIDで検索...",
+  "assign_mode_shift": "当日シフト",
+  "assign_mode_all": "全体検索",
+  "assign_no_shift": "当日シフトのある配布員がいません",
+  "assign_no_results": "該当する配布員が見つかりません",
+  "assign_success": "配布員を割り当てました",
+  "assign_loading": "検索中...",
+  "change_distributor": "変更"
 }

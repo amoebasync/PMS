@@ -116,6 +116,14 @@ export default function ScheduleListPage() {
   const complianceBtnRef = useRef<HTMLButtonElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
 
+  // 配布員割り当てモーダル
+  const [assignSchedule, setAssignSchedule] = useState<any>(null);
+  const [assignMode, setAssignMode] = useState<'shift' | 'all'>('shift');
+  const [assignSearch, setAssignSearch] = useState('');
+  const [assignCandidates, setAssignCandidates] = useState<any[]>([]);
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [shiftDistributorIds, setShiftDistributorIds] = useState<Set<number>>(new Set());
+
   // ポップオーバー/メニュー外クリックで閉じる
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -200,6 +208,67 @@ export default function ScheduleListPage() {
       }
     } catch { showToast(t('communication_error'), 'error'); }
   };
+
+  // 配布員割り当てモーダルを開く
+  const openAssignModal = useCallback(async (schedule: any) => {
+    setAssignSchedule(schedule);
+    setAssignSearch('');
+    setAssignMode('shift');
+    setAssignCandidates([]);
+    setAssignLoading(true);
+
+    try {
+      // 当日シフトの配布員を取得
+      const shiftRes = await fetch(`/api/distributor-shifts?dateFrom=${filterDate}&dateTo=${filterDate}&status=WORKING&limit=200`);
+      if (shiftRes.ok) {
+        const shiftData = await shiftRes.json();
+        const ids = new Set<number>((shiftData.data || []).map((s: any) => s.distributorId));
+        setShiftDistributorIds(ids);
+      }
+      // 全配布員を取得
+      const distRes = await fetch('/api/distributors');
+      if (distRes.ok) {
+        const distData = await distRes.json();
+        const active = (distData || []).filter((d: any) => d.isActive !== false && !d.leaveDate);
+        setAssignCandidates(active);
+      }
+    } catch { /* silent */ }
+    setAssignLoading(false);
+  }, [filterDate]);
+
+  // 配布員を割り当て
+  const handleAssign = async (distributorId: number) => {
+    if (!assignSchedule) return;
+    try {
+      const res = await fetch(`/api/schedules/${assignSchedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ distributorId }),
+      });
+      if (res.ok) {
+        const selected = assignCandidates.find(d => d.id === distributorId);
+        setSchedules(prev => prev.map(s => s.id === assignSchedule.id
+          ? { ...s, distributorId, distributor: selected ? { id: selected.id, name: selected.name, staffId: selected.staffId } : s.distributor }
+          : s
+        ));
+        showToast(t('assign_success'), 'success');
+        setAssignSchedule(null);
+      } else {
+        showToast(t('communication_error'), 'error');
+      }
+    } catch { showToast(t('communication_error'), 'error'); }
+  };
+
+  // 割り当てモーダル内のフィルタ済み候補
+  const filteredCandidates = assignCandidates.filter(d => {
+    if (assignMode === 'shift' && !shiftDistributorIds.has(d.id)) return false;
+    if (assignSearch) {
+      const q = assignSearch.toLowerCase();
+      const target = `${d.name || ''} ${d.staffId || ''}`.toLowerCase();
+      if (!target.includes(q)) return false;
+    }
+    return true;
+  });
 
   const filteredSchedules = schedules.filter(s => {
     if (filterStatus !== 'ALL' && s.status !== filterStatus) return false;
@@ -308,12 +377,23 @@ export default function ScheduleListPage() {
                     {/* Distributor */}
                     <td className="px-3 py-2.5">
                       {s.distributor ? (
-                        <div>
-                          <div className="font-bold text-slate-800 text-xs">{s.distributor.name}</div>
-                          <div className="text-[10px] text-slate-400">{s.distributor.staffId}</div>
+                        <div className="flex items-center gap-1.5 group/dist">
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 text-xs">{s.distributor.name}</div>
+                            <div className="text-[10px] text-slate-400">{s.distributor.staffId}</div>
+                          </div>
+                          {s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
+                            <button onClick={() => openAssignModal(s)}
+                              className="shrink-0 opacity-0 group-hover/dist:opacity-100 text-[10px] text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition-all">
+                              <i className="bi bi-arrow-repeat"></i>
+                            </button>
+                          )}
                         </div>
                       ) : (
-                        <span className="text-slate-300 italic text-[10px]">{t('unassigned')}</span>
+                        <button onClick={() => openAssignModal(s)}
+                          className="text-indigo-400 hover:text-indigo-600 italic text-xs hover:bg-indigo-50 px-2 py-1 rounded transition-colors">
+                          <i className="bi bi-person-plus text-[10px] mr-1"></i>{t('unassigned')}
+                        </button>
                       )}
                     </td>
 
@@ -472,7 +552,13 @@ export default function ScheduleListPage() {
                     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${getCheckBadgeClass(checkCount)}`}>
                       <i className="bi bi-check2-square text-[10px]"></i>{checkCount}/4
                     </span>
-                    <span className="font-bold text-sm text-slate-800 truncate">{s.distributor?.name || <span className="text-slate-300 italic text-xs">{t('unassigned')}</span>}</span>
+                    {s.distributor ? (
+                      <span className="font-bold text-sm text-slate-800 truncate">{s.distributor.name}</span>
+                    ) : (
+                      <button onClick={() => openAssignModal(s)} className="text-indigo-400 hover:text-indigo-600 italic text-xs">
+                        <i className="bi bi-person-plus mr-1"></i>{t('unassigned')}
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
                     <button
@@ -574,6 +660,110 @@ export default function ScheduleListPage() {
           })}
         </div>
       </div>
+
+      {/* Assign Distributor Modal */}
+      {assignSchedule && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block md:max-h-[80vh]">
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base md:text-lg text-slate-800">
+                <i className="bi bi-person-plus text-indigo-500 mr-2"></i>{t('assign_title')}
+              </h3>
+              <button onClick={() => setAssignSchedule(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="px-4 md:px-6 pt-3 space-y-3 shrink-0">
+              {/* Schedule info */}
+              <div className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-3">
+                <span>{assignSchedule.branch?.nameJa || '-'}</span>
+                <span className="text-slate-300">|</span>
+                <span>{formatAreaName(assignSchedule.area?.town_name, assignSchedule.area?.chome_name)}</span>
+                {assignSchedule.distributor && (
+                  <>
+                    <span className="text-slate-300">|</span>
+                    <span className="text-amber-600 font-bold">{assignSchedule.distributor.name}</span>
+                  </>
+                )}
+              </div>
+              {/* Mode toggle */}
+              <div className="flex bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setAssignMode('shift')}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${assignMode === 'shift' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <i className="bi bi-calendar-check mr-1"></i>{t('assign_mode_shift')}
+                  <span className="ml-1 opacity-60">({assignCandidates.filter(d => shiftDistributorIds.has(d.id)).length})</span>
+                </button>
+                <button
+                  onClick={() => setAssignMode('all')}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${assignMode === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <i className="bi bi-people mr-1"></i>{t('assign_mode_all')}
+                  <span className="ml-1 opacity-60">({assignCandidates.length})</span>
+                </button>
+              </div>
+              {/* Search */}
+              <div className="relative">
+                <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" value={assignSearch} onChange={e => setAssignSearch(e.target.value)}
+                  placeholder={t('assign_search_placeholder')}
+                  className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  autoFocus />
+              </div>
+            </div>
+            {/* Candidate list */}
+            <div className="flex-1 overflow-auto px-4 md:px-6 py-3 md:min-h-[200px] md:max-h-[400px]">
+              {assignLoading ? (
+                <div className="flex items-center justify-center py-10 text-slate-400">
+                  <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mr-2"></div>
+                  {t('assign_loading')}
+                </div>
+              ) : filteredCandidates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-slate-400">
+                  <i className="bi bi-person-x text-3xl mb-2"></i>
+                  <span className="text-xs">{assignMode === 'shift' ? t('assign_no_shift') : t('assign_no_results')}</span>
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {filteredCandidates.map(d => {
+                    const hasShift = shiftDistributorIds.has(d.id);
+                    const isCurrentlyAssigned = assignSchedule.distributorId === d.id;
+                    return (
+                      <button key={d.id} onClick={() => !isCurrentlyAssigned && handleAssign(d.id)}
+                        disabled={isCurrentlyAssigned}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          isCurrentlyAssigned ? 'bg-indigo-50 border border-indigo-200 cursor-default' : 'hover:bg-slate-50 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                          {d.avatarUrl ? (
+                            <img src={d.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="bi bi-person-fill text-slate-300 text-sm mt-0.5"></i>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-800 truncate">{d.name}</div>
+                          <div className="text-[10px] text-slate-400">{d.staffId}{d.branch?.nameJa ? ` · ${d.branch.nameJa}` : ''}</div>
+                        </div>
+                        {hasShift && (
+                          <span className="shrink-0 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">
+                            <i className="bi bi-calendar-check mr-0.5"></i>SHIFT
+                          </span>
+                        )}
+                        {isCurrentlyAssigned && (
+                          <span className="shrink-0 text-[10px] font-bold text-indigo-600">
+                            <i className="bi bi-check-circle-fill"></i>
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Remarks Modal */}
       {editingSchedule && (
