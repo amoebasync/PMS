@@ -135,5 +135,15 @@
   "assign_no_results": "No matching distributors found",
   "assign_success": "Distributor assigned",
   "assign_loading": "Searching...",
-  "change_distributor": "Change"
+  "change_distributor": "Change",
+
+  "status_change_title": "Change Status",
+  "status_select_label": "Select Status",
+  "status_actual_counts": "Actual Distribution Counts",
+  "status_fill_planned": "Fill with planned",
+  "status_planned": "Planned",
+  "saving": "Saving...",
+  "incomplete_area_done": "Area Done",
+  "incomplete_give_up": "Give Up",
+  "incomplete_other": "Other"
 }

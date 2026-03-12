@@ -50,11 +50,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       });
     }
 
+    // アイテムの実績枚数更新
+    if (body.items && Array.isArray(body.items)) {
+      for (const item of body.items) {
+        if (item.id && item.actualCount !== undefined) {
+          await prisma.distributionItem.update({
+            where: { id: item.id },
+            data: { actualCount: parseInt(item.actualCount) || 0 },
+          });
+        }
+      }
+    }
+
     const updatedSchedule = await prisma.distributionSchedule.update({
       where: { id: scheduleId },
       data,
       include: {
         checkedBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+        items: { orderBy: { slotIndex: 'asc' } },
       }
     });
 

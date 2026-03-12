@@ -135,5 +135,15 @@
   "assign_no_results": "該当する配布員が見つかりません",
   "assign_success": "配布員を割り当てました",
   "assign_loading": "検索中...",
-  "change_distributor": "変更"
+  "change_distributor": "変更",
+
+  "status_change_title": "ステータス変更",
+  "status_select_label": "ステータスを選択",
+  "status_actual_counts": "配布実績枚数",
+  "status_fill_planned": "予定枚数で入力",
+  "status_planned": "予定",
+  "saving": "保存中...",
+  "incomplete_area_done": "エリア終了",
+  "incomplete_give_up": "ギブアップ",
+  "incomplete_other": "その他"
 }

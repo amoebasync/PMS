@@ -42,6 +42,13 @@ const STATUS_STYLE: Record<string, string> = {
   UNSTARTED: 'bg-slate-100 text-slate-600',
 };
 
+const STATUS_DOT: Record<string, string> = {
+  COMPLETED: 'bg-blue-400',
+  DISTRIBUTING: 'bg-emerald-400',
+  IN_PROGRESS: 'bg-amber-400',
+  UNSTARTED: 'bg-slate-400',
+};
+
 function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate: (updated: any) => void; t: (key: string) => string }) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState<string | null>(null);
@@ -97,6 +104,114 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
   );
 }
 
+function StatusChangeModal({ schedule, onClose, onSave, t, getStatusKey }: {
+  schedule: any;
+  onClose: () => void;
+  onSave: (id: number, status: string, items?: { id: number; actualCount: number }[]) => Promise<void>;
+  t: (key: string) => string;
+  getStatusKey: (status: string) => string;
+}) {
+  const [selectedStatus, setSelectedStatus] = useState<string>(schedule.status);
+  const [saving, setSaving] = useState(false);
+  const activeItems = (schedule.items || []).filter((item: any) => item.flyerName);
+  const [itemCounts, setItemCounts] = useState<Record<number, string>>(() => {
+    const counts: Record<number, string> = {};
+    activeItems.forEach((item: any) => {
+      counts[item.id] = item.actualCount != null ? String(item.actualCount) : String(item.plannedCount || 0);
+    });
+    return counts;
+  });
+  const handleSave = async () => {
+    setSaving(true);
+    const items = selectedStatus === 'COMPLETED'
+      ? activeItems.map((item: any) => ({ id: item.id, actualCount: parseInt(itemCounts[item.id]) || 0 }))
+      : undefined;
+    await onSave(schedule.id, selectedStatus, items);
+    setSaving(false);
+  };
+
+  const fillPlanned = () => {
+    const counts: Record<number, string> = {};
+    activeItems.forEach((item: any) => { counts[item.id] = String(item.plannedCount || 0); });
+    setItemCounts(counts);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-md overflow-hidden flex flex-col md:block">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+          <h3 className="font-bold text-base md:text-lg text-slate-800">
+            <i className="bi bi-arrow-repeat text-indigo-500 mr-2"></i>{t('status_change_title')}
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+        </div>
+        <div className="p-4 md:p-6 flex-1 md:flex-none overflow-auto space-y-4">
+          {/* Schedule info */}
+          <div className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-3">
+            <span className="font-bold text-slate-700">{schedule.distributor?.name || '-'}</span>
+            <span className="text-slate-300">|</span>
+            <span>{formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}</span>
+          </div>
+
+          {/* Status selection */}
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-slate-600">{t('status_select_label')}</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['UNSTARTED', 'IN_PROGRESS', 'DISTRIBUTING', 'COMPLETED'] as const).map(st => (
+                <button key={st} onClick={() => setSelectedStatus(st)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                    selectedStatus === st
+                      ? 'border-indigo-400 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-400'
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  }`}>
+                  <span className={`w-2 h-2 rounded-full ${STATUS_DOT[st]}`}></span>
+                  {t(getStatusKey(st))}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Flyer counts - only show when COMPLETED selected */}
+          {selectedStatus === 'COMPLETED' && activeItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-600">{t('status_actual_counts')}</label>
+                <button onClick={fillPlanned} className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold">
+                  {t('status_fill_planned')}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {activeItems.map((item: any) => (
+                  <div key={item.id} className="flex items-center gap-3 bg-slate-50 rounded-lg px-3 py-2">
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-bold text-slate-700 truncate">{item.flyerName}</div>
+                      <div className="text-[10px] text-slate-400">{t('status_planned')}: {item.plannedCount?.toLocaleString() || 0}</div>
+                    </div>
+                    <input
+                      type="number"
+                      value={itemCounts[item.id] || ''}
+                      onChange={e => setItemCounts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                      className="w-24 text-right border border-slate-200 rounded-lg px-2 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                      min={0}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="px-4 md:px-6 py-3 md:py-4 bg-slate-50 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-xs md:text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">{t('cancel')}</button>
+          <button onClick={handleSave} disabled={saving || selectedStatus === schedule.status}
+            className="px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-colors">
+            {saving ? <span className="inline-flex items-center gap-1"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>{t('saving')}</span> : t('btn_save')}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ScheduleListPage() {
   const { t } = useTranslation('schedules');
   const { showToast, showConfirm } = useNotification();
@@ -123,6 +238,7 @@ export default function ScheduleListPage() {
   const [assignCandidates, setAssignCandidates] = useState<any[]>([]);
   const [assignLoading, setAssignLoading] = useState(false);
   const [shiftDistributorIds, setShiftDistributorIds] = useState<Set<number>>(new Set());
+  const [statusModalSchedule, setStatusModalSchedule] = useState<any>(null);
 
   // ポップオーバー/メニュー外クリックで閉じる
   useEffect(() => {
@@ -174,6 +290,28 @@ export default function ScheduleListPage() {
         : s
     ));
   }, []);
+
+  const handleStatusChange = useCallback(async (scheduleId: number, newStatus: string, items?: { id: number; actualCount: number }[]) => {
+    try {
+      const body: any = { status: newStatus };
+      if (items) body.items = items;
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSchedules(prev => prev.map(s => s.id === scheduleId
+          ? { ...s, status: newStatus, items: updated.items || s.items }
+          : s
+        ));
+        setStatusModalSchedule(null);
+      } else {
+        showToast(t('communication_error'), 'error');
+      }
+    } catch { showToast(t('communication_error'), 'error'); }
+  }, [showToast, t]);
 
   // 配布員を外す
   const handleUnassign = async (schedule: any) => {
@@ -368,10 +506,13 @@ export default function ScheduleListPage() {
                   <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
                     {/* Status */}
                     <td className="px-3 py-2.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${STATUS_STYLE[s.status] || STATUS_STYLE.UNSTARTED}`}>
+                      <button
+                        onClick={() => setStatusModalSchedule(s)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity ${STATUS_STYLE[s.status] || STATUS_STYLE.UNSTARTED}`}
+                      >
                         {s.status === 'DISTRIBUTING' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>}
                         {t(getStatusKey(s.status))}
-                      </span>
+                      </button>
                     </td>
 
                     {/* Distributor */}
@@ -545,10 +686,13 @@ export default function ScheduleListPage() {
                 {/* Row 1: Status + Distributor + Actions */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${STATUS_STYLE[s.status] || STATUS_STYLE.UNSTARTED}`}>
+                    <button
+                      onClick={() => setStatusModalSchedule(s)}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold shrink-0 cursor-pointer hover:opacity-80 transition-opacity ${STATUS_STYLE[s.status] || STATUS_STYLE.UNSTARTED}`}
+                    >
                       {s.status === 'DISTRIBUTING' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>}
                       {t(getStatusKey(s.status))}
-                    </span>
+                    </button>
                     <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0 ${getCheckBadgeClass(checkCount)}`}>
                       <i className="bi bi-check2-square text-[10px]"></i>{checkCount}/4
                     </span>
@@ -788,6 +932,17 @@ export default function ScheduleListPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Status Change Modal */}
+      {statusModalSchedule && (
+        <StatusChangeModal
+          schedule={statusModalSchedule}
+          onClose={() => setStatusModalSchedule(null)}
+          onSave={handleStatusChange}
+          t={t}
+          getStatusKey={getStatusKey}
+        />
       )}
 
       {/* Trajectory Viewer */}
