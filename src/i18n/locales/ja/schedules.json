@@ -145,5 +145,20 @@
   "saving": "保存中...",
   "incomplete_area_done": "エリア終了",
   "incomplete_give_up": "ギブアップ",
-  "incomplete_other": "その他"
+  "incomplete_other": "その他",
+
+  "summary_workers": "出勤人数",
+  "summary_main_count": "メイン枚数",
+
+  "all_traj_btn": "全体マップ",
+  "all_traj_title": "全配布員GPS軌跡",
+  "all_traj_loading": "軌跡データを読み込み中...",
+  "all_traj_no_data": "この日の軌跡データはありません",
+  "all_traj_show_all": "すべて表示",
+  "all_traj_hide_all": "すべて非表示",
+  "all_traj_active": "配布中",
+  "all_traj_completed": "完了",
+  "all_traj_total": "合計",
+  "all_traj_live": "リアルタイム更新中",
+  "all_traj_distributors": "配布員"
 }

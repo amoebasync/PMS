@@ -145,5 +145,20 @@
   "saving": "Saving...",
   "incomplete_area_done": "Area Done",
   "incomplete_give_up": "Give Up",
-  "incomplete_other": "Other"
+  "incomplete_other": "Other",
+
+  "summary_workers": "Workers",
+  "summary_main_count": "Main Flyer Count",
+
+  "all_traj_btn": "All Trajectories Map",
+  "all_traj_title": "All Distributors GPS Trajectories",
+  "all_traj_loading": "Loading trajectory data...",
+  "all_traj_no_data": "No trajectory data for this date",
+  "all_traj_show_all": "Show All",
+  "all_traj_hide_all": "Hide All",
+  "all_traj_active": "Active",
+  "all_traj_completed": "Completed",
+  "all_traj_total": "Total",
+  "all_traj_live": "Real-time updates",
+  "all_traj_distributors": "Distributors"
 }

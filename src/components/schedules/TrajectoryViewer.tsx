@@ -337,9 +337,14 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
             </p>
           </div>
         </div>
-        <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
-          <i className="bi bi-x-lg"></i>
-        </button>
+        <div className="flex items-center gap-1">
+          <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
+            <i className="bi bi-arrow-clockwise"></i>
+          </button>
+          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
       </div>
 
       {/* Main content */}

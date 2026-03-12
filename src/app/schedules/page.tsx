@@ -5,12 +5,18 @@ import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
+const AllTrajectoriesViewer = lazy(() => import('@/components/schedules/AllTrajectoriesViewer'));
 
 const getTodayStr = () => {
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
+  const now = new Date();
+  const jst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+  // 0時〜3時は前日を表示
+  if (jst.getHours() < 3) {
+    jst.setDate(jst.getDate() - 1);
+  }
+  const yyyy = jst.getFullYear();
+  const mm = String(jst.getMonth() + 1).padStart(2, '0');
+  const dd = String(jst.getDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 };
 
@@ -239,6 +245,7 @@ export default function ScheduleListPage() {
   const [assignLoading, setAssignLoading] = useState(false);
   const [shiftDistributorIds, setShiftDistributorIds] = useState<Set<number>>(new Set());
   const [statusModalSchedule, setStatusModalSchedule] = useState<any>(null);
+  const [showAllTrajectories, setShowAllTrajectories] = useState(false);
 
   // ポップオーバー/メニュー外クリックで閉じる
   useEffect(() => {
@@ -457,8 +464,28 @@ export default function ScheduleListPage() {
                 className="w-full border border-slate-300 rounded-lg pl-9 pr-3 py-2 text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 outline-none" />
             </div>
           </div>
-          <div className="text-xs text-slate-400 md:ml-auto">
-            {filteredSchedules.length} {t('results_count')}
+          <div className="flex items-center gap-3 md:ml-auto flex-wrap">
+            {/* Summary stats */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
+                <i className="bi bi-people-fill text-slate-500"></i>
+                {t('summary_workers')}: {new Set(filteredSchedules.filter(s => s.distributorId).map(s => s.distributorId)).size}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
+                <i className="bi bi-file-earmark text-amber-500"></i>
+                {t('summary_main_count')}: {filteredSchedules.reduce((sum, s) => {
+                  const slot1 = (s.items || []).find((item: any) => item.slotIndex === 1);
+                  return sum + (slot1?.plannedCount || 0);
+                }, 0).toLocaleString()}
+              </span>
+            </div>
+            <button onClick={() => setShowAllTrajectories(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
+              <i className="bi bi-map"></i>{t('all_traj_btn')}
+            </button>
+            <span className="text-xs text-slate-400">
+              {filteredSchedules.length} {t('results_count')}
+            </span>
           </div>
         </div>
       </div>
@@ -943,6 +970,20 @@ export default function ScheduleListPage() {
           t={t}
           getStatusKey={getStatusKey}
         />
+      )}
+
+      {/* All Trajectories Viewer */}
+      {showAllTrajectories && (
+        <Suspense fallback={
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl p-8 text-center">
+              <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+              <p className="text-slate-600 text-sm">{t('loading')}</p>
+            </div>
+          </div>
+        }>
+          <AllTrajectoriesViewer date={filterDate} onClose={() => setShowAllTrajectories(false)} />
+        </Suspense>
       )}
 
       {/* Trajectory Viewer */}
