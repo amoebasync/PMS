@@ -6,6 +6,7 @@ import { PortalProviders } from '@/components/portal/PortalProviders';
 import { PortalHeader } from '@/components/portal/PortalHeader';
 import { PortalFooter } from '@/components/portal/PortalFooter';
 import { CartProvider } from '@/components/portal/CartContext';
+import { NotificationProvider } from '@/components/ui/NotificationProvider';
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -20,20 +21,22 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <PortalProviders>
-      <CartProvider>
-        <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
-          <PortalHeader />
-          
-          {/* メインコンテンツ領域 */}
-          <main className={`flex-1 w-full relative flex flex-col ${isFullScreenPage ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}`}>
-            {children}
-          </main>
+      <NotificationProvider>
+        <CartProvider>
+          <div className="min-h-screen bg-slate-50 flex flex-col font-sans">
+            <PortalHeader />
 
-          {/* フッターの表示制御 */}
-          {!hideFooter && <PortalFooter />}
-          
-        </div>
-      </CartProvider>
+            {/* メインコンテンツ領域 */}
+            <main className={`flex-1 w-full relative flex flex-col ${isFullScreenPage ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}`}>
+              {children}
+            </main>
+
+            {/* フッターの表示制御 */}
+            {!hideFooter && <PortalFooter />}
+
+          </div>
+        </CartProvider>
+      </NotificationProvider>
     </PortalProviders>
   );
 }
