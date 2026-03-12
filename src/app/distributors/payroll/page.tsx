@@ -189,7 +189,13 @@ export default function DistributorPayrollPage() {
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
       {/* Action buttons */}
       {distributors.length > 0 && (
-        <div className="flex justify-end mb-4">
+        <div className="flex justify-end gap-3 mb-4">
+          <a
+            href="/distributors/payroll/import"
+            className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition-colors"
+          >
+            <i className="bi bi-file-earmark-arrow-up"></i>過去データ取込
+          </a>
           <button
             onClick={handleGenerateAll}
             disabled={generatingAll || loading}

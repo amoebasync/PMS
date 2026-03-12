@@ -432,6 +432,7 @@ export default function DataImportPage() {
     // スケジュール / パートナー案件: チャンク分割送信
     let totalImported = 0;
     let totalUpdated = 0;
+    let totalCleaned = 0;
     let totalNewDistributors = 0;
     let orderId: number | null = null;
     let orderNo = '';
@@ -474,6 +475,7 @@ export default function DataImportPage() {
         const data = await res.json();
         totalImported += data.count || 0;
         totalUpdated += data.updatedCount || 0;
+        totalCleaned += data.cleanedCount || 0;
         totalNewDistributors += data.newDistributorCount || 0;
         if (data.orderId) orderId = data.orderId;
         if (data.orderNo) orderNo = data.orderNo;
@@ -494,6 +496,7 @@ export default function DataImportPage() {
       msg = `✨ ${ts('import_success', { count: totalImported + totalUpdated })}`;
     }
     if (totalUpdated > 0) msg += ` ${ts('import_updated', { count: totalUpdated })}`;
+    if (totalCleaned > 0) msg += ` (旧データ${totalCleaned}件を削除)`;
     if (totalNewDistributors > 0) msg += ` ${ts('import_new_distributors', { count: totalNewDistributors })}`;
     setMessage(msg); setParsedData([]); setPasteText('');
     setIsImporting(false);

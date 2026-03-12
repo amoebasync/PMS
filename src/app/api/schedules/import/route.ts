@@ -186,6 +186,11 @@ export async function POST(request: Request) {
       let importedCount = 0;
       let updatedCount = 0;
 
+      // インポートで作成/更新したスケジュールIDを追跡（後のクリーンアップ用）
+      const importedScheduleIds = new Set<number>();
+      // 配布員+日付の組み合わせを追跡（古いスケジュールのクリーンアップ用）
+      const distributorDatePairs = new Map<string, { distributorId: number; date: Date }>();
+
       const BATCH = 10;
       for (let i = 0; i < schedules.length; i += BATCH) {
         const batch = schedules.slice(i, i + BATCH);
@@ -222,7 +227,7 @@ export async function POST(request: Request) {
             let isUpdate = false;
 
             if (existingId) {
-              // ── 既存スケジュールを更新 ──
+              // ── 既存スケジュールを更新（エリア・チラシ含む全フィールド） ──
               schedule = await tx.distributionSchedule.update({
                 where: { id: existingId },
                 data: scheduleData,
@@ -239,6 +244,13 @@ export async function POST(request: Request) {
             } else {
               // ── 新規作成 ──
               schedule = await tx.distributionSchedule.create({ data: scheduleData });
+            }
+
+            // 追跡用に記録
+            importedScheduleIds.add(schedule.id);
+            if (distributor?.id && baseDate) {
+              const pairKey = `${distributor.id}_${baseDate.toISOString().split('T')[0]}`;
+              distributorDatePairs.set(pairKey, { distributorId: distributor.id, date: baseDate });
             }
 
             return { schedule, source: s, distributor, baseDate, isUpdate };
@@ -340,13 +352,43 @@ export async function POST(request: Request) {
         }
       }
 
-      return { importedCount, updatedCount, createdOrder };
+      // ── 古いスケジュールのクリーンアップ ──
+      // 同じ配布員+日付で、今回のインポートに含まれない古いスケジュールを削除
+      // （エリア変更等で jobNumber が変わった場合、古いスケジュールが残るのを防ぐ）
+      let cleanedCount = 0;
+      if (distributorDatePairs.size > 0) {
+        for (const { distributorId, date } of distributorDatePairs.values()) {
+          const oldSchedules = await tx.distributionSchedule.findMany({
+            where: {
+              distributorId,
+              date,
+              id: { notIn: [...importedScheduleIds] },
+            },
+            select: { id: true },
+          });
+
+          for (const old of oldSchedules) {
+            // 関連データを削除してからスケジュールを削除
+            const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: old.id }, select: { id: true } });
+            if (oldSession) {
+              await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
+              await tx.distributionSession.delete({ where: { id: oldSession.id } });
+            }
+            await tx.distributionItem.deleteMany({ where: { scheduleId: old.id } });
+            await tx.distributionSchedule.delete({ where: { id: old.id } });
+            cleanedCount++;
+          }
+        }
+      }
+
+      return { importedCount, updatedCount, cleanedCount, createdOrder };
     }, { timeout: 120000 });
 
     return NextResponse.json({
       success: true,
       count: result.importedCount,
       updatedCount: result.updatedCount,
+      cleanedCount: result.cleanedCount,
       newDistributorCount,
       ...(result.createdOrder ? { orderNo: result.createdOrder.orderNo, orderId: result.createdOrder.id } : {}),
     });
