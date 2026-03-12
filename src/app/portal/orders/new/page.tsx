@@ -367,11 +367,13 @@ function NewOrderContent() {
       if (status === 'OK' && results && results[0]) {
         const location = results[0].geometry.location;
         const lat = location.lat(), lng = location.lng();
-        setMapCenter({ lat, lng });
         setSearchMarker({ lat, lng });
         setAppliedRadiusKm(radiusKm);
 
         const r = Number(radiusKm);
+        // 右パネル分（約0.004度）だけ中心を左にずらして円全体が見えるようにする
+        const lngOffset = r === 1 ? 0.004 : r === 2 ? 0.008 : 0.012;
+        setMapCenter({ lat, lng: lng - lngOffset });
         if (r === 1) setMapZoom(15); else if (r === 2) setMapZoom(14); else if (r === 3) setMapZoom(13); else setMapZoom(12);
 
         // 中心座標 + 円周上の東西南北4点で逆ジオコーディングし、隣接する区のエリアも読み込む
