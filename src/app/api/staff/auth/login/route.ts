@@ -79,7 +79,7 @@ export async function POST(request: Request) {
       isPasswordTemp: distributor.isPasswordTemp,
       hasSeenOnboarding: distributor.hasSeenOnboarding,
       language: distributor.language || 'ja',
-      user: { name: distributor.name, staffId: distributor.staffId },
+      user: { name: distributor.name, staffId: distributor.staffId, phone: distributor.phone },
     });
   } catch (error) {
     console.error('Distributor Login API Error:', error);
