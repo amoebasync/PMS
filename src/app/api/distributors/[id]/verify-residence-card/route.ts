@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isGeminiConfigured } from '@/lib/gemini';
-import { verifyResidenceCard } from '@/lib/residence-card-verification';
+import { verifyResidenceCard, autoFillFromCardData } from '@/lib/residence-card-verification';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -43,6 +43,35 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     try {
       const result = await verifyResidenceCard('FlyerDistributor', distributorId);
+
+      // 名前一致 → 国籍・ビザ・有効期限をDBに自動セット
+      if (result.overallMatch) {
+        try {
+          await autoFillFromCardData('FlyerDistributor', distributorId, result.extracted);
+          // autoFill後のDB値で比較結果を再取得して更新
+          const refreshed = await prisma.flyerDistributor.findUnique({
+            where: { id: distributorId },
+            select: { visaExpiryDate: true, countryId: true, visaTypeId: true, country: { select: { name: true, nameEn: true } }, visaType: { select: { name: true } } },
+          });
+          if (refreshed) {
+            if (refreshed.visaExpiryDate) {
+              const dbStr = refreshed.visaExpiryDate.toISOString().slice(0, 10);
+              result.comparisons.expiryDate.dbValue = dbStr;
+              result.comparisons.expiryDate.match = result.comparisons.expiryDate.cardValue === dbStr;
+              if (result.comparisons.expiryDate.match) result.comparisons.expiryDate.confidence = 1.0;
+            }
+            if (refreshed.country) {
+              result.comparisons.nationality.dbValue = refreshed.country.nameEn || refreshed.country.name;
+              if (result.comparisons.nationality.cardValue) result.comparisons.nationality.match = true;
+            }
+            if (refreshed.visaType) {
+              result.comparisons.visaType.dbValue = refreshed.visaType.name;
+            }
+          }
+        } catch (fillError) {
+          console.error('[VerifyResidenceCard] AutoFill error:', fillError);
+        }
+      }
 
       const updated = await prisma.flyerDistributor.update({
         where: { id: distributorId },

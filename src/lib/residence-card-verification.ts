@@ -168,7 +168,7 @@ function compareExpiryDate(cardDate: string | null, dbDate: Date | null): { matc
 /**
  * 在留カードから読み取った国籍・ビザ・有効期限をDBに自動セットする
  */
-async function autoFillFromCardData(
+export async function autoFillFromCardData(
   entityType: VerifiableEntityType,
   entityId: number,
   extracted: ResidenceCardData
@@ -335,6 +335,22 @@ export async function triggerAutoVerification(entityType: VerifiableEntityType, 
     if (result.overallMatch) {
       try {
         await autoFillFromCardData(entityType, entityId, result.extracted);
+        // autoFill後のDB値で比較結果を更新
+        const refreshed = await fetchVerifiableEntity(entityType, entityId);
+        if (refreshed) {
+          if (refreshed.visaExpiryDate) {
+            const dbStr = refreshed.visaExpiryDate.toISOString().slice(0, 10);
+            result.comparisons.expiryDate.dbValue = dbStr;
+            result.comparisons.expiryDate.match = result.comparisons.expiryDate.cardValue === dbStr;
+            if (result.comparisons.expiryDate.match) result.comparisons.expiryDate.confidence = 1.0;
+          }
+          if (refreshed.country) {
+            result.comparisons.nationality.dbValue = refreshed.country.nameEn || refreshed.country.name || null;
+          }
+          if (refreshed.visaType) {
+            result.comparisons.visaType.dbValue = refreshed.visaType.name || null;
+          }
+        }
       } catch (fillError) {
         console.error('[ResidenceCardVerification] AutoFill error:', fillError);
       }
