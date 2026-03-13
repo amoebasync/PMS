@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { removeFromGoogleGroup, isGooglePlayTesterConfigured } from '@/lib/google-play-tester';
+import { removeBetaTester, isAppStoreConnectConfigured } from '@/lib/appstore-connect';
 import { requireAdminSession } from '@/lib/adminAuth';
 
 
@@ -87,24 +88,31 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       ? { passwordHash: buildInitialPassword(body.birthday), isPasswordTemp: true }
       : {};
 
-    // 退職処理: leaveDate が新たに設定された場合、Googleグループから自動削除
+    // 退職処理: leaveDate が新たに設定された場合、テスターリストから自動削除
     const isSettingLeaveDate = body.leaveDate && !body._skipGroupRemoval;
-    if (isSettingLeaveDate && isGooglePlayTesterConfigured()) {
+    if (isSettingLeaveDate) {
       const current = await prisma.flyerDistributor.findUnique({
         where: { id: parseInt(id) },
         select: { leaveDate: true },
       });
       if (!current?.leaveDate) {
-        // 新たに退職日が設定された → Googleグループから配信済みメールを全て削除
+        // 新たに退職日が設定された → 配信済みメールを全て削除
         const sentLogs = await prisma.appDistributionLog.findMany({
-          where: { distributorId: parseInt(id), platform: 'ANDROID', status: 'SENT' },
-          select: { email: true },
-          distinct: ['email'],
+          where: { distributorId: parseInt(id), status: 'SENT' },
+          select: { email: true, platform: true },
+          distinct: ['email', 'platform'],
         });
         for (const log of sentLogs) {
-          removeFromGoogleGroup(log.email).catch(err =>
-            console.error(`[AppDist] Failed to remove ${log.email} from Google Group:`, err)
-          );
+          if (log.platform === 'ANDROID' && isGooglePlayTesterConfigured()) {
+            removeFromGoogleGroup(log.email).catch(err =>
+              console.error(`[AppDist] Failed to remove ${log.email} from Google Group:`, err)
+            );
+          }
+          if (log.platform === 'APPLE' && isAppStoreConnectConfigured()) {
+            removeBetaTester(log.email).catch(err =>
+              console.error(`[AppDist] Failed to remove ${log.email} from TestFlight:`, err)
+            );
+          }
         }
       }
     }

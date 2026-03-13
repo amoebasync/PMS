@@ -125,3 +125,79 @@ export async function addBetaTester(
     return { success: false, error: errMsg };
   }
 }
+
+/**
+ * メールアドレスから TestFlight ベータテスターの ID を取得する
+ */
+async function findBetaTesterIdByEmail(email: string): Promise<string | null> {
+  try {
+    const token = generateJWT();
+    const response = await fetch(
+      `${API_BASE}/betaTesters?filter[email]=${encodeURIComponent(email)}&filter[betaGroups]=${BETA_GROUP_ID}&fields[betaTesters]=email`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.data?.[0]?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * TestFlight ベータテスターをグループから削除する
+ *
+ * @param email - テスターのメールアドレス
+ * @returns { success: boolean, error?: string, notFound?: boolean }
+ */
+export async function removeBetaTester(
+  email: string,
+): Promise<{ success: boolean; error?: string; notFound?: boolean }> {
+  if (!isAppStoreConnectConfigured()) {
+    return { success: false, error: 'App Store Connect APIが設定されていません' };
+  }
+
+  try {
+    const testerId = await findBetaTesterIdByEmail(email);
+    if (!testerId) {
+      console.log(`[AppStoreConnect] Tester ${email} not found in beta group`);
+      return { success: true, notFound: true };
+    }
+
+    const token = generateJWT();
+    const response = await fetch(
+      `${API_BASE}/betaGroups/${BETA_GROUP_ID}/relationships/betaTesters`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: [{ type: 'betaTesters', id: testerId }],
+        }),
+      }
+    );
+
+    if (response.status === 404) {
+      console.log(`[AppStoreConnect] Tester ${email} already removed from beta group`);
+      return { success: true, notFound: true };
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      const errorMsg = errorData?.errors?.[0]?.detail || `HTTP ${response.status}`;
+      console.error('[AppStoreConnect] Failed to remove beta tester:', errorMsg);
+      return { success: false, error: errorMsg };
+    }
+
+    console.log(`[AppStoreConnect] Successfully removed beta tester: ${email}`);
+    return { success: true };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : '不明なエラー';
+    console.error('[AppStoreConnect] Remove error:', errMsg);
+    return { success: false, error: errMsg };
+  }
+}
