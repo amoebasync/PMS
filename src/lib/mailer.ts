@@ -1111,7 +1111,7 @@ export const sendInterviewCancelEmail = async (
 // ─────────────────────────────────────────────────────────
 // 12. Android内部テスト案内メール（配布員向け）
 // ─────────────────────────────────────────────────────────
-const ANDROID_OPT_IN_URL = 'https://play.google.com/apps/internaltest/4701181058894208136';
+const ANDROID_OPT_IN_URL = 'https://play.google.com/apps/testing/net.postingsystem.postingapp';
 
 export const sendAndroidTestInviteEmail = async (
   toEmail: string,
