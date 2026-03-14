@@ -54,6 +54,7 @@
   "error_occurred": "エラーが発生しました",
   "save_success": "保存しました",
   "save_error": "保存に失敗しました",
+  "duplicate_staff_id_error": "このスタッフIDは既に登録されています",
   "delete_success": "削除しました",
   "delete_error": "削除に失敗しました",
   "confirm_delete": "本当に削除しますか？",

@@ -54,6 +54,7 @@
   "error_occurred": "An error occurred",
   "save_success": "Saved successfully",
   "save_error": "Failed to save",
+  "duplicate_staff_id_error": "This Staff ID is already registered",
   "delete_success": "Deleted successfully",
   "delete_error": "Failed to delete",
   "confirm_delete": "Are you sure you want to delete?",

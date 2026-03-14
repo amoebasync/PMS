@@ -254,6 +254,9 @@ export default function DistributorPage() {
         rate1Type: d.rate1Type != null ? Number(d.rate1Type).toFixed(2) : '',
         rate2Type: d.rate2Type != null ? Number(d.rate2Type).toFixed(2) : '',
         rate3Type: d.rate3Type != null ? Number(d.rate3Type).toFixed(2) : '',
+        rate4Type: d.rate4Type != null ? Number(d.rate4Type).toFixed(2) : '',
+        rate5Type: d.rate5Type != null ? Number(d.rate5Type).toFixed(2) : '',
+        rate6Type: d.rate6Type != null ? Number(d.rate6Type).toFixed(2) : '',
         attendanceCount: d.attendanceCount?.toString() || '0',
         bankName: d.bankName || '',
       });
@@ -285,7 +288,15 @@ export default function DistributorPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      if (!res.ok) throw new Error('Error');
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.error === 'DUPLICATE_STAFF_ID') {
+          setFormTab('basic');
+          showToast(t('duplicate_staff_id_error'), 'error');
+          return;
+        }
+        throw new Error('Error');
+      }
       setIsFormModalOpen(false);
       loadData();
     } catch { showToast(t('save_error'), 'error'); }
@@ -882,7 +893,7 @@ export default function DistributorPage() {
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                       <p className="text-xs font-bold text-slate-500">{t('unit_rate_section')}</p>
                       <div className="grid grid-cols-3 gap-3">
-                        {(['rate1Type', 'rate2Type', 'rate3Type'] as const).map((f, i) => (
+                        {(['rate1Type', 'rate2Type', 'rate3Type', 'rate4Type', 'rate5Type', 'rate6Type'] as const).map((f, i) => (
                           <div key={f}>
                             <Label>{i + 1} Type Rate</Label>
                             <input type="number" step="0.01" name={f} value={(formData as any)[f]} onChange={handleInputChange}

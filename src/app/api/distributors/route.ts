@@ -151,8 +151,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(newDistributor);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create Error:', error);
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('staff_id')) {
+      return NextResponse.json({ error: 'DUPLICATE_STAFF_ID' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Failed to create distributor' }, { status: 500 });
   }
 }
