@@ -233,7 +233,9 @@ export async function POST(request: Request) {
                 where: { id: existingId },
                 select: { id: true, status: true },
               });
-              if (existing?.status === 'DISTRIBUTING') {
+              const isDistributing = existing?.status === 'DISTRIBUTING';
+              if (isDistributing) {
+                // 配布中のスケジュールはステータス・セッション・GPSデータを一切変更しない
                 delete (scheduleData as any).status;
               }
               schedule = await tx.distributionSchedule.update({
@@ -241,13 +243,15 @@ export async function POST(request: Request) {
                 data: scheduleData,
                 select: { id: true },
               });
-              // 既存の items / session / progress を削除（再作成するため）
-              const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: existingId }, select: { id: true } });
-              if (oldSession) {
-                await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
-                await tx.distributionSession.delete({ where: { id: oldSession.id } });
+              if (!isDistributing) {
+                // 配布中でない場合のみ、既存の items / session / progress を削除（再作成するため）
+                const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: existingId }, select: { id: true } });
+                if (oldSession) {
+                  await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
+                  await tx.distributionSession.delete({ where: { id: oldSession.id } });
+                }
+                await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
               }
-              await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
               isUpdate = true;
             } else {
               // ── 新規作成 ──
