@@ -1749,6 +1749,8 @@ model PayrollRecord {
   employmentInsurance  Int            @default(0) @map("employment_insurance")
   incomeTax            Int            @default(0) @map("income_tax")
   residentTax          Int            @default(0) @map("resident_tax")
+  // 経費精算
+  expenseTotal         Int            @default(0) @map("expense_total")
   // 合計
   grossPay             Int            @map("gross_pay")
   totalDeductions      Int            @map("total_deductions")

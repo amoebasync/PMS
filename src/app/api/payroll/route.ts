@@ -179,6 +179,12 @@ export async function POST(request: Request) {
           },
           include: { attendanceType: true },
         },
+        expenses: {
+          where: {
+            date: { gte: periodStart, lte: periodEnd },
+            status: 'APPROVED',
+          },
+        },
       },
     });
 
@@ -214,7 +220,8 @@ export async function POST(request: Request) {
 
         const dailyUnit = workingDaysInPeriod > 0 ? Math.floor(baseSalary / workingDaysInPeriod) : 0;
         const absentDeduction = Math.floor(dailyUnit * absentDays);
-        const grossPay = baseSalary + allowance;
+        const expenseTotal = emp.expenses.reduce((sum, e) => sum + e.amount, 0);
+        const grossPay = baseSalary + allowance + expenseTotal;
         const healthInsurance = fin.healthInsurance || 0;
         const pensionInsurance = fin.pensionInsurance || 0;
         const employmentInsurance = fin.employmentInsurance || 0;
@@ -235,6 +242,7 @@ export async function POST(request: Request) {
           absentDays,
           absentDeduction,
           holidayWorkDays,
+          expenseTotal,
           totalWorkHours: 0,
           healthInsurance,
           pensionInsurance,
@@ -262,6 +270,9 @@ export async function POST(request: Request) {
           }
         }
 
+        const expenseTotal = emp.expenses.reduce((sum, e) => sum + e.amount, 0);
+        grossPay += expenseTotal;
+
         // 業務委託は控除なし, アルバイトは設定済みのものを週割り
         const isOutsource = emp.employmentType === 'OUTSOURCE';
         const weeklyFactor = 1 / 4.33;
@@ -285,6 +296,7 @@ export async function POST(request: Request) {
           absentDays: 0,
           absentDeduction: 0,
           holidayWorkDays: 0,
+          expenseTotal,
           totalWorkHours,
           healthInsurance,
           pensionInsurance,

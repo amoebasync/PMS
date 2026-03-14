@@ -49,10 +49,22 @@ export async function GET(
       select: { salaryType: true, hourlyRate: true, dailyRate: true },
     });
 
-    const dailyRows = attendances
+    // 経費データを取得
+    const expenses = await prisma.expense.findMany({
+      where: {
+        employeeId: record.employeeId,
+        date: { gte: record.periodStart, lte: record.periodEnd },
+        status: 'APPROVED',
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    type DailyRow = { date: Date; type: string; attendanceType: string; startTime: string | null; endTime: string | null; breakMinutes: number | null; workHours: number; wage: number; description: string | null; expenseType: string | null; };
+    const dailyRows: DailyRow[] = attendances
       .filter(a => a.attendanceType?.isWorking || a.attendanceType?.isPaid)
       .map(a => ({
         date: a.date,
+        type: 'attendance' as const,
         attendanceType: a.attendanceType?.name || '-',
         startTime: a.startTime,
         endTime: a.endTime,
@@ -62,7 +74,28 @@ export async function GET(
           (financial?.salaryType === 'DAILY'
             ? (financial.dailyRate || 0)
             : Math.floor((financial?.hourlyRate || 0) * (a.workHours || 0))),
+        description: null as string | null,
+        expenseType: null as string | null,
       }));
+
+    // 経費行を追加
+    for (const exp of expenses) {
+      dailyRows.push({
+        date: exp.date,
+        type: 'expense' as const,
+        attendanceType: exp.type === 'TRANSPORTATION' ? '交通費' : '経費',
+        startTime: null,
+        endTime: null,
+        breakMinutes: null,
+        workHours: 0,
+        wage: exp.amount,
+        description: exp.description,
+        expenseType: exp.type,
+      });
+    }
+
+    // 日付順にソート
+    dailyRows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return NextResponse.json(dailyRows);
   } catch (error) {

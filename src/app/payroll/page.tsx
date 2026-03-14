@@ -35,6 +35,7 @@ type PayrollRecord = {
   absentDeduction: number;
   holidayWorkDays: number;
   totalWorkHours: number;
+  expenseTotal: number;
   healthInsurance: number;
   pensionInsurance: number;
   employmentInsurance: number;
@@ -56,12 +57,15 @@ type PayrollRecord = {
 
 type DailyRow = {
   date: string;
+  type: 'attendance' | 'expense';
   attendanceType: string;
   startTime: string | null;
   endTime: string | null;
   breakMinutes: number | null;
   workHours: number;
   wage: number;
+  description: string | null;
+  expenseType: string | null;
 };
 
 const fmt = (n: number) => `¥${n.toLocaleString()}`;
@@ -349,6 +353,7 @@ export default function PayrollPage() {
               <th className="px-3 py-3 whitespace-nowrap">{t('table_emp_type_label')}</th>
               <th className="px-3 py-3 whitespace-nowrap">{t('table_period_label')}</th>
               <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_gross_pay')}</th>
+              <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_expense_total')}</th>
               <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_absent_deduction')}</th>
               <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_social_total')}</th>
               <th className="px-3 py-3 text-right whitespace-nowrap">{t('table_income_tax')}</th>
@@ -360,10 +365,10 @@ export default function PayrollPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={12} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
+              <tr><td colSpan={13} className="p-8 text-center text-slate-400">{t('loading')}</td></tr>
             ) : filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={12} className="p-12 text-center">
+                <td colSpan={13} className="p-12 text-center">
                   <i className="bi bi-calculator text-4xl text-slate-300 block mb-2"></i>
                   <p className="text-slate-400 text-sm">{t('no_data_hint_full')}</p>
                 </td>
@@ -407,6 +412,9 @@ export default function PayrollPage() {
                     </td>
                     <td className="px-3 py-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">{fmt(r.grossPay)}</td>
                     <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
+                      {r.expenseTotal > 0 ? <span className="text-teal-600">{fmt(r.expenseTotal)}</span> : '-'}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono text-slate-600 whitespace-nowrap">
                       {r.absentDeduction > 0
                         ? <span className="text-rose-600">-{fmt(r.absentDeduction)}</span>
                         : r.totalWorkHours > 0
@@ -431,7 +439,7 @@ export default function PayrollPage() {
                   </tr>
                   {isExpanded && (
                     <tr>
-                      <td colSpan={12} className="p-0">
+                      <td colSpan={13} className="p-0">
                         <div className="bg-slate-50 border-t border-b border-slate-200 px-8 py-4">
                           {dailyLoading ? (
                             <div className="text-center text-slate-400 text-sm py-3">
@@ -456,18 +464,29 @@ export default function PayrollPage() {
                                   const dateObj = new Date(d.date);
                                   const dayOfWeek = dayNames[dateObj.getUTCDay()];
                                   const isWeekend = dateObj.getUTCDay() === 0 || dateObj.getUTCDay() === 6;
+                                  const isExpense = d.type === 'expense';
                                   return (
-                                    <tr key={i} className={isWeekend ? 'text-rose-500' : ''}>
+                                    <tr key={i} className={isExpense ? 'bg-teal-50/50' : isWeekend ? 'text-rose-500' : ''}>
                                       <td className="py-1.5 font-mono text-xs">
                                         {dateObj.toLocaleDateString('ja-JP', { month:'numeric', day:'numeric', timeZone:'UTC' })}
                                         <span className="text-slate-400 ml-1">({dayOfWeek})</span>
                                       </td>
-                                      <td className="py-1.5 text-xs text-slate-600">{d.attendanceType}</td>
-                                      <td className="py-1.5 text-xs text-center text-slate-500 font-mono">
-                                        {d.startTime && d.endTime ? `${d.startTime}〜${d.endTime}` : '-'}
+                                      <td className="py-1.5 text-xs text-slate-600">
+                                        {isExpense ? (
+                                          <span className="inline-flex items-center gap-1 text-teal-600">
+                                            <i className="bi bi-receipt text-[10px]"></i>
+                                            {d.attendanceType}
+                                            {d.description && <span className="text-slate-400 ml-1 truncate max-w-[200px]" title={d.description}>({d.description})</span>}
+                                          </span>
+                                        ) : d.attendanceType}
                                       </td>
-                                      <td className="py-1.5 text-right font-mono text-xs">{d.workHours.toFixed(1)}h</td>
-                                      <td className="py-1.5 text-right font-mono font-bold text-xs">{fmt(d.wage)}</td>
+                                      <td className="py-1.5 text-xs text-center text-slate-500 font-mono">
+                                        {isExpense ? '-' : d.startTime && d.endTime ? `${d.startTime}〜${d.endTime}` : '-'}
+                                      </td>
+                                      <td className="py-1.5 text-right font-mono text-xs">
+                                        {isExpense ? '-' : `${d.workHours.toFixed(1)}h`}
+                                      </td>
+                                      <td className={`py-1.5 text-right font-mono font-bold text-xs ${isExpense ? 'text-teal-600' : ''}`}>{fmt(d.wage)}</td>
                                     </tr>
                                   );
                                 })}
@@ -528,6 +547,12 @@ export default function PayrollPage() {
                   <div className="text-[10px] text-slate-400 font-bold uppercase">{t('edit_gross_pay')}</div>
                   <div className="font-mono font-black text-lg text-indigo-600">{fmt(editRecord.grossPay)}</div>
                 </div>
+                {editRecord.expenseTotal > 0 && (
+                  <div>
+                    <div className="text-[10px] text-teal-500 font-bold uppercase">{t('edit_expense_total')}</div>
+                    <div className="font-mono font-bold text-teal-600">{fmt(editRecord.expenseTotal)}</div>
+                  </div>
+                )}
                 {editRecord.employmentType === 'FULL_TIME' ? (
                   <>
                     <div>
