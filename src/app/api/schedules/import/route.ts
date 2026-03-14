@@ -228,6 +228,14 @@ export async function POST(request: Request) {
 
             if (existingId) {
               // ── 既存スケジュールを更新（エリア・チラシ含む全フィールド） ──
+              // 配布中(DISTRIBUTING)のスケジュールはステータスを上書きしない
+              const existing = await tx.distributionSchedule.findUnique({
+                where: { id: existingId },
+                select: { id: true, status: true },
+              });
+              if (existing?.status === 'DISTRIBUTING') {
+                delete (scheduleData as any).status;
+              }
               schedule = await tx.distributionSchedule.update({
                 where: { id: existingId },
                 data: scheduleData,
@@ -363,6 +371,7 @@ export async function POST(request: Request) {
               distributorId,
               date,
               id: { notIn: [...importedScheduleIds] },
+              status: { not: 'DISTRIBUTING' },
             },
             select: { id: true },
           });
