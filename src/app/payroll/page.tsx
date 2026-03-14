@@ -56,6 +56,7 @@ type PayrollRecord = {
 };
 
 type DailyRow = {
+  id: number;
   date: string;
   type: 'attendance' | 'expense';
   attendanceType: string;
@@ -93,17 +94,53 @@ export default function PayrollPage() {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [dailyRows, setDailyRows] = useState<DailyRow[]>([]);
   const [dailyLoading, setDailyLoading] = useState(false);
+  const [dailyEditable, setDailyEditable] = useState(false);
+  const [dailySaving, setDailySaving] = useState(false);
+  const [dailyDirty, setDailyDirty] = useState(false);
 
   const toggleExpand = async (id: number) => {
     if (expandedId === id) { setExpandedId(null); return; }
     setExpandedId(id);
     setDailyLoading(true);
+    setDailyDirty(false);
     try {
       const res = await fetch(`/api/payroll/${id}/daily`);
-      if (res.ok) setDailyRows(await res.json());
-      else setDailyRows([]);
-    } catch { setDailyRows([]); }
+      if (res.ok) {
+        const data = await res.json();
+        setDailyRows(data.rows || []);
+        setDailyEditable(data.status === 'DRAFT');
+      } else {
+        setDailyRows([]);
+        setDailyEditable(false);
+      }
+    } catch { setDailyRows([]); setDailyEditable(false); }
     setDailyLoading(false);
+  };
+
+  const updateDailyWage = (index: number, value: string) => {
+    const num = parseInt(value) || 0;
+    setDailyRows(prev => prev.map((r, i) => i === index ? { ...r, wage: num } : r));
+    setDailyDirty(true);
+  };
+
+  const saveDailyChanges = async () => {
+    if (!expandedId || !dailyDirty) return;
+    setDailySaving(true);
+    try {
+      const changes = dailyRows.map(r => ({ id: r.id, type: r.type, wage: r.wage }));
+      const res = await fetch(`/api/payroll/${expandedId}/daily`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes }),
+      });
+      if (res.ok) {
+        setDailyDirty(false);
+        fetchRecords();
+      } else {
+        showToast(t('save_error'), 'error');
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+    setDailySaving(false);
   };
 
   // システム設定の週開始曜日を取得して今週の開始日を初期値にセット
@@ -486,7 +523,16 @@ export default function PayrollPage() {
                                       <td className="py-1.5 text-right font-mono text-xs">
                                         {isExpense ? '-' : `${d.workHours.toFixed(1)}h`}
                                       </td>
-                                      <td className={`py-1.5 text-right font-mono font-bold text-xs ${isExpense ? 'text-teal-600' : ''}`}>{fmt(d.wage)}</td>
+                                      <td className={`py-1.5 text-right font-mono font-bold text-xs ${isExpense ? 'text-teal-600' : ''}`}>
+                                        {dailyEditable ? (
+                                          <input
+                                            type="number"
+                                            value={d.wage}
+                                            onChange={(e) => updateDailyWage(i, e.target.value)}
+                                            className="w-24 text-right font-mono font-bold text-xs border border-slate-300 rounded px-1.5 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 bg-white"
+                                          />
+                                        ) : fmt(d.wage)}
+                                      </td>
                                     </tr>
                                   );
                                 })}
@@ -501,6 +547,19 @@ export default function PayrollPage() {
                                     {fmt(dailyRows.reduce((s, d) => s + (d.wage || 0), 0))}
                                   </td>
                                 </tr>
+                                {dailyEditable && dailyDirty && (
+                                  <tr>
+                                    <td colSpan={5} className="pt-3 text-right">
+                                      <button
+                                        onClick={saveDailyChanges}
+                                        disabled={dailySaving}
+                                        className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                                      >
+                                        {dailySaving ? t('saving') : t('btn_save')}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                )}
                               </tfoot>
                             </table>
                           )}
