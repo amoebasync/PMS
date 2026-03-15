@@ -1012,9 +1012,7 @@ export default function ScheduleListPage() {
                         <div className="space-y-0.5">
                           {activeFlyers.map((f: any, i: number) => (
                             <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                              <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${
-                                i === 0 ? 'bg-indigo-500' : i === 1 ? 'bg-teal-500' : i === 2 ? 'bg-amber-500' : 'bg-slate-400'
-                              }`}>{i + 1}</span>
+                              <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white bg-slate-400`}>{i + 1}</span>
                               <span className="truncate max-w-[200px] text-slate-700" title={f.flyerName}>{f.flyerName}</span>
                               <span className="shrink-0 text-slate-400 text-[10px]">{f.plannedCount?.toLocaleString() || 0}</span>
                               {f.actualCount != null && (
@@ -1296,7 +1294,7 @@ export default function ScheduleListPage() {
                       <div key={idx} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5 min-w-0 mr-2">
                           <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${
-                            idx === 0 ? 'bg-indigo-500' : idx === 1 ? 'bg-teal-500' : idx === 2 ? 'bg-amber-500' : 'bg-slate-400'
+                            'bg-slate-400'
                           }`}>{idx + 1}</span>
                           <span className="text-slate-700 truncate">{flyer.flyerName}</span>
                         </div>
