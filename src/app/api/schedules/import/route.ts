@@ -188,6 +188,8 @@ export async function POST(request: Request) {
 
       // インポートで作成/更新したスケジュールIDを追跡（後のクリーンアップ用）
       const importedScheduleIds = new Set<number>();
+      // インポートに含まれる日付を追跡（その日付の不要スケジュールを削除するため）
+      const importedDates = new Set<string>();
       // 配布員+日付の組み合わせを追跡（古いスケジュールのクリーンアップ用）
       const distributorDatePairs = new Map<string, { distributorId: number; date: Date }>();
 
@@ -262,6 +264,9 @@ export async function POST(request: Request) {
 
             // 追跡用に記録
             importedScheduleIds.add(schedule.id);
+            if (baseDate) {
+              importedDates.add(baseDate.toISOString().split('T')[0]);
+            }
             if (distributor?.id && baseDate) {
               const pairKey = `${distributor.id}_${baseDate.toISOString().split('T')[0]}`;
               distributorDatePairs.set(pairKey, { distributorId: distributor.id, date: baseDate });
@@ -390,15 +395,14 @@ export async function POST(request: Request) {
       }
 
       // ── 古いスケジュールのクリーンアップ ──
-      // 同じ配布員+日付で、今回のインポートに含まれない古いスケジュールを削除
-      // （エリア変更等で jobNumber が変わった場合、古いスケジュールが残るのを防ぐ）
+      // インポート対象の日付で、今回のインポートに含まれないスケジュールを全て削除
+      // （配布員変更・削除されたスケジュールが残るのを防ぐ）
       let cleanedCount = 0;
-      if (distributorDatePairs.size > 0) {
-        for (const { distributorId, date } of distributorDatePairs.values()) {
+      if (importedDates.size > 0) {
+        for (const dateStr of importedDates) {
           const oldSchedules = await tx.distributionSchedule.findMany({
             where: {
-              distributorId,
-              date,
+              date: new Date(dateStr),
               id: { notIn: [...importedScheduleIds] },
               status: { not: 'DISTRIBUTING' },
             },
@@ -406,7 +410,6 @@ export async function POST(request: Request) {
           });
 
           for (const old of oldSchedules) {
-            // 関連データを削除してからスケジュールを削除
             const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: old.id }, select: { id: true } });
             if (oldSession) {
               await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
