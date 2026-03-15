@@ -890,11 +890,11 @@ export default function ScheduleListPage() {
             <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase tracking-wider sticky top-0 z-20">
               <tr>
                 <th className="px-3 py-2.5 w-[80px]">{t('th_status')}</th>
-                <th className="px-3 py-2.5">{t('th_staff_name')}</th>
-                <th className="px-3 py-2.5">{t('th_branch')}</th>
+                <th className="pl-3 pr-1 py-2.5">{t('th_staff_name')}</th>
+                <th className="pl-1 pr-3 py-2.5">{t('th_branch')}</th>
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
-                <th className="px-3 py-2.5 w-[60px] text-center">{t('th_relay')}</th>
+                <th className="px-3 py-2.5 w-[80px] text-center">{t('th_relay')}</th>
                 <th className="px-3 py-2.5 w-[60px] text-center">{t('th_compliance')}</th>
                 <th className="px-3 py-2.5 w-[80px] text-center">{t('th_actions')}</th>
               </tr>
@@ -935,7 +935,7 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Distributor */}
-                    <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
+                    <td className="pl-3 pr-1 py-2.5" onClick={e => e.stopPropagation()}>
                       {s.distributor ? (
                         <div className="flex items-center gap-1.5 group/dist">
                           <div className="min-w-0">
@@ -958,7 +958,7 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Branch */}
-                    <td className="px-3 py-2.5 text-slate-600">{s.branch?.nameJa || '-'}</td>
+                    <td className="pl-1 pr-3 py-2.5 text-slate-600">{s.branch?.nameJa || '-'}</td>
 
                     {/* Area (combined) */}
                     <td className="px-3 py-2.5">
@@ -1016,7 +1016,7 @@ export default function ScheduleListPage() {
                         return (
                           <div className="flex flex-col items-center gap-0.5">
                             {pendingRelays.length > 0 && (
-                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${
                                 pendingRelays.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
                               }`}>
                                 <i className="bi bi-truck text-[8px]"></i>
@@ -1024,7 +1024,7 @@ export default function ScheduleListPage() {
                               </span>
                             )}
                             {pendingFullRelays.length > 0 && (
-                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${
                                 pendingFullRelays.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
                               }`}>
                                 <i className="bi bi-truck text-[8px]"></i>
@@ -1032,7 +1032,7 @@ export default function ScheduleListPage() {
                               </span>
                             )}
                             {pendingCollections.length > 0 && (
-                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap ${
                                 pendingCollections.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
                               }`}>
                                 <i className="bi bi-box-arrow-in-left text-[8px]"></i>
@@ -1040,7 +1040,7 @@ export default function ScheduleListPage() {
                               </span>
                             )}
                             {pendingRelays.length === 0 && pendingFullRelays.length === 0 && pendingCollections.length === 0 && (
-                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-600">
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap bg-blue-100 text-blue-600">
                                 <i className="bi bi-check-circle text-[8px]"></i>
                                 {relays.length + fullRelays.length + collections.length}
                               </span>
