@@ -131,13 +131,17 @@ function parseClipboardData(text: string, year: number): ParsedDistributor[] {
     const w = currentWeeks[distIdx];
     if (!w.firstDate) return;
     const { start, end } = getWeekRange(w.firstDate);
+    // 小計・合計行がない場合は日別合計から算出
+    const dailyTotal = w.dailyEarnings.reduce((s, d) => s + d.amount, 0);
+    const schedulePay = w.schedulePay || dailyTotal;
+    const grossPay = w.grossPay || (dailyTotal + w.expensePay);
     distributors[distIdx].weeks.push({
       periodStart: start,
       periodEnd: end,
       dailyEarnings: [...w.dailyEarnings],
-      schedulePay: w.schedulePay,
+      schedulePay,
       expensePay: w.expensePay,
-      grossPay: w.grossPay,
+      grossPay,
       deductions: { ...w.deductions },
     });
     // reset
