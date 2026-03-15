@@ -858,11 +858,6 @@ export default function ScheduleListPage() {
                               )}
                             </div>
                           ))}
-                          {activeFlyers.length > 1 && (
-                            <div className="text-[10px] text-slate-400 border-t border-slate-100 pt-0.5 mt-0.5">
-                              {t('flyer_total')}: {totalPlanned.toLocaleString()}{totalActual > 0 && <> / <span className="font-bold text-indigo-600">{totalActual.toLocaleString()}</span></>}
-                            </div>
-                          )}
                         </div>
                       )}
                     </td>
