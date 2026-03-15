@@ -1002,8 +1002,11 @@ export default function ScheduleListPage() {
                       ) : (
                         <div className="space-y-0.5">
                           {activeFlyers.map((f: any, i: number) => (
-                            <div key={i} className="flex items-center gap-2 text-[11px]">
-                              <span className="truncate max-w-[220px] text-slate-700" title={f.flyerName}>{f.flyerName}</span>
+                            <div key={i} className="flex items-center gap-1.5 text-[11px]">
+                              <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${
+                                i === 0 ? 'bg-indigo-500' : i === 1 ? 'bg-teal-500' : i === 2 ? 'bg-amber-500' : 'bg-slate-400'
+                              }`}>{i + 1}</span>
+                              <span className="truncate max-w-[200px] text-slate-700" title={f.flyerName}>{f.flyerName}</span>
                               <span className="shrink-0 text-slate-400 text-[10px]">{f.plannedCount?.toLocaleString() || 0}</span>
                               {f.actualCount != null && (
                                 <>
@@ -1282,7 +1285,12 @@ export default function ScheduleListPage() {
                   <div className="space-y-1 pt-1 border-t border-slate-100">
                     {activeFlyers.map((flyer: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between text-xs">
-                        <span className="text-slate-700 truncate mr-2">{flyer.flyerName}</span>
+                        <div className="flex items-center gap-1.5 min-w-0 mr-2">
+                          <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${
+                            idx === 0 ? 'bg-indigo-500' : idx === 1 ? 'bg-teal-500' : idx === 2 ? 'bg-amber-500' : 'bg-slate-400'
+                          }`}>{idx + 1}</span>
+                          <span className="text-slate-700 truncate">{flyer.flyerName}</span>
+                        </div>
                         <div className="flex items-center gap-2 shrink-0 text-slate-500">
                           <span>{flyer.plannedCount?.toLocaleString() || '-'}</span>
                           <span className="text-slate-300">/</span>
