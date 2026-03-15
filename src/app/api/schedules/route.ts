@@ -52,22 +52,26 @@ export async function GET(request: Request) {
     });
 
     // 各配布員の出勤回数を取得（対象日当日を含む過去のスケジュール数）
-    const distributorIds = [...new Set(schedules.filter(s => s.distributorId).map(s => s.distributorId!))];
     let attendanceCounts: Record<number, number> = {};
-    if (distributorIds.length > 0 && date) {
-      const targetDate = new Date(date);
-      targetDate.setHours(23, 59, 59, 999);
-      const counts = await prisma.distributionSchedule.groupBy({
-        by: ['distributorId'],
-        where: {
-          distributorId: { in: distributorIds },
-          date: { lte: targetDate },
-        },
-        _count: { id: true },
-      });
-      for (const c of counts) {
-        if (c.distributorId) attendanceCounts[c.distributorId] = c._count.id;
+    try {
+      const distributorIds = [...new Set(schedules.filter(s => s.distributorId).map(s => s.distributorId!))];
+      if (distributorIds.length > 0 && date) {
+        const targetDate = new Date(date);
+        targetDate.setHours(23, 59, 59, 999);
+        const counts = await prisma.distributionSchedule.groupBy({
+          by: ['distributorId'],
+          where: {
+            distributorId: { in: distributorIds, not: null },
+            date: { lte: targetDate },
+          },
+          _count: { id: true },
+        });
+        for (const c of counts) {
+          if (c.distributorId) attendanceCounts[c.distributorId] = c._count.id;
+        }
       }
+    } catch (e) {
+      console.error('Attendance count error:', e);
     }
 
     const result = schedules.map(s => ({
