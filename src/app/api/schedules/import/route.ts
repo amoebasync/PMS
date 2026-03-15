@@ -228,14 +228,13 @@ export async function POST(request: Request) {
 
             if (existingId) {
               // ── 既存スケジュールを更新（エリア・チラシ含む全フィールド） ──
-              // 配布中(DISTRIBUTING)のスケジュールはステータスを上書きしない
               const existing = await tx.distributionSchedule.findUnique({
                 where: { id: existingId },
                 select: { id: true, status: true },
               });
               const isDistributing = existing?.status === 'DISTRIBUTING';
               if (isDistributing) {
-                // 配布中のスケジュールはステータス・セッション・GPSデータを一切変更しない
+                // 配布中のスケジュールはステータスを上書きしない
                 delete (scheduleData as any).status;
               }
               schedule = await tx.distributionSchedule.update({
@@ -243,14 +242,17 @@ export async function POST(request: Request) {
                 data: scheduleData,
                 select: { id: true },
               });
+
+              // チラシ（items）は常に削除→再作成（配布中でも最新データに更新）
+              await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
+
               if (!isDistributing) {
-                // 配布中でない場合のみ、既存の items / session / progress を削除（再作成するため）
+                // 配布中でない場合: セッションを更新（削除せず残す）
                 const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: existingId }, select: { id: true } });
                 if (oldSession) {
+                  // セッションの時間を更新、progressは再作成
                   await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
-                  await tx.distributionSession.delete({ where: { id: oldSession.id } });
                 }
-                await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
               }
               isUpdate = true;
             } else {
@@ -324,7 +326,7 @@ export async function POST(request: Request) {
         await tx.distributionItem.createMany({ data: allItemsData });
       }
 
-      // DistributionSession 作成 + ProgressEvent 一括作成
+      // DistributionSession upsert + ProgressEvent 一括作成
       if (pendingSessions.length > 0) {
         const allProgressData: any[] = [];
 
@@ -332,12 +334,28 @@ export async function POST(request: Request) {
           const batch = pendingSessions.slice(i, i + BATCH);
           const sessions = await Promise.all(
             batch.map(async sess => {
-              // 既存セッション（配布中で削除されなかったもの等）がある場合はスキップ
+              // 既存セッションがある場合は時間を更新（配布中はそのまま、完了済みも保持）
               const existing = await tx.distributionSession.findUnique({
                 where: { scheduleId: sess.scheduleId },
                 select: { id: true },
               });
-              if (existing) return existing;
+              if (existing) {
+                // 配布中でなければ時間を更新
+                const schedule = await tx.distributionSchedule.findUnique({
+                  where: { id: sess.scheduleId },
+                  select: { status: true },
+                });
+                if (schedule?.status !== 'DISTRIBUTING') {
+                  await tx.distributionSession.update({
+                    where: { id: existing.id },
+                    data: {
+                      startedAt: sess.startedAt,
+                      finishedAt: sess.finishedAt,
+                    },
+                  });
+                }
+                return existing;
+              }
               return tx.distributionSession.create({
                 data: {
                   scheduleId: sess.scheduleId,
