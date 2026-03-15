@@ -14,6 +14,8 @@ export type CompanyInfo = {
   bankAccountType?: string | null;
   bankAccountNumber?: string | null;
   bankAccountHolder?: string | null;
+  representativeName?: string | null;
+  sealImageUrl?: string | null;
 };
 
 export type LineItem = {

@@ -20,12 +20,14 @@ type CompanySetting = {
   phone: string; fax: string; email: string; website: string;
   invoiceRegistrationNumber: string; bankName: string; bankBranch: string;
   bankAccountType: string; bankAccountNumber: string; bankAccountHolder: string; logoUrl: string;
+  representativeName: string; sealImageUrl: string;
 };
 const COMPANY_DEFAULTS: CompanySetting = {
   companyName: '', companyNameKana: '', postalCode: '', address: '',
   phone: '', fax: '', email: '', website: '',
   invoiceRegistrationNumber: '', bankName: '', bankBranch: '',
   bankAccountType: '普通', bankAccountNumber: '', bankAccountHolder: '', logoUrl: '',
+  representativeName: '', sealImageUrl: '',
 };
 
 const WEEK_DAY_KEYS = [
@@ -1139,6 +1141,62 @@ export default function SettingsPage() {
                       />
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* 代表者・印鑑 */}
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="bg-slate-50 border-b border-slate-200 px-5 py-3">
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <i className="bi bi-person-badge text-indigo-500"></i> {t('representative_seal') || '代表者・印鑑'}
+                  </h2>
+                </div>
+                <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('representative_name') || '代表者名'}</label>
+                    <input
+                      name="representativeName"
+                      value={companyForm.representativeName}
+                      onChange={e => setCompanyForm(prev => ({ ...prev, representativeName: e.target.value }))}
+                      placeholder="山田 太郎"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">{t('seal_image') || '法人印鑑画像'}</label>
+                    {companyForm.sealImageUrl && (
+                      <div className="mb-2 flex items-center gap-3">
+                        <img src={companyForm.sealImageUrl} alt="印鑑" className="w-16 h-16 object-contain border border-slate-200 rounded-lg" />
+                        <button
+                          type="button"
+                          onClick={() => setCompanyForm(prev => ({ ...prev, sealImageUrl: '' }))}
+                          className="text-xs text-rose-500 hover:text-rose-700"
+                        >
+                          <i className="bi bi-trash mr-1"></i>{t('delete') || '削除'}
+                        </button>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        formData.append('type', 'seal');
+                        try {
+                          const res = await fetch('/api/settings/company/upload', { method: 'POST', body: formData });
+                          if (res.ok) {
+                            const { url } = await res.json();
+                            setCompanyForm(prev => ({ ...prev, sealImageUrl: url }));
+                          }
+                        } catch {}
+                      }}
+                      className="w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                    />
+                    <p className="text-xs text-slate-400 mt-1">{t('seal_hint') || 'PNG / JPEG（透過推奨・正方形）'}</p>
+                  </div>
                 </div>
               </div>
 

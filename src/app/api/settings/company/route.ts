@@ -37,6 +37,8 @@ export async function PUT(request: Request) {
       bankAccountNumber:         body.bankAccountNumber         || null,
       bankAccountHolder:         body.bankAccountHolder         || null,
       logoUrl:                   body.logoUrl                   || null,
+      representativeName:        body.representativeName        || null,
+      sealImageUrl:              body.sealImageUrl              || null,
     };
     const setting = await prisma.companySetting.upsert({
       where:  { id: 1 },

@@ -2172,6 +2172,8 @@ model CompanySetting {
   bankAccountNumber         String?  @db.VarChar(20)  @map("bank_account_number")
   bankAccountHolder         String?  @db.VarChar(100) @map("bank_account_holder")
   logoUrl                   String?  @db.Text         @map("logo_url")
+  representativeName        String?  @db.VarChar(100) @map("representative_name")
+  sealImageUrl              String?  @db.Text         @map("seal_image_url")
   updatedAt                 DateTime @updatedAt       @map("updated_at")
 
   @@map("company_settings")
