@@ -86,11 +86,6 @@ export default function DistributorPayrollPage() {
   const [generatingAll, setGeneratingAll] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<Record<number, boolean>>({});
-  const [showStatement, setShowStatement] = useState(false);
-  const [stmtDistId, setStmtDistId] = useState<number>(0);
-  const [stmtYear, setStmtYear] = useState(today.getFullYear());
-  const [stmtMonth, setStmtMonth] = useState<number | null>(today.getMonth() + 1);
-  const [stmtLoading, setStmtLoading] = useState(false);
 
   const weekEnd = new Date(weekStart);
   weekEnd.setDate(weekEnd.getDate() + 6);
@@ -168,33 +163,6 @@ export default function DistributorPayrollPage() {
     await fetchRecords();
   };
 
-  const handleDownloadStatement = async () => {
-    if (!stmtDistId) return;
-    setStmtLoading(true);
-    try {
-      const params = new URLSearchParams({ distributorId: String(stmtDistId), year: String(stmtYear) });
-      if (stmtMonth) params.set('month', String(stmtMonth));
-      const res = await fetch(`/api/distributor-payroll/statement?${params}`);
-      if (!res.ok) throw new Error();
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const dist = distributors.find(d => d.id === stmtDistId);
-      a.download = stmtMonth
-        ? `支払明細書_${dist?.staffId || ''}_${stmtYear}年${stmtMonth}月.pdf`
-        : `支払明細書_${dist?.staffId || ''}_${stmtYear}年度.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      alert('PDF生成に失敗しました');
-    } finally {
-      setStmtLoading(false);
-    }
-  };
-
   const recordMap = new Map(records.map((r) => [r.distributorId, r]));
 
   const totalSchedulePay = records.reduce((s, r) => s + r.schedulePay, 0);
@@ -222,12 +190,12 @@ export default function DistributorPayrollPage() {
       {/* Action buttons */}
       {distributors.length > 0 && (
         <div className="flex justify-end gap-3 mb-4">
-          <button
-            onClick={() => setShowStatement(!showStatement)}
+          <a
+            href="/distributors/payroll/statement"
             className="flex items-center gap-2 px-5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-bold rounded-xl transition-colors"
           >
             <i className="bi bi-file-earmark-pdf"></i>支払明細書
-          </button>
+          </a>
           <a
             href="/distributors/payroll/import"
             className="flex items-center gap-2 px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold rounded-xl transition-colors"
@@ -245,73 +213,6 @@ export default function DistributorPayrollPage() {
               <><i className="bi bi-calculator-fill"></i>全員一斉計算</>
             )}
           </button>
-        </div>
-      )}
-
-      {/* 支払明細書パネル */}
-      {showStatement && (
-        <div className="bg-white rounded-2xl border border-emerald-200 p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <i className="bi bi-file-earmark-pdf text-emerald-600"></i>支払明細書ダウンロード
-            </h3>
-            <button onClick={() => setShowStatement(false)} className="text-slate-400 hover:text-slate-600">
-              <i className="bi bi-x-lg"></i>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">配布員</label>
-              <select
-                value={stmtDistId}
-                onChange={e => setStmtDistId(parseInt(e.target.value))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value={0}>選択してください</option>
-                {distributors.map(d => (
-                  <option key={d.id} value={d.id}>{d.staffId} - {d.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">年</label>
-              <select
-                value={stmtYear}
-                onChange={e => setStmtYear(parseInt(e.target.value))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                {Array.from({ length: 5 }, (_, i) => today.getFullYear() - i).map(y => (
-                  <option key={y} value={y}>{y}年</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 mb-1">月（空欄=年間）</label>
-              <select
-                value={stmtMonth ?? ''}
-                onChange={e => setStmtMonth(e.target.value ? parseInt(e.target.value) : null)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
-              >
-                <option value="">年間</option>
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                  <option key={m} value={m}>{m}月</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleDownloadStatement}
-                disabled={!stmtDistId || stmtLoading}
-                className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {stmtLoading ? (
-                  <><i className="bi bi-hourglass-split animate-spin"></i>生成中...</>
-                ) : (
-                  <><i className="bi bi-download"></i>PDFダウンロード</>
-                )}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
