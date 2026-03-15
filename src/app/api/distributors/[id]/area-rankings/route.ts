@@ -35,7 +35,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     `;
 
     const rankings = rows.map((r, idx) => {
-      const areaName = (r.chome_name || r.town_name || '不明').trim();
+      const areaName = `${r.city_name || ''}${r.chome_name || r.town_name || ''}`.trim() || '不明';
       const count = Number(r.dist_count);
       const avgRate = r.avg_rate != null ? Math.round(r.avg_rate * 1000) / 10 : null;
       const score = avgRate != null ? Math.round(avgRate * 10) / 10 : 0;
