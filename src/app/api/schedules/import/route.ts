@@ -301,6 +301,7 @@ export async function POST(request: Request) {
             });
           }
 
+          // 配布中(DISTRIBUTING)のスケジュールや既存セッションが残っている場合はスキップ
           if (s.startTime && distributor && importStatus === 'COMPLETED') {
             const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
             const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
@@ -330,8 +331,14 @@ export async function POST(request: Request) {
         for (let i = 0; i < pendingSessions.length; i += BATCH) {
           const batch = pendingSessions.slice(i, i + BATCH);
           const sessions = await Promise.all(
-            batch.map(sess =>
-              tx.distributionSession.create({
+            batch.map(async sess => {
+              // 既存セッション（配布中で削除されなかったもの等）がある場合はスキップ
+              const existing = await tx.distributionSession.findUnique({
+                where: { scheduleId: sess.scheduleId },
+                select: { id: true },
+              });
+              if (existing) return existing;
+              return tx.distributionSession.create({
                 data: {
                   scheduleId: sess.scheduleId,
                   distributorId: sess.distributorId,
@@ -339,8 +346,8 @@ export async function POST(request: Request) {
                   finishedAt: sess.finishedAt,
                 },
                 select: { id: true },
-              })
-            )
+              });
+            })
           );
 
           sessions.forEach((session, idx) => {
