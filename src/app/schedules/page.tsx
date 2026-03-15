@@ -251,9 +251,9 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
     });
   }, []);
 
-  // エリアポリゴン取得
+  // エリアポリゴン取得（モーダルマウント時に即取得）
   useEffect(() => {
-    if (!showMap || !schedule.area?.id) return;
+    if (!schedule.area?.id) return;
     fetch(`/api/areas/${schedule.area.id}`).then(r => r.ok ? r.json() : null).then(area => {
       if (!area?.geojson) return;
       try {
@@ -273,7 +273,7 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
         setPolygonPaths(paths);
       } catch { /* silent */ }
     });
-  }, [showMap, schedule.area?.id]);
+  }, [schedule.area?.id]);
 
   const filteredEmployees = employees.filter(e => {
     if (!driverSearch) return true;
@@ -299,8 +299,45 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
   const handleShowMap = () => {
     setShowMap(true);
     if (!latitude && !longitude) {
-      setLatitude(35.6895);
-      setLongitude(139.6917);
+      // エリアのポリゴン中心座標を使用（なければ都庁前フォールバック）
+      if (polygonPaths.length > 0 && polygonPaths[0].length > 0) {
+        const pts = polygonPaths[0];
+        const avgLat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
+        const avgLng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
+        setLatitude(avgLat);
+        setLongitude(avgLng);
+      } else {
+        // ポリゴンがまだ未取得の場合はエリアAPIから取得を試みる
+        if (schedule.area?.id) {
+          fetch(`/api/areas/${schedule.area.id}`).then(r => r.ok ? r.json() : null).then(area => {
+            if (!area?.geojson) { setLatitude(35.6895); setLongitude(139.6917); return; }
+            try {
+              const geo = typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson;
+              const pts: { lat: number; lng: number }[] = [];
+              const features = geo.features || [geo];
+              for (const f of features) {
+                const geom = f.geometry || f;
+                if (geom.type === 'Polygon') {
+                  geom.coordinates[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
+                } else if (geom.type === 'MultiPolygon') {
+                  for (const poly of geom.coordinates) {
+                    poly[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
+                  }
+                }
+              }
+              if (pts.length > 0) {
+                setLatitude(pts.reduce((s, p) => s + p.lat, 0) / pts.length);
+                setLongitude(pts.reduce((s, p) => s + p.lng, 0) / pts.length);
+              } else {
+                setLatitude(35.6895); setLongitude(139.6917);
+              }
+            } catch { setLatitude(35.6895); setLongitude(139.6917); }
+          });
+        } else {
+          setLatitude(35.6895);
+          setLongitude(139.6917);
+        }
+      }
     }
   };
 
@@ -324,7 +361,7 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block max-h-full md:max-h-[90vh]">
+      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-base text-slate-800">
             <i className={`bi ${formType === 'COLLECTION' ? 'bi-box-arrow-in-left text-purple-500' : formType === 'FULL_RELAY' ? 'bi-truck text-green-500' : 'bi-truck text-orange-500'} mr-2`}></i>
