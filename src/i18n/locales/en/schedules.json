@@ -187,6 +187,8 @@
   "all_traj_live": "Real-time updates",
   "all_traj_distributors": "Distributors",
 
+  "summary_unassigned": "Unassigned",
+
   "th_attendance": "#",
   "th_attendance_unit": "th",
 

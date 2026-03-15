@@ -861,6 +861,15 @@ export default function ScheduleListPage() {
                   return sum + (slot1?.plannedCount || 0);
                 }, 0).toLocaleString()}
               </span>
+              {(() => {
+                const unassignedCount = filteredSchedules.filter(s => isDistOnlySchedule(s)).length;
+                return unassignedCount > 0 ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg text-xs font-bold text-red-700">
+                    <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
+                    {t('summary_unassigned')}: {unassignedCount}
+                  </span>
+                ) : null;
+              })()}
             </div>
             <button onClick={openAddDistModal}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm">
