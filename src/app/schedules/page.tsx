@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { GoogleMap, useJsApiLoader, Marker, Polygon } from '@react-google-maps/api';
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
 const AllTrajectoriesViewer = lazy(() => import('@/components/schedules/AllTrajectoriesViewer'));
@@ -238,15 +239,41 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
   const [longitude, setLongitude] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const [showMap, setShowMap] = useState(false);
-  const mapRef = useRef<HTMLDivElement>(null);
-  const googleMapRef = useRef<google.maps.Map | null>(null);
-  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
+
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+  });
 
   useEffect(() => {
     fetch('/api/employees?active=true&limit=500').then(r => r.ok ? r.json() : []).then(data => {
       setEmployees(Array.isArray(data) ? data : data.data || []);
     });
   }, []);
+
+  // エリアポリゴン取得
+  useEffect(() => {
+    if (!showMap || !schedule.area?.id) return;
+    fetch(`/api/areas/${schedule.area.id}`).then(r => r.ok ? r.json() : null).then(area => {
+      if (!area?.geojson) return;
+      try {
+        const geo = typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson;
+        const paths: google.maps.LatLngLiteral[][] = [];
+        const features = geo.features || [geo];
+        for (const f of features) {
+          const geom = f.geometry || f;
+          if (geom.type === 'Polygon') {
+            paths.push(geom.coordinates[0].map((c: number[]) => ({ lat: c[1], lng: c[0] })));
+          } else if (geom.type === 'MultiPolygon') {
+            for (const poly of geom.coordinates) {
+              paths.push(poly[0].map((c: number[]) => ({ lat: c[1], lng: c[0] })));
+            }
+          }
+        }
+        setPolygonPaths(paths);
+      } catch { /* silent */ }
+    });
+  }, [showMap, schedule.area?.id]);
 
   const filteredEmployees = employees.filter(e => {
     if (!driverSearch) return true;
@@ -269,55 +296,12 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
     });
   };
 
-  const initMap = useCallback(async (lat: number, lng: number) => {
-    if (!mapRef.current || !window.google) return;
-    const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
-    const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
-
-    const map = new Map(mapRef.current, {
-      center: { lat, lng }, zoom: 15, mapId: 'relay-map',
-      disableDefaultUI: true, zoomControl: true,
-    });
-    googleMapRef.current = map;
-
-    // エリアポリゴン表示
-    if (schedule.area?.id) {
-      try {
-        const res = await fetch(`/api/areas/${schedule.area.id}`);
-        if (res.ok) {
-          const area = await res.json();
-          if (area.geojson) {
-            map.data.addGeoJson(typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson);
-            map.data.setStyle({ fillColor: '#6366f1', fillOpacity: 0.15, strokeColor: '#6366f1', strokeWeight: 2 });
-          }
-        }
-      } catch { /* silent */ }
-    }
-
-    const marker = new AdvancedMarkerElement({ map, position: { lat, lng }, gmpDraggable: true });
-    markerRef.current = marker;
-
-    marker.addListener('dragend', () => {
-      const pos = marker.position as google.maps.LatLngLiteral;
-      setLatitude(pos.lat);
-      setLongitude(pos.lng);
-    });
-
-    map.addListener('click', (e: google.maps.MapMouseEvent) => {
-      if (e.latLng) {
-        const pos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
-        marker.position = pos;
-        setLatitude(pos.lat);
-        setLongitude(pos.lng);
-      }
-    });
-  }, [schedule.area?.id]);
-
   const handleShowMap = () => {
     setShowMap(true);
-    const lat = latitude || schedule.area?.latitude || 35.6895;
-    const lng = longitude || schedule.area?.longitude || 139.6917;
-    setTimeout(() => initMap(lat, lng), 100);
+    if (!latitude && !longitude) {
+      setLatitude(35.6895);
+      setLongitude(139.6917);
+    }
   };
 
   const handleCurrentLocation = () => {
@@ -325,16 +309,16 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
     navigator.geolocation.getCurrentPosition(pos => {
       setLatitude(pos.coords.latitude);
       setLongitude(pos.coords.longitude);
-      if (googleMapRef.current && markerRef.current) {
-        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        googleMapRef.current.setCenter(p);
-        markerRef.current.position = p;
-      } else {
-        setShowMap(true);
-        setTimeout(() => initMap(pos.coords.latitude, pos.coords.longitude), 100);
-      }
+      setShowMap(true);
     });
   };
+
+  const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
+    if (e.latLng) {
+      setLatitude(e.latLng.lat());
+      setLongitude(e.latLng.lng());
+    }
+  }, []);
 
   const areaName = `${schedule.area?.city?.prefecture?.name || ''}${schedule.area?.city?.name || ''}${formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}`;
 
@@ -424,8 +408,23 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
                 <i className="bi bi-pin-map mr-1"></i>{latitude.toFixed(6)}, {longitude.toFixed(6)}
               </div>
             )}
-            {showMap && (
-              <div ref={mapRef} className="w-full h-48 mt-2 rounded-lg border border-slate-200"></div>
+            {showMap && isLoaded && latitude && longitude && (
+              <div className="w-full h-48 mt-2 rounded-lg border border-slate-200 overflow-hidden">
+                <GoogleMap
+                  mapContainerStyle={{ width: '100%', height: '100%' }}
+                  center={{ lat: latitude, lng: longitude }}
+                  zoom={15}
+                  onClick={handleMapClick}
+                  options={{ disableDefaultUI: true, zoomControl: true }}
+                >
+                  <Marker position={{ lat: latitude, lng: longitude }} draggable
+                    onDragEnd={(e) => { if (e.latLng) { setLatitude(e.latLng.lat()); setLongitude(e.latLng.lng()); } }} />
+                  {polygonPaths.map((path, i) => (
+                    <Polygon key={i} paths={path}
+                      options={{ fillColor: '#6366f1', fillOpacity: 0.15, strokeColor: '#6366f1', strokeWeight: 2 }} />
+                  ))}
+                </GoogleMap>
+              </div>
             )}
           </div>
 
