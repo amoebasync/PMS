@@ -6,7 +6,7 @@ import React from 'react';
 import { PayrollStatementPDF } from '@/lib/pdf/payroll-statement-template';
 import type { PayrollStatementData, PayrollStatementRow } from '@/lib/pdf/payroll-statement-template';
 import type { CompanyInfo } from '@/lib/pdf/types';
-import { getPresignedUrl } from '@/lib/s3';
+import { getPresignedUrl, getS3Url } from '@/lib/s3';
 
 export const runtime = 'nodejs';
 
@@ -55,15 +55,21 @@ export async function GET(request: Request) {
       sealImageUrl: companySetting?.sealImageUrl,
     };
 
-    // 印鑑画像をS3署名付きURLに変換
+    // 印鑑画像をS3署名付きURLに変換（@react-pdf/renderer が読めるように）
     if (company.sealImageUrl) {
-      // プロキシURLの場合、S3キーを抽出
-      const sealUrl = company.sealImageUrl;
-      if (sealUrl.startsWith('/api/s3-proxy?key=')) {
-        const key = decodeURIComponent(sealUrl.replace('/api/s3-proxy?key=', ''));
-        company.sealImageUrl = await getPresignedUrl(key, 300);
-      } else if (sealUrl.startsWith('http')) {
-        // 直接URLはそのまま
+      try {
+        let s3Key = '';
+        const sealUrl = company.sealImageUrl;
+        if (sealUrl.startsWith('/api/s3-proxy?key=')) {
+          s3Key = decodeURIComponent(sealUrl.replace('/api/s3-proxy?key=', ''));
+        }
+        if (s3Key) {
+          // 署名付きURLを生成して@react-pdf/rendererが直接フェッチできるようにする
+          company.sealImageUrl = await getPresignedUrl(s3Key, 300);
+        }
+      } catch (err) {
+        console.error('Seal image URL resolve error:', err);
+        company.sealImageUrl = null;
       }
     }
 
