@@ -233,8 +233,8 @@ export async function POST(request: Request) {
                 select: { id: true, status: true },
               });
               const isDistributing = existing?.status === 'DISTRIBUTING';
-              if (isDistributing) {
-                // 配布中のスケジュールはステータスを上書きしない
+              if (isDistributing && importStatus !== 'COMPLETED') {
+                // 配布中のスケジュールはステータスを上書きしない（完了インポート時は除く）
                 delete (scheduleData as any).status;
               }
               schedule = await tx.distributionSchedule.update({
