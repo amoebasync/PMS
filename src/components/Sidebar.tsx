@@ -62,6 +62,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { nameKey: 'partner_management', href: '/partners', icon: 'bi-truck' },
       { nameKey: 'distributor_management', href: '/distributors', icon: 'bi-bicycle' },
       { nameKey: 'shift_management', href: '/distributor-shifts', icon: 'bi-calendar-week' },
+      { nameKey: 'relay_management', href: '/relay', icon: 'bi-arrow-left-right' },
     ],
   },
   {

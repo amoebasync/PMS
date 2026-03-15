@@ -234,6 +234,9 @@ model Employee {
   resolvedPartnerIncidents    PartnerIncident[] @relation("PartnerIncidentResolver")
   complianceChecks            DistributionSchedule[] @relation("ComplianceChecker")
 
+  // 中継/回収ドライバー
+  relayTasks                  RelayTask[] @relation("RelayDriver")
+
   @@map("employees")
 }
 
@@ -867,6 +870,7 @@ model DistributionSchedule {
   complaints         Complaint[]
   session            DistributionSession?
   adminNotifications AdminNotification[]
+  relayTasks         RelayTask[]
 
   @@index([distributorId, date])
   @@index([branchId, date])
@@ -928,6 +932,57 @@ enum ScheduleStatus {
   IN_PROGRESS   // 進行中（管理者手動）
   DISTRIBUTING  // 配布中（配布員がSTARTを押した、GPS追跡中）
   COMPLETED     // 完了
+}
+
+// --- 中継/回収 ---
+enum RelayType {
+  RELAY      // 中継（チラシを届ける）
+  COLLECTION // 回収（チラシを回収する）
+}
+
+enum RelayStatus {
+  PENDING     // 要中継 / 要回収
+  IN_PROGRESS // 中継中 / 回収中
+  COMPLETED   // 完了
+  CANCELLED   // キャンセル
+}
+
+model RelayTask {
+  id          Int          @id @default(autoincrement())
+  scheduleId  Int          @map("schedule_id")
+  schedule    DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  type        RelayType    // RELAY or COLLECTION
+  status      RelayStatus  @default(PENDING)
+
+  // ドライバー/回収者 - 社員選択 or フリーテキスト
+  driverId    Int?         @map("driver_id")
+  driver      Employee?    @relation("RelayDriver", fields: [driverId], references: [id])
+  driverName  String?      @map("driver_name") @db.VarChar(100) // 業務委託等のフリーテキスト
+
+  // 場所
+  locationName String?     @map("location_name") @db.VarChar(200)
+  latitude     Float?
+  longitude    Float?
+
+  // 到着時間枠
+  timeSlotStart String?    @map("time_slot_start") @db.VarChar(5) // "09:00"
+  timeSlotEnd   String?    @map("time_slot_end") @db.VarChar(5)   // "10:00"
+
+  // 優先順位（ドラッグ&ドロップ並べ替え用）
+  sortOrder   Int          @default(0) @map("sort_order")
+
+  // メモ
+  note        String?      @db.Text
+
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  @@index([scheduleId])
+  @@index([status])
+  @@index([driverId])
+  @@index([type, status])
+  @@map("relay_tasks")
 }
 
 // --- 配布セッション未完了理由 ---

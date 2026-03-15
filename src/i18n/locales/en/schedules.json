@@ -120,6 +120,13 @@
   "unassign_btn": "Remove",
   "unassign_success": "Distributor removed from schedule",
 
+  "add_relay": "Add Relay",
+  "add_collection": "Add Collection",
+  "th_relay": "Relay",
+  "relay_pending": "Relay Needed",
+  "relay_in_progress": "In Transit",
+  "collection_pending": "Collection Needed",
+  "collection_in_progress": "Collecting",
   "delete_schedule": "Delete Schedule",
   "delete_confirm": "Delete this schedule? This cannot be undone.",
   "delete_btn": "Delete",

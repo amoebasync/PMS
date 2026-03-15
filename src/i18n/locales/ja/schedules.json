@@ -120,6 +120,13 @@
   "unassign_btn": "外す",
   "unassign_success": "配布員をスケジュールから外しました",
 
+  "add_relay": "中継追加",
+  "add_collection": "回収追加",
+  "th_relay": "中継",
+  "relay_pending": "要中継",
+  "relay_in_progress": "中継中",
+  "collection_pending": "要回収",
+  "collection_in_progress": "回収中",
   "delete_schedule": "スケジュール削除",
   "delete_confirm": "このスケジュールを削除しますか？この操作は元に戻せません。",
   "delete_btn": "削除する",

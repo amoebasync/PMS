@@ -218,6 +218,239 @@ function StatusChangeModal({ schedule, onClose, onSave, t, getStatusKey }: {
   );
 }
 
+const TIME_SLOTS = Array.from({ length: 15 }, (_, i) => {
+  const h = i + 6; // 6:00 ~ 20:00
+  return { start: `${String(h).padStart(2, '0')}:00`, end: `${String(h + 1).padStart(2, '0')}:00`, label: `${h}:00〜${h + 1}:00` };
+});
+
+function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
+  schedule: any; type: 'RELAY' | 'COLLECTION'; saving: boolean;
+  onSave: (data: any) => void; onClose: () => void; t: (key: string, params?: any) => string;
+}) {
+  const [formType, setFormType] = useState<'RELAY' | 'COLLECTION'>(type);
+  const [driverId, setDriverId] = useState<number | null>(null);
+  const [driverName, setDriverName] = useState('');
+  const [driverSearch, setDriverSearch] = useState('');
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [timeSlot, setTimeSlot] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [note, setNote] = useState('');
+  const [showMap, setShowMap] = useState(false);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const googleMapRef = useRef<google.maps.Map | null>(null);
+  const markerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+
+  useEffect(() => {
+    fetch('/api/employees?active=true&limit=500').then(r => r.ok ? r.json() : []).then(data => {
+      setEmployees(Array.isArray(data) ? data : data.data || []);
+    });
+  }, []);
+
+  const filteredEmployees = employees.filter(e => {
+    if (!driverSearch) return true;
+    const name = `${e.lastNameJa || ''} ${e.firstNameJa || ''} ${e.employeeCode || ''}`.toLowerCase();
+    return name.includes(driverSearch.toLowerCase());
+  }).slice(0, 10);
+
+  const handleSubmit = () => {
+    const slot = TIME_SLOTS.find(s => s.label === timeSlot);
+    onSave({
+      type: formType,
+      driverId: driverId || undefined,
+      driverName: driverName || undefined,
+      timeSlotStart: slot?.start || undefined,
+      timeSlotEnd: slot?.end || undefined,
+      locationName: locationName || undefined,
+      latitude: latitude || undefined,
+      longitude: longitude || undefined,
+      note: note || undefined,
+    });
+  };
+
+  const initMap = useCallback(async (lat: number, lng: number) => {
+    if (!mapRef.current || !window.google) return;
+    const { Map } = await google.maps.importLibrary('maps') as google.maps.MapsLibrary;
+    const { AdvancedMarkerElement } = await google.maps.importLibrary('marker') as google.maps.MarkerLibrary;
+
+    const map = new Map(mapRef.current, {
+      center: { lat, lng }, zoom: 15, mapId: 'relay-map',
+      disableDefaultUI: true, zoomControl: true,
+    });
+    googleMapRef.current = map;
+
+    // エリアポリゴン表示
+    if (schedule.area?.id) {
+      try {
+        const res = await fetch(`/api/areas/${schedule.area.id}`);
+        if (res.ok) {
+          const area = await res.json();
+          if (area.geojson) {
+            map.data.addGeoJson(typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson);
+            map.data.setStyle({ fillColor: '#6366f1', fillOpacity: 0.15, strokeColor: '#6366f1', strokeWeight: 2 });
+          }
+        }
+      } catch { /* silent */ }
+    }
+
+    const marker = new AdvancedMarkerElement({ map, position: { lat, lng }, gmpDraggable: true });
+    markerRef.current = marker;
+
+    marker.addListener('dragend', () => {
+      const pos = marker.position as google.maps.LatLngLiteral;
+      setLatitude(pos.lat);
+      setLongitude(pos.lng);
+    });
+
+    map.addListener('click', (e: google.maps.MapMouseEvent) => {
+      if (e.latLng) {
+        const pos = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+        marker.position = pos;
+        setLatitude(pos.lat);
+        setLongitude(pos.lng);
+      }
+    });
+  }, [schedule.area?.id]);
+
+  const handleShowMap = () => {
+    setShowMap(true);
+    const lat = latitude || schedule.area?.latitude || 35.6895;
+    const lng = longitude || schedule.area?.longitude || 139.6917;
+    setTimeout(() => initMap(lat, lng), 100);
+  };
+
+  const handleCurrentLocation = () => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      setLatitude(pos.coords.latitude);
+      setLongitude(pos.coords.longitude);
+      if (googleMapRef.current && markerRef.current) {
+        const p = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        googleMapRef.current.setCenter(p);
+        markerRef.current.position = p;
+      } else {
+        setShowMap(true);
+        setTimeout(() => initMap(pos.coords.latitude, pos.coords.longitude), 100);
+      }
+    });
+  };
+
+  const areaName = `${schedule.area?.city?.prefecture?.name || ''}${schedule.area?.city?.name || ''}${formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}`;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block max-h-full md:max-h-[90vh]">
+        <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+          <h3 className="font-bold text-base text-slate-800">
+            <i className={`bi ${formType === 'RELAY' ? 'bi-truck text-orange-500' : 'bi-box-arrow-in-left text-purple-500'} mr-2`}></i>
+            {formType === 'RELAY' ? t('add_relay') : t('add_collection')}
+          </h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+        </div>
+        <div className="p-4 md:p-6 space-y-4 flex-1 overflow-auto">
+          {/* Schedule info */}
+          <div className="text-xs bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-2 text-slate-600">
+            <span className="font-bold text-slate-700">{schedule.distributor?.name || '-'}</span>
+            <span className="text-slate-300">|</span>
+            <span>{areaName}</span>
+          </div>
+
+          {/* Type */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_type') || '種別'}</label>
+            <div className="flex gap-2">
+              <button onClick={() => setFormType('RELAY')}
+                className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${formType === 'RELAY' ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <i className="bi bi-truck mr-1"></i>{t('type_relay') || '中継'}
+              </button>
+              <button onClick={() => setFormType('COLLECTION')}
+                className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${formType === 'COLLECTION' ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <i className="bi bi-box-arrow-in-left mr-1"></i>{t('type_collection') || '回収'}
+              </button>
+            </div>
+          </div>
+
+          {/* Driver */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_driver') || '担当者（社員）'}</label>
+            <div className="relative">
+              <input type="text" value={driverSearch} onChange={e => { setDriverSearch(e.target.value); setDriverId(null); }}
+                placeholder={t('field_driver_placeholder') || '社員を検索...'}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" />
+              {driverSearch && !driverId && filteredEmployees.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-40 overflow-auto">
+                  {filteredEmployees.map(e => (
+                    <button key={e.id} onClick={() => { setDriverId(e.id); setDriverSearch(`${e.lastNameJa} ${e.firstNameJa}`); }}
+                      className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2">
+                      <span className="text-slate-400">{e.employeeCode}</span>
+                      <span className="font-bold">{e.lastNameJa} {e.firstNameJa}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <input type="text" value={driverName} onChange={e => setDriverName(e.target.value)}
+              placeholder={t('field_driver_name_placeholder') || '業務委託等の場合に入力'}
+              className="w-full mt-2 px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" />
+          </div>
+
+          {/* Time slot */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_time_slot') || '到着時間枠'}</label>
+            <select value={timeSlot} onChange={e => setTimeSlot(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400">
+              <option value="">-</option>
+              {TIME_SLOTS.map(s => <option key={s.label} value={s.label}>{s.label}</option>)}
+            </select>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_location') || '場所'}</label>
+            <input type="text" value={locationName} onChange={e => setLocationName(e.target.value)}
+              placeholder={t('field_location_placeholder') || '場所を入力 or 地図で指定'}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" />
+            <div className="flex gap-2 mt-2">
+              <button onClick={handleShowMap} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
+                <i className="bi bi-map"></i>{t('btn_set_location') || '地図で指定'}
+              </button>
+              <button onClick={handleCurrentLocation} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
+                <i className="bi bi-crosshair"></i>{t('btn_current_location') || '現在地を使用'}
+              </button>
+            </div>
+            {latitude && longitude && (
+              <div className="text-[10px] text-slate-400 mt-1">
+                <i className="bi bi-pin-map mr-1"></i>{latitude.toFixed(6)}, {longitude.toFixed(6)}
+              </div>
+            )}
+            {showMap && (
+              <div ref={mapRef} className="w-full h-48 mt-2 rounded-lg border border-slate-200"></div>
+            )}
+          </div>
+
+          {/* Note */}
+          <div>
+            <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_note') || 'メモ'}</label>
+            <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
+              placeholder={t('field_note_placeholder') || 'メモを入力...'}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400 resize-none" />
+          </div>
+        </div>
+        <div className="px-4 md:px-6 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+          <button onClick={onClose} className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+            {t('cancel')}
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+            {saving ? <><i className="bi bi-arrow-repeat animate-spin mr-1"></i></> : <><i className="bi bi-check-lg mr-1"></i>{t('btn_save') || '保存'}</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ScheduleListPage() {
   const { t } = useTranslation('schedules');
   const { showToast, showConfirm } = useNotification();
@@ -233,6 +466,8 @@ export default function ScheduleListPage() {
   const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(null);
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
+  const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' } | null>(null);
+  const [relaySaving, setRelaySaving] = useState(false);
   const popoverContainerRef = useRef<HTMLDivElement>(null);
   const complianceBtnRef = useRef<HTMLButtonElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
@@ -352,6 +587,31 @@ export default function ScheduleListPage() {
         showToast(t('communication_error'), 'error');
       }
     } catch { showToast(t('communication_error'), 'error'); }
+  };
+
+  // 中継/回収タスク作成
+  const handleCreateRelay = async (data: { type: string; driverId?: number; driverName?: string; timeSlotStart?: string; timeSlotEnd?: string; locationName?: string; latitude?: number; longitude?: number; note?: string }) => {
+    if (!relayAddSchedule) return;
+    setRelaySaving(true);
+    try {
+      const res = await fetch('/api/relay-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId: relayAddSchedule.schedule.id, ...data }),
+      });
+      if (res.ok) {
+        const task = await res.json();
+        setSchedules(prev => prev.map(s => s.id === relayAddSchedule.schedule.id
+          ? { ...s, relayTasks: [...(s.relayTasks || []), { id: task.id, type: task.type, status: task.status }] }
+          : s
+        ));
+        showToast(t('save_success'), 'success');
+        setRelayAddSchedule(null);
+      } else {
+        showToast(t('communication_error'), 'error');
+      }
+    } catch { showToast(t('communication_error'), 'error'); }
+    setRelaySaving(false);
   };
 
   // 配布員割り当てモーダルを開く
@@ -507,6 +767,7 @@ export default function ScheduleListPage() {
                 <th className="px-3 py-2.5">{t('th_branch')}</th>
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
+                <th className="px-3 py-2.5 w-[60px] text-center">{t('th_relay')}</th>
                 <th className="px-3 py-2.5 w-[60px] text-center">{t('th_compliance')}</th>
                 <th className="px-3 py-2.5 w-[80px] text-center">{t('th_actions')}</th>
               </tr>
@@ -514,7 +775,7 @@ export default function ScheduleListPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
                     <i className="bi bi-calendar-x text-3xl block mb-2"></i>
                     {t('no_results')}
                   </td>
@@ -606,6 +867,45 @@ export default function ScheduleListPage() {
                       )}
                     </td>
 
+                    {/* Relay */}
+                    <td className="px-3 py-2.5 text-center">
+                      {(() => {
+                        const relays = (s.relayTasks || []).filter((r: any) => r.type === 'RELAY');
+                        const collections = (s.relayTasks || []).filter((r: any) => r.type === 'COLLECTION');
+                        const pendingRelays = relays.filter((r: any) => r.status === 'PENDING' || r.status === 'IN_PROGRESS');
+                        const pendingCollections = collections.filter((r: any) => r.status === 'PENDING' || r.status === 'IN_PROGRESS');
+                        if (pendingRelays.length === 0 && pendingCollections.length === 0 && relays.length === 0 && collections.length === 0) {
+                          return <span className="text-slate-300 text-[10px]">-</span>;
+                        }
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            {pendingRelays.length > 0 && (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                pendingRelays.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'
+                              }`}>
+                                <i className="bi bi-truck text-[8px]"></i>
+                                {pendingRelays.some((r: any) => r.status === 'IN_PROGRESS') ? t('relay_in_progress') : t('relay_pending')}
+                              </span>
+                            )}
+                            {pendingCollections.length > 0 && (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                pendingCollections.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
+                              }`}>
+                                <i className="bi bi-box-arrow-in-left text-[8px]"></i>
+                                {pendingCollections.some((r: any) => r.status === 'IN_PROGRESS') ? t('collection_in_progress') : t('collection_pending')}
+                              </span>
+                            )}
+                            {pendingRelays.length === 0 && pendingCollections.length === 0 && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-600">
+                                <i className="bi bi-check-circle text-[8px]"></i>
+                                {relays.length + collections.length}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </td>
+
                     {/* Compliance */}
                     <td className="px-3 py-2.5 text-center">
                       <button
@@ -648,6 +948,16 @@ export default function ScheduleListPage() {
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700">
                                 <i className={`bi ${s.remarks ? 'bi-chat-text-fill text-amber-500' : 'bi-chat-text text-slate-400'}`}></i>
                                 {t('remarks_edit_title')}
+                              </button>
+                              <button onClick={() => { setRelayAddSchedule({ schedule: s, type: 'RELAY' }); setActionMenuId(null); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-orange-600">
+                                <i className="bi bi-truck"></i>
+                                {t('add_relay')}
+                              </button>
+                              <button onClick={() => { setRelayAddSchedule({ schedule: s, type: 'COLLECTION' }); setActionMenuId(null); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-purple-600">
+                                <i className="bi bi-box-arrow-in-left"></i>
+                                {t('add_collection')}
                               </button>
                               {s.distributor && s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
                                 <button onClick={() => handleUnassign(s)}
@@ -984,6 +1294,18 @@ export default function ScheduleListPage() {
         }>
           <AllTrajectoriesViewer date={filterDate} onClose={() => setShowAllTrajectories(false)} />
         </Suspense>
+      )}
+
+      {/* Relay Add Modal */}
+      {relayAddSchedule && (
+        <RelayAddModal
+          schedule={relayAddSchedule.schedule}
+          type={relayAddSchedule.type}
+          saving={relaySaving}
+          onSave={handleCreateRelay}
+          onClose={() => setRelayAddSchedule(null)}
+          t={t}
+        />
       )}
 
       {/* Trajectory Viewer */}
