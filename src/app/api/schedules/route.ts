@@ -51,7 +51,31 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' }
     });
 
-    return NextResponse.json(schedules);
+    // 各配布員の出勤回数を取得（対象日当日を含む過去のスケジュール数）
+    const distributorIds = [...new Set(schedules.filter(s => s.distributorId).map(s => s.distributorId!))];
+    let attendanceCounts: Record<number, number> = {};
+    if (distributorIds.length > 0 && date) {
+      const targetDate = new Date(date);
+      targetDate.setHours(23, 59, 59, 999);
+      const counts = await prisma.distributionSchedule.groupBy({
+        by: ['distributorId'],
+        where: {
+          distributorId: { in: distributorIds },
+          date: { lte: targetDate },
+        },
+        _count: { id: true },
+      });
+      for (const c of counts) {
+        if (c.distributorId) attendanceCounts[c.distributorId] = c._count.id;
+      }
+    }
+
+    const result = schedules.map(s => ({
+      ...s,
+      attendanceCount: s.distributorId ? (attendanceCounts[s.distributorId] || 0) : 0,
+    }));
+
+    return NextResponse.json(result);
   } catch (error) {
     console.error('Failed to fetch schedules:', error);
     return NextResponse.json({ error: 'Failed to fetch schedules' }, { status: 500 });

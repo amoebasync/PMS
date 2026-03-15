@@ -891,6 +891,7 @@ export default function ScheduleListPage() {
               <tr>
                 <th className="px-3 py-2.5 w-[80px]">{t('th_status')}</th>
                 <th className="pl-3 pr-1 py-2.5">{t('th_staff_name')}</th>
+                <th className="px-2 py-2.5 w-[40px] text-center">{t('th_attendance')}</th>
                 <th className="pl-1 pr-3 py-2.5">{t('th_branch')}</th>
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
@@ -902,7 +903,7 @@ export default function ScheduleListPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
                     <i className="bi bi-calendar-x text-3xl block mb-2"></i>
                     {t('no_results')}
                   </td>
@@ -954,6 +955,21 @@ export default function ScheduleListPage() {
                           className="text-indigo-400 hover:text-indigo-600 italic text-xs hover:bg-indigo-50 px-2 py-1 rounded transition-colors">
                           <i className="bi bi-person-plus text-[10px] mr-1"></i>{t('unassigned')}
                         </button>
+                      )}
+                    </td>
+
+                    {/* Attendance count */}
+                    <td className="px-2 py-2.5 text-center">
+                      {s.attendanceCount > 0 ? (
+                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold ${
+                          s.attendanceCount <= 3 ? 'bg-red-100 text-red-700'
+                          : s.attendanceCount <= 10 ? 'bg-amber-100 text-amber-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {s.attendanceCount}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-[10px]">-</span>
                       )}
                     </td>
 
@@ -1231,9 +1247,17 @@ export default function ScheduleListPage() {
                   </div>
                 )}
 
-                {/* Row 2: Branch + Staff code */}
+                {/* Row 2: Branch + Attendance + Staff code */}
                 <div className="flex items-center gap-2 text-xs text-slate-500">
                   <span className="truncate">{s.branch?.nameJa || '-'}</span>
+                  {s.attendanceCount > 0 && (
+                    <>
+                      <span className="text-slate-300">|</span>
+                      <span className={`shrink-0 font-bold ${
+                        s.attendanceCount <= 3 ? 'text-red-600' : s.attendanceCount <= 10 ? 'text-amber-600' : 'text-emerald-600'
+                      }`}>{s.attendanceCount}{t('th_attendance_unit')}</span>
+                    </>
+                  )}
                   {s.distributor?.staffId && <><span className="text-slate-300">|</span><span className="shrink-0">{s.distributor.staffId}</span></>}
                 </div>
 

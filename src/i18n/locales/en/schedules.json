@@ -187,6 +187,9 @@
   "all_traj_live": "Real-time updates",
   "all_traj_distributors": "Distributors",
 
+  "th_attendance": "#",
+  "th_attendance_unit": "th",
+
   "add_dist_btn": "Add Distributor",
   "add_dist_title": "Add Distributor Only",
   "add_dist_description": "Add a distributor to {{date}} schedule. Assign area and flyers later.",

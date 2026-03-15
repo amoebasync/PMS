@@ -187,6 +187,9 @@
   "all_traj_live": "リアルタイム更新中",
   "all_traj_distributors": "配布員",
 
+  "th_attendance": "回数",
+  "th_attendance_unit": "回目",
+
   "add_dist_btn": "配布員追加",
   "add_dist_title": "配布員のみ追加",
   "add_dist_description": "{{date}} のスケジュールに配布員のみを追加します。エリア・チラシは後から割り当ててください。",
