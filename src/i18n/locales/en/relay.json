@@ -2,6 +2,7 @@
   "page_title": "Relay / Collection",
   "type_relay": "Relay",
   "type_collection": "Collection",
+  "type_full_relay": "Full Relay",
   "status_pending": "Pending",
   "status_in_progress": "In Progress",
   "status_completed": "Completed",
@@ -27,6 +28,7 @@
   "no_data": "No relay/collection tasks",
   "add_relay": "Add Relay",
   "add_collection": "Add Collection",
+  "add_full_relay": "Add Full Relay",
   "modal_add_title": "Add Relay / Collection",
   "modal_edit_title": "Edit Relay / Collection",
   "field_type": "Type",
@@ -55,7 +57,9 @@
   "total_count": "{{count}} items",
   "relay_pending": "Relay Needed",
   "collection_pending": "Collection Needed",
+  "full_relay_pending": "Full Relay Needed",
   "schedule_relay_column": "Relay",
   "schedule_add_relay": "Add Relay",
-  "schedule_add_collection": "Add Collection"
+  "schedule_add_collection": "Add Collection",
+  "schedule_add_full_relay": "Add Full Relay"
 }

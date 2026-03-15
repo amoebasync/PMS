@@ -938,6 +938,7 @@ enum ScheduleStatus {
 enum RelayType {
   RELAY      // 中継（チラシを届ける）
   COLLECTION // 回収（チラシを回収する）
+  FULL_RELAY // 全中継（全チラシを届ける）
 }
 
 enum RelayStatus {

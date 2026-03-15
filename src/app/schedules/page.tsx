@@ -225,10 +225,10 @@ const TIME_SLOTS = Array.from({ length: 15 }, (_, i) => {
 });
 
 function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
-  schedule: any; type: 'RELAY' | 'COLLECTION'; saving: boolean;
+  schedule: any; type: 'RELAY' | 'COLLECTION' | 'FULL_RELAY'; saving: boolean;
   onSave: (data: any) => void; onClose: () => void; t: (key: string, params?: any) => string;
 }) {
-  const [formType, setFormType] = useState<'RELAY' | 'COLLECTION'>(type);
+  const [formType, setFormType] = useState<'RELAY' | 'COLLECTION' | 'FULL_RELAY'>(type);
   const [driverId, setDriverId] = useState<number | null>(null);
   const [driverName, setDriverName] = useState('');
   const [driverSearch, setDriverSearch] = useState('');
@@ -327,8 +327,8 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
       <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block max-h-full md:max-h-[90vh]">
         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-base text-slate-800">
-            <i className={`bi ${formType === 'RELAY' ? 'bi-truck text-orange-500' : 'bi-box-arrow-in-left text-purple-500'} mr-2`}></i>
-            {formType === 'RELAY' ? t('add_relay') : t('add_collection')}
+            <i className={`bi ${formType === 'COLLECTION' ? 'bi-box-arrow-in-left text-purple-500' : formType === 'FULL_RELAY' ? 'bi-truck text-green-500' : 'bi-truck text-orange-500'} mr-2`}></i>
+            {formType === 'RELAY' ? t('add_relay') : formType === 'FULL_RELAY' ? t('add_full_relay') : t('add_collection')}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
         </div>
@@ -347,6 +347,10 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
               <button onClick={() => setFormType('RELAY')}
                 className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${formType === 'RELAY' ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 <i className="bi bi-truck mr-1"></i>{t('type_relay') || '中継'}
+              </button>
+              <button onClick={() => setFormType('FULL_RELAY')}
+                className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${formType === 'FULL_RELAY' ? 'border-green-400 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <i className="bi bi-truck mr-1"></i>{t('type_full_relay') || '全中継'}
               </button>
               <button onClick={() => setFormType('COLLECTION')}
                 className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${formType === 'COLLECTION' ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -465,7 +469,7 @@ export default function ScheduleListPage() {
   const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(null);
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
-  const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' } | null>(null);
+  const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' | 'FULL_RELAY' } | null>(null);
   const [relaySaving, setRelaySaving] = useState(false);
   const popoverContainerRef = useRef<HTMLDivElement>(null);
   const complianceBtnRef = useRef<HTMLButtonElement>(null);
@@ -865,10 +869,12 @@ export default function ScheduleListPage() {
                     <td className="px-3 py-2.5 text-center">
                       {(() => {
                         const relays = (s.relayTasks || []).filter((r: any) => r.type === 'RELAY');
+                        const fullRelays = (s.relayTasks || []).filter((r: any) => r.type === 'FULL_RELAY');
                         const collections = (s.relayTasks || []).filter((r: any) => r.type === 'COLLECTION');
                         const pendingRelays = relays.filter((r: any) => r.status === 'PENDING' || r.status === 'IN_PROGRESS');
+                        const pendingFullRelays = fullRelays.filter((r: any) => r.status === 'PENDING' || r.status === 'IN_PROGRESS');
                         const pendingCollections = collections.filter((r: any) => r.status === 'PENDING' || r.status === 'IN_PROGRESS');
-                        if (pendingRelays.length === 0 && pendingCollections.length === 0 && relays.length === 0 && collections.length === 0) {
+                        if (pendingRelays.length === 0 && pendingFullRelays.length === 0 && pendingCollections.length === 0 && relays.length === 0 && fullRelays.length === 0 && collections.length === 0) {
                           return <span className="text-slate-300 text-[10px]">-</span>;
                         }
                         return (
@@ -881,6 +887,14 @@ export default function ScheduleListPage() {
                                 {pendingRelays.some((r: any) => r.status === 'IN_PROGRESS') ? t('relay_in_progress') : t('relay_pending')}
                               </span>
                             )}
+                            {pendingFullRelays.length > 0 && (
+                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                                pendingFullRelays.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                              }`}>
+                                <i className="bi bi-truck text-[8px]"></i>
+                                {pendingFullRelays.some((r: any) => r.status === 'IN_PROGRESS') ? t('full_relay_in_progress') : t('full_relay_pending')}
+                              </span>
+                            )}
                             {pendingCollections.length > 0 && (
                               <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
                                 pendingCollections.some((r: any) => r.status === 'IN_PROGRESS') ? 'bg-amber-100 text-amber-700' : 'bg-purple-100 text-purple-700'
@@ -889,10 +903,10 @@ export default function ScheduleListPage() {
                                 {pendingCollections.some((r: any) => r.status === 'IN_PROGRESS') ? t('collection_in_progress') : t('collection_pending')}
                               </span>
                             )}
-                            {pendingRelays.length === 0 && pendingCollections.length === 0 && (
+                            {pendingRelays.length === 0 && pendingFullRelays.length === 0 && pendingCollections.length === 0 && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-100 text-blue-600">
                                 <i className="bi bi-check-circle text-[8px]"></i>
-                                {relays.length + collections.length}
+                                {relays.length + fullRelays.length + collections.length}
                               </span>
                             )}
                           </div>
@@ -947,6 +961,11 @@ export default function ScheduleListPage() {
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-orange-600">
                                 <i className="bi bi-truck"></i>
                                 {t('add_relay')}
+                              </button>
+                              <button onClick={() => { setRelayAddSchedule({ schedule: s, type: 'FULL_RELAY' }); setActionMenuId(null); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-green-600">
+                                <i className="bi bi-truck"></i>
+                                {t('add_full_relay')}
                               </button>
                               <button onClick={() => { setRelayAddSchedule({ schedule: s, type: 'COLLECTION' }); setActionMenuId(null); }}
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-purple-600">

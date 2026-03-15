@@ -26,6 +26,7 @@ const STATUS_STYLE: Record<string, string> = {
 const TYPE_STYLE: Record<string, string> = {
   RELAY: 'bg-orange-100 text-orange-700',
   COLLECTION: 'bg-purple-100 text-purple-700',
+  FULL_RELAY: 'bg-green-100 text-green-700',
 };
 
 const formatAreaName = (area: any) => {
@@ -204,6 +205,7 @@ export default function RelayListPage() {
             <option value="ALL">{t('filter_type_all')}</option>
             <option value="RELAY">{t('type_relay')}</option>
             <option value="COLLECTION">{t('type_collection')}</option>
+            <option value="FULL_RELAY">{t('type_full_relay')}</option>
           </select>
         </div>
         <div className="flex items-center gap-2">
@@ -285,8 +287,8 @@ export default function RelayListPage() {
                 {/* Type */}
                 <td className="px-3 py-2.5">
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold ${TYPE_STYLE[task.type]}`}>
-                    <i className={`bi ${task.type === 'RELAY' ? 'bi-truck' : 'bi-box-arrow-in-left'} text-[9px]`}></i>
-                    {t(task.type === 'RELAY' ? 'type_relay' : 'type_collection')}
+                    <i className={`bi ${task.type === 'COLLECTION' ? 'bi-box-arrow-in-left' : 'bi-truck'} text-[9px]`}></i>
+                    {t(task.type === 'RELAY' ? 'type_relay' : task.type === 'FULL_RELAY' ? 'type_full_relay' : 'type_collection')}
                   </span>
                 </td>
 
@@ -376,7 +378,7 @@ export default function RelayListPage() {
           <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block max-h-full md:max-h-[90vh]">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base text-slate-800">
-                <i className={`bi ${editForm.type === 'RELAY' ? 'bi-truck text-orange-500' : 'bi-box-arrow-in-left text-purple-500'} mr-2`}></i>
+                <i className={`bi ${editForm.type === 'COLLECTION' ? 'bi-box-arrow-in-left text-purple-500' : editForm.type === 'FULL_RELAY' ? 'bi-truck text-green-500' : 'bi-truck text-orange-500'} mr-2`}></i>
                 {t('modal_edit_title')}
               </h3>
               <button onClick={() => setEditTask(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
@@ -389,6 +391,10 @@ export default function RelayListPage() {
                   <button onClick={() => setEditForm({ ...editForm, type: 'RELAY' })}
                     className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.type === 'RELAY' ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-slate-200 text-slate-600'}`}>
                     <i className="bi bi-truck mr-1"></i>{t('type_relay')}
+                  </button>
+                  <button onClick={() => setEditForm({ ...editForm, type: 'FULL_RELAY' })}
+                    className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.type === 'FULL_RELAY' ? 'border-green-400 bg-green-50 text-green-700' : 'border-slate-200 text-slate-600'}`}>
+                    <i className="bi bi-truck mr-1"></i>{t('type_full_relay')}
                   </button>
                   <button onClick={() => setEditForm({ ...editForm, type: 'COLLECTION' })}
                     className={`flex-1 px-3 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.type === 'COLLECTION' ? 'border-purple-400 bg-purple-50 text-purple-700' : 'border-slate-200 text-slate-600'}`}>

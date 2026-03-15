@@ -2,6 +2,7 @@
   "page_title": "中継/回収管理",
   "type_relay": "中継",
   "type_collection": "回収",
+  "type_full_relay": "全中継",
   "status_pending": "要対応",
   "status_in_progress": "対応中",
   "status_completed": "完了",
@@ -27,6 +28,7 @@
   "no_data": "中継/回収タスクはありません",
   "add_relay": "中継追加",
   "add_collection": "回収追加",
+  "add_full_relay": "全中継追加",
   "modal_add_title": "中継/回収の追加",
   "modal_edit_title": "中継/回収の編集",
   "field_type": "種別",
@@ -55,7 +57,9 @@
   "total_count": "{{count}} 件",
   "relay_pending": "要中継",
   "collection_pending": "要回収",
+  "full_relay_pending": "要全中継",
   "schedule_relay_column": "中継",
   "schedule_add_relay": "中継追加",
-  "schedule_add_collection": "回収追加"
+  "schedule_add_collection": "回収追加",
+  "schedule_add_full_relay": "全中継追加"
 }
