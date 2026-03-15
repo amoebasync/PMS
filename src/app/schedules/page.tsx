@@ -143,7 +143,7 @@ function StatusChangeModal({ schedule, onClose, onSave, t, getStatusKey }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-md overflow-hidden flex flex-col md:block">
         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-base md:text-lg text-slate-800">
@@ -339,7 +339,7 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
   const areaName = `${schedule.area?.city?.prefecture?.name || ''}${schedule.area?.city?.name || ''}${formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block max-h-full md:max-h-[90vh]">
         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-base text-slate-800">
@@ -1139,7 +1139,7 @@ export default function ScheduleListPage() {
 
       {/* Assign Distributor Modal */}
       {assignSchedule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block md:max-h-[80vh]">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base md:text-lg text-slate-800">
@@ -1243,7 +1243,7 @@ export default function ScheduleListPage() {
 
       {/* Remarks Modal */}
       {editingSchedule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base md:text-lg text-slate-800">{t('remarks_edit_title')}</h3>
@@ -1280,7 +1280,7 @@ export default function ScheduleListPage() {
       {/* All Trajectories Viewer */}
       {showAllTrajectories && (
         <Suspense fallback={
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-xl p-8 text-center">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
               <p className="text-slate-600 text-sm">{t('loading')}</p>
@@ -1306,7 +1306,7 @@ export default function ScheduleListPage() {
       {/* Trajectory Viewer */}
       {trajectoryScheduleId && (
         <Suspense fallback={
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="bg-white rounded-xl p-8 text-center">
               <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
               <p className="text-slate-600 text-sm">{t('loading')}</p>
