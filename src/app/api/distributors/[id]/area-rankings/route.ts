@@ -6,7 +6,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const distId = parseInt(id);
 
-    // エリア別: 配布率の平均 × 配布回数 でスコア算出
+    // エリア別: 配布率の平均でスコア算出
     // planned_count = 1 のダミーデータは除外
     const rows = await prisma.$queryRaw<{
       area_id: number;
@@ -31,18 +31,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
         AND ds.status = 'COMPLETED'
         AND ds.area_id IS NOT NULL
       GROUP BY a.id, a.town_name, a.chome_name, c.name
-      ORDER BY (COALESCE(AVG(di.actual_count / di.planned_count), 0) * COUNT(DISTINCT ds.id)) DESC
+      ORDER BY COALESCE(AVG(di.actual_count / di.planned_count), 0) DESC
     `;
 
     const rankings = rows.map((r, idx) => {
-      const areaName = `${r.city_name || ''}${r.town_name || ''}${r.chome_name || ''}`.trim();
+      const areaName = (r.chome_name || r.town_name || '不明').trim();
       const count = Number(r.dist_count);
       const avgRate = r.avg_rate != null ? Math.round(r.avg_rate * 1000) / 10 : null;
-      const score = avgRate != null ? Math.round(avgRate * count * 10) / 10 : 0;
+      const score = avgRate != null ? Math.round(avgRate * 10) / 10 : 0;
       return {
         rank: idx + 1,
         areaId: r.area_id,
-        areaName: areaName || '不明',
+        areaName,
         distributionCount: count,
         avgDistributionRate: avgRate,
         score,
