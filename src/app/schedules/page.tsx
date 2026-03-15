@@ -522,6 +522,15 @@ export default function ScheduleListPage() {
   const [statusModalSchedule, setStatusModalSchedule] = useState<any>(null);
   const [showAllTrajectories, setShowAllTrajectories] = useState(false);
 
+  // 配布員だけ割り当てモーダル
+  const [showAddDistModal, setShowAddDistModal] = useState(false);
+  const [addDistCandidates, setAddDistCandidates] = useState<any[]>([]);
+  const [addDistLoading, setAddDistLoading] = useState(false);
+  const [addDistSearch, setAddDistSearch] = useState('');
+  const [addDistMode, setAddDistMode] = useState<'shift' | 'all'>('shift');
+  const [addDistShiftIds, setAddDistShiftIds] = useState<Set<number>>(new Set());
+  const [addDistSaving, setAddDistSaving] = useState(false);
+
   // ポップオーバー/メニュー外クリックで閉じる
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -715,6 +724,66 @@ export default function ScheduleListPage() {
     return true;
   });
 
+  // 配布員追加モーダルを開く
+  const openAddDistModal = useCallback(async () => {
+    setShowAddDistModal(true);
+    setAddDistSearch('');
+    setAddDistMode('shift');
+    setAddDistCandidates([]);
+    setAddDistLoading(true);
+    try {
+      const shiftRes = await fetch(`/api/distributor-shifts?dateFrom=${filterDate}&dateTo=${filterDate}&status=WORKING&limit=200`);
+      if (shiftRes.ok) {
+        const shiftData = await shiftRes.json();
+        const ids = new Set<number>((shiftData.data || []).map((s: any) => s.distributorId));
+        setAddDistShiftIds(ids);
+      }
+      const distRes = await fetch('/api/distributors');
+      if (distRes.ok) {
+        const distData = await distRes.json();
+        const active = (distData || []).filter((d: any) => d.isActive !== false && !d.leaveDate);
+        setAddDistCandidates(active);
+      }
+    } catch { /* silent */ }
+    setAddDistLoading(false);
+  }, [filterDate]);
+
+  // 配布員だけのスケジュールを作成
+  const handleAddDistSchedule = async (distributorId: number) => {
+    setAddDistSaving(true);
+    try {
+      const res = await fetch('/api/schedules', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: filterDate,
+          distributorId,
+        }),
+      });
+      if (res.ok) {
+        showToast(t('add_dist_success'), 'success');
+        setShowAddDistModal(false);
+        fetchSchedules(filterDate);
+      } else {
+        showToast(t('communication_error'), 'error');
+      }
+    } catch { showToast(t('communication_error'), 'error'); }
+    setAddDistSaving(false);
+  };
+
+  const addDistFilteredCandidates = addDistCandidates.filter(d => {
+    if (addDistMode === 'shift' && !addDistShiftIds.has(d.id)) return false;
+    if (addDistSearch) {
+      const q = addDistSearch.toLowerCase();
+      const target = `${d.name || ''} ${d.staffId || ''}`.toLowerCase();
+      if (!target.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // 配布員だけのスケジュールかを判定（エリアなし＆チラシなし）
+  const isDistOnlySchedule = (s: any) => !s.areaId && (!s.items || s.items.length === 0 || s.items.every((i: any) => !i.flyerName));
+
   const filteredSchedules = schedules.filter(s => {
     if (filterStatus !== 'ALL' && s.status !== filterStatus) return false;
     if (searchQuery) {
@@ -724,6 +793,20 @@ export default function ScheduleListPage() {
       if (!searchTarget.includes(q)) return false;
     }
     return true;
+  }).sort((a, b) => {
+    // 1. 全中継（FULL_RELAY）があるスケジュールを最上位
+    const aHasFullRelay = (a.relayTasks || []).some((r: any) => r.type === 'FULL_RELAY');
+    const bHasFullRelay = (b.relayTasks || []).some((r: any) => r.type === 'FULL_RELAY');
+    if (aHasFullRelay && !bHasFullRelay) return -1;
+    if (!aHasFullRelay && bHasFullRelay) return 1;
+
+    // 2. 支店名でソート（高田馬場を最上位）
+    const aBranch = a.branch?.nameJa || '';
+    const bBranch = b.branch?.nameJa || '';
+    const aIsTop = aBranch.includes('高田馬場') ? 0 : 1;
+    const bIsTop = bBranch.includes('高田馬場') ? 0 : 1;
+    if (aIsTop !== bIsTop) return aIsTop - bIsTop;
+    return aBranch.localeCompare(bBranch, 'ja');
   });
 
   const getStatusKey = (status: string) => {
@@ -779,6 +862,10 @@ export default function ScheduleListPage() {
                 }, 0).toLocaleString()}
               </span>
             </div>
+            <button onClick={openAddDistModal}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors shadow-sm">
+              <i className="bi bi-person-plus-fill"></i>{t('add_dist_btn')}
+            </button>
             <button onClick={() => setShowAllTrajectories(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
               <i className="bi bi-map"></i>{t('all_traj_btn')}
@@ -830,10 +917,14 @@ export default function ScheduleListPage() {
                 const totalPlanned = activeFlyers.reduce((sum: number, f: any) => sum + (f.plannedCount || 0), 0);
                 const totalActual = activeFlyers.reduce((sum: number, f: any) => sum + (f.actualCount || 0), 0);
 
+                const isDistOnly = isDistOnlySchedule(s);
+
                 return (
-                  <tr key={s.id} className="hover:bg-slate-50/80 transition-colors group">
+                  <tr key={s.id}
+                    onClick={() => (s.status === 'DISTRIBUTING' || s.status === 'COMPLETED') && setTrajectoryScheduleId(s.id)}
+                    className={`transition-colors group ${isDistOnly ? 'bg-red-50 hover:bg-red-100/80' : 'hover:bg-slate-50/80'} ${(s.status === 'DISTRIBUTING' || s.status === 'COMPLETED') ? 'cursor-pointer' : ''}`}>
                     {/* Status */}
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                       <button
                         onClick={() => setStatusModalSchedule(s)}
                         className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer hover:opacity-80 transition-opacity ${STATUS_STYLE[s.status] || STATUS_STYLE.UNSTARTED}`}
@@ -844,7 +935,7 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Distributor */}
-                    <td className="px-3 py-2.5">
+                    <td className="px-3 py-2.5" onClick={e => e.stopPropagation()}>
                       {s.distributor ? (
                         <div className="flex items-center gap-1.5 group/dist">
                           <div className="min-w-0">
@@ -871,19 +962,27 @@ export default function ScheduleListPage() {
 
                     {/* Area (combined) */}
                     <td className="px-3 py-2.5">
-                      <div className="text-xs text-slate-700">{displayAreaName !== '-' ? `${cityName} ${displayAreaName}` : cityName || '-'}</div>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                        {prefName && <span>{prefName}</span>}
-                        {s.area?.door_to_door_count > 0 && (
-                          <span className="text-emerald-600 font-bold">{s.area.door_to_door_count.toLocaleString()}{t('th_capacity_unit')}</span>
-                        )}
-                      </div>
+                      {isDistOnly ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-bold text-red-600">
+                          <i className="bi bi-exclamation-triangle-fill"></i>{t('needs_schedule_assignment')}
+                        </span>
+                      ) : (
+                        <>
+                          <div className="text-xs text-slate-700">{displayAreaName !== '-' ? `${cityName} ${displayAreaName}` : cityName || '-'}</div>
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                            {prefName && <span>{prefName}</span>}
+                            {s.area?.door_to_door_count > 0 && (
+                              <span className="text-emerald-600 font-bold">{s.area.door_to_door_count.toLocaleString()}{t('th_capacity_unit')}</span>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </td>
 
                     {/* Flyers (compact) */}
                     <td className="px-3 py-2.5">
                       {activeFlyers.length === 0 ? (
-                        <span className="text-slate-300">-</span>
+                        <span className={isDistOnly ? 'text-red-300' : 'text-slate-300'}>-</span>
                       ) : (
                         <div className="space-y-0.5">
                           {activeFlyers.map((f: any, i: number) => (
@@ -952,7 +1051,7 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Compliance */}
-                    <td className="px-3 py-2.5 text-center">
+                    <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                       <button
                         ref={compliancePopoverId === s.id ? complianceBtnRef : undefined}
                         onClick={() => setCompliancePopoverId(compliancePopoverId === s.id ? null : s.id)}
@@ -964,7 +1063,7 @@ export default function ScheduleListPage() {
                     </td>
 
                     {/* Actions */}
-                    <td className="px-3 py-2.5 text-center">
+                    <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         {/* GPS */}
                         <button
@@ -1067,9 +1166,10 @@ export default function ScheduleListPage() {
             const cityName = s.city?.name || s.area?.city?.name || '-';
             const displayAreaName = formatAreaName(s.area?.town_name, s.area?.chome_name);
             const checkCount = getCheckCount(s);
+            const isDistOnly = isDistOnlySchedule(s);
 
             return (
-              <div key={s.id} className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm space-y-2.5">
+              <div key={s.id} className={`rounded-xl border p-4 shadow-sm space-y-2.5 ${isDistOnly ? 'bg-red-50 border-red-200' : 'bg-white border-slate-200'}`}>
                 {/* Row 1: Status + Distributor + Actions */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 min-w-0">
@@ -1139,9 +1239,18 @@ export default function ScheduleListPage() {
 
                 {/* Row 3: Area info */}
                 <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                  <i className="bi bi-geo text-slate-400 shrink-0"></i>
-                  <span className="truncate">{cityName} {displayAreaName}</span>
-                  <span className="text-emerald-600 font-bold shrink-0 ml-auto">{s.area?.door_to_door_count?.toLocaleString() || '-'}</span>
+                  {isDistOnly ? (
+                    <>
+                      <i className="bi bi-exclamation-triangle-fill text-red-500 shrink-0"></i>
+                      <span className="font-bold text-red-600">{t('needs_schedule_assignment')}</span>
+                    </>
+                  ) : (
+                    <>
+                      <i className="bi bi-geo text-slate-400 shrink-0"></i>
+                      <span className="truncate">{cityName} {displayAreaName}</span>
+                      <span className="text-emerald-600 font-bold shrink-0 ml-auto">{s.area?.door_to_door_count?.toLocaleString() || '-'}</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Row 4: Flyer list */}
@@ -1356,6 +1465,96 @@ export default function ScheduleListPage() {
           onClose={() => setRelayAddSchedule(null)}
           t={t}
         />
+      )}
+
+      {/* Add Distributor Schedule Modal */}
+      {showAddDistModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col md:block md:max-h-[80vh]">
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base md:text-lg text-slate-800">
+                <i className="bi bi-person-plus-fill text-red-500 mr-2"></i>{t('add_dist_title')}
+              </h3>
+              <button onClick={() => setShowAddDistModal(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="px-4 md:px-6 pt-3 space-y-3 shrink-0">
+              <div className="text-xs text-slate-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                <i className="bi bi-exclamation-triangle-fill text-red-500"></i>
+                <span>{t('add_dist_description', { date: filterDate })}</span>
+              </div>
+              {/* Mode toggle */}
+              <div className="flex bg-slate-100 rounded-lg p-0.5">
+                <button
+                  onClick={() => setAddDistMode('shift')}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${addDistMode === 'shift' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <i className="bi bi-calendar-check mr-1"></i>{t('assign_mode_shift')}
+                  <span className="ml-1 opacity-60">({addDistCandidates.filter(d => addDistShiftIds.has(d.id)).length})</span>
+                </button>
+                <button
+                  onClick={() => setAddDistMode('all')}
+                  className={`flex-1 px-3 py-1.5 rounded-md text-xs font-bold transition-colors ${addDistMode === 'all' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                >
+                  <i className="bi bi-people mr-1"></i>{t('assign_mode_all')}
+                  <span className="ml-1 opacity-60">({addDistCandidates.length})</span>
+                </button>
+              </div>
+              {/* Search */}
+              <div className="relative">
+                <i className="bi bi-search absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                <input type="text" value={addDistSearch} onChange={e => setAddDistSearch(e.target.value)}
+                  placeholder={t('assign_search_placeholder')}
+                  className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                  autoFocus />
+              </div>
+            </div>
+            {/* Candidate list */}
+            <div className="flex-1 overflow-auto px-4 md:px-6 py-3 md:min-h-[200px] md:max-h-[400px]">
+              {addDistLoading ? (
+                <div className="flex items-center justify-center py-10 text-slate-400">
+                  <div className="w-6 h-6 border-2 border-slate-200 border-t-indigo-500 rounded-full animate-spin mr-2"></div>
+                  {t('assign_loading')}
+                </div>
+              ) : addDistFilteredCandidates.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-sm">
+                  {addDistMode === 'shift' ? t('assign_no_shift') : t('assign_no_results')}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {addDistFilteredCandidates.map(d => {
+                    // 既にスケジュールに含まれている配布員かチェック
+                    const alreadyAssigned = schedules.some(s => s.distributorId === d.id);
+                    return (
+                      <button key={d.id} onClick={() => !addDistSaving && handleAddDistSchedule(d.id)}
+                        disabled={addDistSaving}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-colors ${
+                          alreadyAssigned ? 'bg-slate-50 border border-slate-200 opacity-50' : 'hover:bg-slate-50 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center shrink-0 overflow-hidden">
+                          {d.avatarUrl ? (
+                            <img src={d.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <i className="bi bi-person-fill text-slate-300 text-sm mt-0.5"></i>
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-bold text-slate-800 truncate">{d.name}</div>
+                          <div className="text-[10px] text-slate-400">{d.staffId}{d.branch?.nameJa ? ` · ${d.branch.nameJa}` : ''}</div>
+                        </div>
+                        {alreadyAssigned && (
+                          <span className="shrink-0 text-[10px] font-bold text-slate-400">
+                            {t('add_dist_already')}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Trajectory Viewer */}

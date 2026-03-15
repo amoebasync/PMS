@@ -185,5 +185,12 @@
   "all_traj_completed": "Completed",
   "all_traj_total": "Total",
   "all_traj_live": "Real-time updates",
-  "all_traj_distributors": "Distributors"
+  "all_traj_distributors": "Distributors",
+
+  "add_dist_btn": "Add Distributor",
+  "add_dist_title": "Add Distributor Only",
+  "add_dist_description": "Add a distributor to {{date}} schedule. Assign area and flyers later.",
+  "add_dist_success": "Distributor added",
+  "add_dist_already": "Assigned",
+  "needs_schedule_assignment": "Schedule Not Assigned"
 }

@@ -185,5 +185,12 @@
   "all_traj_completed": "完了",
   "all_traj_total": "合計",
   "all_traj_live": "リアルタイム更新中",
-  "all_traj_distributors": "配布員"
+  "all_traj_distributors": "配布員",
+
+  "add_dist_btn": "配布員追加",
+  "add_dist_title": "配布員のみ追加",
+  "add_dist_description": "{{date}} のスケジュールに配布員のみを追加します。エリア・チラシは後から割り当ててください。",
+  "add_dist_success": "配布員を追加しました",
+  "add_dist_already": "割当済",
+  "needs_schedule_assignment": "スケジュール未割当"
 }
