@@ -315,25 +315,6 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const lastProgress = data.progressEvents[data.progressEvents.length - 1];
   const totalMailboxes = lastProgress?.mailboxCount || 0;
 
-  // GPSポイントから距離を計算（DB値が0の場合のフォールバック）
-  const calcDistanceFromPoints = () => {
-    if (points.length < 2) return 0;
-    let dist = 0;
-    for (let i = 1; i < points.length; i++) {
-      const R = 6371000; // 地球半径(m)
-      const dLat = (points[i].lat - points[i - 1].lat) * Math.PI / 180;
-      const dLng = (points[i].lng - points[i - 1].lng) * Math.PI / 180;
-      const a = Math.sin(dLat / 2) ** 2 +
-        Math.cos(points[i - 1].lat * Math.PI / 180) * Math.cos(points[i].lat * Math.PI / 180) *
-        Math.sin(dLng / 2) ** 2;
-      dist += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    }
-    return dist;
-  };
-  const totalDistance = data.session.totalDistance > 0 ? data.session.totalDistance : calcDistanceFromPoints();
-  const totalSteps = data.session.totalSteps > 0 ? data.session.totalSteps : Math.round(totalDistance / 0.7); // 歩幅70cm
-  const totalCalories = data.session.totalCalories > 0 ? data.session.totalCalories : Math.round(totalSteps * 0.04); // 約0.04kcal/歩
-
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
@@ -579,15 +560,15 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
             </h3>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-blue-50 rounded-lg p-2 text-center">
-                <div className="text-blue-600 font-black text-lg">{(totalDistance / 1000).toFixed(1)}</div>
+                <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
                 <div className="text-blue-400">km</div>
               </div>
               <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                <div className="text-emerald-600 font-black text-lg">{totalSteps.toLocaleString()}</div>
+                <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
                 <div className="text-emerald-400">歩</div>
               </div>
               <div className="bg-orange-50 rounded-lg p-2 text-center">
-                <div className="text-orange-600 font-black text-lg">{Math.round(totalCalories)}</div>
+                <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
                 <div className="text-orange-400">kcal</div>
               </div>
               <div className="bg-purple-50 rounded-lg p-2 text-center">
@@ -618,13 +599,13 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">歩数</span>
                 <span className="font-bold text-slate-700">
-                  {durationHours > 0 ? Math.round(totalSteps / durationHours).toLocaleString() : 0} 歩/h
+                  {durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500">移動距離</span>
                 <span className="font-bold text-slate-700">
-                  {durationHours > 0 ? (totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
+                  {durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
                 </span>
               </div>
             </div>
