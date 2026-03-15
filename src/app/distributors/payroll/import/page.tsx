@@ -75,13 +75,27 @@ const DEDUCTION_LABELS = [
   'システム', '寮費', '寮費調整', '金（中継等）', '税金', 'バイク', 'バイク2',
 ];
 
+function detectYearFromData(text: string): number | null {
+  const lines = text.split('\n').map((line) => line.split('\t'));
+  if (lines.length < 2) return null;
+  // 2行目A列に「2025年」等がある場合
+  const label = (lines[1]?.[0] || '').trim();
+  const yearMatch = label.match(/^(\d{4})年$/);
+  if (yearMatch) return parseInt(yearMatch[1]);
+  // 1行目A列にもチェック
+  const label0 = (lines[0]?.[0] || '').trim();
+  const yearMatch0 = label0.match(/^(\d{4})年$/);
+  if (yearMatch0) return parseInt(yearMatch0[1]);
+  return null;
+}
+
 function parseClipboardData(text: string, year: number): ParsedDistributor[] {
   const lines = text.split('\n').map((line) => line.split('\t'));
   if (lines.length < 3) return [];
 
   // 行1: staffId（A列はラベル）
   const staffIdRow = lines[0];
-  // 行2: 名前
+  // 行2: 名前（A列に「YYYY年」がある場合もある）
   const nameRow = lines[1];
 
   // 配布員数 = 列数 - 1（A列がラベル）
@@ -249,7 +263,7 @@ function parseClipboardData(text: string, year: number): ParsedDistributor[] {
 
 export default function DistributorPayrollImportPage() {
   const { t } = useTranslation('distributor-payroll-import');
-  const { showToast } = useNotification();
+  const { showToast, showConfirm } = useNotification();
   const currentYear = new Date().getFullYear();
 
   const [year, setYear] = useState(currentYear);
@@ -258,10 +272,19 @@ export default function DistributorPayrollImportPage() {
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+  const [deleteYear, setDeleteYear] = useState(currentYear);
+  const [deleteMonth, setDeleteMonth] = useState(new Date().getMonth() + 1);
+  const [deleting, setDeleting] = useState(false);
 
   const handleParse = useCallback(async () => {
     try {
-      const data = parseClipboardData(rawText, year);
+      // データから年を自動検出
+      const detectedYear = detectYearFromData(rawText);
+      if (detectedYear) {
+        setYear(detectedYear);
+      }
+      const useYear = detectedYear || year;
+      const data = parseClipboardData(rawText, useYear);
       if (data.length === 0) {
         showToast(t('no_valid_data'), 'error');
         return;
@@ -327,6 +350,31 @@ export default function DistributorPayrollImportPage() {
     setExpandedIdx(null);
   };
 
+  const handleBulkDelete = useCallback(async () => {
+    const confirmed = await showConfirm(
+      `${deleteYear}年${deleteMonth}月のインポート済み給与データを全て削除しますか？\nこの操作は取り消せません。`,
+      { variant: 'danger', confirmLabel: '削除する' }
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/distributor-payroll?year=${deleteYear}&month=${deleteMonth}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast(`${data.deleted}件の給与レコードを削除しました`, 'success');
+      } else {
+        showToast(data.error || '削除に失敗しました', 'error');
+      }
+    } catch {
+      showToast('削除に失敗しました', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteYear, deleteMonth, showConfirm, showToast]);
+
   const matchedCount = parsed.filter((d) => d.dbMatch === true).length;
   const unmatchedCount = parsed.filter((d) => d.dbMatch === false).length;
 
@@ -384,6 +432,48 @@ export default function DistributorPayrollImportPage() {
             className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-bold rounded-xl transition-colors"
           >
             {t('btn_clear')}
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk delete */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <i className="bi bi-trash3 text-rose-500"></i>
+          インポート済みデータの削除
+        </h3>
+        <p className="text-xs text-slate-500 mb-3">
+          間違った年・月でインポートした場合、指定年月のデータを一括削除できます。
+        </p>
+        <div className="flex items-center gap-3 flex-wrap">
+          <select
+            value={deleteYear}
+            onChange={(e) => setDeleteYear(parseInt(e.target.value))}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+          >
+            {Array.from({ length: 5 }, (_, i) => currentYear - i).map((y) => (
+              <option key={y} value={y}>{y}年</option>
+            ))}
+          </select>
+          <select
+            value={deleteMonth}
+            onChange={(e) => setDeleteMonth(parseInt(e.target.value))}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-rose-400"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>{m}月</option>
+            ))}
+          </select>
+          <button
+            onClick={handleBulkDelete}
+            disabled={deleting}
+            className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-40"
+          >
+            {deleting ? (
+              <><i className="bi bi-arrow-repeat animate-spin"></i> 削除中...</>
+            ) : (
+              <><i className="bi bi-trash3"></i> 一括削除</>
+            )}
           </button>
         </div>
       </div>

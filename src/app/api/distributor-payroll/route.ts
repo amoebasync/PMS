@@ -63,3 +63,49 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });
   }
 }
+
+// DELETE /api/distributor-payroll?year=YYYY&month=MM
+// 指定年月のインポート済みデータを一括削除
+export async function DELETE(request: Request) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
+  try {
+    const { searchParams } = new URL(request.url);
+    const year = searchParams.get('year');
+    const month = searchParams.get('month');
+
+    if (!year || !month) {
+      return NextResponse.json({ error: 'year と month は必須です' }, { status: 400 });
+    }
+
+    const y = parseInt(year);
+    const m = parseInt(month);
+    const from = new Date(y, m - 1, 1);
+    const to = new Date(y, m, 0);
+
+    // 該当期間のレコードを検索
+    const records = await prisma.distributorPayrollRecord.findMany({
+      where: {
+        periodStart: { gte: from, lte: to },
+      },
+      select: { id: true },
+    });
+
+    if (records.length === 0) {
+      return NextResponse.json({ deleted: 0 });
+    }
+
+    const ids = records.map(r => r.id);
+
+    // 明細行を先に削除してからレコードを削除
+    await prisma.$transaction([
+      prisma.distributorPayrollItem.deleteMany({ where: { payrollId: { in: ids } } }),
+      prisma.distributorPayrollRecord.deleteMany({ where: { id: { in: ids } } }),
+    ]);
+
+    return NextResponse.json({ deleted: records.length });
+  } catch (error) {
+    console.error('Payroll DELETE Error:', error);
+    return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });
+  }
+}
