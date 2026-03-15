@@ -255,9 +255,9 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
   useEffect(() => {
     if (!schedule.area?.id) return;
     fetch(`/api/areas/${schedule.area.id}`).then(r => r.ok ? r.json() : null).then(area => {
-      if (!area?.geojson) return;
+      if (!area?.boundary_geojson) return;
       try {
-        const geo = typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson;
+        const geo = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
         const paths: google.maps.LatLngLiteral[][] = [];
         const features = geo.features || [geo];
         for (const f of features) {
@@ -310,9 +310,9 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
         // ポリゴンがまだ未取得の場合はエリアAPIから取得を試みる
         if (schedule.area?.id) {
           fetch(`/api/areas/${schedule.area.id}`).then(r => r.ok ? r.json() : null).then(area => {
-            if (!area?.geojson) { setLatitude(35.6895); setLongitude(139.6917); return; }
+            if (!area?.boundary_geojson) { setLatitude(35.6895); setLongitude(139.6917); return; }
             try {
-              const geo = typeof area.geojson === 'string' ? JSON.parse(area.geojson) : area.geojson;
+              const geo = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
               const pts: { lat: number; lng: number }[] = [];
               const features = geo.features || [geo];
               for (const f of features) {
