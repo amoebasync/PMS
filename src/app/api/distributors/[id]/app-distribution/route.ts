@@ -157,7 +157,8 @@ export async function POST(
     // 5. Android: オプトインURL付き案内メール送信
     if (platform === 'ANDROID' && !result.alreadyExists) {
       try {
-        await sendAndroidTestInviteEmail(email, distributor.name);
+        const mStatus = (result as any).memberStatus as string | undefined;
+        await sendAndroidTestInviteEmail(email, distributor.name, mStatus);
         console.log(`[AppDist] Android test invite email sent to ${email}`);
       } catch (mailErr) {
         console.error('[AppDist] Failed to send Android invite email:', mailErr);
