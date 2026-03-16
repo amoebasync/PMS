@@ -134,6 +134,7 @@ export async function GET(
       const durationMs = session.finishedAt.getTime() - session.startedAt.getTime();
       const hours = durationMs / (1000 * 60 * 60);
       if (hours <= 0) continue;
+      if (!session.schedule) continue;
       const sessionDelivered = session.schedule.items.reduce(
         (sum, item) => sum + (item.actualCount || 0),
         0

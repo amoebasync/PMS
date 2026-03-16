@@ -2911,7 +2911,7 @@ model AppDistributionLog {
 // --- 配布作業セッション（START〜FINISH） ---
 model DistributionSession {
   id              Int                @id @default(autoincrement())
-  scheduleId      Int                @unique @map("schedule_id")
+  scheduleId      Int?               @unique @map("schedule_id")
   distributorId   Int                @map("distributor_id")
 
   startedAt       DateTime           @map("started_at")
@@ -2930,7 +2930,7 @@ model DistributionSession {
   updatedAt       DateTime           @updatedAt @map("updated_at")
 
   // リレーション
-  schedule        DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  schedule        DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   distributor     FlyerDistributor     @relation(fields: [distributorId], references: [id])
   gpsPoints       GpsPoint[]
   progressEvents  ProgressEvent[]

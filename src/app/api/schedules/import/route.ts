@@ -434,13 +434,44 @@ export async function POST(request: Request) {
               continue;
             }
 
-            // セッション・関連データを削除（カスケードで GPS/Progress/Skip も消える）
-            if (old.session) {
-              await tx.distributionSession.delete({ where: { id: old.session.id } });
-            }
-            await tx.distributionItem.deleteMany({ where: { scheduleId: old.id } });
+            // セッションは削除しない（onDelete: SetNull で scheduleId が null になる）
+            // GPS・進捗データはセッションに紐付いているので保持される
+            // RelayTask, DistributionItem は onDelete: Cascade で自動削除
             await tx.distributionSchedule.delete({ where: { id: old.id } });
             cleanedCount++;
+          }
+        }
+      }
+
+      // ── 孤児セッションの再紐付け ──
+      // スケジュール削除でscheduleId=nullになったセッションを、同じ配布員+同じ日の新スケジュールに紐付ける
+      if (isLastChunk && createdIds.length > 0) {
+        const orphanedSessions = await tx.distributionSession.findMany({
+          where: { scheduleId: null },
+          select: { id: true, distributorId: true, startedAt: true },
+        });
+
+        if (orphanedSessions.length > 0) {
+          const newSchedules = await tx.distributionSchedule.findMany({
+            where: { id: { in: [...keepIdsFromPrev.filter(id => !matchedIds.includes(id)), ...createdIds] } },
+            select: { id: true, distributorId: true, date: true, session: { select: { id: true } } },
+          });
+
+          for (const orphan of orphanedSessions) {
+            const orphanDate = orphan.startedAt.toISOString().split('T')[0];
+            const matchSchedule = newSchedules.find(ns =>
+              ns.distributorId === orphan.distributorId &&
+              ns.date && ns.date.toISOString().split('T')[0] === orphanDate &&
+              !ns.session // まだセッションが紐付いていない
+            );
+            if (matchSchedule) {
+              await tx.distributionSession.update({
+                where: { id: orphan.id },
+                data: { scheduleId: matchSchedule.id },
+              });
+              // 再紐付け後は次のマッチに使わない
+              matchSchedule.session = { id: orphan.id } as any;
+            }
           }
         }
       }

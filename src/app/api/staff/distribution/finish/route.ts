@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     // トランザクション: セッション終了 + 実績枚数更新 + スケジュールステータス更新
     await prisma.$transaction(async (tx) => {
       // 1. 各チラシの実績枚数を更新
-      if (Array.isArray(items)) {
+      if (Array.isArray(items) && session.schedule) {
         for (const item of items) {
           if (!item.itemId || item.actualCount == null) continue;
           // itemId が本スケジュールに属するか検証
@@ -79,15 +79,17 @@ export async function POST(request: Request) {
         },
       });
 
-      // 3. スケジュールステータスを COMPLETED に
-      await tx.distributionSchedule.update({
-        where: { id: session.scheduleId },
-        data: { status: 'COMPLETED' },
-      });
+      // 3. スケジュールステータスを COMPLETED に（スケジュールが存在する場合のみ）
+      if (session.scheduleId) {
+        await tx.distributionSchedule.update({
+          where: { id: session.scheduleId },
+          data: { status: 'COMPLETED' },
+        });
+      }
     });
 
     // 通知作成（トランザクション外）
-    const areaName = session.schedule.area
+    const areaName = session.schedule?.area
       ? `${session.schedule.area.town_name || ''}${session.schedule.area.chome_name || ''}`
       : '';
 
@@ -106,7 +108,7 @@ export async function POST(request: Request) {
           type: 'DISTRIBUTION_FINISH',
           title: `${distributor.name}さんが配布を完了しました`,
           message: `${areaName} / ${totalActual.toLocaleString()}ポスト${reasonText}`,
-          scheduleId: session.scheduleId,
+          scheduleId: session.scheduleId || undefined,
           distributorId: distributor.id,
         },
       });
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
     }
 
     // 報酬計算
-    const earnings = await calculateDailyEarnings(distributor.id, session.schedule.date || new Date());
+    const earnings = await calculateDailyEarnings(distributor.id, session.schedule?.date || new Date());
 
     return NextResponse.json({ ok: true, earnings });
   } catch (error) {

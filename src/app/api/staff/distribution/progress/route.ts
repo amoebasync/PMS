@@ -32,10 +32,12 @@ export async function POST(request: Request) {
     }
 
     // 配布予定枚数の最大値を超えていないかチェック
-    const scheduleItems = await prisma.distributionItem.findMany({
-      where: { scheduleId: session.scheduleId },
-      select: { plannedCount: true },
-    });
+    const scheduleItems = session.scheduleId
+      ? await prisma.distributionItem.findMany({
+          where: { scheduleId: session.scheduleId },
+          select: { plannedCount: true },
+        })
+      : [];
     const maxPlanned = Math.max(...scheduleItems.map(i => i.plannedCount ?? 0), 0);
     if (maxPlanned > 0 && mailboxCount > maxPlanned) {
       return NextResponse.json({
