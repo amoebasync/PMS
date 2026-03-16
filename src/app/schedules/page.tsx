@@ -7,6 +7,7 @@ import { GoogleMap, useJsApiLoader, Marker, Polygon } from '@react-google-maps/a
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
 const AllTrajectoriesViewer = lazy(() => import('@/components/schedules/AllTrajectoriesViewer'));
+const DistributorDetailModal = lazy(() => import('@/components/schedules/DistributorDetailModal'));
 
 const getTodayStr = () => {
   const now = new Date();
@@ -522,6 +523,9 @@ export default function ScheduleListPage() {
   const [statusModalSchedule, setStatusModalSchedule] = useState<any>(null);
   const [showAllTrajectories, setShowAllTrajectories] = useState(false);
 
+  // 配布員詳細モーダル
+  const [detailDistributorId, setDetailDistributorId] = useState<number | null>(null);
+
   // 配布員だけ割り当てモーダル
   const [showAddDistModal, setShowAddDistModal] = useState(false);
   const [addDistCandidates, setAddDistCandidates] = useState<any[]>([]);
@@ -948,8 +952,8 @@ export default function ScheduleListPage() {
                     <td className="pl-3 pr-1 py-2.5" onClick={e => e.stopPropagation()}>
                       {s.distributor ? (
                         <div className="flex items-center gap-1.5 group/dist">
-                          <div className="min-w-0">
-                            <div className="font-bold text-slate-800 text-xs">{s.distributor.name}</div>
+                          <div className="min-w-0 cursor-pointer" onClick={() => setDetailDistributorId(s.distributor.id)}>
+                            <div className="font-bold text-slate-800 text-xs hover:text-indigo-600 transition-colors">{s.distributor.name}</div>
                             <div className="text-[10px] text-slate-400">{s.distributor.staffId}</div>
                           </div>
                           {s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
@@ -1210,7 +1214,7 @@ export default function ScheduleListPage() {
                       <i className="bi bi-check2-square text-[10px]"></i>{checkCount}/4
                     </span>
                     {s.distributor ? (
-                      <span className="font-bold text-sm text-slate-800 truncate">{s.distributor.name}</span>
+                      <span className="font-bold text-sm text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors" onClick={(e) => { e.stopPropagation(); setDetailDistributorId(s.distributor.id); }}>{s.distributor.name}</span>
                     ) : (
                       <button onClick={() => openAssignModal(s)} className="text-indigo-400 hover:text-indigo-600 italic text-xs">
                         <i className="bi bi-person-plus mr-1"></i>{t('unassigned')}
@@ -1607,6 +1611,12 @@ export default function ScheduleListPage() {
           </div>
         }>
           <TrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => setTrajectoryScheduleId(null)} />
+        </Suspense>
+      )}
+
+      {detailDistributorId && (
+        <Suspense fallback={null}>
+          <DistributorDetailModal distributorId={detailDistributorId} onClose={() => setDetailDistributorId(null)} />
         </Suspense>
       )}
     </div>
