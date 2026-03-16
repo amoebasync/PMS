@@ -33,10 +33,11 @@ const FORM_TABS: { key: FormTab; label: string; icon: string }[] = [
 ];
 
 /* ─── 詳細画面タブ ─── */
-type DetailTab = 'overview' | 'finance' | 'analytics' | 'inspections' | 'schedules' | 'tasks' | 'complaints';
+type DetailTab = 'overview' | 'finance' | 'analytics' | 'inspections' | 'schedules' | 'tasks' | 'complaints' | 'payroll';
 const DETAIL_TABS: { key: DetailTab; label: string; icon: string }[] = [
   { key: 'overview',    label: '概要',     icon: 'bi-person-fill' },
   { key: 'finance',     label: '口座・レート', icon: 'bi-bank2' },
+  { key: 'payroll',     label: '給与履歴', icon: 'bi-wallet2' },
   { key: 'analytics',   label: '分析',     icon: 'bi-graph-up-arrow' },
   { key: 'inspections', label: '現地確認',  icon: 'bi-clipboard-check' },
   { key: 'schedules',   label: '配布履歴', icon: 'bi-calendar-check' },
@@ -148,6 +149,14 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
   const [complaints, setComplaints] = useState<any[]>([]);
   const [complaintsLoading, setComplaintsLoading] = useState(false);
   const [complaintsLoaded, setComplaintsLoaded] = useState(false);
+
+  // 給与履歴
+  const [payrollRecords, setPayrollRecords] = useState<any[]>([]);
+  const [payrollLoading, setPayrollLoading] = useState(false);
+  const [payrollLoaded, setPayrollLoaded] = useState(false);
+  const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
+  const [expandedPayrollWeek, setExpandedPayrollWeek] = useState<number | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // Master data for edit modal
   const [branches, setBranches] = useState<any[]>([]);
@@ -317,6 +326,52 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setComplaintsLoaded(true);
   };
 
+  const loadPayroll = async (year?: number) => {
+    const y = year ?? payrollYear;
+    setPayrollLoading(true);
+    setExpandedPayrollWeek(null);
+    try {
+      // 12ヶ月分を並列取得
+      const promises = Array.from({ length: 12 }, (_, i) =>
+        fetch(`/api/distributor-payroll?distributorId=${id}&year=${y}&month=${i + 1}`)
+          .then(r => r.ok ? r.json() : { records: [] })
+          .then(j => j.records || [])
+          .catch(() => [])
+      );
+      const results = await Promise.all(promises);
+      // 重複除去（週が月をまたぐ場合）
+      const seen = new Set<number>();
+      const allRecords: any[] = [];
+      for (const recs of results) {
+        for (const rec of recs) {
+          if (!seen.has(rec.id)) { seen.add(rec.id); allRecords.push(rec); }
+        }
+      }
+      setPayrollRecords(allRecords);
+    } catch { /* ignore */ }
+    setPayrollLoading(false);
+    setPayrollLoaded(true);
+  };
+
+  const downloadPayrollPdf = async (month?: number) => {
+    setDownloadingPdf(true);
+    try {
+      const params = new URLSearchParams({ distributorId: id, year: payrollYear.toString() });
+      if (month) params.set('month', month.toString());
+      const res = await fetch(`/api/distributor-payroll/statement?${params}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = month ? `支払明細書_${payrollYear}年${month}月.pdf` : `支払明細書_${payrollYear}年度.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch { /* ignore */ }
+    setDownloadingPdf(false);
+  };
+
   const saveEvalRank = async () => {
     if (!evalRankForm.determinedRank) return;
     setEvalSaving(true);
@@ -391,6 +446,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     if (activeTab === 'schedules' && !schedulesLoaded) loadSchedules();
     if (activeTab === 'tasks' && !tasksLoaded) loadTasks();
     if (activeTab === 'complaints' && !complaintsLoaded) loadComplaints();
+    if (activeTab === 'payroll' && !payrollLoaded) loadPayroll();
   }, [activeTab]);
 
   const japanId = useMemo(() => countries.find((c: any) => c.code === 'JP')?.id?.toString() || '', [countries]);
@@ -1230,6 +1286,150 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ====== 給与履歴タブ ====== */}
+      {activeTab === 'payroll' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
+          {/* Year selector + PDF download */}
+          <div className="px-4 py-3 border-b border-slate-200 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <button onClick={() => { const y = payrollYear - 1; setPayrollYear(y); setPayrollLoaded(false); loadPayroll(y); }}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors">
+                <i className="bi bi-chevron-left text-sm"></i>
+              </button>
+              <span className="text-sm font-bold text-slate-700 min-w-[60px] text-center">{payrollYear}年</span>
+              <button onClick={() => { const y = payrollYear + 1; setPayrollYear(y); setPayrollLoaded(false); loadPayroll(y); }}
+                className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                disabled={payrollYear >= new Date().getFullYear()}>
+                <i className="bi bi-chevron-right text-sm"></i>
+              </button>
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <button onClick={() => downloadPayrollPdf()} disabled={downloadingPdf || payrollRecords.length === 0}
+                className="px-3 py-1.5 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1 transition-colors">
+                <i className="bi bi-file-earmark-pdf"></i>
+                {downloadingPdf ? '生成中...' : '年間明細PDF'}
+              </button>
+            </div>
+          </div>
+
+          {payrollLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : payrollRecords.length === 0 ? (
+            <div className="p-8 text-center">
+              <i className="bi bi-wallet2 text-4xl text-slate-200 block mb-2"></i>
+              <p className="text-sm text-slate-400">{payrollYear}年の給与データはありません</p>
+            </div>
+          ) : (() => {
+            // 月別にグループ化
+            const monthMap = new Map<number, { records: any[]; totalSchedule: number; totalExpense: number; totalGross: number }>();
+            for (const rec of payrollRecords) {
+              const m = new Date(rec.periodStart).getMonth() + 1;
+              if (!monthMap.has(m)) monthMap.set(m, { records: [], totalSchedule: 0, totalExpense: 0, totalGross: 0 });
+              const entry = monthMap.get(m)!;
+              entry.records.push(rec);
+              entry.totalSchedule += rec.schedulePay;
+              entry.totalExpense += rec.expensePay;
+              entry.totalGross += rec.grossPay;
+            }
+            const yearTotal = payrollRecords.reduce((s, r) => s + r.grossPay, 0);
+            const yearSchedule = payrollRecords.reduce((s, r) => s + r.schedulePay, 0);
+            const yearExpense = payrollRecords.reduce((s, r) => s + r.expensePay, 0);
+
+            return (
+              <div>
+                {/* Year summary */}
+                <div className="px-4 py-3 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-700">{payrollYear}年 合計</span>
+                  <div className="flex items-center gap-4 text-xs">
+                    <span className="text-slate-500">配布報酬 <b className="text-slate-700">¥{yearSchedule.toLocaleString()}</b></span>
+                    <span className="text-slate-500">交通費 <b className="text-slate-700">¥{yearExpense.toLocaleString()}</b></span>
+                    <span className="text-emerald-700 font-black text-sm">¥{yearTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Month rows */}
+                {Array.from(monthMap.entries()).sort((a, b) => b[0] - a[0]).map(([month, data]) => (
+                  <div key={month} className="border-b border-slate-100 last:border-0">
+                    {/* Month header */}
+                    <div className="px-4 py-3 flex items-center justify-between hover:bg-slate-50 cursor-pointer transition-colors"
+                      onClick={() => setExpandedPayrollWeek(expandedPayrollWeek === month ? null : month)}>
+                      <div className="flex items-center gap-3">
+                        <i className={`bi ${expandedPayrollWeek === month ? 'bi-chevron-down' : 'bi-chevron-right'} text-slate-400 text-xs`}></i>
+                        <span className="text-sm font-bold text-slate-700">{month}月</span>
+                        <span className="text-[10px] text-slate-400">{data.records.length}週分</span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <div className="text-xs text-slate-400">配布報酬</div>
+                          <div className="text-sm font-bold text-slate-700">¥{data.totalSchedule.toLocaleString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-slate-400">交通費</div>
+                          <div className="text-sm font-bold text-slate-700">¥{data.totalExpense.toLocaleString()}</div>
+                        </div>
+                        <div className="text-right min-w-[80px]">
+                          <div className="text-xs text-slate-400">合計</div>
+                          <div className="text-sm font-black text-emerald-600">¥{data.totalGross.toLocaleString()}</div>
+                        </div>
+                        <button onClick={(e) => { e.stopPropagation(); downloadPayrollPdf(month); }}
+                          disabled={downloadingPdf}
+                          className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-indigo-100 text-slate-400 hover:text-indigo-600 flex items-center justify-center transition-colors"
+                          title="月間PDF">
+                          <i className="bi bi-file-earmark-pdf text-sm"></i>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Expanded weekly details */}
+                    {expandedPayrollWeek === month && (
+                      <div className="bg-slate-50 border-t border-slate-200">
+                        <table className="w-full text-xs">
+                          <thead className="bg-slate-100">
+                            <tr>
+                              <th className="px-4 py-2 text-left font-bold text-slate-500">期間</th>
+                              <th className="px-4 py-2 text-right font-bold text-slate-500">配布報酬</th>
+                              <th className="px-4 py-2 text-right font-bold text-slate-500">交通費</th>
+                              <th className="px-4 py-2 text-right font-bold text-slate-500">合計</th>
+                              <th className="px-4 py-2 text-center font-bold text-slate-500">ステータス</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {data.records.sort((a: any, b: any) => new Date(b.periodStart).getTime() - new Date(a.periodStart).getTime()).map((rec: any) => {
+                              const ps = new Date(rec.periodStart);
+                              const pe = new Date(rec.periodEnd);
+                              const fmt = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+                              const statusMap: Record<string, { cls: string; label: string }> = {
+                                DRAFT:     { cls: 'bg-slate-100 text-slate-500', label: '下書き' },
+                                CONFIRMED: { cls: 'bg-blue-100 text-blue-700', label: '確定' },
+                                PAID:      { cls: 'bg-emerald-100 text-emerald-700', label: '支払済' },
+                              };
+                              const st = statusMap[rec.status] || statusMap.DRAFT;
+                              return (
+                                <tr key={rec.id} className="hover:bg-white transition-colors">
+                                  <td className="px-4 py-2.5 text-slate-600">{fmt(ps)}〜{fmt(pe)}</td>
+                                  <td className="px-4 py-2.5 text-right text-slate-700 font-medium">¥{rec.schedulePay.toLocaleString()}</td>
+                                  <td className="px-4 py-2.5 text-right text-slate-700 font-medium">¥{rec.expensePay.toLocaleString()}</td>
+                                  <td className="px-4 py-2.5 text-right font-bold text-slate-800">¥{rec.grossPay.toLocaleString()}</td>
+                                  <td className="px-4 py-2.5 text-center">
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       )}
 
