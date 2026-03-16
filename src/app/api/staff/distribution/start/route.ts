@@ -13,8 +13,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { scheduleId, latitude, longitude, timestamp } = body;
 
-    if (!scheduleId || latitude == null || longitude == null) {
-      return NextResponse.json({ error: 'scheduleId, latitude, longitude は必須です' }, { status: 400 });
+    if (!scheduleId) {
+      return NextResponse.json({ error: 'scheduleId は必須です' }, { status: 400 });
     }
 
     // スケジュールの所有権・状態チェック
@@ -72,15 +72,17 @@ export async function POST(request: Request) {
         data: { status: 'DISTRIBUTING' },
       });
 
-      // 初回GPSポイント
-      await tx.gpsPoint.create({
-        data: {
-          sessionId: newSession.id,
-          latitude,
-          longitude,
-          timestamp: deviceTimestamp,
-        },
-      });
+      // 初回GPSポイント（有効な座標がある場合のみ）
+      if (latitude && longitude && !(latitude === 0 && longitude === 0)) {
+        await tx.gpsPoint.create({
+          data: {
+            sessionId: newSession.id,
+            latitude,
+            longitude,
+            timestamp: deviceTimestamp,
+          },
+        });
+      }
 
       return newSession;
     });
