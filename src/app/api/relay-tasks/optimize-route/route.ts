@@ -12,6 +12,35 @@ async function authorize() {
 
 type Priority = 'COLLECTION_FIRST' | 'RELAY_FIRST' | 'TIME_OPTIMAL';
 
+/**
+ * エリアのboundary_geojsonから中心座標を算出
+ */
+function computeAreaCentroid(geojson: any): { lat: number; lng: number } | null {
+  if (!geojson) return null;
+  try {
+    const geo = typeof geojson === 'string' ? JSON.parse(geojson) : geojson;
+    const pts: { lat: number; lng: number }[] = [];
+    const features = geo.features || [geo];
+    for (const f of features) {
+      const geom = f.geometry || f;
+      if (geom.type === 'Polygon') {
+        geom.coordinates[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
+      } else if (geom.type === 'MultiPolygon') {
+        for (const poly of geom.coordinates) {
+          poly[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
+        }
+      }
+    }
+    if (pts.length === 0) return null;
+    return {
+      lat: pts.reduce((s, p) => s + p.lat, 0) / pts.length,
+      lng: pts.reduce((s, p) => s + p.lng, 0) / pts.length,
+    };
+  } catch {
+    return null;
+  }
+}
+
 interface TaskWithCoords {
   task: any;
   lat: number;
@@ -241,6 +270,7 @@ export async function GET(request: Request) {
             area: {
               select: {
                 id: true, chome_name: true,
+                boundary_geojson: true,
                 prefecture: { select: { name: true } },
                 city: { select: { name: true } },
               },
@@ -252,16 +282,30 @@ export async function GET(request: Request) {
       orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
 
-    // 座標あり/なしに分離
+    // 座標を解決（タスク座標 → エリアGeoJSON中心座標 → スキップ）
     const withCoords: TaskWithCoords[] = [];
     const skippedTasks: any[] = [];
 
     for (const task of allTasks) {
-      if (task.latitude != null && task.longitude != null) {
+      let lat = task.latitude;
+      let lng = task.longitude;
+
+      // 座標なしの場合、エリアのGeoJSON中心座標を使用
+      if (lat == null || lng == null) {
+        const center = computeAreaCentroid(task.schedule?.area?.boundary_geojson);
+        if (center) {
+          lat = center.lat;
+          lng = center.lng;
+        }
+      }
+
+      if (lat != null && lng != null) {
+        // タスクオブジェクトに解決済み座標を付与（レスポンス用）
+        const taskWithCoords = { ...task, latitude: lat, longitude: lng };
         withCoords.push({
-          task,
-          lat: task.latitude,
-          lng: task.longitude,
+          task: taskWithCoords,
+          lat,
+          lng,
           timeSlotStart: task.timeSlotStart,
         });
       } else {
