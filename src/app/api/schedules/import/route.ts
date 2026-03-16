@@ -21,6 +21,15 @@ function parseDayString(baseDateStr: string, dayStr: string) {
   return null;
 }
 
+/** チラシの一致判定用キーを生成（flyerCodeのソート済みリスト） */
+function buildFlyerKey(items: { flyerName?: string | null; flyerCode?: string | null }[]): string {
+  return items
+    .filter(i => i.flyerName)
+    .map(i => (i.flyerCode || i.flyerName || '').trim())
+    .sort()
+    .join('|');
+}
+
 export async function POST(request: Request) {
   try {
     const { error } = await requireAdminSession();
@@ -32,11 +41,11 @@ export async function POST(request: Request) {
     const isPartnerImport = !Array.isArray(body) && body.partnerId;
     const schedules = Array.isArray(body) ? body : body.schedules;
     const importStatus = ((!Array.isArray(body) && body.importStatus) || 'COMPLETED') as ScheduleStatus;
-    const allJobNumbers: string[] = (!Array.isArray(body) && body.allJobNumbers) || [];
     const isLastChunk: boolean = Array.isArray(body) ? true : (body.isLastChunk !== false);
+    const keepIdsFromPrev: number[] = (!Array.isArray(body) && body.keepIds) || [];
 
     if (!schedules || schedules.length === 0) {
-      return NextResponse.json({ success: true, count: 0, newDistributorCount: 0 });
+      return NextResponse.json({ success: true, count: 0, newDistributorCount: 0, matchedIds: [], createdIds: [] });
     }
 
     // ── インポートデータから必要なキーを事前収集 ──
@@ -53,7 +62,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── マスタデータを並列取得（必要な列・レコードのみ） ──
+    // ── マスタデータを並列取得 ──
     const [branches, distributors, cities, areas, customers] = await Promise.all([
       prisma.branch.findMany({ select: { id: true, nameJa: true } }),
       uniqueStaffIds.size > 0
@@ -129,36 +138,30 @@ export async function POST(request: Request) {
       newDistributorCount = newDists.length;
     }
 
-    // ── 既存スケジュールの検索（date + jobNumber で upsert 判定） ──
-    const jobDatePairs: { jobNumber: string; date: string }[] = [];
-    for (const s of schedules) {
-      if (s.jobNumber && s.date) {
-        jobDatePairs.push({ jobNumber: String(s.jobNumber), date: s.date });
-      }
-    }
-
-    const existingSchedules = jobDatePairs.length > 0
+    // ── 既存スケジュールの取得（配布員+エリア+チラシで一致判定） ──
+    const importDates = [...new Set(schedules.map((s: any) => s.date).filter(Boolean))];
+    const existingSchedulesWithItems = importDates.length > 0
       ? await prisma.distributionSchedule.findMany({
-          where: {
-            OR: jobDatePairs.map(p => ({
-              jobNumber: p.jobNumber,
-              date: new Date(p.date),
-            })),
+          where: { date: { in: importDates.map(d => new Date(d)) } },
+          include: {
+            items: { select: { flyerName: true, flyerCode: true } },
+            session: { select: { id: true, finishedAt: true } },
           },
-          select: { id: true, jobNumber: true, date: true },
         })
       : [];
 
-    // date+jobNumber → existing schedule id のマップ
-    const existingMap = new Map<string, number>();
-    for (const es of existingSchedules) {
-      if (es.jobNumber && es.date) {
-        const key = `${es.date.toISOString().split('T')[0]}_${es.jobNumber}`;
-        existingMap.set(key, es.id);
+    // distributorId_areaId → 既存スケジュールリスト（同じ配布員+エリアで複数ある可能性）
+    const existingByDistArea = new Map<string, typeof existingSchedulesWithItems>();
+    for (const es of existingSchedulesWithItems) {
+      if (es.distributorId != null && es.areaId != null) {
+        const key = `${es.distributorId}_${es.areaId}`;
+        const list = existingByDistArea.get(key) || [];
+        list.push(es);
+        existingByDistArea.set(key, list);
       }
     }
 
-    // ── トランザクションで一括処理（upsert対応） ──
+    // ── トランザクションで一括処理 ──
     const result = await prisma.$transaction(async (tx) => {
       // パートナー案件時: 受注を作成 or 既存IDを使用（チャンク送信対応）
       let createdOrder: { id: number; orderNo: string } | null = null;
@@ -182,18 +185,13 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── スケジュール作成/更新（10件ずつ並列） ──
+      const matchedIds: number[] = [];
+      const createdIds: number[] = [];
       const allItemsData: any[] = [];
       const pendingSessions: { scheduleId: number; distributorId: number; startedAt: Date; finishedAt: Date | null; milestones: { count: number; time: string | null }[]; dateStr: string }[] = [];
       let importedCount = 0;
       let updatedCount = 0;
-
-      // インポートで作成/更新したスケジュールIDを追跡（後のクリーンアップ用）
-      const importedScheduleIds = new Set<number>();
-      // インポートに含まれる日付を追跡（その日付の不要スケジュールを削除するため）
       const importedDates = new Set<string>();
-      // 配布員+日付の組み合わせを追跡（古いスケジュールのクリーンアップ用）
-      const distributorDatePairs = new Map<string, { distributorId: number; date: Date }>();
 
       const BATCH = 10;
       for (let i = 0; i < schedules.length; i += BATCH) {
@@ -210,75 +208,109 @@ export async function POST(request: Request) {
             const area = s.areaCode ? areaMap.get(String(s.areaCode)) || null : null;
             const baseDate = s.date ? new Date(s.date) : null;
 
-            const scheduleData = {
-              jobNumber: s.jobNumber || null,
-              date: baseDate,
-              distributorId: distributor?.id || null,
-              branchId: branch?.id || null,
-              cityId: city?.id || null,
-              areaId: area?.id || null,
-              areaUnitPrice: s.areaUnitPrice != null ? Number(s.areaUnitPrice) : undefined,
-              sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
-              remarks: s.remarks || undefined,
-              status: importStatus,
-            };
-
-            // upsert 判定: date + jobNumber で既存レコードを検索
-            const lookupKey = s.jobNumber && s.date ? `${s.date}_${s.jobNumber}` : null;
-            const existingId = lookupKey ? existingMap.get(lookupKey) : null;
-
-            let schedule: { id: number };
-            let isUpdate = false;
-
-            if (existingId) {
-              // ── 既存スケジュールを更新（エリア・チラシ含む全フィールド） ──
-              const existing = await tx.distributionSchedule.findUnique({
-                where: { id: existingId },
-                select: { id: true, status: true },
-              });
-              const isDistributing = existing?.status === 'DISTRIBUTING';
-              if (isDistributing && importStatus !== 'COMPLETED') {
-                // 配布中のスケジュールはステータスを上書きしない（完了インポート時は除く）
-                delete (scheduleData as any).status;
-              }
-              schedule = await tx.distributionSchedule.update({
-                where: { id: existingId },
-                data: scheduleData,
-                select: { id: true },
-              });
-
-              // チラシ（items）は常に削除→再作成（配布中でも最新データに更新）
-              await tx.distributionItem.deleteMany({ where: { scheduleId: existingId } });
-
-              if (!isDistributing) {
-                // 配布中でない場合: セッションを更新（削除せず残す）
-                const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: existingId }, select: { id: true } });
-                if (oldSession) {
-                  // セッションの時間を更新、progressは再作成
-                  await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
-                }
-              }
-              isUpdate = true;
-            } else {
-              // ── 新規作成 ──
-              schedule = await tx.distributionSchedule.create({ data: scheduleData });
-            }
-
-            // 追跡用に記録
-            importedScheduleIds.add(schedule.id);
             if (baseDate) {
               importedDates.add(baseDate.toISOString().split('T')[0]);
             }
-            if (distributor?.id && baseDate) {
-              const pairKey = `${distributor.id}_${baseDate.toISOString().split('T')[0]}`;
-              distributorDatePairs.set(pairKey, { distributorId: distributor.id, date: baseDate });
+
+            const distributorId = distributor?.id || null;
+            const areaId = area?.id || null;
+
+            // ── 既存スケジュールとの一致判定 ──
+            // 同じ配布員 + 同じエリアの既存スケジュールを検索
+            let matchedExisting: (typeof existingSchedulesWithItems)[0] | null = null;
+            let flyersMatch = false;
+
+            if (distributorId && areaId) {
+              const daKey = `${distributorId}_${areaId}`;
+              const candidates = existingByDistArea.get(daKey) || [];
+              const importFlyerKey = buildFlyerKey(s.items || []);
+
+              for (const candidate of candidates) {
+                const existingFlyerKey = buildFlyerKey(candidate.items);
+                if (importFlyerKey === existingFlyerKey) {
+                  matchedExisting = candidate;
+                  flyersMatch = true;
+                  break;
+                }
+              }
+              // チラシが違っても同じ配布員+エリアなら既存を更新（セッション保持）
+              if (!matchedExisting && candidates.length > 0) {
+                matchedExisting = candidates[0];
+                flyersMatch = false;
+              }
             }
 
-            return { schedule, source: s, distributor, baseDate, isUpdate };
+            if (matchedExisting) {
+              if (flyersMatch) {
+                // ── 完全一致: 配布員+エリア+チラシ全て同じ → 更新せずに残す ──
+                if (importStatus === 'COMPLETED') {
+                  // 完了インポート時のみステータスを更新
+                  await tx.distributionSchedule.update({
+                    where: { id: matchedExisting.id },
+                    data: { status: 'COMPLETED', jobNumber: s.jobNumber || undefined },
+                  });
+                }
+                matchedIds.push(matchedExisting.id);
+                return { type: 'matched' as const, scheduleId: matchedExisting.id, source: s, distributor, baseDate };
+              } else {
+                // ── 部分一致: 配布員+エリアは同じだがチラシが違う → チラシだけ更新、セッション保持 ──
+                const hasActiveSession = matchedExisting.session && !matchedExisting.session.finishedAt;
+                const updateData: any = {
+                  jobNumber: s.jobNumber || null,
+                  branchId: branch?.id || null,
+                  cityId: city?.id || null,
+                  areaUnitPrice: s.areaUnitPrice != null ? Number(s.areaUnitPrice) : undefined,
+                  sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
+                  remarks: s.remarks || undefined,
+                };
+                // ステータス更新: COMPLETED インポート時は常に更新、それ以外は配布中なら維持
+                if (importStatus === 'COMPLETED') {
+                  updateData.status = 'COMPLETED';
+                } else if (!hasActiveSession) {
+                  updateData.status = importStatus;
+                }
+
+                await tx.distributionSchedule.update({
+                  where: { id: matchedExisting.id },
+                  data: updateData,
+                });
+                // チラシだけ入れ替え（セッション・GPSはそのまま）
+                await tx.distributionItem.deleteMany({ where: { scheduleId: matchedExisting.id } });
+                matchedIds.push(matchedExisting.id);
+                return { type: 'updated' as const, scheduleId: matchedExisting.id, source: s, distributor, baseDate };
+              }
+            } else {
+              // ── 一致なし: 新規作成 ──
+              const schedule = await tx.distributionSchedule.create({
+                data: {
+                  jobNumber: s.jobNumber || null,
+                  date: baseDate,
+                  distributorId,
+                  branchId: branch?.id || null,
+                  cityId: city?.id || null,
+                  areaId,
+                  areaUnitPrice: s.areaUnitPrice != null ? Number(s.areaUnitPrice) : undefined,
+                  sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
+                  remarks: s.remarks || undefined,
+                  status: importStatus,
+                },
+              });
+              createdIds.push(schedule.id);
+              return { type: 'created' as const, scheduleId: schedule.id, source: s, distributor, baseDate };
+            }
           })
         );
 
-        for (const { schedule, source: s, distributor, baseDate, isUpdate } of results) {
+        for (const r of results) {
+          const { source: s, distributor, baseDate, scheduleId } = r;
+
+          // matched（完全一致）の場合はアイテム作成不要（既存のまま）
+          if (r.type === 'matched') {
+            updatedCount++;
+            continue;
+          }
+
+          // updated / created の場合はアイテムを作成
           for (const item of s.items || []) {
             const customer = item.customerCode ? customerMap.get(String(item.customerCode)) || null : null;
 
@@ -294,7 +326,7 @@ export async function POST(request: Request) {
             }
 
             allItemsData.push({
-              scheduleId: schedule.id,
+              scheduleId,
               slotIndex: item.slotIndex,
               flyerName: item.flyerName,
               flyerCode: item.flyerCode,
@@ -310,12 +342,12 @@ export async function POST(request: Request) {
             });
           }
 
-          // 配布中(DISTRIBUTING)のスケジュールや既存セッションが残っている場合はスキップ
-          if (s.startTime && distributor && importStatus === 'COMPLETED') {
+          // セッション作成（新規 + COMPLETED インポート + startTime あり）
+          if (r.type === 'created' && s.startTime && distributor && importStatus === 'COMPLETED') {
             const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
             const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
             pendingSessions.push({
-              scheduleId: schedule.id,
+              scheduleId,
               distributorId: distributor.id,
               startedAt,
               finishedAt,
@@ -324,7 +356,7 @@ export async function POST(request: Request) {
             });
           }
 
-          if (isUpdate) updatedCount++; else importedCount++;
+          if (r.type === 'updated') updatedCount++; else importedCount++;
         }
       }
 
@@ -333,7 +365,7 @@ export async function POST(request: Request) {
         await tx.distributionItem.createMany({ data: allItemsData });
       }
 
-      // DistributionSession upsert + ProgressEvent 一括作成
+      // DistributionSession + ProgressEvent 一括作成（新規作成分のみ）
       if (pendingSessions.length > 0) {
         const allProgressData: any[] = [];
 
@@ -341,28 +373,11 @@ export async function POST(request: Request) {
           const batch = pendingSessions.slice(i, i + BATCH);
           const sessions = await Promise.all(
             batch.map(async sess => {
-              // 既存セッションがある場合は時間を更新（配布中はそのまま、完了済みも保持）
               const existing = await tx.distributionSession.findUnique({
                 where: { scheduleId: sess.scheduleId },
                 select: { id: true },
               });
-              if (existing) {
-                // 配布中でなければ時間を更新
-                const schedule = await tx.distributionSchedule.findUnique({
-                  where: { id: sess.scheduleId },
-                  select: { status: true },
-                });
-                if (schedule?.status !== 'DISTRIBUTING') {
-                  await tx.distributionSession.update({
-                    where: { id: existing.id },
-                    data: {
-                      startedAt: sess.startedAt,
-                      finishedAt: sess.finishedAt,
-                    },
-                  });
-                }
-                return existing;
-              }
+              if (existing) return existing;
               return tx.distributionSession.create({
                 data: {
                   scheduleId: sess.scheduleId,
@@ -396,40 +411,32 @@ export async function POST(request: Request) {
         }
       }
 
-      // ── 古いスケジュールのクリーンアップ ──
-      // 最後のチャンクでのみ実行（チャンク分割送信時に先のチャンクのデータを消さないため）
-      // jobNumber付きかつインポート全体に含まれないスケジュールのみ削除
-      // jobNumberが無いスケジュール（手動作成・配布員のみ追加等）は保持する
+      // ── クリーンアップ（最後のチャンクでのみ実行） ──
+      // その日のスケジュールを置き換える: マッチしなかったスケジュールを削除
+      // ただし配布中（アクティブセッション）のスケジュールは絶対に削除しない
       let cleanedCount = 0;
       if (isLastChunk && importedDates.size > 0) {
-        // 全チャンクのjobNumberセット（フロントエンドから送られた全体リスト）
-        const fullJobNumberSet = new Set<string>(allJobNumbers);
-        // フォールバック: allJobNumbersが空の場合は現チャンクのjobNumberのみ使用
-        if (fullJobNumberSet.size === 0) {
-          for (const s of schedules) {
-            if (s.jobNumber) fullJobNumberSet.add(String(s.jobNumber));
-          }
-        }
+        const allKeepIds = new Set([...keepIdsFromPrev, ...matchedIds, ...createdIds]);
 
         for (const dateStr of importedDates) {
-          const oldSchedules = await tx.distributionSchedule.findMany({
+          const candidates = await tx.distributionSchedule.findMany({
             where: {
               date: new Date(dateStr),
-              status: { not: 'DISTRIBUTING' },
-              // jobNumberがあるスケジュールのみクリーンアップ対象
-              jobNumber: { not: null },
+              id: { notIn: [...allKeepIds] },
             },
-            select: { id: true, jobNumber: true },
+            select: { id: true, status: true, session: { select: { id: true, finishedAt: true } } },
           });
 
-          for (const old of oldSchedules) {
-            // インポートデータ全体に同じjobNumberがある場合はスキップ（upsert済み or 他チャンクで作成済み）
-            if (old.jobNumber && fullJobNumberSet.has(old.jobNumber)) continue;
+          for (const old of candidates) {
+            // 配布中のスケジュールは絶対に削除しない
+            const hasActiveSession = old.session && !old.session.finishedAt;
+            if (old.status === 'DISTRIBUTING' || hasActiveSession) {
+              continue;
+            }
 
-            const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: old.id }, select: { id: true } });
-            if (oldSession) {
-              await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
-              await tx.distributionSession.delete({ where: { id: oldSession.id } });
+            // セッション・関連データを削除（カスケードで GPS/Progress/Skip も消える）
+            if (old.session) {
+              await tx.distributionSession.delete({ where: { id: old.session.id } });
             }
             await tx.distributionItem.deleteMany({ where: { scheduleId: old.id } });
             await tx.distributionSchedule.delete({ where: { id: old.id } });
@@ -438,14 +445,17 @@ export async function POST(request: Request) {
         }
       }
 
-      return { importedCount, updatedCount, cleanedCount, createdOrder };
+      return { importedCount, updatedCount, matchedIds, createdIds, cleanedCount, createdOrder };
     }, { timeout: 120000 });
 
     return NextResponse.json({
       success: true,
       count: result.importedCount,
       updatedCount: result.updatedCount,
+      matchedCount: result.matchedIds.length,
       cleanedCount: result.cleanedCount,
+      matchedIds: result.matchedIds,
+      createdIds: result.createdIds,
       newDistributorCount,
       ...(result.createdOrder ? { orderNo: result.createdOrder.orderNo, orderId: result.createdOrder.id } : {}),
     });

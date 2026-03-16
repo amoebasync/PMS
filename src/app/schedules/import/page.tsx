@@ -439,18 +439,19 @@ export default function DataImportPage() {
 
     const cleanData = cleanForSend(parsedData);
     const totalChunks = Math.ceil(cleanData.length / CHUNK_SIZE);
-    // 全データのjobNumberリストを各チャンクに送る（クリーンアップで他チャンクのデータを消さないため）
-    const allJobNumbers = cleanData.map((s: any) => s.jobNumber).filter(Boolean) as string[];
-    const isLastChunk = (ci: number) => ci === totalChunks - 1;
+    // マッチ/作成済みIDをチャンク間で蓄積（クリーンアップ時に削除対象から除外するため）
+    let keepIds: number[] = [];
+    let totalMatched = 0;
 
     for (let ci = 0; ci < totalChunks; ci++) {
       const chunk = cleanData.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
       const progress = Math.min((ci + 1) * CHUNK_SIZE, cleanData.length);
       setMessage(`⏳ ${ts('importing')} ${progress} / ${cleanData.length} 件 (${ci + 1}/${totalChunks})`);
 
+      const isLast = ci === totalChunks - 1;
       const requestBody = dataType === 'partner'
-        ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}), allJobNumbers, isLastChunk: isLastChunk(ci) }
-        : { schedules: chunk, importStatus, allJobNumbers, isLastChunk: isLastChunk(ci) };
+        ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}), keepIds, isLastChunk: isLast }
+        : { schedules: chunk, importStatus, keepIds, isLastChunk: isLast };
 
       const bodyStr = JSON.stringify(requestBody);
 
@@ -479,7 +480,11 @@ export default function DataImportPage() {
         totalImported += data.count || 0;
         totalUpdated += data.updatedCount || 0;
         totalCleaned += data.cleanedCount || 0;
+        totalMatched += data.matchedCount || 0;
         totalNewDistributors += data.newDistributorCount || 0;
+        // マッチ/作成済みIDを蓄積（次チャンクのkeepIdsとして送信）
+        if (data.matchedIds) keepIds = [...keepIds, ...data.matchedIds];
+        if (data.createdIds) keepIds = [...keepIds, ...data.createdIds];
         if (data.orderId) orderId = data.orderId;
         if (data.orderNo) orderNo = data.orderNo;
       } catch (e) {
@@ -498,6 +503,7 @@ export default function DataImportPage() {
     } else {
       msg = `✨ ${ts('import_success', { count: totalImported + totalUpdated })}`;
     }
+    if (totalMatched > 0) msg += ` (${totalMatched}件は既存データを維持)`;
     if (totalUpdated > 0) msg += ` ${ts('import_updated', { count: totalUpdated })}`;
     if (totalCleaned > 0) msg += ` (旧データ${totalCleaned}件を削除)`;
     if (totalNewDistributors > 0) msg += ` ${ts('import_new_distributors', { count: totalNewDistributors })}`;
