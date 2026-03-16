@@ -139,10 +139,10 @@ export async function POST(request: Request) {
     }
 
     // ── 既存スケジュールの取得（配布員+エリア+チラシで一致判定） ──
-    const importDates = [...new Set(schedules.map((s: any) => s.date).filter(Boolean))];
+    const importDates: string[] = [...new Set(schedules.map((s: any) => s.date as string).filter(Boolean))];
     const existingSchedulesWithItems = importDates.length > 0
       ? await prisma.distributionSchedule.findMany({
-          where: { date: { in: importDates.map(d => new Date(d)) } },
+          where: { date: { in: importDates.map((d: string) => new Date(d)) } },
           include: {
             items: { select: { flyerName: true, flyerCode: true } },
             session: { select: { id: true, finishedAt: true } },
