@@ -166,7 +166,7 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white md:bg-black/40 md:backdrop-blur-sm md:items-center md:justify-center md:p-4">
+    <div className="fixed inset-0 z-[200] flex flex-col bg-white md:bg-black/40 md:backdrop-blur-sm md:items-center md:justify-center md:p-4">
       <div className="w-full h-full md:max-w-5xl md:max-h-[90vh] md:rounded-xl md:shadow-xl bg-white flex flex-col overflow-hidden">
         {/* Header */}
         <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between shrink-0">

@@ -567,7 +567,7 @@ export default function RelayListPage() {
 
       {/* Edit Modal */}
       {editTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base text-slate-800">
