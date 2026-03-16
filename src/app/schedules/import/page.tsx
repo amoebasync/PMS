@@ -60,7 +60,7 @@ export default function DataImportPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [message, setMessage] = useState('');
   const [pasteText, setPasteText] = useState('');
-  const [importStatus, setImportStatus] = useState<'COMPLETED' | 'UNSTARTED'>('COMPLETED');
+  const [importStatus, setImportStatus] = useState<'COMPLETED' | 'UNSTARTED'>('UNSTARTED');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // パートナー案件用
@@ -376,6 +376,14 @@ export default function DataImportPage() {
     if (dataType === 'partner' && !selectedPartnerId) {
       setMessage(`❌ ${ts('partner_required')}`);
       return;
+    }
+
+    // 完了インポート時は確認ダイアログ
+    if (importStatus === 'COMPLETED' && dataType !== 'branch') {
+      const confirmed = window.confirm(
+        '⚠️ 完了インポート\n\n全スケジュールのステータスが「完了」に変更されます。\n配布中のデータに影響する可能性があります。\n\n本当に完了状態でインポートしますか？'
+      );
+      if (!confirmed) return;
     }
 
     setIsImporting(true);
@@ -744,28 +752,38 @@ export default function DataImportPage() {
               </button>
             </div>
             {dataType !== 'branch' && (
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-slate-500 mr-1">{ts('import_status_label')}:</span>
-                <label
-                  className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    importStatus === 'COMPLETED'
-                      ? 'bg-blue-50 border-blue-300 text-blue-700'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <input type="radio" name="importStatus" checked={importStatus === 'COMPLETED'} onChange={() => setImportStatus('COMPLETED')} className="sr-only" />
-                  <i className="bi bi-check-circle-fill"></i> {ts('import_status_completed')}
-                </label>
-                <label
-                  className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
-                    importStatus === 'UNSTARTED'
-                      ? 'bg-orange-50 border-orange-300 text-orange-700'
-                      : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-                  }`}
-                >
-                  <input type="radio" name="importStatus" checked={importStatus === 'UNSTARTED'} onChange={() => setImportStatus('UNSTARTED')} className="sr-only" />
-                  <i className="bi bi-clock"></i> {ts('import_status_unstarted')}
-                </label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-slate-500 mr-1">{ts('import_status_label')}:</span>
+                  <label
+                    className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      importStatus === 'UNSTARTED'
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input type="radio" name="importStatus" checked={importStatus === 'UNSTARTED'} onChange={() => setImportStatus('UNSTARTED')} className="sr-only" />
+                    <i className="bi bi-clock"></i> {ts('import_status_unstarted')}
+                  </label>
+                  <label
+                    className={`flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                      importStatus === 'COMPLETED'
+                        ? 'bg-red-50 border-red-300 text-red-700'
+                        : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input type="radio" name="importStatus" checked={importStatus === 'COMPLETED'} onChange={() => setImportStatus('COMPLETED')} className="sr-only" />
+                    <i className="bi bi-exclamation-triangle-fill"></i> {ts('import_status_completed')}
+                  </label>
+                </div>
+                {importStatus === 'COMPLETED' && (
+                  <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+                    <i className="bi bi-exclamation-triangle-fill text-red-500 mt-0.5"></i>
+                    <p className="text-xs text-red-700 font-semibold leading-relaxed">
+                      完了インポート: 全スケジュールのステータスが「完了」に変更されます。配布中のデータに影響する可能性があります。通常は「未完了」でインポートしてください。
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
