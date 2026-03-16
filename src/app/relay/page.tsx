@@ -392,7 +392,7 @@ export default function RelayListPage() {
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_location')}</th>
                 <th className="px-3 py-2.5">{t('th_note')}</th>
-                <th className="px-3 py-2.5 w-[80px] text-center">{t('th_actions')}</th>
+                <th className="px-3 py-2.5 w-[120px] text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -466,15 +466,15 @@ export default function RelayListPage() {
                   <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
                       <button onClick={() => handleCarryOver(task)} title={t('btn_carryover')}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors">
                         <i className="bi bi-arrow-right-circle text-xs"></i>
                       </button>
                       <button onClick={() => openEdit(task)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                         <i className="bi bi-pencil text-xs"></i>
                       </button>
                       <button onClick={() => handleDelete(task)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors">
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors">
                         <i className="bi bi-trash3 text-xs"></i>
                       </button>
                     </div>
@@ -514,11 +514,11 @@ export default function RelayListPage() {
                     <option value="CANCELLED">{t('status_cancelled')}</option>
                   </select>
                   <button onClick={e => { e.stopPropagation(); handleCarryOver(task); }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50">
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50">
                     <i className="bi bi-arrow-right-circle text-xs"></i>
                   </button>
                   <button onClick={e => { e.stopPropagation(); handleDelete(task); }}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50">
+                    className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50">
                     <i className="bi bi-trash3 text-xs"></i>
                   </button>
                 </div>
