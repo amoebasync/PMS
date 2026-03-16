@@ -94,60 +94,84 @@ export async function POST(request: Request) {
 
     const passwordHash = buildInitialPassword(body.birthday);
 
-    const newDistributor = await prisma.flyerDistributor.create({
-      data: {
-        branchId: parseIntSafe(body.branchId),
-        countryId: parseIntSafe(body.countryId),
-        visaTypeId: parseIntSafe(body.visaTypeId),
-        staffId: body.staffId,
-        name: body.name,
-        phone: body.phone,
-        email: body.email,
-        birthday: parseDate(body.birthday),
-        gender: body.gender,
-        postalCode: body.postalCode,
-        address: body.address,
-        buildingName: body.buildingName,
-        passwordHash,
-        isPasswordTemp: true,
-        visaExpiryDate: parseDate(body.visaExpiryDate),
-        hasAgreedPersonalInfo: Boolean(body.hasAgreedPersonalInfo),
-        hasSignedContract: Boolean(body.hasSignedContract),
-        hasResidenceCard: Boolean(body.hasResidenceCard),
-        joinDate: parseDate(body.joinDate),
-        leaveDate: parseDate(body.leaveDate),
-        leaveReason: body.leaveReason,
-        paymentMethod: body.paymentMethod,
-        bankName: body.bankName,
-        bankBranchCode: body.bankBranchCode,
-        bankAccountType: body.bankAccountType,
-        bankAccountNumber: body.bankAccountNumber,
-        bankAccountName: body.bankAccountName,
-        bankAccountNameKana: body.bankAccountNameKana,
-        transferNumber: body.transferNumber,
-        equipmentBattery: body.equipmentBattery,
-        equipmentBag: body.equipmentBag,
-        equipmentMobile: body.equipmentMobile,
-        flyerDeliveryMethod: body.flyerDeliveryMethod,
-        transportationMethod: body.transportationMethod,
-        ratePlan: body.ratePlan,
-        rate1Type: parseFloatSafe(body.rate1Type),
-        rate2Type: parseFloatSafe(body.rate2Type),
-        rate3Type: parseFloatSafe(body.rate3Type),
-        rate4Type: parseFloatSafe(body.rate4Type),
-        rate5Type: parseFloatSafe(body.rate5Type),
-        rate6Type: parseFloatSafe(body.rate6Type),
-        transportationFee: body.transportationFee,
-        trainingAllowance: body.trainingAllowance,
-        rank: body.rank,
-        attendanceCount: parseIntSafe(body.attendanceCount) || 0,
-        minTypes: parseIntSafe(body.minTypes),
-        maxTypes: parseIntSafe(body.maxTypes),
-        minSheets: parseIntSafe(body.minSheets),
-        maxSheets: parseIntSafe(body.maxSheets),
-        targetAmount: body.targetAmount,
-        note: body.note,
-      },
+    const branchId = parseIntSafe(body.branchId);
+
+    const newDistributor = await prisma.$transaction(async (tx) => {
+      const distributor = await tx.flyerDistributor.create({
+        data: {
+          branchId,
+          countryId: parseIntSafe(body.countryId),
+          visaTypeId: parseIntSafe(body.visaTypeId),
+          staffId: body.staffId,
+          name: body.name,
+          phone: body.phone,
+          email: body.email,
+          birthday: parseDate(body.birthday),
+          gender: body.gender,
+          postalCode: body.postalCode,
+          address: body.address,
+          buildingName: body.buildingName,
+          passwordHash,
+          isPasswordTemp: true,
+          visaExpiryDate: parseDate(body.visaExpiryDate),
+          hasAgreedPersonalInfo: Boolean(body.hasAgreedPersonalInfo),
+          hasSignedContract: Boolean(body.hasSignedContract),
+          hasResidenceCard: Boolean(body.hasResidenceCard),
+          joinDate: parseDate(body.joinDate),
+          leaveDate: parseDate(body.leaveDate),
+          leaveReason: body.leaveReason,
+          paymentMethod: body.paymentMethod,
+          bankName: body.bankName,
+          bankBranchCode: body.bankBranchCode,
+          bankAccountType: body.bankAccountType,
+          bankAccountNumber: body.bankAccountNumber,
+          bankAccountName: body.bankAccountName,
+          bankAccountNameKana: body.bankAccountNameKana,
+          transferNumber: body.transferNumber,
+          equipmentBattery: body.equipmentBattery,
+          equipmentBag: body.equipmentBag,
+          equipmentMobile: body.equipmentMobile,
+          flyerDeliveryMethod: body.flyerDeliveryMethod,
+          transportationMethod: body.transportationMethod,
+          ratePlan: body.ratePlan,
+          rate1Type: parseFloatSafe(body.rate1Type),
+          rate2Type: parseFloatSafe(body.rate2Type),
+          rate3Type: parseFloatSafe(body.rate3Type),
+          rate4Type: parseFloatSafe(body.rate4Type),
+          rate5Type: parseFloatSafe(body.rate5Type),
+          rate6Type: parseFloatSafe(body.rate6Type),
+          transportationFee: body.transportationFee,
+          trainingAllowance: body.trainingAllowance,
+          rank: body.rank,
+          attendanceCount: parseIntSafe(body.attendanceCount) || 0,
+          minTypes: parseIntSafe(body.minTypes),
+          maxTypes: parseIntSafe(body.maxTypes),
+          minSheets: parseIntSafe(body.minSheets),
+          maxSheets: parseIntSafe(body.maxSheets),
+          targetAmount: body.targetAmount,
+          note: body.note,
+        },
+      });
+
+      // スタッフIDから番号部分を抽出し、支店のシーケンスを更新
+      if (branchId && body.staffId) {
+        const numMatch = body.staffId.match(/(\d+)$/);
+        if (numMatch) {
+          const seqNum = parseInt(numMatch[1], 10);
+          const branch = await tx.branch.findUnique({
+            where: { id: branchId },
+            select: { staffIdSeq: true },
+          });
+          if (branch && seqNum > (branch.staffIdSeq ?? 0)) {
+            await tx.branch.update({
+              where: { id: branchId },
+              data: { staffIdSeq: seqNum },
+            });
+          }
+        }
+      }
+
+      return distributor;
     });
 
     return NextResponse.json(newDistributor);
