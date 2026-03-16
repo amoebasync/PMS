@@ -88,5 +88,8 @@
   "field_date": "実施日",
   "btn_carryover": "翌日に繰越",
   "carryover_confirm": "このタスクを翌日に繰り越しますか？",
-  "carryover_success": "{date} に繰り越しました"
+  "carryover_success": "{date} に繰り越しました",
+  "route_origin_default": "高田馬場",
+  "route_origin_current": "現在地",
+  "route_origin_no_gps": "位置情報を取得できません"
 }

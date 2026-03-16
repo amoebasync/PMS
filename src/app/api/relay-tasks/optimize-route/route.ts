@@ -61,7 +61,7 @@ interface OptimizedTask {
  * nearest-neighbor で時間指定タスクを固定位置に配置し、
  * 時間指定なしタスクを最適な順序で挿入する
  */
-function optimizeGroup(tasks: TaskWithCoords[]): TaskWithCoords[] {
+function optimizeGroup(tasks: TaskWithCoords[], origin?: { lat: number; lng: number } | null): TaskWithCoords[] {
   if (tasks.length <= 1) return tasks;
 
   const timeTasks = tasks
@@ -77,8 +77,11 @@ function optimizeGroup(tasks: TaskWithCoords[]): TaskWithCoords[] {
   let currentLat: number;
   let currentLng: number;
 
-  // 起点を決定: 最初の時間指定タスク、なければ最初のフリータスク
-  if (timeTasks.length > 0) {
+  // 起点を決定: origin指定 > 最初の時間指定タスク > 最初のフリータスク
+  if (origin) {
+    currentLat = origin.lat;
+    currentLng = origin.lng;
+  } else if (timeTasks.length > 0) {
     currentLat = timeTasks[0].lat;
     currentLng = timeTasks[0].lng;
   } else if (freeRemaining.length > 0) {
@@ -235,6 +238,8 @@ export async function GET(request: Request) {
     const date = searchParams.get('date');
     const driverId = searchParams.get('driverId');
     const priority = (searchParams.get('priority') || 'TIME_OPTIMAL') as Priority;
+    const originLat = searchParams.get('originLat') ? parseFloat(searchParams.get('originLat')!) : null;
+    const originLng = searchParams.get('originLng') ? parseFloat(searchParams.get('originLng')!) : null;
 
     if (!date || !driverId) {
       return NextResponse.json(
@@ -323,11 +328,16 @@ export async function GET(request: Request) {
       });
     }
 
+    // 起点座標
+    const origin = (originLat != null && originLng != null)
+      ? { lat: originLat, lng: originLng }
+      : null;
+
     // 優先度に応じてグループ分け & 最適化
     let optimized: TaskWithCoords[];
 
     if (priority === 'TIME_OPTIMAL') {
-      optimized = optimizeGroup(withCoords);
+      optimized = optimizeGroup(withCoords, origin);
     } else {
       const isCollectionFirst = priority === 'COLLECTION_FIRST';
       const collectionTasks = withCoords.filter(t => t.task.type === 'COLLECTION');
@@ -336,26 +346,50 @@ export async function GET(request: Request) {
       const firstGroup = isCollectionFirst ? collectionTasks : relayTasks;
       const secondGroup = isCollectionFirst ? relayTasks : collectionTasks;
 
-      const optimizedFirst = optimizeGroup(firstGroup);
+      const optimizedFirst = optimizeGroup(firstGroup, origin);
       const optimizedSecond = optimizeGroup(secondGroup);
       optimized = [...optimizedFirst, ...optimizedSecond];
     }
 
-    // Directions API でルート情報取得
-    const directions = await fetchDirections(optimized);
+    // Directions API でルート情報取得（起点指定時はoriginを先頭に含める）
+    const directionsInput: TaskWithCoords[] = origin
+      ? [{ task: { id: 0, type: 'ORIGIN' }, lat: origin.lat, lng: origin.lng, timeSlotStart: null }, ...optimized]
+      : optimized;
+    const directions = await fetchDirections(directionsInput);
 
     // legDistance / legDuration を計算
     const legs: { distance: number; duration: number }[] = [];
-    legs.push({ distance: 0, duration: 0 }); // 最初のタスクは距離0
 
-    for (let i = 1; i < optimized.length; i++) {
-      if (directions && directions.legs[i - 1]) {
-        legs.push(directions.legs[i - 1]);
-      } else {
+    if (origin && directions) {
+      // 起点→最初のタスクの距離を含める
+      legs.push(directions.legs[0] || computeHaversineLeg(origin.lat, origin.lng, optimized[0].lat, optimized[0].lng));
+      for (let i = 1; i < optimized.length; i++) {
+        legs.push(directions.legs[i] || computeHaversineLeg(
+          optimized[i - 1].lat, optimized[i - 1].lng,
+          optimized[i].lat, optimized[i].lng,
+        ));
+      }
+    } else if (origin) {
+      // Directions API なし、起点あり
+      legs.push(computeHaversineLeg(origin.lat, origin.lng, optimized[0].lat, optimized[0].lng));
+      for (let i = 1; i < optimized.length; i++) {
         legs.push(computeHaversineLeg(
           optimized[i - 1].lat, optimized[i - 1].lng,
           optimized[i].lat, optimized[i].lng,
         ));
+      }
+    } else {
+      // 起点なし（従来通り）
+      legs.push({ distance: 0, duration: 0 });
+      for (let i = 1; i < optimized.length; i++) {
+        if (directions && directions.legs[i - 1]) {
+          legs.push(directions.legs[i - 1]);
+        } else {
+          legs.push(computeHaversineLeg(
+            optimized[i - 1].lat, optimized[i - 1].lng,
+            optimized[i].lat, optimized[i].lng,
+          ));
+        }
       }
     }
 
@@ -395,6 +429,7 @@ export async function GET(request: Request) {
       totalDuration,
       polylineEncoded: directions?.polyline ?? null,
       skippedTasks,
+      origin: origin ? { lat: origin.lat, lng: origin.lng } : null,
     });
   } catch (error) {
     console.error('Route optimization error:', error);

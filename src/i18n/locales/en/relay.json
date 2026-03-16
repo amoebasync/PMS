@@ -88,5 +88,8 @@
   "field_date": "Date",
   "btn_carryover": "Carry Over",
   "carryover_confirm": "Carry over this task to the next day?",
-  "carryover_success": "Carried over to {date}"
+  "carryover_success": "Carried over to {date}",
+  "route_origin_default": "Takadanobaba",
+  "route_origin_current": "Current",
+  "route_origin_no_gps": "Unable to get location"
 }

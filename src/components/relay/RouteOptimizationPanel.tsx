@@ -21,9 +21,14 @@ interface OptimizeResult {
   totalDuration: number;
   polylineEncoded: string | null;
   skippedTasks: any[];
+  origin: { lat: number; lng: number } | null;
 }
 
 type Priority = 'COLLECTION_FIRST' | 'RELAY_FIRST' | 'TIME_OPTIMAL';
+type OriginType = 'DEFAULT' | 'CURRENT';
+
+// 高田馬場4-39-6 の座標
+const DEFAULT_ORIGIN = { lat: 35.7126, lng: 139.7038 };
 
 const TYPE_COLOR: Record<string, string> = {
   RELAY: '#ea580c',      // orange-600
@@ -90,18 +95,31 @@ interface Props {
 
 export default function RouteOptimizationPanel({ isLoaded, date, driverId, driverName, onClose, onApplyOrder, t }: Props) {
   const [priority, setPriority] = useState<Priority>('TIME_OPTIMAL');
+  const [originType, setOriginType] = useState<OriginType>('DEFAULT');
+  const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [result, setResult] = useState<OptimizeResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: 35.6895, lng: 139.6917 });
 
-  const fetchOptimizedRoute = useCallback(async (p: Priority) => {
+  const getOriginCoords = useCallback((type: OriginType): { lat: number; lng: number } => {
+    if (type === 'CURRENT' && currentLocation) return currentLocation;
+    return DEFAULT_ORIGIN;
+  }, [currentLocation]);
+
+  const fetchOptimizedRoute = useCallback(async (p: Priority, oType?: OriginType) => {
     setLoading(true);
     setError(null);
     setSelectedIdx(null);
+    const ot = oType ?? originType;
+    const originCoords = getOriginCoords(ot);
     try {
-      const params = new URLSearchParams({ date, driverId, priority: p });
+      const params = new URLSearchParams({
+        date, driverId, priority: p,
+        originLat: originCoords.lat.toString(),
+        originLng: originCoords.lng.toString(),
+      });
       const res = await fetch(`/api/relay-tasks/optimize-route?${params}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -119,7 +137,18 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
       setError(e.message || t('route_error'));
     }
     setLoading(false);
-  }, [date, driverId, t]);
+  }, [date, driverId, t, originType, getOriginCoords]);
+
+  // 現在地を取得
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setCurrentLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {}, // 失敗時は無視（デフォルト使用）
+        { timeout: 5000, enableHighAccuracy: false },
+      );
+    }
+  }, []);
 
   useEffect(() => {
     fetchOptimizedRoute(priority);
@@ -130,6 +159,11 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
     fetchOptimizedRoute(p);
   };
 
+  const handleOriginChange = (ot: OriginType) => {
+    setOriginType(ot);
+    fetchOptimizedRoute(priority, ot);
+  };
+
   const handleApplyOrder = () => {
     if (!result) return;
     onApplyOrder(result.optimizedTasks.map(ot => ot.task.id));
@@ -138,9 +172,10 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
   const handleStartNavigation = () => {
     if (!result || result.optimizedTasks.length === 0) return;
     const tasks = result.optimizedTasks;
-    const origin = `${tasks[0].task.latitude},${tasks[0].task.longitude}`;
+    const originCoords = getOriginCoords(originType);
+    const origin = `${originCoords.lat},${originCoords.lng}`;
     const destination = `${tasks[tasks.length - 1].task.latitude},${tasks[tasks.length - 1].task.longitude}`;
-    const waypoints = tasks.slice(1, -1).map(t => `${t.task.latitude},${t.task.longitude}`).join('|');
+    const waypoints = tasks.slice(0, -1).map(t => `${t.task.latitude},${t.task.longitude}`).join('|');
     const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}${waypoints ? `&waypoints=${waypoints}` : ''}&travelmode=driving`;
     window.open(url, '_blank');
   };
@@ -182,7 +217,7 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
           </button>
         </div>
 
-        {/* Priority Toggle */}
+        {/* Priority Toggle + Origin Selector */}
         <div className="px-4 py-2 border-b border-slate-100 flex flex-wrap items-center gap-2 shrink-0">
           {([
             { key: 'COLLECTION_FIRST' as Priority, icon: 'bi-box-arrow-in-left', active: 'bg-purple-100 text-purple-700 border-purple-300' },
@@ -199,6 +234,30 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
               {t(`priority_${key.toLowerCase()}`)}
             </button>
           ))}
+
+          {/* Origin selector */}
+          <div className="flex items-center gap-1 ml-2 border-l border-slate-200 pl-2">
+            <span className="text-[10px] text-slate-400 mr-1"><i className="bi bi-pin-map"></i></span>
+            <button onClick={() => handleOriginChange('DEFAULT')}
+              className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
+                originType === 'DEFAULT'
+                  ? 'bg-sky-100 text-sky-700 border-sky-300'
+                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+              }`}>
+              {t('route_origin_default')}
+            </button>
+            <button onClick={() => handleOriginChange('CURRENT')}
+              className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
+                originType === 'CURRENT'
+                  ? 'bg-sky-100 text-sky-700 border-sky-300'
+                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+              }`}
+              disabled={!currentLocation}
+              title={!currentLocation ? t('route_origin_no_gps') : ''}>
+              <i className="bi bi-crosshair mr-0.5"></i>
+              {t('route_origin_current')}
+            </button>
+          </div>
 
           <div className="ml-auto flex items-center gap-2">
             {result && result.optimizedTasks.length > 0 && (
@@ -264,6 +323,19 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
                         strokeOpacity: 0.8,
                         strokeWeight: 4,
                       }}
+                    />
+                  )}
+
+                  {/* Origin marker */}
+                  {result.origin && (
+                    <Marker
+                      position={{ lat: result.origin.lat, lng: result.origin.lng }}
+                      icon={{
+                        url: `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36"><path d="M14 0C6.3 0 0 6.3 0 14c0 10.5 14 22 14 22s14-11.5 14-22C28 6.3 21.7 0 14 0z" fill="#0ea5e9"/><circle cx="14" cy="13" r="8" fill="white"/><text x="14" y="17" text-anchor="middle" font-size="11" font-weight="bold" font-family="Arial" fill="#0ea5e9">S</text></svg>`)}`,
+                        scaledSize: typeof google !== 'undefined' ? new google.maps.Size(28, 36) : undefined,
+                        anchor: typeof google !== 'undefined' ? new google.maps.Point(14, 36) : undefined,
+                      }}
+                      zIndex={2000}
                     />
                   )}
 
