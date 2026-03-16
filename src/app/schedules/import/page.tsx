@@ -439,6 +439,9 @@ export default function DataImportPage() {
 
     const cleanData = cleanForSend(parsedData);
     const totalChunks = Math.ceil(cleanData.length / CHUNK_SIZE);
+    // 全データのjobNumberリストを各チャンクに送る（クリーンアップで他チャンクのデータを消さないため）
+    const allJobNumbers = cleanData.map((s: any) => s.jobNumber).filter(Boolean) as string[];
+    const isLastChunk = (ci: number) => ci === totalChunks - 1;
 
     for (let ci = 0; ci < totalChunks; ci++) {
       const chunk = cleanData.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
@@ -446,8 +449,8 @@ export default function DataImportPage() {
       setMessage(`⏳ ${ts('importing')} ${progress} / ${cleanData.length} 件 (${ci + 1}/${totalChunks})`);
 
       const requestBody = dataType === 'partner'
-        ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}) }
-        : { schedules: chunk, importStatus };
+        ? { partnerId: selectedPartnerId, orderTitle: orderTitle || undefined, schedules: chunk, importStatus, ...(orderId ? { orderId } : {}), allJobNumbers, isLastChunk: isLastChunk(ci) }
+        : { schedules: chunk, importStatus, allJobNumbers, isLastChunk: isLastChunk(ci) };
 
       const bodyStr = JSON.stringify(requestBody);
 

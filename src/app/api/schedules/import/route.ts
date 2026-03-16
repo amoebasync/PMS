@@ -32,6 +32,8 @@ export async function POST(request: Request) {
     const isPartnerImport = !Array.isArray(body) && body.partnerId;
     const schedules = Array.isArray(body) ? body : body.schedules;
     const importStatus = ((!Array.isArray(body) && body.importStatus) || 'COMPLETED') as ScheduleStatus;
+    const allJobNumbers: string[] = (!Array.isArray(body) && body.allJobNumbers) || [];
+    const isLastChunk: boolean = Array.isArray(body) ? true : (body.isLastChunk !== false);
 
     if (!schedules || schedules.length === 0) {
       return NextResponse.json({ success: true, count: 0, newDistributorCount: 0 });
@@ -395,21 +397,35 @@ export async function POST(request: Request) {
       }
 
       // ── 古いスケジュールのクリーンアップ ──
-      // インポート対象の日付で、今回のインポートに含まれないスケジュールを全て削除
-      // （配布員変更・削除されたスケジュールが残るのを防ぐ）
+      // 最後のチャンクでのみ実行（チャンク分割送信時に先のチャンクのデータを消さないため）
+      // jobNumber付きかつインポート全体に含まれないスケジュールのみ削除
+      // jobNumberが無いスケジュール（手動作成・配布員のみ追加等）は保持する
       let cleanedCount = 0;
-      if (importedDates.size > 0) {
+      if (isLastChunk && importedDates.size > 0) {
+        // 全チャンクのjobNumberセット（フロントエンドから送られた全体リスト）
+        const fullJobNumberSet = new Set<string>(allJobNumbers);
+        // フォールバック: allJobNumbersが空の場合は現チャンクのjobNumberのみ使用
+        if (fullJobNumberSet.size === 0) {
+          for (const s of schedules) {
+            if (s.jobNumber) fullJobNumberSet.add(String(s.jobNumber));
+          }
+        }
+
         for (const dateStr of importedDates) {
           const oldSchedules = await tx.distributionSchedule.findMany({
             where: {
               date: new Date(dateStr),
-              id: { notIn: [...importedScheduleIds] },
               status: { not: 'DISTRIBUTING' },
+              // jobNumberがあるスケジュールのみクリーンアップ対象
+              jobNumber: { not: null },
             },
-            select: { id: true },
+            select: { id: true, jobNumber: true },
           });
 
           for (const old of oldSchedules) {
+            // インポートデータ全体に同じjobNumberがある場合はスキップ（upsert済み or 他チャンクで作成済み）
+            if (old.jobNumber && fullJobNumberSet.has(old.jobNumber)) continue;
+
             const oldSession = await tx.distributionSession.findUnique({ where: { scheduleId: old.id }, select: { id: true } });
             if (oldSession) {
               await tx.progressEvent.deleteMany({ where: { sessionId: oldSession.id } });
