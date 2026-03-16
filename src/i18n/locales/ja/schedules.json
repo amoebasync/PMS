@@ -197,5 +197,18 @@
   "add_dist_description": "{{date}} のスケジュールに配布員のみを追加します。エリア・チラシは後から割り当ててください。",
   "add_dist_success": "配布員を追加しました",
   "add_dist_already": "割当済",
-  "needs_schedule_assignment": "スケジュール未割当"
+  "needs_schedule_assignment": "スケジュール未割当",
+
+  "orphan_title": "未紐付けセッションの紐付け",
+  "orphan_btn": "未紐付けセッション",
+  "orphan_step1": "紐付けるセッションを選択",
+  "orphan_step2": "紐付け先のスケジュールを選択",
+  "orphan_empty": "未紐付けのセッションはありません",
+  "orphan_no_schedules": "紐付け可能なスケジュールがありません",
+  "orphan_in_progress": "配布中",
+  "orphan_finished": "完了",
+  "orphan_active": "配布中",
+  "orphan_count": "件の未紐付けセッション",
+  "orphan_link_btn": "紐付ける",
+  "orphan_link_success": "セッションをスケジュールに紐付けました"
 }

@@ -8,6 +8,7 @@ import { GoogleMap, useJsApiLoader, Marker, Polygon } from '@react-google-maps/a
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
 const AllTrajectoriesViewer = lazy(() => import('@/components/schedules/AllTrajectoriesViewer'));
 const DistributorDetailModal = lazy(() => import('@/components/schedules/DistributorDetailModal'));
+const OrphanSessionLinker = lazy(() => import('@/components/schedules/OrphanSessionLinker'));
 
 const getTodayStr = () => {
   const now = new Date();
@@ -526,6 +527,9 @@ export default function ScheduleListPage() {
   // 配布員詳細モーダル
   const [detailDistributorId, setDetailDistributorId] = useState<number | null>(null);
 
+  // 孤児セッション紐付けモーダル
+  const [showOrphanLinker, setShowOrphanLinker] = useState(false);
+
   // 配布員だけ割り当てモーダル
   const [showAddDistModal, setShowAddDistModal] = useState(false);
   const [addDistCandidates, setAddDistCandidates] = useState<any[]>([]);
@@ -882,6 +886,10 @@ export default function ScheduleListPage() {
             <button onClick={() => setShowAllTrajectories(true)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors">
               <i className="bi bi-map"></i>{t('all_traj_btn')}
+            </button>
+            <button onClick={() => setShowOrphanLinker(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors">
+              <i className="bi bi-link-45deg"></i>{t('orphan_btn')}
             </button>
             <span className="text-xs text-slate-400">
               {filteredSchedules.length} {t('results_count')}
@@ -1617,6 +1625,17 @@ export default function ScheduleListPage() {
       {detailDistributorId && (
         <Suspense fallback={null}>
           <DistributorDetailModal distributorId={detailDistributorId} onClose={() => setDetailDistributorId(null)} />
+        </Suspense>
+      )}
+
+      {showOrphanLinker && (
+        <Suspense fallback={null}>
+          <OrphanSessionLinker
+            date={filterDate}
+            schedules={schedules}
+            onClose={() => setShowOrphanLinker(false)}
+            onLinked={() => fetchSchedules(filterDate)}
+          />
         </Suspense>
       )}
     </div>

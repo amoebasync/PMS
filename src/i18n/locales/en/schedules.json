@@ -197,5 +197,18 @@
   "add_dist_description": "Add a distributor to {{date}} schedule. Assign area and flyers later.",
   "add_dist_success": "Distributor added",
   "add_dist_already": "Assigned",
-  "needs_schedule_assignment": "Schedule Not Assigned"
+  "needs_schedule_assignment": "Schedule Not Assigned",
+
+  "orphan_title": "Link Unlinked Sessions",
+  "orphan_btn": "Unlinked Sessions",
+  "orphan_step1": "Select a session to link",
+  "orphan_step2": "Select target schedule",
+  "orphan_empty": "No unlinked sessions found",
+  "orphan_no_schedules": "No linkable schedules available",
+  "orphan_in_progress": "In Progress",
+  "orphan_finished": "Finished",
+  "orphan_active": "Active",
+  "orphan_count": "unlinked session(s)",
+  "orphan_link_btn": "Link",
+  "orphan_link_success": "Session linked to schedule successfully"
 }
