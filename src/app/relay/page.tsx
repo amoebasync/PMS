@@ -117,6 +117,8 @@ export default function RelayListPage() {
   const openEdit = (task: any) => {
     setEditTask(task);
     const slot = task.timeSlotStart ? TIME_SLOTS.find(s => s.start === task.timeSlotStart) : null;
+    // タスクの実施日: date フィールドがあればそれ、なければ schedule.date
+    const taskDate = task.date ? task.date.split('T')[0] : task.schedule?.date?.split('T')[0] || filterDate;
     setEditForm({
       type: task.type,
       driverId: task.driverId,
@@ -126,6 +128,7 @@ export default function RelayListPage() {
       latitude: task.latitude,
       longitude: task.longitude,
       note: task.note || '',
+      date: taskDate,
     });
     setDriverSearch(task.driver ? `${task.driver.lastNameJa} ${task.driver.firstNameJa}` : '');
     setShowMap(!!(task.latitude && task.longitude));
@@ -149,14 +152,14 @@ export default function RelayListPage() {
           latitude: editForm.latitude || null,
           longitude: editForm.longitude || null,
           note: editForm.note || null,
+          date: editForm.date || null,
         }),
       });
       if (res.ok) {
-        const updated = await res.json();
-        setTasks(prev => prev.map(t => t.id === editTask.id ? updated : t));
         showToast(t('save_success'), 'success');
         setEditTask(null);
         setShowMap(false);
+        fetchTasks();
       }
     } catch { showToast(t('save_error'), 'error'); }
     setEditSaving(false);
@@ -263,6 +266,26 @@ export default function RelayListPage() {
       setEditForm((f: any) => ({ ...f, latitude: e.latLng!.lat(), longitude: e.latLng!.lng() }));
     }
   }, []);
+
+  const handleCarryOver = async (task: any) => {
+    if (!await showConfirm(t('carryover_confirm'), { confirmLabel: t('btn_carryover') })) return;
+    // 現在のタスク日付を取得し、翌日に設定
+    const currentDate = task.date ? task.date.split('T')[0] : task.schedule?.date?.split('T')[0] || filterDate;
+    const nextDay = new Date(currentDate);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDateStr = `${nextDay.getFullYear()}-${String(nextDay.getMonth() + 1).padStart(2, '0')}-${String(nextDay.getDate()).padStart(2, '0')}`;
+    try {
+      const res = await fetch(`/api/relay-tasks/${task.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: nextDateStr }),
+      });
+      if (res.ok) {
+        showToast(t('carryover_success', { date: nextDateStr }), 'success');
+        fetchTasks();
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+  };
 
   const handleApplyRouteOrder = async (orderedIds: number[]) => {
     try {
@@ -442,6 +465,10 @@ export default function RelayListPage() {
                   </td>
                   <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <button onClick={() => handleCarryOver(task)} title={t('btn_carryover')}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors">
+                        <i className="bi bi-arrow-right-circle text-xs"></i>
+                      </button>
                       <button onClick={() => openEdit(task)}
                         className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">
                         <i className="bi bi-pencil text-xs"></i>
@@ -486,6 +513,10 @@ export default function RelayListPage() {
                     <option value="COMPLETED">{t('status_completed')}</option>
                     <option value="CANCELLED">{t('status_cancelled')}</option>
                   </select>
+                  <button onClick={e => { e.stopPropagation(); handleCarryOver(task); }}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50">
+                    <i className="bi bi-arrow-right-circle text-xs"></i>
+                  </button>
                   <button onClick={e => { e.stopPropagation(); handleDelete(task); }}
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50">
                     <i className="bi bi-trash3 text-xs"></i>
@@ -620,14 +651,21 @@ export default function RelayListPage() {
                   className="w-full mt-2 px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
               </div>
 
-              {/* Time slot */}
-              <div>
-                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_time_slot')}</label>
-                <select value={editForm.timeSlot} onChange={e => setEditForm({ ...editForm, timeSlot: e.target.value })}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400">
-                  <option value="">-</option>
-                  {TIME_SLOTS.map(s => <option key={s.label} value={s.label}>{s.label}</option>)}
-                </select>
+              {/* Date + Time slot */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_date')}</label>
+                  <input type="date" value={editForm.date || ''} onChange={e => setEditForm({ ...editForm, date: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_time_slot')}</label>
+                  <select value={editForm.timeSlot} onChange={e => setEditForm({ ...editForm, timeSlot: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400">
+                    <option value="">-</option>
+                    {TIME_SLOTS.map(s => <option key={s.label} value={s.label}>{s.label}</option>)}
+                  </select>
+                </div>
               </div>
 
               {/* Location */}

@@ -26,7 +26,11 @@ export async function GET(request: Request) {
     if (scheduleId) {
       where.scheduleId = parseInt(scheduleId);
     } else if (date) {
-      where.schedule = { date: new Date(date) };
+      // date フィールドがセットされたタスク OR dateがnullでschedule.dateが一致するタスク
+      where.OR = [
+        { date: new Date(date) },
+        { date: null, schedule: { date: new Date(date) } },
+      ];
     }
 
     if (type) where.type = type;

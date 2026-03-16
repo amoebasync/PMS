@@ -37,6 +37,7 @@ export async function PUT(
     if (body.timeSlotEnd !== undefined) data.timeSlotEnd = body.timeSlotEnd || null;
     if (body.note !== undefined) data.note = body.note || null;
     if (body.type !== undefined) data.type = body.type;
+    if (body.date !== undefined) data.date = body.date ? new Date(body.date) : null;
 
     const task = await prisma.relayTask.update({
       where: { id: taskId },

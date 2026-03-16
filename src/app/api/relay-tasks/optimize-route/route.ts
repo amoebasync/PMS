@@ -226,7 +226,10 @@ export async function GET(request: Request) {
       where: {
         driverId: parseInt(driverId),
         status: { in: ['PENDING', 'IN_PROGRESS'] },
-        schedule: { date: new Date(date) },
+        OR: [
+          { date: new Date(date) },
+          { date: null, schedule: { date: new Date(date) } },
+        ],
       },
       include: {
         driver: { select: { id: true, lastNameJa: true, firstNameJa: true } },

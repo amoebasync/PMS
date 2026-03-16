@@ -84,5 +84,9 @@
   "route_skipped_tasks": "座標なしでスキップされたタスク",
   "route_overview": "ルート概要",
   "route_stop": "地点",
-  "route_applied_order": "順番を適用しました"
+  "route_applied_order": "順番を適用しました",
+  "field_date": "実施日",
+  "btn_carryover": "翌日に繰越",
+  "carryover_confirm": "このタスクを翌日に繰り越しますか？",
+  "carryover_success": "{date} に繰り越しました"
 }

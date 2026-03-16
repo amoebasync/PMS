@@ -970,6 +970,9 @@ model RelayTask {
   timeSlotStart String?    @map("time_slot_start") @db.VarChar(5) // "09:00"
   timeSlotEnd   String?    @map("time_slot_end") @db.VarChar(5)   // "10:00"
 
+  // タスク実施日（スケジュールの日付と異なる場合に使用、繰越時に翌日にセット）
+  date         DateTime?    @db.Date
+
   // 優先順位（ドラッグ&ドロップ並べ替え用）
   sortOrder   Int          @default(0) @map("sort_order")
 
@@ -983,6 +986,7 @@ model RelayTask {
   @@index([status])
   @@index([driverId])
   @@index([type, status])
+  @@index([date])
   @@map("relay_tasks")
 }
 
