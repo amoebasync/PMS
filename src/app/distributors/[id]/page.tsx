@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
@@ -130,14 +130,18 @@ function ComplaintStatusBadge({ status }: { status: string }) {
 export default function DistributorDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { showToast, showConfirm } = useNotification();
 
   const [distributor, setDistributor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
-  // 詳細タブ
-  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  // 詳細タブ（URLパラメータから初期値）
+  const initialTab = (searchParams.get('tab') as DetailTab) || 'overview';
+  const [activeTab, setActiveTab] = useState<DetailTab>(
+    DETAIL_TABS.some(t => t.key === initialTab) ? initialTab : 'overview'
+  );
 
   // 遅延ロード用
   const [schedules, setSchedules] = useState<any[]>([]);
