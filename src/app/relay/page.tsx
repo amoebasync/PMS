@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
 import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import RouteOptimizationPanel from '@/components/relay/RouteOptimizationPanel';
 
 const getTodayStr = () => {
   const now = new Date();
@@ -59,6 +60,7 @@ export default function RelayListPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [showRouteOpt, setShowRouteOpt] = useState(false);
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
 
@@ -262,6 +264,24 @@ export default function RelayListPage() {
     }
   }, []);
 
+  const handleApplyRouteOrder = async (orderedIds: number[]) => {
+    try {
+      await fetch('/api/relay-tasks/reorder', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds }),
+      });
+      showToast(t('route_applied_order'), 'success');
+      setShowRouteOpt(false);
+      fetchTasks();
+    } catch { showToast(t('save_error'), 'error'); }
+  };
+
+  const selectedDriverInfo = uniqueDrivers.find(([id]) => String(id) === filterDriver);
+  const selectedDriverName = selectedDriverInfo
+    ? `${selectedDriverInfo[1]?.lastNameJa || ''} ${selectedDriverInfo[1]?.firstNameJa || ''}`
+    : '';
+
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header / Filters */}
@@ -293,16 +313,23 @@ export default function RelayListPage() {
               <option value="CANCELLED">{t('status_cancelled')}</option>
             </select>
           </div>
-          <div className="hidden md:flex items-center gap-1.5">
-            <label className="text-xs font-bold text-slate-500">{t('filter_driver')}</label>
+          <div className="flex items-center gap-1.5">
+            <label className="text-[10px] md:text-xs font-bold text-slate-500">{t('filter_driver')}</label>
             <select value={filterDriver} onChange={e => setFilterDriver(e.target.value)}
-              className="px-3 py-1.5 border border-slate-200 rounded-lg text-xs">
+              className="px-2 md:px-3 py-1.5 border border-slate-200 rounded-lg text-xs">
               <option value="ALL">{t('filter_driver_all')}</option>
               {uniqueDrivers.map(([id, driver]) => (
                 <option key={id} value={id}>{driver?.lastNameJa} {driver?.firstNameJa}</option>
               ))}
             </select>
           </div>
+          {filterDriver !== 'ALL' && (
+            <button onClick={() => setShowRouteOpt(true)}
+              className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition-colors">
+              <i className="bi bi-signpost-2"></i>
+              <span className="hidden sm:inline">{t('btn_optimize_route')}</span>
+            </button>
+          )}
           <div className="ml-auto text-xs text-slate-500">
             {t('total_count', { count: tasks.length })}
           </div>
@@ -523,6 +550,19 @@ export default function RelayListPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Route Optimization Panel */}
+      {showRouteOpt && filterDriver !== 'ALL' && (
+        <RouteOptimizationPanel
+          isLoaded={isLoaded}
+          date={filterDate}
+          driverId={filterDriver}
+          driverName={selectedDriverName}
+          onClose={() => setShowRouteOpt(false)}
+          onApplyOrder={handleApplyRouteOrder}
+          t={t}
+        />
       )}
 
       {/* Edit Modal */}
