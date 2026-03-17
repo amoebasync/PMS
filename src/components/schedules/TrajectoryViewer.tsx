@@ -278,6 +278,23 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   // Live duration tick (every second)
   const [nowTick, setNowTick] = useState(Date.now());
 
+  // Google Maps ref for panning (must be before early returns)
+  const mapRef = useRef<google.maps.Map | null>(null);
+
+  // Dwell spot analysis (must be before early returns to maintain hook order)
+  const dwellSpots = useMemo(() => data ? clusterDwellSpots(data.gpsPoints) : [], [data]);
+  const dwellSorted = useMemo(() => [...dwellSpots].sort((a, b) => b.dwellMs - a.dwellMs), [dwellSpots]);
+  const dwellStats = useMemo(() => {
+    if (dwellSpots.length === 0) return { count: 0, avgMs: 0, maxMs: 0, totalMs: 0 };
+    const totalMs = dwellSpots.reduce((s, d) => s + d.dwellMs, 0);
+    return {
+      count: dwellSpots.length,
+      avgMs: totalMs / dwellSpots.length,
+      maxMs: Math.max(...dwellSpots.map(d => d.dwellMs)),
+      totalMs,
+    };
+  }, [dwellSpots]);
+
   // Fetch trajectory data
   const fetchData = useCallback(async () => {
     try {
@@ -374,24 +391,6 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
       </div>
     );
   }
-
-  // Dwell spot analysis (memoized)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const dwellSpots = useMemo(() => clusterDwellSpots(data.gpsPoints), [data.gpsPoints]);
-  const dwellSorted = useMemo(() => [...dwellSpots].sort((a, b) => b.dwellMs - a.dwellMs), [dwellSpots]);
-  const dwellStats = useMemo(() => {
-    if (dwellSpots.length === 0) return { count: 0, avgMs: 0, maxMs: 0, totalMs: 0 };
-    const totalMs = dwellSpots.reduce((s, d) => s + d.dwellMs, 0);
-    return {
-      count: dwellSpots.length,
-      avgMs: totalMs / dwellSpots.length,
-      maxMs: Math.max(...dwellSpots.map(d => d.dwellMs)),
-      totalMs,
-    };
-  }, [dwellSpots]);
-
-  // Google Maps ref for panning
-  const mapRef = useRef<google.maps.Map | null>(null);
 
   // Calculate visible data based on slider
   const points = data.gpsPoints;
