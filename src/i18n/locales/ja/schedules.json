@@ -210,5 +210,8 @@
   "orphan_active": "配布中",
   "orphan_count": "件の未紐付けセッション",
   "orphan_link_btn": "紐付ける",
-  "orphan_link_success": "セッションをスケジュールに紐付けました"
+  "orphan_link_success": "セッションをスケジュールに紐付けました",
+
+  "relay_duplicate_warning": "同じスケジュールに{{type}}タスクが既に{{count}}件あります。追加しますか？",
+  "relay_duplicate_confirm": "追加する"
 }

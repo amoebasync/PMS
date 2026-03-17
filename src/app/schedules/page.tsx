@@ -647,16 +647,34 @@ export default function ScheduleListPage() {
   };
 
   // 中継/回収タスク作成
-  const handleCreateRelay = async (data: { type: string; driverId?: number; driverName?: string; timeSlotStart?: string; timeSlotEnd?: string; locationName?: string; latitude?: number; longitude?: number; note?: string }) => {
+  const handleCreateRelay = async (data: { type: string; driverId?: number; driverName?: string; timeSlotStart?: string; timeSlotEnd?: string; locationName?: string; latitude?: number; longitude?: number; note?: string }, force?: boolean) => {
     if (!relayAddSchedule) return;
     setRelaySaving(true);
     try {
       const res = await fetch('/api/relay-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduleId: relayAddSchedule.schedule.id, ...data }),
+        body: JSON.stringify({ scheduleId: relayAddSchedule.schedule.id, ...data, force }),
       });
-      if (res.ok) {
+      if (res.status === 409) {
+        // 重複あり — 確認ダイアログ
+        const result = await res.json();
+        const existingInfo = result.existingTasks?.map((t: any) => {
+          const driver = t.driverName || '';
+          const time = t.timeSlotStart && t.timeSlotEnd ? `${t.timeSlotStart}〜${t.timeSlotEnd}` : '';
+          return [driver, time].filter(Boolean).join(' ') || '-';
+        }).join('\n') || '';
+        const typeLabel = data.type === 'RELAY' ? t('type_relay') : data.type === 'FULL_RELAY' ? t('type_full_relay') : t('type_collection');
+        const confirmed = await showConfirm(
+          `${t('relay_duplicate_warning', { type: typeLabel, count: result.existingTasks?.length || 1 })}\n${existingInfo}`,
+          { confirmLabel: t('relay_duplicate_confirm'), variant: 'warning' }
+        );
+        if (confirmed) {
+          setRelaySaving(false);
+          handleCreateRelay(data, true);
+          return;
+        }
+      } else if (res.ok) {
         const task = await res.json();
         setSchedules(prev => prev.map(s => s.id === relayAddSchedule.schedule.id
           ? { ...s, relayTasks: [...(s.relayTasks || []), { id: task.id, type: task.type, status: task.status }] }

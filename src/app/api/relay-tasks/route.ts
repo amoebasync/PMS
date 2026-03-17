@@ -67,10 +67,37 @@ export async function POST(request: Request) {
     if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { scheduleId, type, driverId, driverName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note } = body;
+    const { scheduleId, type, driverId, driverName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note, force } = body;
 
     if (!scheduleId || !type) {
       return NextResponse.json({ error: 'scheduleId and type are required' }, { status: 400 });
+    }
+
+    // 重複チェック: 同スケジュール・同タイプのタスクが既に存在するか
+    if (!force) {
+      const existing = await prisma.relayTask.findMany({
+        where: {
+          scheduleId: parseInt(scheduleId),
+          type,
+          status: { not: 'CANCELLED' },
+        },
+        include: {
+          driver: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+        },
+      });
+      if (existing.length > 0) {
+        return NextResponse.json({
+          duplicate: true,
+          existingTasks: existing.map(t => ({
+            id: t.id,
+            type: t.type,
+            status: t.status,
+            driverName: t.driver ? `${t.driver.lastNameJa} ${t.driver.firstNameJa}` : t.driverName || null,
+            timeSlotStart: t.timeSlotStart,
+            timeSlotEnd: t.timeSlotEnd,
+          })),
+        }, { status: 409 });
+      }
     }
 
     // 同スケジュールの最大sortOrderを取得
