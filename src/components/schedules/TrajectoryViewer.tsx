@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, InfoWindow } from '@react-google-maps/api';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 
 // ============================================================
 // Types
@@ -134,6 +134,117 @@ const fmtDuration = (ms: number) => {
 };
 
 // ============================================================
+// Dwell spot analysis
+// ============================================================
+interface DwellSpot {
+  id: number;
+  centerLat: number;
+  centerLng: number;
+  dwellMs: number;        // 滞在時間 (ms)
+  pointCount: number;     // GPSポイント数
+  startTime: string;      // 滞在開始時刻
+  endTime: string;        // 滞在終了時刻
+}
+
+type ViewMode = 'trajectory' | 'dwell';
+
+const DWELL_RADIUS_M = 30;          // クラスタ半径 (メートル)
+const DWELL_MIN_MS = 30 * 1000;     // 最低滞在時間 (30秒)
+
+/** 2点間の距離 (メートル) — Haversine */
+const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+/** 連続するGPSポイントを滞在スポットにクラスタリング */
+const clusterDwellSpots = (points: GpsPoint[]): DwellSpot[] => {
+  if (points.length < 2) return [];
+
+  const spots: DwellSpot[] = [];
+  let clusterStart = 0;
+  let centroidLat = points[0].lat;
+  let centroidLng = points[0].lng;
+  let spotId = 0;
+
+  for (let i = 1; i < points.length; i++) {
+    const dist = haversineM(centroidLat, centroidLng, points[i].lat, points[i].lng);
+
+    if (dist <= DWELL_RADIUS_M) {
+      // 重心を更新
+      const n = i - clusterStart + 1;
+      centroidLat = centroidLat + (points[i].lat - centroidLat) / n;
+      centroidLng = centroidLng + (points[i].lng - centroidLng) / n;
+    } else {
+      // 現クラスタを確定
+      const dwellMs = new Date(points[i - 1].timestamp).getTime() - new Date(points[clusterStart].timestamp).getTime();
+      if (dwellMs >= DWELL_MIN_MS) {
+        spots.push({
+          id: spotId++,
+          centerLat: centroidLat,
+          centerLng: centroidLng,
+          dwellMs,
+          pointCount: i - clusterStart,
+          startTime: points[clusterStart].timestamp,
+          endTime: points[i - 1].timestamp,
+        });
+      }
+      // 新クラスタ開始
+      clusterStart = i;
+      centroidLat = points[i].lat;
+      centroidLng = points[i].lng;
+    }
+  }
+
+  // 最後のクラスタ
+  const lastDwell = new Date(points[points.length - 1].timestamp).getTime() - new Date(points[clusterStart].timestamp).getTime();
+  if (lastDwell >= DWELL_MIN_MS) {
+    spots.push({
+      id: spotId++,
+      centerLat: centroidLat,
+      centerLng: centroidLng,
+      dwellMs: lastDwell,
+      pointCount: points.length - clusterStart,
+      startTime: points[clusterStart].timestamp,
+      endTime: points[points.length - 1].timestamp,
+    });
+  }
+
+  return spots;
+};
+
+/** 滞在時間に応じた色 */
+const dwellColor = (ms: number) => {
+  if (ms < 2 * 60 * 1000) return '#22c55e';       // 緑: ~2分
+  if (ms < 5 * 60 * 1000) return '#eab308';       // 黄: 2~5分
+  if (ms < 10 * 60 * 1000) return '#f97316';      // オレンジ: 5~10分
+  return '#ef4444';                                 // 赤: 10分+
+};
+
+/** 滞在時間に応じた円の半径 (px → meters for map) */
+const dwellRadius = (ms: number) => {
+  const minR = 15;
+  const maxR = 50;
+  const minMs = DWELL_MIN_MS;
+  const maxMs = 15 * 60 * 1000;
+  const ratio = Math.min(1, (ms - minMs) / (maxMs - minMs));
+  return minR + ratio * (maxR - minR);
+};
+
+/** 滞在時間のカテゴリラベル */
+const dwellLabel = (ms: number) => {
+  if (ms < 2 * 60 * 1000) return '短い停止';
+  if (ms < 5 * 60 * 1000) return '中程度';
+  if (ms < 10 * 60 * 1000) return '長め';
+  return '非常に長い';
+};
+
+// ============================================================
 // Component
 // ============================================================
 export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
@@ -144,6 +255,10 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const [data, setData] = useState<TrajectoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
+  const [selectedDwellSpot, setSelectedDwellSpot] = useState<DwellSpot | null>(null);
 
   // Playback state
   const [sliderValue, setSliderValue] = useState(1000); // 0-1000 range
@@ -260,6 +375,24 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
     );
   }
 
+  // Dwell spot analysis (memoized)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const dwellSpots = useMemo(() => clusterDwellSpots(data.gpsPoints), [data.gpsPoints]);
+  const dwellSorted = useMemo(() => [...dwellSpots].sort((a, b) => b.dwellMs - a.dwellMs), [dwellSpots]);
+  const dwellStats = useMemo(() => {
+    if (dwellSpots.length === 0) return { count: 0, avgMs: 0, maxMs: 0, totalMs: 0 };
+    const totalMs = dwellSpots.reduce((s, d) => s + d.dwellMs, 0);
+    return {
+      count: dwellSpots.length,
+      avgMs: totalMs / dwellSpots.length,
+      maxMs: Math.max(...dwellSpots.map(d => d.dwellMs)),
+      totalMs,
+    };
+  }, [dwellSpots]);
+
+  // Google Maps ref for panning
+  const mapRef = useRef<google.maps.Map | null>(null);
+
   // Calculate visible data based on slider
   const points = data.gpsPoints;
   const sliderRatio = sliderValue / 1000;
@@ -344,7 +477,32 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="flex items-center gap-1 md:gap-2 shrink-0">
+          {/* View mode toggle */}
+          <div className="flex bg-slate-100 rounded-lg p-0.5">
+            <button
+              onClick={() => { setViewMode('trajectory'); setSelectedDwellSpot(null); }}
+              className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                viewMode === 'trajectory'
+                  ? 'bg-white text-indigo-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <i className="bi bi-bezier2 mr-1"></i>
+              <span className="hidden md:inline">軌跡</span>
+            </button>
+            <button
+              onClick={() => { setViewMode('dwell'); setSelectedDwellSpot(null); setIsPlaying(false); }}
+              className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                viewMode === 'dwell'
+                  ? 'bg-white text-orange-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <i className="bi bi-clock-fill mr-1"></i>
+              <span className="hidden md:inline">滞在時間</span>
+            </button>
+          </div>
           <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
             <i className="bi bi-arrow-clockwise"></i>
           </button>
@@ -368,8 +526,9 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 streetViewControl: false,
                 fullscreenControl: false,
               }}
+              onLoad={(map) => { mapRef.current = map; }}
             >
-              {/* Area polygon */}
+              {/* Area polygon (both modes) */}
               {areaPaths.map((path, i) => (
                 <Polygon
                   key={`area-${i}`}
@@ -384,171 +543,252 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 />
               ))}
 
-              {/* GPS trajectory - already traversed */}
-              {visiblePoints.length > 1 && (
-                <Polyline
-                  path={visiblePoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
-                  options={{
-                    strokeColor: '#ec4899',
-                    strokeWeight: 3,
-                    strokeOpacity: 0.85,
-                  }}
-                />
+              {/* ========== TRAJECTORY MODE ========== */}
+              {viewMode === 'trajectory' && (
+                <>
+                  {/* GPS trajectory - already traversed */}
+                  {visiblePoints.length > 1 && (
+                    <Polyline
+                      path={visiblePoints.map((p) => ({ lat: p.lat, lng: p.lng }))}
+                      options={{
+                        strokeColor: '#ec4899',
+                        strokeWeight: 3,
+                        strokeOpacity: 0.85,
+                      }}
+                    />
+                  )}
+
+                  {/* GPS trajectory - remaining (dimmed) */}
+                  {visibleCount < points.length && (
+                    <Polyline
+                      path={points.slice(visibleCount - 1).map((p) => ({ lat: p.lat, lng: p.lng }))}
+                      options={{
+                        strokeColor: '#f9a8d4',
+                        strokeWeight: 2,
+                        strokeOpacity: 0.35,
+                      }}
+                    />
+                  )}
+
+                  {/* Start marker */}
+                  {points.length > 0 && (
+                    <Marker
+                      position={{ lat: points[0].lat, lng: points[0].lng }}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#22c55e',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                      title="START"
+                      onClick={() => setSelectedInfo({
+                        position: { lat: points[0].lat, lng: points[0].lng },
+                        content: `START: ${fmtTime(points[0].timestamp)}`,
+                      })}
+                    />
+                  )}
+
+                  {/* Finish marker */}
+                  {data.session.finishedAt && points.length > 0 && (
+                    <Marker
+                      position={{ lat: points[points.length - 1].lat, lng: points[points.length - 1].lng }}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: '#ef4444',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                      title="FINISH"
+                      onClick={() => setSelectedInfo({
+                        position: { lat: points[points.length - 1].lat, lng: points[points.length - 1].lng },
+                        content: `FINISH: ${fmtTime(points[points.length - 1].timestamp)}`,
+                      })}
+                    />
+                  )}
+
+                  {/* Current position marker */}
+                  {currentPoint && (
+                    <Marker
+                      position={{ lat: currentPoint.lat, lng: currentPoint.lng }}
+                      icon={data.session.finishedAt ? {
+                        path: 'M12 0C7.03 0 3 4.03 3 9c0 6.75 9 15 9 15s9-8.25 9-15c0-4.97-4.03-9-9-9zm-1.5 12.5l-3-3 1.41-1.41L10.5 9.67l4.59-4.58L16.5 6.5l-6 6z',
+                        scale: 1.8,
+                        fillColor: '#16a34a',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        anchor: new google.maps.Point(12, 24),
+                      } : {
+                        path: 'M12 0C7.03 0 3 4.03 3 9c0 6.75 9 15 9 15s9-8.25 9-15c0-4.97-4.03-9-9-9zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 10c-2.21 0-4-1.12-4-2.5C8 10.12 9.79 9 12 9s4 1.12 4 2.5c0 1.38-1.79 2.5-4 2.5z',
+                        scale: 1.8,
+                        fillColor: '#3b82f6',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        anchor: new google.maps.Point(12, 24),
+                      }}
+                      animation={data.session.finishedAt ? undefined : google.maps.Animation.BOUNCE}
+                      title={currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : ''}
+                    />
+                  )}
+
+                  {/* Progress event markers */}
+                  {visibleProgress.map((e) =>
+                    e.lat != null && e.lng != null ? (
+                      <Marker
+                        key={`progress-${e.id}`}
+                        position={{ lat: e.lat, lng: e.lng }}
+                        label={{
+                          text: String(e.mailboxCount),
+                          color: '#fff',
+                          fontSize: '10px',
+                          fontWeight: 'bold',
+                        }}
+                        icon={{
+                          path: google.maps.SymbolPath.CIRCLE,
+                          scale: 14,
+                          fillColor: '#22c55e',
+                          fillOpacity: 0.9,
+                          strokeColor: '#fff',
+                          strokeWeight: 2,
+                        }}
+                        onClick={() => setSelectedInfo({
+                          position: { lat: e.lat!, lng: e.lng! },
+                          content: `${e.mailboxCount}枚完了 (${fmtTime(e.timestamp)})`,
+                        })}
+                      />
+                    ) : null
+                  )}
+
+                  {/* Skip event markers */}
+                  {visibleSkips.map((e) => (
+                    <Marker
+                      key={`skip-${e.id}`}
+                      position={{ lat: e.lat, lng: e.lng }}
+                      icon={{
+                        path: 'M12 2L2 22h20L12 2z',
+                        scale: 1.2,
+                        fillColor: '#f97316',
+                        fillOpacity: 0.9,
+                        strokeColor: '#fff',
+                        strokeWeight: 1,
+                        anchor: new google.maps.Point(12, 22),
+                      }}
+                      onClick={() => setSelectedInfo({
+                        position: { lat: e.lat, lng: e.lng },
+                        content: `スキップ (${fmtTime(e.timestamp)})${e.reason ? `\n${e.reason}` : ''}${e.prohibitedProperty ? `\n${e.prohibitedProperty.buildingName || e.prohibitedProperty.address}` : ''}`,
+                      })}
+                    />
+                  ))}
+
+                  {/* Prohibited property markers */}
+                  {data.prohibitedProperties.map((pp) =>
+                    pp.latitude && pp.longitude ? (
+                      <Marker
+                        key={`pp-${pp.id}`}
+                        position={{ lat: pp.latitude, lng: pp.longitude }}
+                        icon={{
+                          path: google.maps.SymbolPath.CIRCLE,
+                          scale: 5,
+                          fillColor: '#ef4444',
+                          fillOpacity: 0.6,
+                          strokeColor: '#ef4444',
+                          strokeWeight: 1,
+                        }}
+                        title={pp.buildingName || pp.address || '禁止物件'}
+                      />
+                    ) : null
+                  )}
+                </>
               )}
 
-              {/* GPS trajectory - remaining (dimmed) */}
-              {visibleCount < points.length && (
-                <Polyline
-                  path={points.slice(visibleCount - 1).map((p) => ({ lat: p.lat, lng: p.lng }))}
-                  options={{
-                    strokeColor: '#f9a8d4',
-                    strokeWeight: 2,
-                    strokeOpacity: 0.35,
-                  }}
-                />
-              )}
+              {/* ========== DWELL TIME MODE ========== */}
+              {viewMode === 'dwell' && (
+                <>
+                  {/* Faint trajectory line for context */}
+                  {points.length > 1 && (
+                    <Polyline
+                      path={points.map((p) => ({ lat: p.lat, lng: p.lng }))}
+                      options={{
+                        strokeColor: '#cbd5e1',
+                        strokeWeight: 1.5,
+                        strokeOpacity: 0.5,
+                      }}
+                    />
+                  )}
 
-              {/* Start marker */}
-              {points.length > 0 && (
-                <Marker
-                  position={{ lat: points[0].lat, lng: points[0].lng }}
-                  icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: '#22c55e',
-                    fillOpacity: 1,
-                    strokeColor: '#fff',
-                    strokeWeight: 2,
-                  }}
-                  title="START"
-                  onClick={() => setSelectedInfo({
-                    position: { lat: points[0].lat, lng: points[0].lng },
-                    content: `START: ${fmtTime(points[0].timestamp)}`,
+                  {/* Dwell spot circles */}
+                  {dwellSpots.map((spot) => {
+                    const color = dwellColor(spot.dwellMs);
+                    const isSelected = selectedDwellSpot?.id === spot.id;
+                    return (
+                      <Circle
+                        key={`dwell-${spot.id}`}
+                        center={{ lat: spot.centerLat, lng: spot.centerLng }}
+                        radius={dwellRadius(spot.dwellMs)}
+                        options={{
+                          fillColor: color,
+                          fillOpacity: isSelected ? 0.7 : 0.45,
+                          strokeColor: isSelected ? '#1e293b' : color,
+                          strokeWeight: isSelected ? 3 : 2,
+                          strokeOpacity: 0.9,
+                          clickable: true,
+                          zIndex: isSelected ? 10 : Math.round(spot.dwellMs / 1000),
+                        }}
+                        onClick={() => {
+                          setSelectedDwellSpot(spot);
+                          setSelectedInfo({
+                            position: { lat: spot.centerLat, lng: spot.centerLng },
+                            content: `滞在時間: ${fmtDuration(spot.dwellMs)}\n${fmtTime(spot.startTime)} 〜 ${fmtTime(spot.endTime)}\nGPSポイント: ${spot.pointCount}件\n${dwellLabel(spot.dwellMs)}`,
+                          });
+                        }}
+                      />
+                    );
                   })}
-                />
+
+                  {/* Start marker */}
+                  {points.length > 0 && (
+                    <Marker
+                      position={{ lat: points[0].lat, lng: points[0].lng }}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 6,
+                        fillColor: '#22c55e',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                      title="START"
+                    />
+                  )}
+
+                  {/* Finish marker */}
+                  {data.session.finishedAt && points.length > 0 && (
+                    <Marker
+                      position={{ lat: points[points.length - 1].lat, lng: points[points.length - 1].lng }}
+                      icon={{
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 6,
+                        fillColor: '#ef4444',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                      }}
+                      title="FINISH"
+                    />
+                  )}
+                </>
               )}
 
-              {/* Finish marker */}
-              {data.session.finishedAt && points.length > 0 && (
-                <Marker
-                  position={{ lat: points[points.length - 1].lat, lng: points[points.length - 1].lng }}
-                  icon={{
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 8,
-                    fillColor: '#ef4444',
-                    fillOpacity: 1,
-                    strokeColor: '#fff',
-                    strokeWeight: 2,
-                  }}
-                  title="FINISH"
-                  onClick={() => setSelectedInfo({
-                    position: { lat: points[points.length - 1].lat, lng: points[points.length - 1].lng },
-                    content: `FINISH: ${fmtTime(points[points.length - 1].timestamp)}`,
-                  })}
-                />
-              )}
-
-              {/* Current position marker - person pin (blue=active, green checkmark=completed) */}
-              {currentPoint && (
-                <Marker
-                  position={{ lat: currentPoint.lat, lng: currentPoint.lng }}
-                  icon={data.session.finishedAt ? {
-                    // Completed: checkmark inside pin
-                    path: 'M12 0C7.03 0 3 4.03 3 9c0 6.75 9 15 9 15s9-8.25 9-15c0-4.97-4.03-9-9-9zm-1.5 12.5l-3-3 1.41-1.41L10.5 9.67l4.59-4.58L16.5 6.5l-6 6z',
-                    scale: 1.8,
-                    fillColor: '#16a34a',
-                    fillOpacity: 1,
-                    strokeColor: '#fff',
-                    strokeWeight: 2,
-                    anchor: new google.maps.Point(12, 24),
-                  } : {
-                    // Active: person silhouette inside pin
-                    path: 'M12 0C7.03 0 3 4.03 3 9c0 6.75 9 15 9 15s9-8.25 9-15c0-4.97-4.03-9-9-9zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4zm0 10c-2.21 0-4-1.12-4-2.5C8 10.12 9.79 9 12 9s4 1.12 4 2.5c0 1.38-1.79 2.5-4 2.5z',
-                    scale: 1.8,
-                    fillColor: '#3b82f6',
-                    fillOpacity: 1,
-                    strokeColor: '#fff',
-                    strokeWeight: 2,
-                    anchor: new google.maps.Point(12, 24),
-                  }}
-                  animation={data.session.finishedAt ? undefined : google.maps.Animation.BOUNCE}
-                  title={currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : ''}
-                />
-              )}
-
-              {/* Progress event markers */}
-              {visibleProgress.map((e) =>
-                e.lat != null && e.lng != null ? (
-                  <Marker
-                    key={`progress-${e.id}`}
-                    position={{ lat: e.lat, lng: e.lng }}
-                    label={{
-                      text: String(e.mailboxCount),
-                      color: '#fff',
-                      fontSize: '10px',
-                      fontWeight: 'bold',
-                    }}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
-                      scale: 14,
-                      fillColor: '#22c55e',
-                      fillOpacity: 0.9,
-                      strokeColor: '#fff',
-                      strokeWeight: 2,
-                    }}
-                    onClick={() => setSelectedInfo({
-                      position: { lat: e.lat!, lng: e.lng! },
-                      content: `${e.mailboxCount}枚完了 (${fmtTime(e.timestamp)})`,
-                    })}
-                  />
-                ) : null
-              )}
-
-              {/* Skip event markers */}
-              {visibleSkips.map((e) => (
-                <Marker
-                  key={`skip-${e.id}`}
-                  position={{ lat: e.lat, lng: e.lng }}
-                  icon={{
-                    path: 'M12 2L2 22h20L12 2z',
-                    scale: 1.2,
-                    fillColor: '#f97316',
-                    fillOpacity: 0.9,
-                    strokeColor: '#fff',
-                    strokeWeight: 1,
-                    anchor: new google.maps.Point(12, 22),
-                  }}
-                  onClick={() => setSelectedInfo({
-                    position: { lat: e.lat, lng: e.lng },
-                    content: `スキップ (${fmtTime(e.timestamp)})${e.reason ? `\n${e.reason}` : ''}${e.prohibitedProperty ? `\n${e.prohibitedProperty.buildingName || e.prohibitedProperty.address}` : ''}`,
-                  })}
-                />
-              ))}
-
-              {/* Prohibited property markers */}
-              {data.prohibitedProperties.map((pp) =>
-                pp.latitude && pp.longitude ? (
-                  <Marker
-                    key={`pp-${pp.id}`}
-                    position={{ lat: pp.latitude, lng: pp.longitude }}
-                    icon={{
-                      path: google.maps.SymbolPath.CIRCLE,
-                      scale: 5,
-                      fillColor: '#ef4444',
-                      fillOpacity: 0.6,
-                      strokeColor: '#ef4444',
-                      strokeWeight: 1,
-                    }}
-                    title={pp.buildingName || pp.address || '禁止物件'}
-                  />
-                ) : null
-              )}
-
-              {/* Info window */}
+              {/* Info window (both modes) */}
               {selectedInfo && (
                 <InfoWindow
                   position={selectedInfo.position}
-                  onCloseClick={() => setSelectedInfo(null)}
+                  onCloseClick={() => { setSelectedInfo(null); setSelectedDwellSpot(null); }}
                 >
                   <div className="text-xs whitespace-pre-line">{selectedInfo.content}</div>
                 </InfoWindow>
@@ -571,217 +811,348 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
           w-72 bg-white border-l border-slate-200 flex flex-col overflow-y-auto shrink-0
           transition-transform duration-200 ease-in-out shadow-xl md:shadow-none
         `}>
-          {/* Stats */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-700 text-sm mb-3">
-              <i className="bi bi-speedometer2 mr-1"></i>
-              パフォーマンス
-            </h3>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div className="bg-blue-50 rounded-lg p-2 text-center">
-                <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
-                <div className="text-blue-400">km</div>
-              </div>
-              <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
-                <div className="text-emerald-400">歩</div>
-              </div>
-              <div className="bg-orange-50 rounded-lg p-2 text-center">
-                <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
-                <div className="text-orange-400">kcal</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-2 text-center">
-                <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
-                <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Per-hour metrics */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-700 text-sm mb-3">
-              <i className="bi bi-graph-up mr-1"></i>
-              時間あたり
-            </h3>
-            {totalPausedMs > 0 && (
-              <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
-                * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
-              </div>
-            )}
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">配布ペース</span>
-                <span className="font-bold text-slate-700">
-                  {durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} ポスト/h
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">歩数</span>
-                <span className="font-bold text-slate-700">
-                  {durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-500">移動距離</span>
-                <span className="font-bold text-slate-700">
-                  {durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Distribution items */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-700 text-sm mb-3">
-              <i className="bi bi-file-earmark-text mr-1"></i>
-              配布チラシ
-            </h3>
-            <div className="space-y-1.5 text-xs">
-              {data.schedule.items.map((item) => (
-                <div key={item.id} className="flex justify-between items-center bg-slate-50 rounded-lg px-2 py-1.5">
-                  <span className="text-slate-600 truncate max-w-[140px]" title={item.flyerName}>{item.flyerName}</span>
-                  <span className="font-bold shrink-0 ml-1">
-                    <span className="text-indigo-600">{item.actualCount ?? '-'}</span>
-                    <span className="text-slate-400">/{item.plannedCount}</span>
-                  </span>
+          {viewMode === 'trajectory' ? (
+            <>
+              {/* Stats */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-speedometer2 mr-1"></i>
+                  パフォーマンス
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-blue-50 rounded-lg p-2 text-center">
+                    <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
+                    <div className="text-blue-400">km</div>
+                  </div>
+                  <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                    <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
+                    <div className="text-emerald-400">歩</div>
+                  </div>
+                  <div className="bg-orange-50 rounded-lg p-2 text-center">
+                    <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
+                    <div className="text-orange-400">kcal</div>
+                  </div>
+                  <div className="bg-purple-50 rounded-lg p-2 text-center">
+                    <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
+                    <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
+                  </div>
                 </div>
-              ))}
-            </div>
-            {data.session.incompleteReason && (
-              <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-amber-700">
-                未完了: {data.session.incompleteReason === 'AREA_DONE' ? 'エリア終了' : data.session.incompleteReason === 'GIVE_UP' ? 'ギブアップ' : 'その他'}
-                {data.session.incompleteNote && <span className="block text-amber-500 mt-0.5">{data.session.incompleteNote}</span>}
               </div>
-            )}
-          </div>
 
-          {/* Progress timeline */}
-          <div className="p-4 border-b border-slate-100">
-            <h3 className="font-bold text-slate-700 text-sm mb-3">
-              <i className="bi bi-clock-history mr-1"></i>
-              配布進捗
-            </h3>
-            <div className="space-y-1 text-xs">
-              {/* START + 全イベントを時系列ソートして表示 */}
-              {[
-                { time: data.session.startedAt, type: 'START' as const },
-                ...data.progressEvents.map((e) => ({ time: e.timestamp, type: 'PROGRESS' as const, mailboxCount: e.mailboxCount })),
-                ...data.skipEvents.map((e) => ({ time: e.timestamp, type: 'SKIP' as const })),
-                ...(data.pauseEvents || []).flatMap((e) => [
-                  { time: e.pausedAt, type: 'PAUSE' as const },
-                  ...(e.resumedAt ? [{ time: e.resumedAt, type: 'RESUME' as const }] : []),
-                ]),
-                ...(data.session.finishedAt ? [{ time: data.session.finishedAt, type: 'FINISH' as const }] : []),
-              ]
-                .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-                .map((item, idx) => {
-                  if (item.type === 'START') return (
-                    <div key={`start-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-emerald-600">START</span>
-                    </div>
-                  );
-                  if (item.type === 'PROGRESS') return (
-                    <div key={`p-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-blue-600">{'mailboxCount' in item ? item.mailboxCount : 0}枚</span>
-                    </div>
-                  );
-                  if (item.type === 'SKIP') return (
-                    <div key={`s-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-orange-600">SKIP</span>
-                    </div>
-                  );
-                  if (item.type === 'PAUSE') return (
-                    <div key={`pause-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-yellow-600">PAUSE</span>
-                    </div>
-                  );
-                  if (item.type === 'RESUME') return (
-                    <div key={`resume-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-teal-400 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-teal-600">RESUME</span>
-                    </div>
-                  );
-                  return (
-                    <div key={`finish-${idx}`} className="flex items-center gap-2">
-                      <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
-                      <span className="text-slate-500">{fmtTime(item.time)}</span>
-                      <span className="font-bold text-red-600">FINISH</span>
-                    </div>
-                  );
-                })}
-              {/* 現在 PAUSE 中の場合 */}
-              {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
-                <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
-                  現在一時停止中
+              {/* Per-hour metrics */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-graph-up mr-1"></i>
+                  時間あたり
+                </h3>
+                {totalPausedMs > 0 && (
+                  <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                    * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
+                  </div>
+                )}
+                <div className="space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">配布ペース</span>
+                    <span className="font-bold text-slate-700">
+                      {durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} ポスト/h
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">歩数</span>
+                    <span className="font-bold text-slate-700">
+                      {durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500">移動距離</span>
+                    <span className="font-bold text-slate-700">
+                      {durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+
+              {/* Distribution items */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-file-earmark-text mr-1"></i>
+                  配布チラシ
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  {data.schedule.items.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center bg-slate-50 rounded-lg px-2 py-1.5">
+                      <span className="text-slate-600 truncate max-w-[140px]" title={item.flyerName}>{item.flyerName}</span>
+                      <span className="font-bold shrink-0 ml-1">
+                        <span className="text-indigo-600">{item.actualCount ?? '-'}</span>
+                        <span className="text-slate-400">/{item.plannedCount}</span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {data.session.incompleteReason && (
+                  <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-amber-700">
+                    未完了: {data.session.incompleteReason === 'AREA_DONE' ? 'エリア終了' : data.session.incompleteReason === 'GIVE_UP' ? 'ギブアップ' : 'その他'}
+                    {data.session.incompleteNote && <span className="block text-amber-500 mt-0.5">{data.session.incompleteNote}</span>}
+                  </div>
+                )}
+              </div>
+
+              {/* Progress timeline */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-clock-history mr-1"></i>
+                  配布進捗
+                </h3>
+                <div className="space-y-1 text-xs">
+                  {[
+                    { time: data.session.startedAt, type: 'START' as const },
+                    ...data.progressEvents.map((e) => ({ time: e.timestamp, type: 'PROGRESS' as const, mailboxCount: e.mailboxCount })),
+                    ...data.skipEvents.map((e) => ({ time: e.timestamp, type: 'SKIP' as const })),
+                    ...(data.pauseEvents || []).flatMap((e) => [
+                      { time: e.pausedAt, type: 'PAUSE' as const },
+                      ...(e.resumedAt ? [{ time: e.resumedAt, type: 'RESUME' as const }] : []),
+                    ]),
+                    ...(data.session.finishedAt ? [{ time: data.session.finishedAt, type: 'FINISH' as const }] : []),
+                  ]
+                    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+                    .map((item, idx) => {
+                      if (item.type === 'START') return (
+                        <div key={`start-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-emerald-600">START</span>
+                        </div>
+                      );
+                      if (item.type === 'PROGRESS') return (
+                        <div key={`p-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-blue-600">{'mailboxCount' in item ? item.mailboxCount : 0}枚</span>
+                        </div>
+                      );
+                      if (item.type === 'SKIP') return (
+                        <div key={`s-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-orange-600">SKIP</span>
+                        </div>
+                      );
+                      if (item.type === 'PAUSE') return (
+                        <div key={`pause-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-yellow-600">PAUSE</span>
+                        </div>
+                      );
+                      if (item.type === 'RESUME') return (
+                        <div key={`resume-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-teal-400 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-teal-600">RESUME</span>
+                        </div>
+                      );
+                      return (
+                        <div key={`finish-${idx}`} className="flex items-center gap-2">
+                          <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
+                          <span className="text-slate-500">{fmtTime(item.time)}</span>
+                          <span className="font-bold text-red-600">FINISH</span>
+                        </div>
+                      );
+                    })}
+                  {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
+                    <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
+                      現在一時停止中
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* ========== DWELL TIME SIDE PANEL ========== */}
+
+              {/* Dwell summary stats */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-clock-fill mr-1 text-orange-500"></i>
+                  滞在分析サマリー
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="bg-orange-50 rounded-lg p-2 text-center">
+                    <div className="text-orange-600 font-black text-lg">{dwellStats.count}</div>
+                    <div className="text-orange-400">滞在スポット</div>
+                  </div>
+                  <div className="bg-amber-50 rounded-lg p-2 text-center">
+                    <div className="text-amber-600 font-black text-lg">{fmtDuration(dwellStats.totalMs)}</div>
+                    <div className="text-amber-400">総滞在時間</div>
+                  </div>
+                  <div className="bg-blue-50 rounded-lg p-2 text-center">
+                    <div className="text-blue-600 font-black text-lg">{dwellStats.count > 0 ? fmtDuration(dwellStats.avgMs) : '-'}</div>
+                    <div className="text-blue-400">平均滞在</div>
+                  </div>
+                  <div className="bg-red-50 rounded-lg p-2 text-center">
+                    <div className="text-red-600 font-black text-lg">{dwellStats.maxMs > 0 ? fmtDuration(dwellStats.maxMs) : '-'}</div>
+                    <div className="text-red-400">最長滞在</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Color legend */}
+              <div className="p-4 border-b border-slate-100">
+                <h3 className="font-bold text-slate-700 text-sm mb-2">
+                  <i className="bi bi-palette mr-1"></i>
+                  凡例
+                </h3>
+                <div className="space-y-1.5 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500 shrink-0"></span>
+                    <span className="text-slate-600">30秒〜2分（個別住宅）</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-yellow-500 shrink-0"></span>
+                    <span className="text-slate-600">2分〜5分（小〜中規模アパート）</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span>
+                    <span className="text-slate-600">5分〜10分（大規模マンション）</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
+                    <span className="text-slate-600">10分以上（要確認）</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Dwell spot ranking */}
+              <div className="p-4 border-b border-slate-100 flex-1">
+                <h3 className="font-bold text-slate-700 text-sm mb-3">
+                  <i className="bi bi-sort-down mr-1"></i>
+                  滞在スポット（長い順）
+                </h3>
+                {dwellSorted.length === 0 ? (
+                  <p className="text-xs text-slate-400 text-center py-4">滞在スポットなし</p>
+                ) : (
+                  <div className="space-y-1.5 text-xs">
+                    {dwellSorted.map((spot, idx) => {
+                      const color = dwellColor(spot.dwellMs);
+                      const isSelected = selectedDwellSpot?.id === spot.id;
+                      return (
+                        <button
+                          key={spot.id}
+                          onClick={() => {
+                            setSelectedDwellSpot(spot);
+                            setSelectedInfo({
+                              position: { lat: spot.centerLat, lng: spot.centerLng },
+                              content: `滞在時間: ${fmtDuration(spot.dwellMs)}\n${fmtTime(spot.startTime)} 〜 ${fmtTime(spot.endTime)}\nGPSポイント: ${spot.pointCount}件\n${dwellLabel(spot.dwellMs)}`,
+                            });
+                            if (mapRef.current) {
+                              mapRef.current.panTo({ lat: spot.centerLat, lng: spot.centerLng });
+                              mapRef.current.setZoom(18);
+                            }
+                          }}
+                          className={`w-full flex items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors ${
+                            isSelected
+                              ? 'bg-slate-200 ring-1 ring-slate-400'
+                              : 'bg-slate-50 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span className="text-slate-400 font-bold w-5 text-right shrink-0">#{idx + 1}</span>
+                          <span
+                            className="w-3 h-3 rounded-full shrink-0"
+                            style={{ backgroundColor: color }}
+                          ></span>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-bold text-slate-700">{fmtDuration(spot.dwellMs)}</div>
+                            <div className="text-slate-400">{fmtTime(spot.startTime)} 〜 {fmtTime(spot.endTime)}</div>
+                          </div>
+                          {spot.dwellMs >= 10 * 60 * 1000 && (
+                            <span className="text-red-500 shrink-0" title="10分以上の長時間滞在">
+                              <i className="bi bi-exclamation-triangle-fill"></i>
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Time slider / Playback controls */}
-      <div className="bg-white border-t border-slate-200 px-2 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-4 shrink-0">
-        {/* Play/Pause */}
-        <button
-          onClick={() => {
-            if (sliderValue >= 1000) setSliderValue(0);
-            setIsPlaying(!isPlaying);
-          }}
-          className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shrink-0"
-        >
-          <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'} md:text-lg`}></i>
-        </button>
+      {/* Time slider / Playback controls — trajectory mode only */}
+      {viewMode === 'trajectory' && (
+        <div className="bg-white border-t border-slate-200 px-2 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-4 shrink-0">
+          {/* Play/Pause */}
+          <button
+            onClick={() => {
+              if (sliderValue >= 1000) setSliderValue(0);
+              setIsPlaying(!isPlaying);
+            }}
+            className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shrink-0"
+          >
+            <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'} md:text-lg`}></i>
+          </button>
 
-        {/* Time display */}
-        <div className="text-[10px] md:text-xs text-slate-500 w-12 md:w-16 shrink-0 text-center font-mono">
-          {currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : '--:--:--'}
+          {/* Time display */}
+          <div className="text-[10px] md:text-xs text-slate-500 w-12 md:w-16 shrink-0 text-center font-mono">
+            {currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : '--:--:--'}
+          </div>
+
+          {/* Slider */}
+          <input
+            type="range"
+            min={0}
+            max={1000}
+            value={Math.round(sliderValue)}
+            onChange={(e) => {
+              setSliderValue(parseInt(e.target.value));
+              setIsPlaying(false);
+            }}
+            className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+          />
+
+          {/* Speed selector */}
+          <div className="hidden md:flex items-center gap-1 shrink-0">
+            {[1, 2, 5, 10].map((speed) => (
+              <button
+                key={speed}
+                onClick={() => setPlaybackSpeed(speed)}
+                className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
+                  playbackSpeed === speed
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                {speed}x
+              </button>
+            ))}
+          </div>
+
+          {/* Point count */}
+          <span className="hidden md:inline text-xs text-slate-400 shrink-0">
+            {visibleCount}/{points.length} pts
+          </span>
         </div>
+      )}
 
-        {/* Slider */}
-        <input
-          type="range"
-          min={0}
-          max={1000}
-          value={Math.round(sliderValue)}
-          onChange={(e) => {
-            setSliderValue(parseInt(e.target.value));
-            setIsPlaying(false);
-          }}
-          className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-        />
-
-        {/* Speed selector */}
-        <div className="hidden md:flex items-center gap-1 shrink-0">
-          {[1, 2, 5, 10].map((speed) => (
-            <button
-              key={speed}
-              onClick={() => setPlaybackSpeed(speed)}
-              className={`px-2 py-1 rounded text-xs font-bold transition-colors ${
-                playbackSpeed === speed
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-              }`}
-            >
-              {speed}x
-            </button>
-          ))}
+      {/* Dwell mode footer — spot count summary */}
+      {viewMode === 'dwell' && (
+        <div className="bg-white border-t border-slate-200 px-4 py-2 md:py-3 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4 text-xs text-slate-500">
+            <span><i className="bi bi-geo-alt mr-1"></i>{dwellStats.count} スポット検出</span>
+            <span><i className="bi bi-clock mr-1"></i>総滞在 {fmtDuration(dwellStats.totalMs)}</span>
+            {dwellSorted.filter(s => s.dwellMs >= 10 * 60 * 1000).length > 0 && (
+              <span className="text-red-500 font-bold">
+                <i className="bi bi-exclamation-triangle-fill mr-1"></i>
+                {dwellSorted.filter(s => s.dwellMs >= 10 * 60 * 1000).length}件の長時間滞在
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-slate-400">{points.length} GPS pts</span>
         </div>
-
-        {/* Point count */}
-        <span className="hidden md:inline text-xs text-slate-400 shrink-0">
-          {visibleCount}/{points.length} pts
-        </span>
-      </div>
+      )}
     </div>
   );
 }
