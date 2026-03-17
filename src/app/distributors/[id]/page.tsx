@@ -392,6 +392,23 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     setEvalSaving(false);
   };
 
+  const handleSendPortalInfo = async () => {
+    if (!d) return;
+    if (!d.email) { showToast('メールアドレスが登録されていません', 'error'); return; }
+    if (!d.birthday) { showToast('生年月日が登録されていません', 'error'); return; }
+    const confirmed = await showConfirm(`${d.name} にポータル案内メールを送信しますか？\n送信先: ${d.email}`, { confirmLabel: '送信', variant: 'primary' });
+    if (!confirmed) return;
+    try {
+      const res = await fetch(`/api/distributors/${d.id}/send-portal-info`, { method: 'POST' });
+      if (res.ok) {
+        showToast('ポータル案内メールを送信しました', 'success');
+      } else {
+        const data = await res.json();
+        showToast(data.error || '送信に失敗しました', 'error');
+      }
+    } catch { showToast('送信に失敗しました', 'error'); }
+  };
+
   const openAppDist = () => {
     setAppDistEmail(distributor?.email || '');
     setAppDistPlatform('APPLE');
@@ -708,6 +725,10 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          <button onClick={handleSendPortalInfo} title="ポータル案内メール送信"
+            className="flex items-center gap-1.5 bg-white hover:bg-blue-50 text-blue-600 border border-blue-300 px-3 py-2 rounded-lg font-bold text-xs transition-colors whitespace-nowrap">
+            <i className="bi bi-envelope-fill"></i><span className="hidden lg:inline">ポータル通知</span>
+          </button>
           <button onClick={openAppDist} title="配布アプリ配信"
             className="flex items-center gap-1.5 bg-white hover:bg-indigo-50 text-indigo-600 border border-indigo-300 px-3 py-2 rounded-lg font-bold text-xs transition-colors whitespace-nowrap">
             <i className="bi bi-phone-fill"></i><span className="hidden lg:inline">アプリ配信</span>
