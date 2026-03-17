@@ -53,7 +53,14 @@ const Label = ({ children, required }: { children: React.ReactNode; required?: b
   </label>
 );
 
-function InfoRow({ label, value }: { label: string; value?: string | number | null | boolean }) {
+function InfoRow({ label, value, copyable }: { label: string; value?: string | number | null | boolean; copyable?: boolean }) {
+  const [copied, setCopied] = React.useState(false);
+  const handleCopy = () => {
+    if (value == null || value === '' || typeof value === 'boolean') return;
+    navigator.clipboard.writeText(String(value));
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
   if (typeof value === 'boolean') {
     return (
       <div className="flex items-start gap-2 py-2 border-b border-slate-100 last:border-0">
@@ -65,9 +72,18 @@ function InfoRow({ label, value }: { label: string; value?: string | number | nu
     );
   }
   return (
-    <div className="flex items-start gap-2 py-2 border-b border-slate-100 last:border-0">
+    <div className="group flex items-start gap-2 py-2 border-b border-slate-100 last:border-0">
       <span className="text-xs text-slate-500 w-32 shrink-0 pt-0.5">{label}</span>
       <span className="text-sm font-medium text-slate-800 break-words flex-1">{value ?? '—'}</span>
+      {copyable && value != null && value !== '' && (
+        <button
+          onClick={handleCopy}
+          className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-indigo-600 p-0.5"
+          title="コピー"
+        >
+          <i className={`bi ${copied ? 'bi-check-lg text-emerald-500' : 'bi-clipboard'} text-sm`}></i>
+        </button>
+      )}
     </div>
   );
 }
@@ -824,11 +840,11 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
             <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
               <i className="bi bi-person-fill text-emerald-500"></i> 基本情報
             </h2>
-            <InfoRow label="氏名" value={d.name} />
+            <InfoRow label="氏名" value={d.name} copyable />
             <InfoRow label="スタッフID" value={d.staffId} />
             <InfoRow label="支店" value={d.branch?.nameJa} />
-            <InfoRow label="メール" value={d.email} />
-            <InfoRow label="電話番号" value={d.phone} />
+            <InfoRow label="メール" value={d.email} copyable />
+            <InfoRow label="電話番号" value={d.phone} copyable />
             <InfoRow label="生年月日" value={d.birthday ? d.birthday.slice(0, 10) : null} />
             <InfoRow label="性別" value={d.gender} />
             <InfoRow label="国籍" value={d.country?.name} />
@@ -840,8 +856,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <h2 className="text-sm font-bold text-slate-500 mb-3 flex items-center gap-1.5">
                 <i className="bi bi-geo-alt-fill text-emerald-500"></i> 住所
               </h2>
-              <InfoRow label="郵便番号" value={d.postalCode} />
-              <InfoRow label="住所" value={d.address} />
+              <InfoRow label="郵便番号" value={d.postalCode} copyable />
+              <InfoRow label="住所" value={d.address} copyable />
               <InfoRow label="建物名" value={d.buildingName} />
             </div>
 
