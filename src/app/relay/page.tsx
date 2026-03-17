@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
-import { GoogleMap, Marker, useJsApiLoader } from '@react-google-maps/api';
+import { GoogleMap, Marker, Polygon, useJsApiLoader } from '@react-google-maps/api';
 import RouteOptimizationPanel from '@/components/relay/RouteOptimizationPanel';
 
 const getTodayStr = () => {
@@ -60,6 +60,7 @@ export default function RelayListPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
   const [showRouteOpt, setShowRouteOpt] = useState(false);
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
@@ -132,6 +133,30 @@ export default function RelayListPage() {
     });
     setDriverSearch(task.driver ? `${task.driver.lastNameJa} ${task.driver.firstNameJa}` : '');
     setShowMap(!!(task.latitude && task.longitude));
+    // エリアポリゴン取得
+    setPolygonPaths([]);
+    const areaId = task.schedule?.area?.id;
+    if (areaId) {
+      fetch(`/api/areas/${areaId}`).then(r => r.ok ? r.json() : null).then(area => {
+        if (!area?.boundary_geojson) return;
+        try {
+          const geo = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
+          const paths: google.maps.LatLngLiteral[][] = [];
+          const features = geo.features || [geo];
+          for (const f of features) {
+            const geom = f.geometry || f;
+            if (geom.type === 'Polygon') {
+              paths.push(geom.coordinates[0].map((c: number[]) => ({ lat: c[1], lng: c[0] })));
+            } else if (geom.type === 'MultiPolygon') {
+              for (const poly of geom.coordinates) {
+                paths.push(poly[0].map((c: number[]) => ({ lat: c[1], lng: c[0] })));
+              }
+            }
+          }
+          setPolygonPaths(paths);
+        } catch { /* silent */ }
+      });
+    }
   };
 
   const saveEdit = async () => {
@@ -212,41 +237,14 @@ export default function RelayListPage() {
   const handleShowMap = () => {
     setShowMap(true);
     if (!editForm.latitude && !editForm.longitude) {
-      // エリアの中心座標を取得
-      const areaId = editTask?.schedule?.area?.id;
-      if (areaId) {
-        fetch(`/api/areas/${areaId}`).then(r => r.ok ? r.json() : null).then(area => {
-          if (!area?.boundary_geojson) {
-            setEditForm((f: any) => ({ ...f, latitude: 35.6895, longitude: 139.6917 }));
-            return;
-          }
-          try {
-            const geo = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
-            const pts: { lat: number; lng: number }[] = [];
-            const features = geo.features || [geo];
-            for (const f of features) {
-              const geom = f.geometry || f;
-              if (geom.type === 'Polygon') {
-                geom.coordinates[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
-              } else if (geom.type === 'MultiPolygon') {
-                for (const poly of geom.coordinates) {
-                  poly[0].forEach((c: number[]) => pts.push({ lat: c[1], lng: c[0] }));
-                }
-              }
-            }
-            if (pts.length > 0) {
-              setEditForm((f: any) => ({
-                ...f,
-                latitude: pts.reduce((s, p) => s + p.lat, 0) / pts.length,
-                longitude: pts.reduce((s, p) => s + p.lng, 0) / pts.length,
-              }));
-            } else {
-              setEditForm((f: any) => ({ ...f, latitude: 35.6895, longitude: 139.6917 }));
-            }
-          } catch {
-            setEditForm((f: any) => ({ ...f, latitude: 35.6895, longitude: 139.6917 }));
-          }
-        });
+      // ポリゴンが既に取得済みならそこから中心座標を計算
+      if (polygonPaths.length > 0 && polygonPaths[0].length > 0) {
+        const pts = polygonPaths.flat();
+        setEditForm((f: any) => ({
+          ...f,
+          latitude: pts.reduce((s, p) => s + p.lat, 0) / pts.length,
+          longitude: pts.reduce((s, p) => s + p.lng, 0) / pts.length,
+        }));
       } else {
         setEditForm((f: any) => ({ ...f, latitude: 35.6895, longitude: 139.6917 }));
       }
@@ -696,6 +694,9 @@ export default function RelayListPage() {
                       onClick={handleMapClick}
                       options={{ disableDefaultUI: true, zoomControl: true }}
                     >
+                      {polygonPaths.map((path, i) => (
+                        <Polygon key={i} paths={path} options={{ fillColor: '#6366f1', fillOpacity: 0.15, strokeColor: '#6366f1', strokeOpacity: 0.6, strokeWeight: 2 }} />
+                      ))}
                       <Marker position={{ lat: editForm.latitude, lng: editForm.longitude }} draggable
                         onDragEnd={(e) => { if (e.latLng) { setEditForm((f: any) => ({ ...f, latitude: e.latLng!.lat(), longitude: e.latLng!.lng() })); } }} />
                     </GoogleMap>
