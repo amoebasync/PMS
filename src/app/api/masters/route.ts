@@ -12,8 +12,15 @@ export async function GET() {
           { code: 'SUPER_ADMIN', name: 'スーパー管理者', permissionLevel: 'ALL' },
           { code: 'HR_ADMIN', name: '人事管理者', permissionLevel: 'HR_ALL' },
           { code: 'HR_VIEWER', name: '人事閲覧者', permissionLevel: 'HR_READ' },
+          { code: 'DRIVER', name: 'ドライバー', permissionLevel: 'DRIVER' },
         ]
       });
+    } else {
+      // 既存環境: DRIVERロールがなければ追加
+      const driverExists = await prisma.role.findUnique({ where: { code: 'DRIVER' } });
+      if (!driverExists) {
+        await prisma.role.create({ data: { code: 'DRIVER', name: 'ドライバー', permissionLevel: 'DRIVER' } });
+      }
     }
 
     const [departments, roles, countries] = await Promise.all([

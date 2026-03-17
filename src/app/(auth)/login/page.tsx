@@ -34,6 +34,8 @@ export default function LoginPage() {
         // 初回ログイン / 仮パスワードの場合はパスワード変更ページへ
         if (data.mustChangePassword) {
           router.push('/change-password');
+        } else if (data.roles?.includes('DRIVER')) {
+          router.push('/relay');
         } else {
           router.push('/');
         }

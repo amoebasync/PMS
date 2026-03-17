@@ -26,6 +26,9 @@ export async function POST(request: Request) {
         ],
         isActive: true,
       },
+      include: {
+        roles: { include: { role: true } },
+      },
     });
 
     if (!employee) {
@@ -64,6 +67,8 @@ export async function POST(request: Request) {
     }
 
     // 4. 認証成功: Cookieにセッション情報を保存 (Next.js 15+ の書き方)
+    const roleCodes = employee.roles?.map(r => r.role?.code).filter(Boolean) || [];
+
     const cookieStore = await cookies();
     cookieStore.set('pms_session', employee.id.toString(), {
       httpOnly: true,
@@ -72,6 +77,20 @@ export async function POST(request: Request) {
       path: '/',
       maxAge: 60 * 60 * 24 * 7 // 7日間有効
     });
+
+    // DRIVERロールの場合: ロール Cookie をセット（ミドルウェアでのアクセス制御用）
+    if (roleCodes.includes('DRIVER')) {
+      cookieStore.set('pms_role', 'DRIVER', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 60 * 60 * 24 * 7,
+      });
+    } else {
+      // DRIVER以外のユーザーは pms_role Cookie を削除（切り替え対応）
+      cookieStore.delete('pms_role');
+    }
 
     // 初回ログイン / 仮パスワードの場合: 強制変更フラグ Cookie をセット
     if (employee.mustChangePassword) {
@@ -101,6 +120,7 @@ export async function POST(request: Request) {
       user: { name: employee.lastNameJa },
       mustChangePassword: employee.mustChangePassword,
       language: employee.language || 'ja',
+      roles: roleCodes,
     });
 
   } catch (error) {

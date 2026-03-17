@@ -11,6 +11,7 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     // ログイン時に発行したセッションCookieを削除
     cookieStore.delete('pms_session');
+    cookieStore.delete('pms_role');
 
     await writeAuditLog({
       actorType: 'EMPLOYEE',

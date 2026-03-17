@@ -55,6 +55,7 @@ export function middleware(request: NextRequest) {
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;
   const distributorSession = request.cookies.get('pms_distributor_session')?.value;
   const forcePwChange = request.cookies.get('pms_force_pw_change')?.value;
+  const pmsRole = request.cookies.get('pms_role')?.value;
 
   // 社員ログイン後・初回パスワード強制変更
   if (
@@ -114,7 +115,29 @@ export function middleware(request: NextRequest) {
   }
 
   if (adminSession && path === '/login') {
+    // DRIVERはログイン済みで /login にアクセスしたら /relay へ
+    if (pmsRole === 'DRIVER') {
+      return NextResponse.redirect(new URL('/relay', request.url));
+    }
     return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  // --- 4. DRIVERロール: アクセス可能ページを制限 ---
+  if (adminSession && pmsRole === 'DRIVER' && !isPublicPath) {
+    const driverAllowed =
+      path === '/relay' ||
+      path === '/attendance' ||
+      path.startsWith('/attendance/') ||
+      path === '/crm/tasks' ||
+      path.startsWith('/crm/tasks/') ||
+      path === '/profile' ||
+      path.startsWith('/profile/') ||
+      path === '/change-password' ||
+      path.startsWith('/api/');  // APIは個別のAPI側で制御（サイドバー非表示で十分）
+
+    if (!driverAllowed) {
+      return NextResponse.redirect(new URL('/relay', request.url));
+    }
   }
 
   return NextResponse.next();

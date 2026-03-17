@@ -134,6 +134,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   const [approvalPendingCount, setApprovalPendingCount] = useState(0);
   const [openAlertCount, setOpenAlertCount] = useState(0);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [isDriver, setIsDriver] = useState(false);
 
   // Flyout (collapsed mode)
   const [flyoutGroup, setFlyoutGroup] = useState<string | null>(null);
@@ -152,6 +153,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
       if (data) {
         const roles = data.roles?.map((r: any) => r.role?.code) || [];
         setIsSuperAdmin(roles.includes('SUPER_ADMIN'));
+        setIsDriver(roles.includes('DRIVER'));
       }
     }).catch(() => {});
   }, [pathname]);
@@ -202,6 +204,18 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
   }, [flyoutGroup]);
 
   if (pathname === '/login') return null;
+
+  // DRIVER: 限定メニュー（マイ勤怠・タスク・中継/回収管理のみ）
+  const DRIVER_ALLOWED_HREFS = ['/attendance', '/crm/tasks', '/relay'];
+  const effectivePinned = isDriver
+    ? PINNED_ITEMS.filter(item => DRIVER_ALLOWED_HREFS.includes(item.href))
+    : PINNED_ITEMS;
+  const effectiveGroups = isDriver
+    ? MENU_GROUPS.map(g => ({
+        ...g,
+        items: g.items.filter(item => DRIVER_ALLOWED_HREFS.includes(item.href)),
+      })).filter(g => g.items.length > 0)
+    : MENU_GROUPS;
 
   /* ================================================================ */
   /*  Render                                                          */
@@ -260,7 +274,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
           {/* ── Pinned items (always visible, no group) ── */}
           <div className={isCollapsed ? 'px-2 mb-1' : 'px-3 mb-1'}>
             <div className="space-y-0.5">
-              {PINNED_ITEMS.map(item => {
+              {effectivePinned.map(item => {
                 const active = isHrefActive(item.href, pathname);
                 const badgeCount = getBadge(item.badge);
                 const label = t(item.nameKey);
@@ -305,7 +319,7 @@ export default function Sidebar({ isCollapsed, toggleCollapse, isMobileOpen = fa
           </div>
 
           {/* ── Menu groups ── */}
-          {MENU_GROUPS.map((group) => {
+          {effectiveGroups.map((group) => {
             const visibleItems = group.items.filter(item => !item.superAdminOnly || isSuperAdmin);
             if (visibleItems.length === 0) return null;
             const filteredGroup = { ...group, items: visibleItems };
