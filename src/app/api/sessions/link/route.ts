@@ -48,6 +48,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'このスケジュールには既にセッションが紐付いています' }, { status: 400 });
     }
 
+    // セッション完了済みの場合、進捗データから actualCount を取得
+    let lastMailboxCount = 0;
+    if (session.finishedAt) {
+      const lastProgress = await prisma.progressEvent.findFirst({
+        where: { sessionId },
+        orderBy: { mailboxCount: 'desc' },
+        select: { mailboxCount: true },
+      });
+      lastMailboxCount = lastProgress?.mailboxCount ?? 0;
+    }
+
+    // スケジュールの items を取得（actualCount 更新用）
+    const scheduleItems = await prisma.distributionItem.findMany({
+      where: { scheduleId },
+      select: { id: true, actualCount: true },
+    });
+
     // 紐付け実行（トランザクション）
     const updatedSession = await prisma.$transaction(async (tx) => {
       const linked = await tx.distributionSession.update({
@@ -55,12 +72,25 @@ export async function POST(request: Request) {
         data: { scheduleId },
       });
 
-      // セッション完了済みならスケジュールもCOMPLETEDに
+      // セッション完了済みならスケジュールもCOMPLETEDに + actualCount更新
       if (session.finishedAt) {
         await tx.distributionSchedule.update({
           where: { id: scheduleId },
           data: { status: 'COMPLETED' },
         });
+
+        // actualCount が未設定の items に lastMailboxCount を設定
+        if (lastMailboxCount > 0 && scheduleItems.length > 0) {
+          for (const item of scheduleItems) {
+            if (item.actualCount === null || item.actualCount === 0) {
+              await tx.distributionItem.update({
+                where: { id: item.id },
+                data: { actualCount: lastMailboxCount },
+              });
+            }
+          }
+          console.log(`[SESSION-LINK] Updated ${scheduleItems.length} items with actualCount=${lastMailboxCount} for schedule ${scheduleId}`);
+        }
       } else {
         // 未完了セッションならDISTRIBUTINGに
         await tx.distributionSchedule.update({
@@ -72,7 +102,8 @@ export async function POST(request: Request) {
       return linked;
     });
 
-    return NextResponse.json({ success: true, sessionId: updatedSession.id, scheduleId });
+    const itemsUpdated = session.finishedAt && lastMailboxCount > 0 ? scheduleItems.length : 0;
+    return NextResponse.json({ success: true, sessionId: updatedSession.id, scheduleId, itemsUpdated, lastMailboxCount });
   } catch (error) {
     console.error('Session link error:', error);
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });

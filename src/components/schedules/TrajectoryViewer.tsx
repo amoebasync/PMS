@@ -148,6 +148,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   // Playback state
   const [sliderValue, setSliderValue] = useState(1000); // 0-1000 range
   const [isPlaying, setIsPlaying] = useState(false);
+  const [sidePanelOpen, setSidePanelOpen] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const animFrameRef = useRef<number | null>(null);
   const lastTimeRef = useRef<number>(0);
@@ -324,15 +325,15 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   return (
     <div className="fixed inset-0 z-[200] flex flex-col bg-black/50 backdrop-blur-sm">
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
-          <i className="bi bi-geo-alt-fill text-emerald-500 text-xl"></i>
-          <div>
-            <h2 className="font-bold text-slate-800">
-              GPS軌跡 — {data.schedule.distributorName}
-              <span className="text-slate-400 font-normal text-sm ml-2">({data.schedule.distributorStaffId})</span>
+      <div className="bg-white border-b border-slate-200 px-3 md:px-4 py-2 md:py-3 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0">
+          <i className="bi bi-geo-alt-fill text-emerald-500 text-lg md:text-xl shrink-0"></i>
+          <div className="min-w-0">
+            <h2 className="font-bold text-slate-800 text-sm md:text-base truncate">
+              {data.schedule.distributorName}
+              <span className="text-slate-400 font-normal text-xs md:text-sm ml-1 md:ml-2">({data.schedule.distributorStaffId})</span>
             </h2>
-            <p className="text-xs text-slate-500">
+            <p className="text-[10px] md:text-xs text-slate-500 truncate">
               {data.area ? (data.area.chomeName || data.area.townName) : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
               {isLive && (
                 <span className="ml-2 inline-flex items-center gap-1 text-emerald-600 font-bold">
@@ -343,7 +344,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 shrink-0">
           <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
             <i className="bi bi-arrow-clockwise"></i>
           </button>
@@ -354,7 +355,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
       </div>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden relative">
         {/* Map */}
         <div className="flex-1 relative">
           {isLoaded && (
@@ -556,8 +557,20 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
           )}
         </div>
 
-        {/* Side panel */}
-        <div className="w-72 bg-white border-l border-slate-200 flex flex-col overflow-y-auto shrink-0">
+        {/* Side panel - mobile: toggle overlay, desktop: fixed sidebar */}
+        <button
+          onClick={() => setSidePanelOpen(!sidePanelOpen)}
+          className="md:hidden absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-600 hover:bg-slate-50"
+        >
+          <i className={`bi ${sidePanelOpen ? 'bi-x-lg' : 'bi-bar-chart-line'}`}></i>
+        </button>
+        <div className={`
+          ${sidePanelOpen ? 'translate-x-0' : 'translate-x-full'}
+          md:translate-x-0
+          absolute md:relative right-0 top-0 h-full z-20
+          w-72 bg-white border-l border-slate-200 flex flex-col overflow-y-auto shrink-0
+          transition-transform duration-200 ease-in-out shadow-xl md:shadow-none
+        `}>
           {/* Stats */}
           <div className="p-4 border-b border-slate-100">
             <h3 className="font-bold text-slate-700 text-sm mb-3">
@@ -717,20 +730,20 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
       </div>
 
       {/* Time slider / Playback controls */}
-      <div className="bg-white border-t border-slate-200 px-4 py-3 flex items-center gap-4 shrink-0">
+      <div className="bg-white border-t border-slate-200 px-2 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-4 shrink-0">
         {/* Play/Pause */}
         <button
           onClick={() => {
             if (sliderValue >= 1000) setSliderValue(0);
             setIsPlaying(!isPlaying);
           }}
-          className="w-10 h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shrink-0"
+          className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center transition-colors shrink-0"
         >
-          <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'} text-lg`}></i>
+          <i className={`bi ${isPlaying ? 'bi-pause-fill' : 'bi-play-fill'} md:text-lg`}></i>
         </button>
 
         {/* Time display */}
-        <div className="text-xs text-slate-500 w-16 shrink-0 text-center font-mono">
+        <div className="text-[10px] md:text-xs text-slate-500 w-12 md:w-16 shrink-0 text-center font-mono">
           {currentTimestamp ? fmtTime(currentTimestamp.toISOString()) : '--:--:--'}
         </div>
 
@@ -748,7 +761,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
         />
 
         {/* Speed selector */}
-        <div className="flex items-center gap-1 shrink-0">
+        <div className="hidden md:flex items-center gap-1 shrink-0">
           {[1, 2, 5, 10].map((speed) => (
             <button
               key={speed}
@@ -765,7 +778,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
         </div>
 
         {/* Point count */}
-        <span className="text-xs text-slate-400 shrink-0">
+        <span className="hidden md:inline text-xs text-slate-400 shrink-0">
           {visibleCount}/{points.length} pts
         </span>
       </div>

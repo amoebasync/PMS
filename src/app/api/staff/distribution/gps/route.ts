@@ -11,20 +11,20 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { sessionId, latitude, longitude, accuracy, timestamp, steps, distance, calories } = body;
+    const { sessionId, latitude, longitude, accuracy, timestamp, steps, distance, calories, needsItems } = body;
 
     if (!sessionId || latitude == null || longitude == null) {
       return NextResponse.json({ error: 'sessionId, latitude, longitude は必須です' }, { status: 400 });
     }
 
-    // セッション所有権チェック（軽量クエリ）
+    // セッション所有権チェック（scheduleId も取得して紐付け検知）
     const session = await prisma.distributionSession.findFirst({
       where: {
         id: sessionId,
         distributorId: distributor.id,
         finishedAt: null,
       },
-      select: { id: true },
+      select: { id: true, scheduleId: true },
     });
 
     if (!session) {
@@ -58,6 +58,17 @@ export async function POST(request: Request) {
         where: { id: sessionId },
         data: updateData,
       });
+    }
+
+    // アプリがitemsを要求 & スケジュール紐付け済みの場合のみitemsを返す
+    // （孤立セッションが手動紐付けされた場合にアプリ側でpmsItemIdを更新するため）
+    if (needsItems && session.scheduleId) {
+      const items = await prisma.distributionItem.findMany({
+        where: { scheduleId: session.scheduleId },
+        select: { id: true, slotIndex: true, flyerName: true, flyerCode: true, plannedCount: true, customerId: true },
+        orderBy: { slotIndex: 'asc' },
+      });
+      return NextResponse.json({ ok: true, scheduleId: session.scheduleId, items });
     }
 
     return NextResponse.json({ ok: true });
