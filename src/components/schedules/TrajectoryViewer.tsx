@@ -313,13 +313,14 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const duration = Math.max(0, totalDuration - totalPausedMs);
   const durationHours = duration / (1000 * 60 * 60);
   const lastProgress = data.progressEvents[data.progressEvents.length - 1];
-  // 完了ステータス: 最も配布実績枚数の多いチラシの actualCount を使用
+  // 配布完了（セッション終了 or COMPLETED）: 最も配布実績枚数の多いチラシの actualCount を使用
+  // actualCount がない場合は plannedCount にフォールバック
   // それ以外: progressEvents の最後の mailboxCount を使用
-  const maxActualCount = data.schedule.status === 'COMPLETED'
-    ? Math.max(0, ...data.schedule.items.map(i => i.actualCount || 0))
-    : 0;
-  const totalMailboxes = (data.schedule.status === 'COMPLETED' && maxActualCount > 0)
-    ? maxActualCount
+  const isFinished = !!data.session.finishedAt || data.schedule.status === 'COMPLETED';
+  const maxActualCount = Math.max(0, ...data.schedule.items.map(i => i.actualCount || 0));
+  const maxPlannedCount = Math.max(0, ...data.schedule.items.map(i => i.plannedCount || 0));
+  const totalMailboxes = isFinished
+    ? (maxActualCount > 0 ? maxActualCount : maxPlannedCount)
     : (lastProgress?.mailboxCount || 0);
 
   return (
