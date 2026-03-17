@@ -49,10 +49,14 @@ export async function POST(request: Request) {
 
     const deviceTimestamp = timestamp ? new Date(timestamp) : new Date();
 
+    // デバッグログ: items の内容を記録
+    console.log(`[FINISH] sessionId=${sessionId}, scheduleId=${session.scheduleId}, items received:`, JSON.stringify(items));
+
     // トランザクション: セッション終了 + 実績枚数更新 + スケジュールステータス更新
     await prisma.$transaction(async (tx) => {
       // 1. 各チラシの実績枚数を更新
       if (Array.isArray(items) && session.schedule) {
+        let updatedCount = 0;
         for (const item of items) {
           if (!item.itemId || item.actualCount == null) continue;
           // itemId が本スケジュールに属するか検証
@@ -62,8 +66,12 @@ export async function POST(request: Request) {
               where: { id: item.itemId },
               data: { actualCount: item.actualCount },
             });
+            updatedCount++;
           }
         }
+        console.log(`[FINISH] Updated ${updatedCount}/${items.length} items for schedule ${session.scheduleId}`);
+      } else {
+        console.log(`[FINISH] WARNING: items not updated. Array.isArray(items)=${Array.isArray(items)}, session.schedule=${!!session.schedule}`);
       }
 
       // 2. セッション終了
