@@ -12,21 +12,20 @@
 const API_URL = process.env.POSTING_SYSTEM_API_URL;
 const API_KEY = process.env.POSTING_SYSTEM_API_KEY;
 
-/** PMS支店名 → Posting System 店舗コード（SHOP_CD）マッピング */
+/**
+ * PMS支店名 → Posting System 店舗名（SHOP_CD）マッピング
+ * Posting System の m_shop テーブルの SHOP_CD はそのまま表示名
+ * PMS側と異なる名前のみ定義（一致するものはそのまま渡す）
+ */
 const BRANCH_TO_SHOP_CD: Record<string, string> = {
   '高田馬場': '馬場',
-  '横浜': '横浜',
-  '新松戸': '松戸',
-  '浦和': '浦和',
-  '西新井': '新井',
-  '新小岩': '小岩',
-  '蒲田': '蒲田',
-  '赤羽': '赤羽',
-  '吉祥寺': '吉祥',
 };
 
-/** デフォルトの業務区分 */
-const DEFAULT_BUSINESS_CATEGORY = 'ポスティングスタッフ';
+/**
+ * Posting System 業務区分コード（STAFF_DUTY_DIV）
+ * 0 = 未設定, 1 = ポスティングスタッフ, 2 = 配送スタッフ, 3 = 折スタッフ, 4 = 本社スタッフ, 5 = 部長
+ */
+const STAFF_DUTY_DIV_POSTING = 1; // ポスティングスタッフ
 
 export function isPostingSystemSyncConfigured(): boolean {
   return !!(API_URL && API_KEY);
@@ -43,7 +42,7 @@ interface SyncStaffParams {
   staffTel: string;
   shopCd: string;
   joinDate?: string; // YYYY-MM-DD
-  businessCategory?: string;
+  staffDutyDiv?: number;
 }
 
 /**
@@ -77,7 +76,7 @@ export async function syncStaffToPostingSystem(
         staffTel: params.staffTel,
         shopCd: params.shopCd,
         joinDate: params.joinDate || new Date().toISOString().slice(0, 10),
-        businessCategory: params.businessCategory || DEFAULT_BUSINESS_CATEGORY,
+        staffDutyDiv: params.staffDutyDiv ?? STAFF_DUTY_DIV_POSTING,
       }),
     });
 
