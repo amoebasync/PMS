@@ -63,10 +63,14 @@ export async function createContractSubmission(params: CreateSubmissionParams): 
       send_email: params.sendEmail ?? true,
       submitters: [
         {
-          role: 'First Party',
+          role: 'Contractor',
           email: params.email,
           name: params.name,
           external_id: params.externalId,
+          fields: [
+            { name: 'Contractor Name', default_value: params.name, readonly: false },
+            { name: 'Agreement Date', default_value: new Date().toLocaleDateString('en-GB', { timeZone: 'Asia/Tokyo' }), readonly: false },
+          ],
         },
       ],
     }),

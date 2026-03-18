@@ -28,7 +28,7 @@ export async function POST(
     const { id } = await params;
     const applicantId = parseInt(id);
     const body = await request.json();
-    const { branchId, staffId, sendWelcomeEmail = false } = body;
+    const { branchId, staffId, sendWelcomeEmail = false, syncToPostingSystem = true } = body;
 
     if (!branchId) {
       return NextResponse.json({ error: '所属支店は必須です' }, { status: 400 });
@@ -110,7 +110,7 @@ export async function POST(
     });
 
     // Posting System に同期（fire-and-forget）
-    if (isPostingSystemSyncConfigured()) {
+    if (syncToPostingSystem && isPostingSystemSyncConfigured()) {
       const branch = await prisma.branch.findUnique({
         where: { id: parseInt(branchId, 10) },
         select: { prefix: true },
