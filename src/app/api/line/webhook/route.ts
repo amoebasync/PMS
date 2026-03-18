@@ -16,6 +16,12 @@ export async function POST(request: Request) {
   const body = await request.text();
   const signature = request.headers.get('x-line-signature') || '';
 
+  // デバッグ: 署名検証の詳細をログ出力
+  const crypto = await import('crypto');
+  const secret = process.env.LINE_CHANNEL_SECRET || '';
+  const computed = crypto.createHmac('SHA256', secret).update(body).digest('base64');
+  console.log(`[LINE Webhook] secret_len=${secret.length} body_len=${body.length} computed=${computed} received=${signature} match=${computed === signature}`);
+
   if (!verifySignature(body, signature)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
