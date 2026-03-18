@@ -46,7 +46,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
         
         <div className="flex flex-col items-center mb-8">
-          <div className="relative w-[180px] h-[45px] mb-4">
+          <div className="relative w-[140px] h-[35px] sm:w-[180px] sm:h-[45px] mb-4">
             {/* ★ 変更: 白背景用のロゴに変更 */}
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>

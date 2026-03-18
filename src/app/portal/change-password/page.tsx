@@ -59,7 +59,7 @@ export default function ChangePasswordPage() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
 
         <div className="flex flex-col items-center mb-6">
-          <div className="relative w-[180px] h-[45px] mb-4">
+          <div className="relative w-[140px] h-[35px] sm:w-[180px] sm:h-[45px] mb-4">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>
           <h1 className="text-xl font-bold text-slate-800">パスワードの変更</h1>

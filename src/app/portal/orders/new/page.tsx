@@ -233,6 +233,7 @@ function NewOrderContent() {
   const [mapCenter, setMapCenter] = useState(initialCenter);
   const [searchMarker, setSearchMarker] = useState<{lat: number, lng: number} | null>(null);
   const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
+  const [showMobilePanel, setShowMobilePanel] = useState(false);
   const [isEditLoaded, setIsEditLoaded] = useState(false);
 
   const { isLoaded } = useJsApiLoader({
@@ -600,10 +601,10 @@ function NewOrderContent() {
   };
 
   return (
-    <div className="absolute inset-0 flex bg-slate-50 overflow-hidden font-sans">
+    <div className="absolute inset-0 flex flex-col md:flex-row bg-slate-50 overflow-hidden font-sans">
 
       {/* --- 左側: 固定幅サイドパネル --- */}
-      <div className="w-[380px] h-full bg-white flex flex-col shadow-[4px_0_24px_rgba(0,0,0,0.06)] z-20 border-r border-slate-200">
+      <div className="w-full md:w-[380px] h-auto max-h-[40vh] md:max-h-none md:h-full bg-white flex flex-col shadow-[0_4px_24px_rgba(0,0,0,0.06)] md:shadow-[4px_0_24px_rgba(0,0,0,0.06)] z-20 border-b md:border-b-0 md:border-r border-slate-200 shrink-0 overflow-y-auto">
 
         <div className="p-5 border-b border-slate-100 shrink-0 bg-white">
           <h1 className="text-xl font-black text-slate-800 tracking-tight">発注シミュレーション</h1>
@@ -993,7 +994,7 @@ function NewOrderContent() {
       </div>
 
       {/* --- 中央〜右側: フルスクリーンマップ --- */}
-      <div className="flex-1 h-full relative z-10 bg-slate-200">
+      <div className="flex-1 min-h-0 h-full relative z-10 bg-slate-200">
         {!isLoaded ? (
           <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 font-bold">
             <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
@@ -1007,13 +1008,14 @@ function NewOrderContent() {
           </GoogleMap>
         )}
 
-        <div className="absolute top-4 left-4 bg-white/95 backdrop-blur px-4 py-2 rounded-xl shadow-lg border border-slate-200 text-[11px] font-bold text-slate-600 pointer-events-none flex items-center gap-2">
-          <i className="bi bi-cursor-fill text-indigo-500 text-lg"></i>
-          地図上のエリアをクリックして、配布エリアを選択出来ます
+        <div className="absolute top-2 left-2 md:top-4 md:left-4 bg-white/95 backdrop-blur px-3 py-1.5 md:px-4 md:py-2 rounded-xl shadow-lg border border-slate-200 text-[10px] md:text-[11px] font-bold text-slate-600 pointer-events-none flex items-center gap-1.5 md:gap-2 max-w-[calc(100%-1rem)] md:max-w-none">
+          <i className="bi bi-cursor-fill text-indigo-500 text-base md:text-lg"></i>
+          <span className="hidden sm:inline">地図上のエリアをクリックして、配布エリアを選択出来ます</span>
+          <span className="sm:hidden">エリアをタップして選択</span>
         </div>
 
         {/* --- 右端フローティング: 見積もり＆リストパネル --- */}
-        <div className="absolute top-4 right-4 bottom-4 w-[340px] flex flex-col pointer-events-none z-30">
+        <div className="hidden md:flex absolute top-4 right-4 bottom-4 w-[340px] flex-col pointer-events-none z-30">
           <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200 flex flex-col h-full pointer-events-auto overflow-hidden">
 
             <div className="p-3 border-b border-slate-100 bg-white flex justify-between items-center shrink-0">
@@ -1126,6 +1128,98 @@ function NewOrderContent() {
             </div>
           </div>
         </div>
+
+        {/* Mobile: floating selected areas badge */}
+        {!showMobilePanel && (
+          <div className="md:hidden absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
+            <button
+              onClick={() => setShowMobilePanel(true)}
+              className="flex items-center gap-2 bg-white/95 backdrop-blur-md px-4 py-2.5 rounded-full shadow-xl border border-slate-200 text-sm font-bold text-slate-700 pointer-events-auto"
+            >
+              <i className="bi bi-list-check text-indigo-600"></i>
+              選択エリア <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-xs">{selectedAreaIds.size}</span>
+              <span className="text-xs text-slate-400 ml-1">¥{totalPrice.toLocaleString()}</span>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile: full-screen panel overlay */}
+        {showMobilePanel && (
+          <div className="md:hidden absolute inset-0 z-40 flex flex-col bg-white/95 backdrop-blur-md pointer-events-auto">
+            <div className="p-3 border-b border-slate-200 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-slate-700 text-sm flex items-center gap-1.5"><i className="bi bi-list-check text-indigo-600"></i> 選択エリア</h4>
+                <span className="bg-indigo-100 text-indigo-800 text-[10px] font-bold px-2 py-0.5 rounded-full">{selectedAreaIds.size} 件</span>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedAreaIds.size > 0 && (
+                  <button onClick={handleClearAll} className="text-[10px] text-rose-500 font-bold hover:bg-rose-50 px-2 py-1 rounded transition-colors flex items-center">
+                    <i className="bi bi-trash mr-1"></i>クリア
+                  </button>
+                )}
+                <button onClick={() => setShowMobilePanel(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                  <i className="bi bi-x-lg text-lg"></i>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-2 space-y-1 bg-slate-50">
+              {selectedAreasList.length === 0 ? (
+                <div className="text-center text-slate-400 text-xs py-10 flex flex-col items-center justify-center h-full">
+                  <i className="bi bi-map text-4xl mb-3 block opacity-20"></i>
+                  左の検索、または地図のクリックで<br/>エリアを選択してください
+                </div>
+              ) : (
+                selectedAreasList.map(a => (
+                  <div key={a.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg shadow-sm border border-slate-100">
+                    <div className="overflow-hidden flex-1 mr-2">
+                      <div className="text-[10px] text-slate-400 leading-tight mb-0.5">{a.prefecture?.name} {a.city?.name}</div>
+                      <div className="text-xs font-bold text-slate-700 truncate">{formatAreaName(a.town_name, a.chome_name)}</div>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="text-right">
+                        <div className="text-sm font-black text-indigo-600">{getCapacity(a).toLocaleString()}</div>
+                        <div className="text-[9px] text-slate-400 leading-none">枚</div>
+                      </div>
+                      <button onClick={() => toggleArea(a.id)} className="text-slate-300 hover:text-rose-500">
+                        <i className="bi bi-x-circle-fill text-lg"></i>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Mobile panel: estimate + cart button */}
+            <div className="bg-white border-t border-slate-200 p-4 shrink-0 shadow-[0_-4px_15px_rgba(0,0,0,0.03)]">
+              <div className="flex justify-between items-end mb-1">
+                <span className="text-xs font-bold text-slate-500">希望配布枚数</span>
+                <span className="font-bold text-lg tracking-tight text-slate-800">{pCount.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span></span>
+              </div>
+              <div className="flex justify-between items-end mb-3 pb-3 border-b border-slate-100">
+                <span className="text-xs font-bold text-slate-500">エリアカバー数</span>
+                <span className={`font-bold text-sm tracking-tight ${isCapacityEnough ? 'text-emerald-600' : 'text-rose-500'}`}>
+                  {totalAreaCapacity.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span>
+                </span>
+              </div>
+              <div className="flex justify-between items-baseline mb-4">
+                <span className="text-xs font-bold text-slate-500">合計 (税抜)</span>
+                <span className="text-2xl font-black text-indigo-600 tracking-tighter">¥{totalPrice.toLocaleString()}</span>
+              </div>
+              <button
+                onClick={() => { setShowMobilePanel(false); handleAddToCart(); }}
+                disabled={pCount === 0 || !isCapacityEnough}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-all shadow-md shadow-indigo-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {editItemId ? (
+                  <><i className="bi bi-arrow-repeat text-lg"></i> カート内容を更新</>
+                ) : (
+                  <><i className="bi bi-cart-plus-fill text-lg"></i> カートに入れる</>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ export function PortalHeader() {
   
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -95,15 +96,29 @@ export function PortalHeader() {
 
   const navItems = session ? authNavItems : publicNavItems;
 
+  // モバイルメニューをページ遷移時に閉じる
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [pathname]);
+
   return (
     <header className="bg-white border-b border-slate-200 sticky top-0 z-[110] shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-        
-        <div className="flex items-center gap-8">
-          <Link href="/portal" className="relative w-[140px] h-[30px]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 md:h-16 flex items-center justify-between">
+
+        <div className="flex items-center gap-4 md:gap-8">
+          {/* モバイル: ハンバーガーメニュー */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden w-10 h-10 flex items-center justify-center text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            aria-label="メニュー"
+          >
+            <i className={`bi ${isMobileMenuOpen ? 'bi-x-lg' : 'bi-list'} text-xl`}></i>
+          </button>
+
+          <Link href="/portal" className="relative w-[110px] h-[28px] sm:w-[140px] sm:h-[30px]">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </Link>
-          
+
           <nav className="hidden md:flex gap-1">
             {navItems.map(item => {
               const isActive = item.href === '/portal' ? pathname === '/portal' : pathname.startsWith(item.href);
@@ -116,7 +131,7 @@ export function PortalHeader() {
           </nav>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4">
           
           {/* --- 通知アイコン --- */}
           {session && (
@@ -138,7 +153,7 @@ export function PortalHeader() {
 
               {/* 通知ポップオーバー */}
               {isNotifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                <div className="absolute right-0 mt-2 w-[calc(100vw-2rem)] sm:w-80 max-w-sm bg-white border border-slate-200 shadow-2xl rounded-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
                     <h3 className="font-bold text-slate-800 text-sm">お知らせ</h3>
                   </div>
@@ -199,12 +214,12 @@ export function PortalHeader() {
                 <div className="text-[10px] text-slate-400 font-bold leading-none">{(session.user as any)?.company}</div>
                 <div className="text-sm font-bold text-slate-700 leading-tight">{session.user?.name} 様</div>
               </div>
-              <button onClick={() => signOut({ callbackUrl: '/portal/login' })} className="text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
-                <i className="bi bi-box-arrow-right"></i> ログアウト
+              <button onClick={() => signOut({ callbackUrl: '/portal/login' })} className="text-[10px] font-bold text-slate-500 bg-slate-100 hover:bg-rose-100 hover:text-rose-600 px-2 md:px-3 py-1.5 rounded-full transition-colors flex items-center gap-1">
+                <i className="bi bi-box-arrow-right"></i> <span className="hidden sm:inline">ログアウト</span>
               </button>
             </>
           ) : (
-            <div className="flex gap-3">
+            <div className="hidden md:flex gap-3">
               <Link href="/portal/login" className="text-sm font-bold text-slate-600 hover:text-indigo-600 px-4 py-2 transition-colors">
                 ログイン
               </Link>
@@ -215,6 +230,36 @@ export function PortalHeader() {
           )}
         </div>
       </div>
+
+      {/* モバイルメニュー */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden border-t border-slate-100 bg-white shadow-lg animate-in slide-in-from-top-1 duration-200">
+          <nav className="max-w-7xl mx-auto px-4 py-3 space-y-1">
+            {navItems.map(item => {
+              const isActive = item.href === '/portal' ? pathname === '/portal' : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-colors ${isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <i className={`bi ${item.icon}`}></i> {item.name}
+                </Link>
+              );
+            })}
+            {!session && (
+              <div className="pt-3 mt-2 border-t border-slate-100 flex gap-3">
+                <Link href="/portal/login" className="flex-1 text-center text-sm font-bold text-slate-600 hover:text-indigo-600 py-3 rounded-xl border border-slate-200 transition-colors">
+                  ログイン
+                </Link>
+                <Link href="/portal/signup" className="flex-1 text-center text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 py-3 rounded-xl shadow-sm transition-all">
+                  無料で始める
+                </Link>
+              </div>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

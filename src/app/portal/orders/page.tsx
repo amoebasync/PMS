@@ -528,8 +528,8 @@ function PortalOrdersContent() {
       {selectedOrder && (() => {
         const flyerId = selectedOrder.distributions?.[0]?.flyerId as number | undefined;
         return (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={closeOrderModal}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in zoom-in-95 duration-200" onClick={closeOrderModal}>
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-4xl flex flex-col max-h-[95vh] md:max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
 
               {/* ヘッダー */}
               <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
@@ -598,7 +598,7 @@ function PortalOrdersContent() {
                                 <h4 className="font-black text-slate-800 text-lg border-l-4 border-indigo-500 pl-2 leading-tight">
                                   {dist.flyer?.name} <span className="text-sm font-normal text-slate-500 ml-2">({dist.flyer?.size?.name})</span>
                                 </h4>
-                                <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100 text-sm">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 bg-slate-50 p-3 sm:p-4 rounded-lg border border-slate-100 text-sm">
                                   <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布プラン</span><span className="font-bold text-slate-800">{isPrinting ? '印刷＋配布' : '配布のみ'} ({dist.method})</span></div>
                                   <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布枚数</span><span className="font-black text-indigo-600 text-base">{dist.plannedCount?.toLocaleString()}</span> 枚</div>
                                   <div><span className="block text-[10px] text-slate-500 font-bold mb-0.5">配布開始日</span><span className="font-bold text-slate-800">{dist.startDate ? new Date(dist.startDate).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' }) : '未定'}</span></div>
@@ -857,7 +857,7 @@ function PortalOrdersContent() {
                                             {qr.isActive ? '有効' : '無効'}
                                           </button>
                                           {qr.memo && (
-                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 font-medium truncate max-w-[100px]" title={qr.memo}>
+                                            <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md border border-slate-200 font-medium truncate max-w-[80px] sm:max-w-[100px] md:max-w-[140px]" title={qr.memo}>
                                               {qr.memo}
                                             </span>
                                           )}

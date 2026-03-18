@@ -351,7 +351,7 @@ export default function CartPage() {
               )}
 
               {/* 詳細情報 (表示専用) */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50 p-3 sm:p-4 rounded-xl border border-slate-100">
                 <div>
                   <div className="text-[10px] font-bold text-slate-500 mb-1">希望配布枚数</div>
                   <div className="text-sm font-black text-indigo-600">{item.totalCount.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">枚</span></div>
@@ -516,8 +516,8 @@ export default function CartPage() {
 
       {/* チラシ選択モーダル */}
       {flyerModalItemId && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-slate-900/40 backdrop-blur-sm p-0 md:p-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col overflow-hidden">
             {/* ヘッダー */}
             <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-indigo-50/30">
               <div className="flex justify-between items-center">
@@ -677,7 +677,7 @@ export default function CartPage() {
                     </div>
 
                     {/* 業種 + サイズ + 折り加工 */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="text-[10px] font-bold text-slate-500 block mb-1.5">業種</label>
                         <select

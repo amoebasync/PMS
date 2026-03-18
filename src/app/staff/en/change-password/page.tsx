@@ -46,7 +46,7 @@ export default function ChangePasswordPageEn() {
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50">
       <div className="w-full max-w-sm bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
         <div className="flex flex-col items-center mb-8">
-          <div className="relative w-[160px] h-[40px] mb-5">
+          <div className="relative w-[120px] h-[30px] sm:w-[160px] sm:h-[40px] mb-5">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>
           <h1 className="text-xl font-bold text-slate-800">Set Your Password</h1>

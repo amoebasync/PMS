@@ -498,28 +498,28 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden text-slate-800 font-sans">
 
       {/* ヘッダー */}
-      <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 shrink-0 z-20 shadow-sm">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="w-10 h-10 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors text-slate-600">
-            <i className="bi bi-arrow-left text-xl"></i>
+      <div className="h-14 md:h-16 bg-white border-b border-slate-200 flex items-center justify-between px-3 md:px-6 shrink-0 z-20 shadow-sm">
+        <div className="flex items-center gap-2 md:gap-4 min-w-0">
+          <button onClick={() => router.back()} className="w-9 h-9 md:w-10 md:h-10 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center transition-colors text-slate-600 shrink-0">
+            <i className="bi bi-arrow-left text-lg md:text-xl"></i>
           </button>
-          <div>
-            <div className="flex items-center gap-3 mb-0.5">
-              <span className="text-[10px] font-bold bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded border border-fuchsia-200 animate-pulse">入稿手続き</span>
-              <span className="text-xs font-bold text-slate-400 font-mono tracking-wider">{order?.orderNo}</span>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 md:gap-3 mb-0.5">
+              <span className="text-[10px] font-bold bg-fuchsia-100 text-fuchsia-700 px-2 py-0.5 rounded border border-fuchsia-200 animate-pulse shrink-0">入稿手続き</span>
+              <span className="text-[10px] md:text-xs font-bold text-slate-400 font-mono tracking-wider truncate">{order?.orderNo}</span>
             </div>
-            <h1 className="font-black text-slate-800 text-lg truncate max-w-lg leading-tight">
+            <h1 className="font-black text-slate-800 text-base md:text-lg truncate max-w-[200px] sm:max-w-sm md:max-w-lg leading-tight">
               {order?.title || '名称未設定'}
             </h1>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
 
         {/* 左カラム：プレビュー ＆ アップロード */}
         <div
-          className={`w-[60%] flex flex-col relative overflow-hidden transition-colors duration-300 ${isDragOver ? 'bg-fuchsia-100/50' : 'bg-slate-200'}`}
+          className={`w-full md:w-[60%] min-h-[50vh] md:min-h-0 flex flex-col relative overflow-hidden transition-colors duration-300 ${isDragOver ? 'bg-fuchsia-100/50' : 'bg-slate-200'}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
@@ -537,10 +537,10 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* 上部：表裏タブ と 向き切替 */}
-          <div className="h-16 px-6 flex justify-between items-center bg-white/50 backdrop-blur-md border-b border-slate-300 z-30 shrink-0">
+          <div className="h-14 md:h-16 px-3 md:px-6 flex justify-between items-center bg-white/50 backdrop-blur-md border-b border-slate-300 z-30 shrink-0">
             <div className="flex items-center gap-2">
               <div className="bg-slate-200 p-1 rounded-xl flex gap-1 shadow-inner">
-                <button type="button" onClick={() => switchSide('front')} className={`px-6 py-1.5 rounded-lg text-sm font-black transition-all relative ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                <button type="button" onClick={() => switchSide('front')} className={`px-4 md:px-6 py-1.5 rounded-lg text-sm font-black transition-all relative ${activeSide === 'front' ? 'bg-white text-fuchsia-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
                   表面
                   {!submitForm.frontDesignUrl && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-pulse shadow-sm"></span>
@@ -697,8 +697,8 @@ export default function SubmitDataPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* 右カラム：確定済み印刷仕様 + 備考 */}
-        <div className="w-[40%] bg-white flex flex-col border-l border-slate-200 overflow-hidden">
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8 pb-10">
+        <div className="w-full md:w-[40%] bg-white flex flex-col border-t md:border-t-0 md:border-l border-slate-200 overflow-hidden">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-5 md:p-8 space-y-6 md:space-y-8 pb-10">
 
             {/* 確定済み印刷仕様（読み取り専用） */}
             {printingSpec && (

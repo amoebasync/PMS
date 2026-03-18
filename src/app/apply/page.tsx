@@ -719,7 +719,7 @@ function ApplyForm() {
             <div className={sectionHeaderClass}>
               <i className="bi bi-briefcase text-indigo-500" />
               {t.jobCategory}
-              <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-1">
+              <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-1">
                 {t.required}
               </span>
             </div>
@@ -755,7 +755,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.name}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -775,7 +775,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.email}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -795,7 +795,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.emailConfirm}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -845,7 +845,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.birthday}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -865,7 +865,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.gender}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -910,7 +910,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.country}
-                  <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                  <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                     {t.required}
                   </span>
                 </label>
@@ -947,7 +947,7 @@ function ApplyForm() {
                 <div className="animate-in fade-in">
                   <label className={labelClass}>
                     {t.visaType}
-                    <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
+                    <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-2">
                       {t.required}
                     </span>
                   </label>
@@ -1019,7 +1019,7 @@ function ApplyForm() {
               <div>
                 <label className={labelClass}>
                   {t.building}
-                  <span className="text-[10px] font-medium text-slate-400 ml-2">
+                  <span className="text-[11px] sm:text-xs font-medium text-slate-400 ml-2">
                     {t.optional}
                   </span>
                 </label>
@@ -1041,7 +1041,7 @@ function ApplyForm() {
             <div className={sectionHeaderClass}>
               <i className="bi bi-calendar-check text-indigo-500" />
               {t.interviewSlot}
-              <span className="text-[10px] font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-1">
+              <span className="text-[11px] sm:text-xs font-bold text-white bg-rose-500 rounded px-1.5 py-0.5 ml-1">
                 {t.required}
               </span>
             </div>
@@ -1119,7 +1119,7 @@ function ApplyForm() {
                               {start} - {end}
                             </span>
                             {meetingType && (
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                              <span className={`text-[11px] sm:text-xs font-bold px-2 py-0.5 rounded-full ${
                                 meetingType === 'ZOOM'
                                   ? 'bg-violet-100 text-violet-700'
                                   : 'bg-indigo-100 text-indigo-700'

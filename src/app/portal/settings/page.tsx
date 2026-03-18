@@ -603,7 +603,7 @@ function ContactModal({ editTarget, customerType, deliveryAddresses, onClose, on
         </div>
         <div className="px-5 py-4 space-y-3">
           {/* Row 1: 姓 名 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormFieldCompact label="姓" required>
               <input className={inputCompactClass} value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
             </FormFieldCompact>
@@ -612,7 +612,7 @@ function ContactModal({ editTarget, customerType, deliveryAddresses, onClose, on
             </FormFieldCompact>
           </div>
           {/* Row 2: 姓カナ 名カナ */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormFieldCompact label="姓（カナ）">
               <input className={inputCompactClass} value={form.lastNameKana} onChange={e => setForm({ ...form, lastNameKana: e.target.value })} />
             </FormFieldCompact>
@@ -625,7 +625,7 @@ function ContactModal({ editTarget, customerType, deliveryAddresses, onClose, on
             <input type="email" className={inputCompactClass} value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
           </FormFieldCompact>
           {/* Row 4: 携帯電話 直通電話 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormFieldCompact label="携帯電話">
               <input className={inputCompactClass} value={form.mobilePhone} onChange={e => handlePhoneChange(e.target.value, v => setForm(f => ({ ...f, mobilePhone: v })))} placeholder="090-1234-5678" maxLength={13} />
             </FormFieldCompact>
@@ -635,7 +635,7 @@ function ContactModal({ editTarget, customerType, deliveryAddresses, onClose, on
           </div>
           {/* Row 5: 部署 役職 (COMPANYのみ) */}
           {isCompany && (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <FormFieldCompact label="部署">
                 <input className={inputCompactClass} value={form.department} onChange={e => setForm({ ...form, department: e.target.value })} />
               </FormFieldCompact>
@@ -922,7 +922,7 @@ function DeliveryAddressModal({ editTarget, defaultOrganizationName, defaultReci
           <FormFieldCompact label="ラベル名" required>
             <input className={inputCompactClass} value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="本社、支社A、自宅 など" />
           </FormFieldCompact>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <FormFieldCompact label="組織名">
               <input className={inputCompactClass} value={form.organizationName} onChange={e => setForm({ ...form, organizationName: e.target.value })} placeholder="株式会社〇〇" />
             </FormFieldCompact>

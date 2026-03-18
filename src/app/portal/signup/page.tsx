@@ -120,7 +120,7 @@ export default function SignupPage() {
       <div className="w-full max-w-md bg-white rounded-3xl shadow-xl border border-slate-100 p-8">
         
         <div className="flex flex-col items-center mb-8">
-          <div className="relative w-[180px] h-[45px] mb-4">
+          <div className="relative w-[140px] h-[35px] sm:w-[180px] sm:h-[45px] mb-4">
             <Image src="/logo/logo_light_transparent.png" alt="Logo" fill className="object-contain" priority />
           </div>
           <h1 className="text-xl font-bold text-slate-800">新規アカウント登録</h1>
@@ -283,8 +283,8 @@ export default function SignupPage() {
       {/* 利用規約モーダル */}
       {/* ========================================================= */}
       {showTermsModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowTermsModal(false)} aria-hidden="true">
-          <div role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowTermsModal(false)} aria-hidden="true">
+          <div role="dialog" aria-modal="true" aria-labelledby="terms-modal-title" className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-3xl flex flex-col max-h-[95vh] md:max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
               <h3 id="terms-modal-title" className="font-bold text-lg">利用規約</h3>
               <button onClick={() => setShowTermsModal(false)} aria-label="閉じる" className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors"><i className="bi bi-x-lg" aria-hidden="true"></i></button>
@@ -305,8 +305,8 @@ export default function SignupPage() {
       {/* プライバシーポリシーモーダル */}
       {/* ========================================================= */}
       {showPrivacyModal && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowPrivacyModal(false)} aria-hidden="true">
-          <div role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/60 backdrop-blur-sm p-0 md:p-4 animate-in fade-in zoom-in-95 duration-200" onClick={() => setShowPrivacyModal(false)} aria-hidden="true">
+          <div role="dialog" aria-modal="true" aria-labelledby="privacy-modal-title" className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl w-full md:max-w-3xl flex flex-col max-h-[95vh] md:max-h-[90vh] overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-4 bg-slate-800 text-white flex justify-between items-center shrink-0">
               <h3 id="privacy-modal-title" className="font-bold text-lg">個人情報の取り扱いについて</h3>
               <button onClick={() => setShowPrivacyModal(false)} aria-label="閉じる" className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full transition-colors"><i className="bi bi-x-lg" aria-hidden="true"></i></button>
