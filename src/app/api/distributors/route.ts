@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
+import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem } from '@/lib/posting-system-sync';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
@@ -170,6 +171,32 @@ export async function POST(request: Request) {
 
       return distributor;
     });
+
+    // Posting System 同期（fire-and-forget）
+    if (isPostingSystemSyncConfigured()) {
+      syncStaffToPostingSystem({
+        staffCd: newDistributor.staffId,
+        staffName: newDistributor.name,
+        staffTel: newDistributor.phone || '',
+        shopCd: '',
+        joinDate: newDistributor.joinDate
+          ? new Date(newDistributor.joinDate).toISOString().slice(0, 10)
+          : undefined,
+      }).catch(err => console.error('[PostingSync] Failed to sync new staff:', err));
+
+      // 単価同期
+      if (body.rate1Type !== undefined || body.rate2Type !== undefined) {
+        syncStaffRatesToPostingSystem({
+          staffCd: newDistributor.staffId,
+          rate1: newDistributor.rate1Type,
+          rate2: newDistributor.rate2Type,
+          rate3: newDistributor.rate3Type,
+          rate4: newDistributor.rate4Type,
+          rate5: newDistributor.rate5Type,
+          rate6: newDistributor.rate6Type,
+        }).catch(err => console.error('[PostingSync] Failed to sync new staff rates:', err));
+      }
+    }
 
     return NextResponse.json(newDistributor);
   } catch (error: any) {
