@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { verifySignature, getProfile, isLineConfigured } from '@/lib/line';
+import { verifySignature, getProfile, replyMessage, buildRegistrationFlexMessage, isLineConfigured } from '@/lib/line';
 
 /**
  * POST /api/line/webhook — LINE Webhook 受信
- * あらゆるイベントから userId を収集し、DB に保存する
+ * - follow: ユーザー登録 + 連携依頼メッセージ自動送信
+ * - unfollow: フォロー解除
+ * - message, postback, 他: ユーザー登録（未登録の場合）
  */
 export async function POST(request: Request) {
   if (!isLineConfigured()) {
@@ -26,7 +28,6 @@ export async function POST(request: Request) {
     if (!userId) continue;
 
     if (event.type === 'unfollow') {
-      // ブロック/友だち解除
       try {
         await prisma.lineUser.updateMany({
           where: { lineUserId: userId },
@@ -45,7 +46,6 @@ export async function POST(request: Request) {
       });
 
       if (!existing) {
-        // 新規ユーザー: プロフィール取得して登録
         const profile = await getProfile(userId);
         await prisma.lineUser.create({
           data: {
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
         });
         console.log(`[LINE Webhook] New user registered: ${profile.displayName}`);
       } else if (!existing.isFollowing) {
-        // 再フォロー
         const profile = await getProfile(userId);
         await prisma.lineUser.update({
           where: { lineUserId: userId },
@@ -69,6 +68,11 @@ export async function POST(request: Request) {
             isFollowing: true,
           },
         });
+      }
+
+      // 友だち追加時: 連携依頼メッセージを自動送信
+      if (event.type === 'follow' && event.replyToken) {
+        await replyMessage(event.replyToken, [buildRegistrationFlexMessage()]);
       }
     } catch (e) {
       console.error('[LINE Webhook] event error:', e);

@@ -49,6 +49,98 @@ export async function broadcastMessage(messages: any[]): Promise<void> {
   });
 }
 
+/** 特定ユーザーにリプライメッセージ送信 */
+export async function replyMessage(replyToken: string, messages: any[]): Promise<void> {
+  await lineApiFetch('/message/reply', {
+    method: 'POST',
+    body: JSON.stringify({ replyToken, messages }),
+  });
+}
+
+/** LINE連携依頼 Flex Message（日英バイリンガル） */
+export function buildRegistrationFlexMessage() {
+  return {
+    type: 'flex',
+    altText: 'K&Partners 配布員登録 / Distributor Registration',
+    contents: {
+      type: 'bubble',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: 'K&Partners',
+            weight: 'bold',
+            size: 'xl',
+            color: '#10B981',
+          },
+          {
+            type: 'separator',
+            margin: 'lg',
+          },
+          // 日本語
+          {
+            type: 'text',
+            text: '🇯🇵 配布員登録のご案内',
+            weight: 'bold',
+            size: 'md',
+            margin: 'lg',
+            color: '#333333',
+          },
+          {
+            type: 'text',
+            text: '配布員管理システム（PMS）とLINEアカウントを連携します。下の「登録する」ボタンを押してください。連携後、スケジュールやお知らせをLINEでお届けできるようになります。',
+            wrap: true,
+            size: 'sm',
+            margin: 'md',
+            color: '#555555',
+          },
+          {
+            type: 'separator',
+            margin: 'lg',
+          },
+          // English
+          {
+            type: 'text',
+            text: '🇬🇧 Distributor Registration',
+            weight: 'bold',
+            size: 'md',
+            margin: 'lg',
+            color: '#333333',
+          },
+          {
+            type: 'text',
+            text: 'Link your LINE account with the Posting Management System (PMS). Please tap the "Register" button below. After linking, you will receive schedules and notifications via LINE.',
+            wrap: true,
+            size: 'sm',
+            margin: 'md',
+            color: '#555555',
+          },
+        ],
+      },
+      footer: {
+        type: 'box',
+        layout: 'vertical',
+        spacing: 'sm',
+        contents: [
+          {
+            type: 'button',
+            action: {
+              type: 'postback',
+              label: '登録する / Register',
+              data: 'action=register',
+              displayText: '登録します / I will register',
+            },
+            style: 'primary',
+            color: '#10B981',
+          },
+        ],
+      },
+    },
+  };
+}
+
 /** LINE設定が有効か確認 */
 export function isLineConfigured(): boolean {
   return !!CHANNEL_ACCESS_TOKEN && !!CHANNEL_SECRET;
