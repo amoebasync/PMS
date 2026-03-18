@@ -73,7 +73,9 @@
     "area_analytics": "Area Distribution Analytics",
     "distribution_analytics": "Distribution Analytics",
     "company_settings": "Company Settings",
-    "picking_verification": "Picking Verification"
+    "picking_verification": "Picking Verification",
+    "line_integration": "LINE Integration"
   },
-  "picking_verification": "Picking"
+  "picking_verification": "Picking",
+  "line_integration": "LINE"
 }

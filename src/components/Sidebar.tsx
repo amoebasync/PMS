@@ -102,6 +102,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: 'SYSTEM',
     items: [
+      { nameKey: 'line_integration', href: '/line', icon: 'bi-chat-dots-fill' },
       { nameKey: 'system_settings', href: '/settings', icon: 'bi-gear-fill' },
       { nameKey: 'audit_logs', href: '/audit-logs', icon: 'bi-shield-check', superAdminOnly: true },
     ],

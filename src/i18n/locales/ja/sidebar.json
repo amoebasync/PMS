@@ -73,7 +73,9 @@
     "area_analytics": "エリア別配布分析",
     "distribution_analytics": "配布分析",
     "company_settings": "自社情報設定",
-    "picking_verification": "ピッキング照合"
+    "picking_verification": "ピッキング照合",
+    "line_integration": "LINE連携管理"
   },
-  "picking_verification": "ピッキング照合"
+  "picking_verification": "ピッキング照合",
+  "line_integration": "LINE連携"
 }

@@ -723,6 +723,7 @@ model FlyerDistributor {
   evaluations           DistributorEvaluation[]
   fieldInspections      FieldInspection[]
   fraudAnalyses         FraudAnalysis[]
+  lineUser              LineUser?
 
   @@index([branchId])
   @@index([visaExpiryDate])
@@ -3266,4 +3267,20 @@ model PickingVerification {
   @@index([checkerId])
   @@index([status])
   @@map("picking_verifications")
+}
+
+// ─── LINE連携 ───
+model LineUser {
+  id            Int               @id @default(autoincrement())
+  lineUserId    String            @unique @map("line_user_id") @db.VarChar(50)
+  displayName   String?           @map("display_name") @db.VarChar(100)
+  pictureUrl    String?           @map("picture_url") @db.Text
+  statusMessage String?           @map("status_message") @db.Text
+  isFollowing   Boolean           @default(true) @map("is_following")
+  distributorId Int?              @unique @map("distributor_id")
+  distributor   FlyerDistributor? @relation(fields: [distributorId], references: [id])
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@map("line_users")
 }
