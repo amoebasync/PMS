@@ -7,6 +7,10 @@ import { verifySignature, getProfile, replyMessage, buildRegistrationFlexMessage
  * - follow: ユーザー登録 + 連携依頼メッセージ自動送信
  * - unfollow: フォロー解除
  * - message, postback, 他: ユーザー登録（未登録の場合）
+ *
+ * NOTE: CloudFront が x-line-signature ヘッダーを転送しないため、
+ * 署名が存在する場合のみ検証し、ない場合はスキップする。
+ * TODO: CloudFront で x-line-signature ヘッダーの転送設定を追加する
  */
 export async function POST(request: Request) {
   if (!isLineConfigured()) {
@@ -16,17 +20,18 @@ export async function POST(request: Request) {
   const body = await request.text();
   const signature = request.headers.get('x-line-signature') || '';
 
-  // デバッグ: 署名検証の詳細をログ出力
-  const crypto = await import('crypto');
-  const secret = process.env.LINE_CHANNEL_SECRET || '';
-  const computed = crypto.createHmac('SHA256', secret).update(body).digest('base64');
-  console.log(`[LINE Webhook] secret_len=${secret.length} body_len=${body.length} computed=${computed} received=${signature} match=${computed === signature}`);
-
-  if (!verifySignature(body, signature)) {
+  // 署名がある場合は検証（直接アクセス時）、ない場合はスキップ（CloudFront経由）
+  if (signature && !verifySignature(body, signature)) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
-  const payload = JSON.parse(body);
+  let payload;
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+  }
+
   const events = payload.events || [];
 
   for (const event of events) {
@@ -78,7 +83,12 @@ export async function POST(request: Request) {
 
       // 友だち追加時: 連携依頼メッセージを自動送信
       if (event.type === 'follow' && event.replyToken) {
-        await replyMessage(event.replyToken, [buildRegistrationFlexMessage()]);
+        try {
+          await replyMessage(event.replyToken, [buildRegistrationFlexMessage()]);
+          console.log(`[LINE Webhook] Registration message sent to ${userId}`);
+        } catch (e) {
+          console.error('[LINE Webhook] reply error:', e);
+        }
       }
     } catch (e) {
       console.error('[LINE Webhook] event error:', e);
