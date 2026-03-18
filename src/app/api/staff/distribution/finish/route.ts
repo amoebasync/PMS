@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
+import { analyzeFraudIndicators } from '@/lib/fraud-analysis';
 
 // POST /api/staff/distribution/finish — 配布終了
 export async function POST(request: Request) {
@@ -123,6 +124,9 @@ export async function POST(request: Request) {
     } catch (e) {
       console.error('通知作成エラー:', e);
     }
+
+    // 不正検知分析（非同期、レスポンスをブロックしない）
+    void analyzeFraudIndicators(sessionId).catch((e) => console.error('[FraudAnalysis] Error:', e));
 
     // 報酬計算
     const earnings = await calculateDailyEarnings(distributor.id, session.schedule?.date || new Date());

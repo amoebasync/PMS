@@ -233,6 +233,7 @@ model Employee {
   // パートナーインシデント解決
   resolvedPartnerIncidents    PartnerIncident[] @relation("PartnerIncidentResolver")
   complianceChecks            DistributionSchedule[] @relation("ComplianceChecker")
+  fraudReviews                FraudAnalysis[] @relation("FraudReviewer")
 
   // 中継/回収ドライバー
   relayTasks                  RelayTask[] @relation("RelayDriver")
@@ -721,6 +722,7 @@ model FlyerDistributor {
   adminNotifications    AdminNotification[]
   evaluations           DistributorEvaluation[]
   fieldInspections      FieldInspection[]
+  fraudAnalyses         FraudAnalysis[]
 
   @@index([branchId])
   @@index([visaExpiryDate])
@@ -881,6 +883,7 @@ model DistributionSchedule {
   adminNotifications AdminNotification[]
   relayTasks         RelayTask[]
   pickingVerification PickingVerification?
+  fraudAnalyses       FraudAnalysis[]
 
   @@index([distributorId, date])
   @@index([branchId, date])
@@ -1008,6 +1011,21 @@ enum IncompleteReason {
   AREA_DONE  // エリア終了（全戸配布済み）
   GIVE_UP    // ギブアップ
   OTHER      // その他
+}
+
+// --- 不正検知リスクレベル ---
+enum FraudRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// --- 不正検知レビュー結果 ---
+enum FraudReviewResult {
+  FALSE_POSITIVE   // 誤検知
+  SUSPICIOUS       // 要注意
+  CONFIRMED_FRAUD  // 不正確定
 }
 
 // --- 管理者通知種別 ---
@@ -2953,9 +2971,52 @@ model DistributionSession {
   progressEvents  ProgressEvent[]
   skipEvents      SkipEvent[]
   pauseEvents     PauseEvent[]
+  fraudAnalysis   FraudAnalysis?
 
   @@index([distributorId, startedAt])
   @@map("distribution_sessions")
+}
+
+// --- 不正検知分析結果 ---
+model FraudAnalysis {
+  id                     Int               @id @default(autoincrement())
+  sessionId              Int               @unique @map("session_id")
+  scheduleId             Int?              @map("schedule_id")
+  distributorId          Int               @map("distributor_id")
+
+  // 各指標 (0.0 ~ 1.0)
+  outOfAreaRatio         Float             @default(0) @map("out_of_area_ratio")        // エリア外活動率
+  outOfAreaDwell         Float             @default(0) @map("out_of_area_dwell")        // エリア外長時間滞在
+  distanceCountRatio     Float             @default(0) @map("distance_count_ratio")     // 距離-枚数比
+  speedAnomaly           Float             @default(0) @map("speed_anomaly")            // 配布速度異常
+  gpsGapRatio            Float             @default(0) @map("gps_gap_ratio")            // GPS欠損率
+  workRatio              Float             @default(0) @map("work_ratio")               // 実働率
+
+  // 総合スコア (0 ~ 100)
+  riskScore              Int               @default(0) @map("risk_score")
+  riskLevel              FraudRiskLevel    @default(LOW) @map("risk_level")
+
+  // 分析メタデータ (JSON)
+  analysisDetail         String?           @map("analysis_detail") @db.Text
+
+  // 管理者レビュー
+  reviewedById           Int?              @map("reviewed_by_id")
+  reviewedAt             DateTime?         @map("reviewed_at")
+  reviewNote             String?           @map("review_note") @db.Text
+  reviewResult           FraudReviewResult? @map("review_result")
+
+  createdAt              DateTime          @default(now()) @map("created_at")
+  updatedAt              DateTime          @updatedAt @map("updated_at")
+
+  session                DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  distributor            FlyerDistributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  schedule               DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  reviewedBy             Employee?           @relation("FraudReviewer", fields: [reviewedById], references: [id])
+
+  @@index([distributorId, createdAt])
+  @@index([riskLevel])
+  @@index([riskScore])
+  @@map("fraud_analyses")
 }
 
 // --- GPS座標（10秒ごとの高頻度データ） ---
