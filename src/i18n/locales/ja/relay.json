@@ -85,6 +85,7 @@
   "route_overview": "ルート概要",
   "route_stop": "地点",
   "route_applied_order": "順番を適用しました",
+  "route_all_drivers_alert": "全ドライバーの中継/回収を表示しています。自分以外のタスクも含まれています。",
   "field_date": "実施日",
   "btn_carryover": "翌日に繰越",
   "carryover_confirm": "このタスクを翌日に繰り越しますか？",

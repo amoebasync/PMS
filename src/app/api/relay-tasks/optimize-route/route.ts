@@ -241,9 +241,9 @@ export async function GET(request: Request) {
     const originLat = searchParams.get('originLat') ? parseFloat(searchParams.get('originLat')!) : null;
     const originLng = searchParams.get('originLng') ? parseFloat(searchParams.get('originLng')!) : null;
 
-    if (!date || !driverId) {
+    if (!date) {
       return NextResponse.json(
-        { error: 'date and driverId are required' },
+        { error: 'date is required' },
         { status: 400 },
       );
     }
@@ -255,10 +255,11 @@ export async function GET(request: Request) {
       );
     }
 
-    // RelayTask を取得
+    // RelayTask を取得（driverIdが指定されていない場合は全件）
+    const driverWhere = driverId ? { driverId: parseInt(driverId) } : {};
     const allTasks = await prisma.relayTask.findMany({
       where: {
-        driverId: parseInt(driverId),
+        ...driverWhere,
         status: { in: ['PENDING', 'IN_PROGRESS'] },
         OR: [
           { date: new Date(date) },

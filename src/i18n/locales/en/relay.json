@@ -85,6 +85,7 @@
   "route_overview": "Route Overview",
   "route_stop": "Stop",
   "route_applied_order": "Order applied",
+  "route_all_drivers_alert": "Showing all drivers' relay/collection tasks. Tasks from other drivers are included.",
   "field_date": "Date",
   "btn_carryover": "Carry Over",
   "carryover_confirm": "Carry over this task to the next day?",

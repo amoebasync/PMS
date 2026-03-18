@@ -88,12 +88,13 @@ interface Props {
   date: string;
   driverId: string;
   driverName: string;
+  isAllDrivers?: boolean;
   onClose: () => void;
   onApplyOrder: (orderedIds: number[]) => void;
   t: (key: string, params?: Record<string, any>) => string;
 }
 
-export default function RouteOptimizationPanel({ isLoaded, date, driverId, driverName, onClose, onApplyOrder, t }: Props) {
+export default function RouteOptimizationPanel({ isLoaded, date, driverId, driverName, isAllDrivers = false, onClose, onApplyOrder, t }: Props) {
   const [priority, setPriority] = useState<Priority>('TIME_OPTIMAL');
   const [originType, setOriginType] = useState<OriginType>('DEFAULT');
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -116,10 +117,13 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
     const originCoords = getOriginCoords(ot);
     try {
       const params = new URLSearchParams({
-        date, driverId, priority: p,
+        date, priority: p,
         originLat: originCoords.lat.toString(),
         originLng: originCoords.lng.toString(),
       });
+      if (driverId && driverId !== 'ALL') {
+        params.append('driverId', driverId);
+      }
       const res = await fetch(`/api/relay-tasks/optimize-route?${params}`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -216,6 +220,16 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
             <i className="bi bi-x-lg"></i>
           </button>
         </div>
+
+        {/* All drivers alert */}
+        {isAllDrivers && (
+          <div className="px-4 py-2 bg-amber-50 border-b border-amber-200 flex items-center gap-2 shrink-0">
+            <i className="bi bi-exclamation-triangle-fill text-amber-500"></i>
+            <span className="text-xs text-amber-700 font-bold">
+              {t('route_all_drivers_alert')}
+            </span>
+          </div>
+        )}
 
         {/* Priority Toggle + Origin Selector */}
         <div className="px-4 py-2 border-b border-slate-100 shrink-0 space-y-2">

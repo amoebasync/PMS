@@ -309,7 +309,7 @@ export default function RelayListPage() {
   return (
     <div className="flex flex-col h-full bg-white">
       {/* Header / Filters */}
-      <div className="px-3 md:px-6 py-3 md:py-4 border-b border-slate-200 bg-white">
+      <div className="px-3 md:px-6 py-3 md:py-4 border-b border-slate-200 bg-white sticky top-0 z-20">
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           <div className="flex items-center gap-1.5">
             <label className="text-[10px] md:text-xs font-bold text-slate-500">{t('filter_date')}</label>
@@ -347,13 +347,11 @@ export default function RelayListPage() {
               ))}
             </select>
           </div>
-          {filterDriver !== 'ALL' && (
-            <button onClick={() => setShowRouteOpt(true)}
-              className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition-colors">
-              <i className="bi bi-signpost-2"></i>
-              <span className="hidden sm:inline">{t('btn_optimize_route')}</span>
-            </button>
-          )}
+          <button onClick={() => setShowRouteOpt(true)}
+            className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition-colors">
+            <i className="bi bi-signpost-2"></i>
+            <span className="hidden sm:inline">{t('btn_optimize_route')}</span>
+          </button>
           <div className="ml-auto text-xs text-slate-500">
             {t('total_count', { count: tasks.length })}
           </div>
@@ -585,12 +583,13 @@ export default function RelayListPage() {
       )}
 
       {/* Route Optimization Panel */}
-      {showRouteOpt && filterDriver !== 'ALL' && (
+      {showRouteOpt && (
         <RouteOptimizationPanel
           isLoaded={isLoaded}
           date={filterDate}
           driverId={filterDriver}
-          driverName={selectedDriverName}
+          driverName={filterDriver === 'ALL' ? t('filter_driver_all') : selectedDriverName}
+          isAllDrivers={filterDriver === 'ALL'}
           onClose={() => setShowRouteOpt(false)}
           onApplyOrder={handleApplyRouteOrder}
           t={t}
