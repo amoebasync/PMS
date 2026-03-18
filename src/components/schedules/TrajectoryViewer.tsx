@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, InfoWindow, Circle, OverlayView } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, InfoWindow, Circle } from '@react-google-maps/api';
 
 // ============================================================
 // Types
@@ -572,40 +572,44 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
                   {/* Start marker */}
                   {points.length > 0 && (
-                    <OverlayView
+                    <Marker
                       position={{ lat: points[0].lat, lng: points[0].lng }}
-                      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                      <div
-                        className="px-2 py-0.5 rounded shadow-md text-xs font-bold text-white cursor-pointer whitespace-nowrap"
-                        style={{ background: '#22c55e', border: '2px solid #fff', transform: 'translate(-50%, -50%)' }}
-                        onClick={() => setSelectedInfo({
-                          position: { lat: points[0].lat, lng: points[0].lng },
-                          content: `START: ${fmtTime(points[0].timestamp)}`,
-                        })}
-                      >
-                        START
-                      </div>
-                    </OverlayView>
+                      label={{ text: 'START', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+                      icon={{
+                        path: 'M -24 -12 L 24 -12 L 24 12 L -24 12 Z',
+                        fillColor: '#22c55e',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        scale: 1,
+                        labelOrigin: new google.maps.Point(0, 0),
+                      }}
+                      onClick={() => setSelectedInfo({
+                        position: { lat: points[0].lat, lng: points[0].lng },
+                        content: `START: ${fmtTime(points[0].timestamp)}`,
+                      })}
+                    />
                   )}
 
                   {/* Finish marker */}
                   {data.session.finishedAt && points.length > 0 && (
-                    <OverlayView
+                    <Marker
                       position={{ lat: points[points.length - 1].lat, lng: points[points.length - 1].lng }}
-                      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                      <div
-                        className="px-2 py-0.5 rounded shadow-md text-xs font-bold text-white cursor-pointer whitespace-nowrap"
-                        style={{ background: '#ef4444', border: '2px solid #fff', transform: 'translate(-50%, -50%)' }}
-                        onClick={() => setSelectedInfo({
-                          position: { lat: points[points.length - 1].lat, lng: points[points.length - 1].lng },
-                          content: `FINISH: ${fmtTime(points[points.length - 1].timestamp)}`,
-                        })}
-                      >
-                        FINISH
-                      </div>
-                    </OverlayView>
+                      label={{ text: 'FINISH', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+                      icon={{
+                        path: 'M -24 -12 L 24 -12 L 24 12 L -24 12 Z',
+                        fillColor: '#ef4444',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        scale: 1,
+                        labelOrigin: new google.maps.Point(0, 0),
+                      }}
+                      onClick={() => setSelectedInfo({
+                        position: { lat: points[points.length - 1].lat, lng: points[points.length - 1].lng },
+                        content: `FINISH: ${fmtTime(points[points.length - 1].timestamp)}`,
+                      })}
+                    />
                   )}
 
                   {/* Current position marker */}
@@ -754,32 +758,36 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
 
                   {/* Start marker */}
                   {points.length > 0 && (
-                    <OverlayView
+                    <Marker
                       position={{ lat: points[0].lat, lng: points[0].lng }}
-                      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                      <div
-                        className="px-2 py-0.5 rounded shadow-md text-xs font-bold text-white whitespace-nowrap"
-                        style={{ background: '#22c55e', border: '2px solid #fff', transform: 'translate(-50%, -50%)' }}
-                      >
-                        START
-                      </div>
-                    </OverlayView>
+                      label={{ text: 'START', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+                      icon={{
+                        path: 'M -24 -12 L 24 -12 L 24 12 L -24 12 Z',
+                        fillColor: '#22c55e',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        scale: 1,
+                        labelOrigin: new google.maps.Point(0, 0),
+                      }}
+                    />
                   )}
 
                   {/* Finish marker */}
                   {data.session.finishedAt && points.length > 0 && (
-                    <OverlayView
+                    <Marker
                       position={{ lat: points[points.length - 1].lat, lng: points[points.length - 1].lng }}
-                      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                    >
-                      <div
-                        className="px-2 py-0.5 rounded shadow-md text-xs font-bold text-white whitespace-nowrap"
-                        style={{ background: '#ef4444', border: '2px solid #fff', transform: 'translate(-50%, -50%)' }}
-                      >
-                        FINISH
-                      </div>
-                    </OverlayView>
+                      label={{ text: 'FINISH', color: '#fff', fontWeight: 'bold', fontSize: '11px' }}
+                      icon={{
+                        path: 'M -24 -12 L 24 -12 L 24 12 L -24 12 Z',
+                        fillColor: '#ef4444',
+                        fillOpacity: 1,
+                        strokeColor: '#fff',
+                        strokeWeight: 2,
+                        scale: 1,
+                        labelOrigin: new google.maps.Point(0, 0),
+                      }}
+                    />
                   )}
                 </>
               )}
