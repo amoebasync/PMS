@@ -284,13 +284,13 @@ function TopHeader({
           </div>
         )}
 
-        <div className="w-px h-6 bg-slate-200 mx-1 hidden md:block" />
+        <div className="w-px h-6 bg-slate-200 mx-1" />
 
         {/* 言語切替トグル */}
         <button
           onClick={toggleLanguage}
           title={lang === 'ja' ? 'Switch to English' : '日本語に切り替え'}
-          className="relative hidden md:flex items-center h-8 w-[68px] rounded-full bg-slate-100 p-0.5 transition-colors hover:bg-slate-200/80 group"
+          className="relative flex items-center h-8 w-[68px] rounded-full bg-slate-100 p-0.5 transition-colors hover:bg-slate-200/80 group shrink-0"
         >
           {/* sliding pill */}
           <span
