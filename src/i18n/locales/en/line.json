@@ -1,9 +1,9 @@
 {
   "page_title": "LINE Integration",
-  "import_followers": "Import Followers",
-  "importing": "Importing...",
-  "import_success": "Import complete: {{imported}} new users added (out of {{total}})",
-  "import_failed": "Import failed",
+  "import_followers": "Send Registration Request",
+  "importing": "Sending...",
+  "broadcast_success": "Registration request sent to all followers. Users will appear as they tap the button.",
+  "import_failed": "Failed to send",
   "filter_all": "All",
   "filter_linked": "Linked",
   "filter_unlinked": "Unlinked",

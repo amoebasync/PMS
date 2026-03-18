@@ -41,19 +41,12 @@ export async function getProfile(userId: string): Promise<{
   return lineApiFetch(`/profile/${userId}`);
 }
 
-/** フォロワーIDを全件取得（ページネーション対応） */
-export async function getAllFollowerIds(): Promise<string[]> {
-  const allIds: string[] = [];
-  let start: string | undefined;
-
-  do {
-    const params = start ? `?start=${start}` : '';
-    const data = await lineApiFetch(`/followers/ids${params}`);
-    allIds.push(...(data.userIds || []));
-    start = data.next;
-  } while (start);
-
-  return allIds;
+/** ブロードキャストメッセージ送信（全フォロワーに送信） */
+export async function broadcastMessage(messages: any[]): Promise<void> {
+  await lineApiFetch('/message/broadcast', {
+    method: 'POST',
+    body: JSON.stringify({ messages }),
+  });
 }
 
 /** LINE設定が有効か確認 */

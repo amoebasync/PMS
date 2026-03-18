@@ -73,8 +73,9 @@ export default function LinePage() {
       const res = await fetch('/api/line/import-followers', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        showToast(t('import_success', { imported: data.imported, total: data.total }), 'success');
-        fetchUsers();
+        showToast(t('broadcast_success'), 'success');
+        // ユーザーがボタンを押すまで待つため、少し遅延してからリフレッシュ
+        setTimeout(() => fetchUsers(), 3000);
       } else {
         showToast(data.error || t('import_failed'), 'error');
       }
