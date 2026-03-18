@@ -993,6 +993,11 @@ model RelayTask {
   // メモ
   note        String?      @db.Text
 
+  // 備品数量
+  bagCount    Int          @default(0) @map("bag_count")     // バッグ（Flyer bag）
+  trolleyCount Int         @default(0) @map("trolley_count") // 台車（Trolley）
+  otherCount  Int          @default(0) @map("other_count")   // その他
+
   // エビデンス写真（S3 URL の JSON配列）
   evidenceUrls Json?       @map("evidence_urls") // ["url1", "url2", ...]
 

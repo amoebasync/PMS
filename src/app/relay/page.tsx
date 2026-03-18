@@ -126,6 +126,7 @@ export default function RelayListPage() {
     const taskDate = task.date ? task.date.split('T')[0] : task.schedule?.date?.split('T')[0] || filterDate;
     setEditForm({
       type: task.type,
+      status: task.status,
       driverId: task.driverId,
       driverName: task.driverName || '',
       timeSlot: slot?.label || '',
@@ -134,6 +135,9 @@ export default function RelayListPage() {
       longitude: task.longitude,
       note: task.note || '',
       date: taskDate,
+      bagCount: task.bagCount ?? 0,
+      trolleyCount: task.trolleyCount ?? 0,
+      otherCount: task.otherCount ?? 0,
     });
     setDriverSearch(task.driver ? `${task.driver.lastNameJa} ${task.driver.firstNameJa}` : '');
     setEvidenceUrls(Array.isArray(task.evidenceUrls) ? task.evidenceUrls : []);
@@ -174,6 +178,7 @@ export default function RelayListPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: editForm.type,
+          status: editForm.status,
           driverId: editForm.driverId || null,
           driverName: editForm.driverName || null,
           timeSlotStart: slot?.start || null,
@@ -183,6 +188,9 @@ export default function RelayListPage() {
           longitude: editForm.longitude || null,
           note: editForm.note || null,
           date: editForm.date || null,
+          bagCount: editForm.bagCount ?? 0,
+          trolleyCount: editForm.trolleyCount ?? 0,
+          otherCount: editForm.otherCount ?? 0,
         }),
       });
       if (res.ok) {
@@ -240,11 +248,8 @@ export default function RelayListPage() {
   }).slice(0, 10);
 
   const handleShowMap = () => {
-    // 既にマップ表示中の場合はキーを変えて再マウント（center反映のため）
-    setMapKey(k => k + 1);
-    setShowMap(true);
     if (!editForm.latitude && !editForm.longitude) {
-      // ポリゴンが既に取得済みならそこから中心座標を計算
+      // 座標未設定の場合はポリゴン中心 or デフォルト座標を設定
       if (polygonPaths.length > 0 && polygonPaths[0].length > 0) {
         const pts = polygonPaths.flat();
         setEditForm((f: any) => ({
@@ -255,7 +260,12 @@ export default function RelayListPage() {
       } else {
         setEditForm((f: any) => ({ ...f, latitude: 35.6895, longitude: 139.6917 }));
       }
+      setMapKey(k => k + 1);
+    } else if (!showMap) {
+      // 座標はあるが地図非表示の場合のみ再マウント
+      setMapKey(k => k + 1);
     }
+    setShowMap(true);
   };
 
   const handleCurrentLocation = () => {
@@ -672,6 +682,29 @@ export default function RelayListPage() {
                 </div>
               </div>
 
+              {/* Status */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('th_status')}</label>
+                <div className="flex gap-2">
+                  <button onClick={() => setEditForm({ ...editForm, status: 'PENDING' })}
+                    className={`flex-1 px-2 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.status === 'PENDING' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-500'}`}>
+                    <i className="bi bi-clock mr-1"></i>{t('status_pending')}
+                  </button>
+                  <button onClick={() => setEditForm({ ...editForm, status: 'IN_PROGRESS' })}
+                    className={`flex-1 px-2 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.status === 'IN_PROGRESS' ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-slate-200 text-slate-500'}`}>
+                    <i className="bi bi-arrow-repeat mr-1"></i>{t('status_in_progress')}
+                  </button>
+                  <button onClick={() => setEditForm({ ...editForm, status: 'COMPLETED' })}
+                    className={`flex-1 px-2 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.status === 'COMPLETED' ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500'}`}>
+                    <i className="bi bi-check-circle mr-1"></i>{t('status_completed')}
+                  </button>
+                  <button onClick={() => setEditForm({ ...editForm, status: 'CANCELLED' })}
+                    className={`flex-1 px-2 py-2 rounded-lg border text-xs font-bold transition-all ${editForm.status === 'CANCELLED' ? 'border-slate-400 bg-slate-50 text-slate-700' : 'border-slate-200 text-slate-500'}`}>
+                    <i className="bi bi-x-circle mr-1"></i>{t('status_cancelled')}
+                  </button>
+                </div>
+              </div>
+
               {/* Driver */}
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_driver')}</label>
@@ -758,6 +791,46 @@ export default function RelayListPage() {
                 <textarea value={editForm.note} onChange={e => setEditForm({ ...editForm, note: e.target.value })} rows={2}
                   placeholder={t('field_note_placeholder')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 resize-none" />
+              </div>
+
+              {/* Equipment Counts */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_equipment')}</label>
+                <div className="space-y-2">
+                  {/* Bag */}
+                  <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                    <span className="text-xs font-bold text-slate-700"><i className="bi bi-bag mr-1.5"></i>{t('equipment_bag')}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, bagCount: Math.max(0, (f.bagCount || 0) - 1) }))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors flex items-center justify-center">−</button>
+                      <span className="w-10 text-center text-sm font-bold text-slate-800">{editForm.bagCount ?? 0}</span>
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, bagCount: (f.bagCount || 0) + 1 }))}
+                        className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+                  {/* Trolley */}
+                  <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                    <span className="text-xs font-bold text-slate-700"><i className="bi bi-cart3 mr-1.5"></i>{t('equipment_trolley')}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, trolleyCount: Math.max(0, (f.trolleyCount || 0) - 1) }))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors flex items-center justify-center">−</button>
+                      <span className="w-10 text-center text-sm font-bold text-slate-800">{editForm.trolleyCount ?? 0}</span>
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, trolleyCount: (f.trolleyCount || 0) + 1 }))}
+                        className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+                  {/* Other */}
+                  <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
+                    <span className="text-xs font-bold text-slate-700"><i className="bi bi-box mr-1.5"></i>{t('equipment_other')}</span>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, otherCount: Math.max(0, (f.otherCount || 0) - 1) }))}
+                        className="w-8 h-8 rounded-lg bg-white border border-slate-200 text-slate-600 font-bold text-sm hover:bg-slate-100 transition-colors flex items-center justify-center">−</button>
+                      <span className="w-10 text-center text-sm font-bold text-slate-800">{editForm.otherCount ?? 0}</span>
+                      <button onClick={() => setEditForm((f: any) => ({ ...f, otherCount: (f.otherCount || 0) + 1 }))}
+                        className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-bold text-sm hover:bg-indigo-700 transition-colors flex items-center justify-center">+</button>
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Evidence Photos */}

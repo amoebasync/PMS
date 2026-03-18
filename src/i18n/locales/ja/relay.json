@@ -97,5 +97,9 @@
   "evidence_add_photo": "写真を追加",
   "evidence_uploading": "アップロード中...",
   "evidence_upload_success": "写真をアップロードしました",
-  "evidence_delete_success": "写真を削除しました"
+  "evidence_delete_success": "写真を削除しました",
+  "field_equipment": "備品数量",
+  "equipment_bag": "バッグ",
+  "equipment_trolley": "台車",
+  "equipment_other": "その他"
 }

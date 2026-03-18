@@ -38,6 +38,9 @@ export async function PUT(
     if (body.note !== undefined) data.note = body.note || null;
     if (body.type !== undefined) data.type = body.type;
     if (body.date !== undefined) data.date = body.date ? new Date(body.date) : null;
+    if (body.bagCount !== undefined) data.bagCount = parseInt(body.bagCount) || 0;
+    if (body.trolleyCount !== undefined) data.trolleyCount = parseInt(body.trolleyCount) || 0;
+    if (body.otherCount !== undefined) data.otherCount = parseInt(body.otherCount) || 0;
 
     const task = await prisma.relayTask.update({
       where: { id: taskId },

@@ -97,5 +97,9 @@
   "evidence_add_photo": "Add Photo",
   "evidence_uploading": "Uploading...",
   "evidence_upload_success": "Photo uploaded",
-  "evidence_delete_success": "Photo deleted"
+  "evidence_delete_success": "Photo deleted",
+  "field_equipment": "Equipment",
+  "equipment_bag": "Flyer Bag",
+  "equipment_trolley": "Trolley",
+  "equipment_other": "Other"
 }
