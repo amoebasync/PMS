@@ -92,5 +92,10 @@
   "carryover_success": "{date} に繰り越しました",
   "route_origin_default": "高田馬場",
   "route_origin_current": "現在地",
-  "route_origin_no_gps": "位置情報を取得できません"
+  "route_origin_no_gps": "位置情報を取得できません",
+  "field_evidence": "エビデンス写真",
+  "evidence_add_photo": "写真を追加",
+  "evidence_uploading": "アップロード中...",
+  "evidence_upload_success": "写真をアップロードしました",
+  "evidence_delete_success": "写真を削除しました"
 }

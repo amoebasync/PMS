@@ -61,6 +61,9 @@ export default function RelayListPage() {
   const [driverSearch, setDriverSearch] = useState('');
   const [showMap, setShowMap] = useState(false);
   const [mapKey, setMapKey] = useState(0); // マップ再マウント用キー
+  const [evidenceUrls, setEvidenceUrls] = useState<string[]>([]);
+  const [evidenceUploading, setEvidenceUploading] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
   const [showRouteOpt, setShowRouteOpt] = useState(false);
   const dragItem = useRef<number | null>(null);
@@ -133,6 +136,7 @@ export default function RelayListPage() {
       date: taskDate,
     });
     setDriverSearch(task.driver ? `${task.driver.lastNameJa} ${task.driver.firstNameJa}` : '');
+    setEvidenceUrls(Array.isArray(task.evidenceUrls) ? task.evidenceUrls : []);
     setShowMap(!!(task.latitude && task.longitude));
     // エリアポリゴン取得
     setPolygonPaths([]);
@@ -267,6 +271,47 @@ export default function RelayListPage() {
       setEditForm((f: any) => ({ ...f, latitude: e.latLng!.lat(), longitude: e.latLng!.lng() }));
     }
   }, []);
+
+  const handleEvidenceUpload = async (files: FileList) => {
+    if (!editTask || files.length === 0) return;
+    setEvidenceUploading(true);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('photos', files[i]);
+      }
+      const res = await fetch(`/api/relay-tasks/${editTask.id}/evidence`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setEvidenceUrls(Array.isArray(data.evidenceUrls) ? data.evidenceUrls : []);
+        // tasks 一覧も更新
+        setTasks(prev => prev.map(t => t.id === editTask.id ? { ...t, evidenceUrls: data.evidenceUrls } : t));
+        showToast(t('evidence_upload_success'), 'success');
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+    setEvidenceUploading(false);
+  };
+
+  const handleEvidenceDelete = async (url: string) => {
+    if (!editTask) return;
+    try {
+      const res = await fetch(`/api/relay-tasks/${editTask.id}/evidence`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const newUrls = Array.isArray(data.evidenceUrls) ? data.evidenceUrls : [];
+        setEvidenceUrls(newUrls);
+        setTasks(prev => prev.map(t => t.id === editTask.id ? { ...t, evidenceUrls: data.evidenceUrls } : t));
+        showToast(t('evidence_delete_success'), 'success');
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+  };
 
   const handleCarryOver = async (task: any) => {
     if (!await showConfirm(t('carryover_confirm'), { confirmLabel: t('btn_carryover') })) return;
@@ -652,7 +697,7 @@ export default function RelayListPage() {
               </div>
 
               {/* Date + Time slot */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_date')}</label>
                   <input type="date" value={editForm.date || ''} onChange={e => setEditForm({ ...editForm, date: e.target.value })}
@@ -714,6 +759,32 @@ export default function RelayListPage() {
                   placeholder={t('field_note_placeholder')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 resize-none" />
               </div>
+
+              {/* Evidence Photos */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_evidence')}</label>
+                {evidenceUrls.length > 0 && (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mb-2">
+                    {evidenceUrls.map((url, idx) => (
+                      <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                        <img src={url} alt={`evidence-${idx}`} className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => setPreviewImage(url)} />
+                        <button onClick={() => handleEvidenceDelete(url)}
+                          className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                          <i className="bi bi-x"></i>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label className={`inline-flex items-center gap-1.5 px-3 py-1.5 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 cursor-pointer hover:border-indigo-400 hover:text-indigo-600 transition-colors ${evidenceUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                  {evidenceUploading
+                    ? <><i className="bi bi-arrow-repeat animate-spin"></i>{t('evidence_uploading')}</>
+                    : <><i className="bi bi-camera"></i>{t('evidence_add_photo')}</>}
+                  <input type="file" accept="image/*" multiple className="hidden"
+                    onChange={e => { if (e.target.files) { handleEvidenceUpload(e.target.files); e.target.value = ''; } }} />
+                </label>
+              </div>
             </div>
             <div className="px-4 md:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-slate-100 flex justify-end gap-2 shrink-0 bg-white">
               <button onClick={() => { setEditTask(null); setShowMap(false); }} className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">
@@ -725,6 +796,16 @@ export default function RelayListPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
+          <button onClick={() => setPreviewImage(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/20 text-white rounded-full flex items-center justify-center text-xl hover:bg-white/30">
+            <i className="bi bi-x-lg"></i>
+          </button>
+          <img src={previewImage} alt="preview" className="max-w-full max-h-full object-contain rounded-lg" onClick={e => e.stopPropagation()} />
         </div>
       )}
     </div>

@@ -989,6 +989,9 @@ model RelayTask {
   // メモ
   note        String?      @db.Text
 
+  // エビデンス写真（S3 URL の JSON配列）
+  evidenceUrls Json?       @map("evidence_urls") // ["url1", "url2", ...]
+
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
 

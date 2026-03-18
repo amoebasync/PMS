@@ -92,5 +92,10 @@
   "carryover_success": "Carried over to {date}",
   "route_origin_default": "Takadanobaba",
   "route_origin_current": "Current",
-  "route_origin_no_gps": "Unable to get location"
+  "route_origin_no_gps": "Unable to get location",
+  "field_evidence": "Evidence Photos",
+  "evidence_add_photo": "Add Photo",
+  "evidence_uploading": "Uploading...",
+  "evidence_upload_success": "Photo uploaded",
+  "evidence_delete_success": "Photo deleted"
 }
