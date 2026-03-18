@@ -280,6 +280,8 @@
   "eval_distributor_send_welcome_note": "Sends an email with login URL, staff ID, and initial password",
   "eval_distributor_sync_posting": "Also register in Posting System",
   "eval_distributor_sync_posting_note": "Uncheck to register in PMS only",
+  "eval_distributor_send_contract": "Send employment contract (DocuSeal)",
+  "eval_distributor_send_contract_note": "Automatically sends a contractor agreement via DocuSeal after registration",
   "eval_distributor_send_portal": "Send Portal Info",
   "eval_distributor_portal_sent": "Distributor portal info email sent",
   "eval_distributor_portal_failed": "Failed to send portal info email",

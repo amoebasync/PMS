@@ -280,6 +280,8 @@
   "eval_distributor_send_welcome_note": "ログインURL・スタッフID・初期パスワードを記載したメールを送信します",
   "eval_distributor_sync_posting": "Posting Systemにも登録する",
   "eval_distributor_sync_posting_note": "チェックを外すとPMSのみに登録されます",
+  "eval_distributor_send_contract": "業務委託契約書を送信する（DocuSeal）",
+  "eval_distributor_send_contract_note": "登録完了後にDocuSealで業務委託契約書を自動送信します",
   "eval_distributor_send_portal": "ポータル案内送信",
   "eval_distributor_portal_sent": "配布員ポータル案内メールを送信しました",
   "eval_distributor_portal_failed": "ポータル案内メールの送信に失敗しました",

@@ -528,7 +528,7 @@ export default function ApplicantsPage() {
   // ── 配布員登録 ──
   const [branches, setBranches] = useState<{ id: number; nameJa: string; prefix: string | null }[]>([]);
   const [showDistributorForm, setShowDistributorForm] = useState(false);
-  const [distForm, setDistForm] = useState({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true });
+  const [distForm, setDistForm] = useState({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true, sendContract: true });
   const [staffIdLoading, setStaffIdLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [registeredDistributorId, setRegisteredDistributorId] = useState<number | null>(null);
@@ -778,6 +778,7 @@ export default function ApplicantsPage() {
           staffId: distForm.staffId || undefined,
           sendWelcomeEmail: distForm.sendWelcomeEmail,
           syncToPostingSystem: distForm.syncToPostingSystem,
+          sendContract: distForm.sendContract,
         }),
       });
       const data = await res.json();
@@ -1236,7 +1237,7 @@ export default function ApplicantsPage() {
     setSelectedTrainingSlotId('');
     setTrainingBookingMode('now');
     setShowDistributorForm(false);
-    setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true });
+    setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true, sendContract: true });
     setRegisteredDistributorId(null);
     try {
       const res = await fetch(`/api/applicants/${applicantId}`);
@@ -3956,7 +3957,7 @@ export default function ApplicantsPage() {
                     <button
                       onClick={() => {
                         setShowDistributorForm(true);
-                        setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true });
+                        setDistForm({ branchId: '', staffId: '', sendWelcomeEmail: true, syncToPostingSystem: true, sendContract: true });
                         if (branches.length === 0) fetchBranches();
                       }}
                       className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors flex items-center gap-1.5"
@@ -4068,6 +4069,16 @@ export default function ApplicantsPage() {
                 <span className="text-sm text-slate-700">{t('eval_distributor_sync_posting')}</span>
               </label>
               <p className="text-[10px] text-slate-400 -mt-2 ml-6.5">{t('eval_distributor_sync_posting_note')}</p>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={distForm.sendContract}
+                  onChange={e => setDistForm(f => ({ ...f, sendContract: e.target.checked }))}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700">{t('eval_distributor_send_contract')}</span>
+              </label>
+              <p className="text-[10px] text-slate-400 -mt-2 ml-6.5">{t('eval_distributor_send_contract_note')}</p>
             </div>
             {/* フッター */}
             <div className="flex gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">

@@ -5,6 +5,7 @@ import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { sendDistributorWelcomeEmail } from '@/lib/mailer';
 import { isPostingSystemSyncConfigured, syncStaffToPostingSystem } from '@/lib/posting-system-sync';
 import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
+import { isDocusealConfigured, createContractSubmission } from '@/lib/docuseal';
 
 async function buildInitialPassword(birthday: Date): Promise<string> {
   return hashPassword(birthdayToYYYYMMDD(birthday));
@@ -25,7 +26,7 @@ export async function POST(
     const { id } = await params;
     const applicantId = parseInt(id);
     const body = await request.json();
-    const { branchId, staffId, sendWelcomeEmail = false, syncToPostingSystem = true } = body;
+    const { branchId, staffId, sendWelcomeEmail = false, syncToPostingSystem = true, sendContract = false } = body;
 
     if (!branchId) {
       return NextResponse.json({ error: '所属支店は必須です' }, { status: 400 });
@@ -144,12 +145,38 @@ export async function POST(
       }
     }
 
+    // 業務委託契約書送信（DocuSeal）
+    let contractSent = false;
+    if (sendContract && applicant.email && isDocusealConfigured()) {
+      try {
+        const submission = await createContractSubmission({
+          email: applicant.email,
+          name: applicant.name,
+          externalId: String(newDistributor.id),
+          sendEmail: true,
+        });
+        const submitter = submission.submitters?.[0];
+        await prisma.flyerDistributor.update({
+          where: { id: newDistributor.id },
+          data: {
+            contractStatus: 'SENT',
+            docusealSubmissionId: submission.id,
+            docusealSubmitterId: submitter?.id || null,
+          },
+        });
+        contractSent = true;
+      } catch (err) {
+        console.error('Contract send error during distributor registration:', err);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       distributorId: newDistributor.id,
       staffId: newDistributor.staffId,
       name: newDistributor.name,
       emailSent,
+      contractSent,
     });
   } catch (error: any) {
     console.error('Register As Distributor Error:', error);
