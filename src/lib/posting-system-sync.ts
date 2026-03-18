@@ -12,8 +12,29 @@
 const API_URL = process.env.POSTING_SYSTEM_API_URL;
 const API_KEY = process.env.POSTING_SYSTEM_API_KEY;
 
+/** PMS支店名 → Posting System 店舗コード（SHOP_CD）マッピング */
+const BRANCH_TO_SHOP_CD: Record<string, string> = {
+  '高田馬場': '馬場',
+  '横浜': '横浜',
+  '新松戸': '松戸',
+  '浦和': '浦和',
+  '西新井': '新井',
+  '新小岩': '小岩',
+  '蒲田': '蒲田',
+  '赤羽': '赤羽',
+  '吉祥寺': '吉祥',
+};
+
+/** デフォルトの業務区分 */
+const DEFAULT_BUSINESS_CATEGORY = 'ポスティングスタッフ';
+
 export function isPostingSystemSyncConfigured(): boolean {
   return !!(API_URL && API_KEY);
+}
+
+/** PMS支店名からPosting System店舗コードを取得 */
+export function branchNameToShopCd(branchName: string): string {
+  return BRANCH_TO_SHOP_CD[branchName] || branchName;
 }
 
 interface SyncStaffParams {
@@ -22,6 +43,7 @@ interface SyncStaffParams {
   staffTel: string;
   shopCd: string;
   joinDate?: string; // YYYY-MM-DD
+  businessCategory?: string;
 }
 
 /**
@@ -55,6 +77,7 @@ export async function syncStaffToPostingSystem(
         staffTel: params.staffTel,
         shopCd: params.shopCd,
         joinDate: params.joinDate || new Date().toISOString().slice(0, 10),
+        businessCategory: params.businessCategory || DEFAULT_BUSINESS_CATEGORY,
       }),
     });
 

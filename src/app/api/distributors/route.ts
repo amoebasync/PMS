@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
-import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem } from '@/lib/posting-system-sync';
+import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem, branchNameToShopCd } from '@/lib/posting-system-sync';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
@@ -174,11 +174,15 @@ export async function POST(request: Request) {
 
     // Posting System 同期（fire-and-forget）
     if (isPostingSystemSyncConfigured()) {
+      // 支店名からPosting System店舗コードを取得
+      const branch = branchId ? await prisma.branch.findUnique({ where: { id: branchId }, select: { nameJa: true } }) : null;
+      const shopCd = branch?.nameJa ? branchNameToShopCd(branch.nameJa) : '';
+
       syncStaffToPostingSystem({
         staffCd: newDistributor.staffId,
         staffName: newDistributor.name,
         staffTel: newDistributor.phone || '',
-        shopCd: '',
+        shopCd,
         joinDate: newDistributor.joinDate
           ? new Date(newDistributor.joinDate).toISOString().slice(0, 10)
           : undefined,

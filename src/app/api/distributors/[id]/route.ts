@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { removeFromGoogleGroup, isGooglePlayTesterConfigured } from '@/lib/google-play-tester';
 import { removeBetaTester, isAppStoreConnectConfigured } from '@/lib/appstore-connect';
 import { requireAdminSession } from '@/lib/adminAuth';
-import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem } from '@/lib/posting-system-sync';
+import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem, branchNameToShopCd } from '@/lib/posting-system-sync';
 import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
 
 
@@ -176,14 +176,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     // Posting System 同期（fire-and-forget）
     if (isPostingSystemSyncConfigured()) {
-      // 基本情報（電話番号・名前）
-      if (body.phone !== undefined) {
+      // 支店名からPosting System店舗コードを取得
+      const updatedBranchId = parseIntSafe(body.branchId);
+      const branch = updatedBranchId ? await prisma.branch.findUnique({ where: { id: updatedBranchId }, select: { nameJa: true } }) : null;
+      const shopCd = branch?.nameJa ? branchNameToShopCd(branch.nameJa) : '';
+
+      // 基本情報（電話番号・名前・店舗）
+      if (body.phone !== undefined || body.branchId !== undefined) {
         syncStaffToPostingSystem({
           staffCd: updated.staffId,
           staffName: updated.name,
           staffTel: updated.phone || '',
-          shopCd: '',
-          joinDate: '',
+          shopCd,
         }).catch(err => console.error('[PostingSync] Failed to sync phone update:', err));
       }
 
