@@ -682,3 +682,63 @@ function MyPage() {
 3. コンポーネント内で `const { t } = useTranslation('{page}');` を呼ぶ
 4. ハードコードされた日本語を `t('key')` に置換
 5. common.json に既にあるキー（save, cancel, delete等）は重複登録しない
+
+## ピッキング照合機能（2026-03-18 実装済み）
+
+### 概要
+配布員別のスケジュールに基づいてチラシをピッキング（準備）する際に、正しいチラシか確認する機能。
+- スケジュール単位でチェック（チラシ毎ではない）
+- 2段階チェック: AIチェック（Claude Vision API） + 人的チェック（別の人）
+- 類似チラシ警告: 当日同じ顧客の異なるチラシがある場合に自動警告
+- チラシ備考表示: Flyer.remarks をピッキング画面に表示
+
+### DB（Prisma スキーマ）
+- Enum: `VerificationResult`（MATCH / MISMATCH / UNCERTAIN）
+- Enum: `CheckerResult`（APPROVED / REJECTED）
+- Enum: `PickingStatus`（PENDING / AI_CHECKED / VERIFIED / REJECTED）
+- テーブル: `picking_verifications`（スケジュール1件 = 1レコード）
+
+### API（管理者 pms_session 必須）
+- `GET /api/picking?date=YYYY-MM-DD` — 当日スケジュール＋照合状況一覧、類似チラシ警告、統計
+- `POST /api/picking/upload` — 写真アップロード（S3） + Claude Vision AIで照合
+  - FormData: scheduleId, photo, similarWarnings(オプション)
+- `PUT /api/picking/[id]/check` — 人的チェック（承認/差戻し）
+  - body: { result: "APPROVED" | "REJECTED", note?: string }
+  - ピッキングした人 ≠ チェックする人（同一人物不可）
+- `PUT /api/picking/[id]/retake` — 撮り直し（レコード削除してリセット）
+
+### フロントエンド
+- `/picking` — ピッキング照合画面
+  - 日付選択
+  - 配布員ごとのスケジュール一覧（アコーディオン）
+  - 各スケジュールにチラシ名・コード・部数・備考表示
+  - 類似チラシ警告（同じ顧客で異なるチラシがある場合）
+  - 写真撮影/アップロードボタン
+  - AIチェック結果表示（MATCH=緑, MISMATCH=赤, UNCERTAIN=黄）
+  - 人的チェックボタン（承認/差戻し）
+  - ステータスバッジ（未着手/AI確認済/完了/差戻し）
+  - 統計カード（合計/未着手/AI確認済/完了/差戻し）
+
+### Claude Vision AIプロンプト
+- チラシ名、コード、顧客名、枚数、備考をプロンプトに含める
+- 類似チラシ警告がある場合は「混同注意」として追記
+- 判定結果: MATCH（全て一致）, MISMATCH（明らかに不一致）, UNCERTAIN（判断困難）
+- JSON形式で { result, reason } を返す
+
+### S3 アップロード先
+- `uploads/picking/{scheduleId}/{timestamp}.{ext}`
+
+### 環境変数
+- `ANTHROPIC_API_KEY` — Claude API呼び出しに必要
+
+### ルール
+- ピッキングした人 ≠ チェックする人（同一人物不可）
+- AI が MISMATCH の場合、撮り直しを促す
+- 全スケジュールが AI + 人 VERIFIED で当日ピッキング完了
+
+### i18n
+- `src/i18n/locales/ja/picking.json`
+- `src/i18n/locales/en/picking.json`
+
+### サイドバー
+- OPERATIONSグループに「ピッキング照合」メニュー追加

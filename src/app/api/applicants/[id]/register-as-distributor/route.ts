@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { sendDistributorWelcomeEmail } from '@/lib/mailer';
+import { isPostingSystemSyncConfigured, syncStaffToPostingSystem } from '@/lib/posting-system-sync';
 import crypto from 'crypto';
 
 function buildInitialPassword(birthday: Date): string {
@@ -107,6 +108,21 @@ export async function POST(
 
       return distributor;
     });
+
+    // Posting System に同期（fire-and-forget）
+    if (isPostingSystemSyncConfigured()) {
+      const branch = await prisma.branch.findUnique({
+        where: { id: parseInt(branchId, 10) },
+        select: { prefix: true },
+      });
+      syncStaffToPostingSystem({
+        staffCd: newDistributor.staffId,
+        staffName: newDistributor.name,
+        staffTel: newDistributor.phone || '',
+        shopCd: branch?.prefix || '',
+        joinDate: new Date().toISOString().slice(0, 10),
+      }).catch(err => console.error('[PostingSync] Failed to sync new distributor:', err));
+    }
 
     // 案内メール送信
     let emailSent = false;

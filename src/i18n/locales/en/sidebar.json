@@ -70,6 +70,8 @@
     "pricing": "Pricing",
     "area_analytics": "Area Distribution Analytics",
     "distribution_analytics": "Distribution Analytics",
-    "company_settings": "Company Settings"
-  }
+    "company_settings": "Company Settings",
+    "picking_verification": "Picking Verification"
+  },
+  "picking_verification": "Picking"
 }

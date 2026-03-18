@@ -59,6 +59,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { nameKey: 'area_management', href: '/areas', icon: 'bi-geo-alt-fill' },
       { nameKey: 'flyer_management', href: '/flyers', icon: 'bi-file-earmark-richtext' },
       { nameKey: 'inventory_management', href: '/transactions', icon: 'bi-box-seam' },
+      { nameKey: 'picking_verification', href: '/picking', icon: 'bi-camera-fill' },
       { nameKey: 'partner_management', href: '/partners', icon: 'bi-truck' },
       { nameKey: 'distributor_management', href: '/distributors', icon: 'bi-bicycle' },
       { nameKey: 'shift_management', href: '/distributor-shifts', icon: 'bi-calendar-week' },

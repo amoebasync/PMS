@@ -70,6 +70,8 @@
     "pricing": "価格設定",
     "area_analytics": "エリア別配布分析",
     "distribution_analytics": "配布分析",
-    "company_settings": "自社情報設定"
-  }
+    "company_settings": "自社情報設定",
+    "picking_verification": "ピッキング照合"
+  },
+  "picking_verification": "ピッキング照合"
 }

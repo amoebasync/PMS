@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { removeFromGoogleGroup, isGooglePlayTesterConfigured } from '@/lib/google-play-tester';
 import { removeBetaTester, isAppStoreConnectConfigured } from '@/lib/appstore-connect';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem } from '@/lib/posting-system-sync';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
@@ -175,6 +176,35 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         language: body.language || 'ja',
       },
     });
+
+    // Posting System 同期（fire-and-forget）
+    if (isPostingSystemSyncConfigured()) {
+      // 基本情報（電話番号・名前）
+      if (body.phone !== undefined) {
+        syncStaffToPostingSystem({
+          staffCd: updated.staffId,
+          staffName: updated.name,
+          staffTel: updated.phone || '',
+          shopCd: '',
+          joinDate: '',
+        }).catch(err => console.error('[PostingSync] Failed to sync phone update:', err));
+      }
+
+      // 単価同期
+      if (body.rate1Type !== undefined || body.rate2Type !== undefined ||
+          body.rate3Type !== undefined || body.rate4Type !== undefined ||
+          body.rate5Type !== undefined || body.rate6Type !== undefined) {
+        syncStaffRatesToPostingSystem({
+          staffCd: updated.staffId,
+          rate1: updated.rate1Type,
+          rate2: updated.rate2Type,
+          rate3: updated.rate3Type,
+          rate4: updated.rate4Type,
+          rate5: updated.rate5Type,
+          rate6: updated.rate6Type,
+        }).catch(err => console.error('[PostingSync] Failed to sync rate update:', err));
+      }
+    }
 
     return NextResponse.json(updated);
   } catch (error) {

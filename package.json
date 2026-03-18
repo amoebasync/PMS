@@ -17,6 +17,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.79.0",
     "@aws-sdk/client-s3": "^3.997.0",
     "@aws-sdk/s3-request-presigner": "^3.997.0",
     "@fullcalendar/core": "^6.1.20",

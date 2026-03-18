@@ -237,6 +237,10 @@ model Employee {
   // 中継/回収ドライバー
   relayTasks                  RelayTask[] @relation("RelayDriver")
 
+  // ピッキング照合
+  pickingAsPicker             PickingVerification[] @relation("PickingPicker")
+  pickingAsChecker            PickingVerification[] @relation("PickingChecker")
+
   @@map("employees")
 }
 
@@ -871,6 +875,7 @@ model DistributionSchedule {
   session            DistributionSession?
   adminNotifications AdminNotification[]
   relayTasks         RelayTask[]
+  pickingVerification PickingVerification?
 
   @@index([distributorId, date])
   @@index([branchId, date])
@@ -3127,4 +3132,69 @@ model AlertDefinition {
   notifications   AdminNotification[]
 
   @@map("alert_definitions")
+}
+
+// ==========================================
+// ピッキング照合モジュール
+// ==========================================
+
+// --- AI照合結果 ---
+enum VerificationResult {
+  MATCH     @map("一致")
+  MISMATCH  @map("不一致")
+  UNCERTAIN @map("要確認")
+}
+
+// --- 人的チェック結果 ---
+enum CheckerResult {
+  APPROVED @map("承認")
+  REJECTED @map("差戻し")
+}
+
+// --- ピッキングステータス ---
+enum PickingStatus {
+  PENDING     @map("未着手")
+  AI_CHECKED  @map("AI確認済")
+  VERIFIED    @map("完了")
+  REJECTED    @map("差戻し")
+}
+
+// --- ピッキング照合 ---
+model PickingVerification {
+  id           Int                  @id @default(autoincrement())
+  
+  // スケジュールとの紐付け（1スケジュール = 1レコード）
+  scheduleId   Int                  @unique @map("schedule_id")
+  schedule     DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  
+  // 写真（S3）
+  photoUrl     String?              @map("photo_url") @db.Text
+  
+  // ピッキング担当者
+  pickerId     Int                  @map("picker_id")
+  picker       Employee             @relation("PickingPicker", fields: [pickerId], references: [id])
+  pickedAt     DateTime             @map("picked_at")
+  
+  // AI照合結果
+  aiResult     VerificationResult?  @map("ai_result")
+  aiReason     String?              @map("ai_reason") @db.Text
+  aiCheckedAt  DateTime?            @map("ai_checked_at")
+  
+  // 人的チェック
+  checkerId    Int?                 @map("checker_id")
+  checker      Employee?            @relation("PickingChecker", fields: [checkerId], references: [id])
+  checkerResult CheckerResult?      @map("checker_result")
+  checkerNote  String?              @map("checker_note") @db.Text
+  checkedAt    DateTime?            @map("checked_at")
+  
+  // ステータス
+  status       PickingStatus        @default(PENDING)
+  
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  
+  @@index([pickerId])
+  @@index([checkerId])
+  @@index([status])
+  @@map("picking_verifications")
 }
