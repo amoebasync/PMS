@@ -804,9 +804,9 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
         {/* Side panel - mobile: toggle overlay, desktop: fixed sidebar */}
         <button
           onClick={() => setSidePanelOpen(!sidePanelOpen)}
-          className="md:hidden absolute top-3 right-3 z-10 w-10 h-10 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-600 hover:bg-slate-50"
+          className="md:hidden absolute top-3 right-3 z-30 w-12 h-12 rounded-full bg-white shadow-lg flex items-center justify-center text-slate-600 hover:bg-slate-50 active:bg-slate-100 border border-slate-200"
         >
-          <i className={`bi ${sidePanelOpen ? 'bi-x-lg' : 'bi-bar-chart-line'}`}></i>
+          <i className={`bi ${sidePanelOpen ? 'bi-x-lg' : 'bi-bar-chart-line'} text-lg`}></i>
         </button>
         <div className={`
           ${sidePanelOpen ? 'translate-x-0' : 'translate-x-full'}
