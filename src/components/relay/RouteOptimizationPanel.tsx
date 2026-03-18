@@ -218,63 +218,65 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
         </div>
 
         {/* Priority Toggle + Origin Selector */}
-        <div className="px-4 py-2 border-b border-slate-100 flex flex-wrap items-center gap-2 shrink-0">
-          {([
-            { key: 'COLLECTION_FIRST' as Priority, icon: 'bi-box-arrow-in-left', active: 'bg-purple-100 text-purple-700 border-purple-300' },
-            { key: 'RELAY_FIRST' as Priority, icon: 'bi-truck', active: 'bg-orange-100 text-orange-700 border-orange-300' },
-            { key: 'TIME_OPTIMAL' as Priority, icon: 'bi-clock', active: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
-          ]).map(({ key, icon, active }) => (
-            <button key={key} onClick={() => handlePriorityChange(key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
-                priority === key
-                  ? active
-                  : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
-              }`}>
-              <i className={`bi ${icon}`}></i>
-              {t(`priority_${key.toLowerCase()}`)}
-            </button>
-          ))}
+        <div className="px-4 py-2 border-b border-slate-100 shrink-0 space-y-2">
+          {/* Row 1: Priority buttons */}
+          <div className="flex items-center gap-1.5">
+            {([
+              { key: 'COLLECTION_FIRST' as Priority, icon: 'bi-box-arrow-in-left', active: 'bg-purple-100 text-purple-700 border-purple-300' },
+              { key: 'RELAY_FIRST' as Priority, icon: 'bi-truck', active: 'bg-orange-100 text-orange-700 border-orange-300' },
+              { key: 'TIME_OPTIMAL' as Priority, icon: 'bi-clock', active: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
+            ]).map(({ key, icon, active }) => (
+              <button key={key} onClick={() => handlePriorityChange(key)}
+                className={`px-2 md:px-3 py-1.5 rounded-lg text-[11px] md:text-xs font-bold flex items-center gap-1 transition-all border ${
+                  priority === key
+                    ? active
+                    : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'
+                }`}>
+                <i className={`bi ${icon}`}></i>
+                <span className="hidden sm:inline">{t(`priority_${key.toLowerCase()}`)}</span>
+              </button>
+            ))}
 
-          {/* Origin selector */}
-          <div className="flex items-center gap-1 ml-2 border-l border-slate-200 pl-2">
-            <span className="text-[10px] text-slate-400 mr-1"><i className="bi bi-pin-map"></i></span>
-            <button onClick={() => handleOriginChange('DEFAULT')}
-              className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
-                originType === 'DEFAULT'
-                  ? 'bg-sky-100 text-sky-700 border-sky-300'
-                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
-              }`}>
-              {t('route_origin_default')}
-            </button>
-            <button onClick={() => handleOriginChange('CURRENT')}
-              className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
-                originType === 'CURRENT'
-                  ? 'bg-sky-100 text-sky-700 border-sky-300'
-                  : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
-              }`}
-              disabled={!currentLocation}
-              title={!currentLocation ? t('route_origin_no_gps') : ''}>
-              <i className="bi bi-crosshair mr-0.5"></i>
-              {t('route_origin_current')}
-            </button>
+            {/* Origin selector */}
+            <div className="flex items-center gap-1 ml-auto md:ml-2 md:border-l border-slate-200 md:pl-2">
+              <button onClick={() => handleOriginChange('DEFAULT')}
+                className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
+                  originType === 'DEFAULT'
+                    ? 'bg-sky-100 text-sky-700 border-sky-300'
+                    : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                }`}>
+                <i className="bi bi-pin-map mr-0.5"></i>
+                <span className="hidden sm:inline">{t('route_origin_default')}</span>
+              </button>
+              <button onClick={() => handleOriginChange('CURRENT')}
+                className={`px-2 py-1 rounded text-[10px] font-bold transition-all border ${
+                  originType === 'CURRENT'
+                    ? 'bg-sky-100 text-sky-700 border-sky-300'
+                    : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                }`}
+                disabled={!currentLocation}
+                title={!currentLocation ? t('route_origin_no_gps') : ''}>
+                <i className="bi bi-crosshair"></i>
+                <span className="hidden sm:inline ml-0.5">{t('route_origin_current')}</span>
+              </button>
+            </div>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {result && result.optimizedTasks.length > 0 && (
-              <>
-                <button onClick={handleApplyOrder}
-                  className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1">
-                  <i className="bi bi-check-lg"></i>
-                  <span className="hidden sm:inline">{t('btn_apply_order')}</span>
-                </button>
-                <button onClick={handleStartNavigation}
-                  className="px-3 py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 flex items-center gap-1">
-                  <i className="bi bi-navigation"></i>
-                  <span className="hidden sm:inline">{t('btn_start_navigation')}</span>
-                </button>
-              </>
-            )}
-          </div>
+          {/* Row 2: Action buttons (mobile: full width) */}
+          {result && result.optimizedTasks.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button onClick={handleApplyOrder}
+                className="flex-1 md:flex-none px-3 py-2 md:py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-1.5">
+                <i className="bi bi-check-lg"></i>
+                {t('btn_apply_order')}
+              </button>
+              <button onClick={handleStartNavigation}
+                className="flex-1 md:flex-none px-3 py-2 md:py-1.5 bg-green-600 text-white text-xs font-bold rounded-lg hover:bg-green-700 flex items-center justify-center gap-1.5">
+                <i className="bi bi-navigation"></i>
+                {t('btn_start_navigation')}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Loading / Error */}
@@ -409,17 +411,11 @@ export default function RouteOptimizationPanel({ isLoaded, date, driverId, drive
                 </div>
               )}
 
-              {/* Mobile navigation floating button */}
-              {result.optimizedTasks.length > 0 && (
-                <button onClick={handleStartNavigation}
-                  className="md:hidden absolute bottom-4 right-4 w-14 h-14 bg-green-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-green-700 active:scale-95 transition-transform z-10">
-                  <i className="bi bi-navigation text-xl"></i>
-                </button>
-              )}
+              {/* Mobile navigation floating button removed - buttons are now in the toolbar */}
             </div>
 
             {/* Task List Panel */}
-            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 flex flex-col shrink-0 max-h-[40vh] md:max-h-none overflow-hidden">
+            <div className="w-full md:w-80 border-t md:border-t-0 md:border-l border-slate-200 flex flex-col shrink-0 max-h-[35vh] md:max-h-none overflow-hidden">
               {/* Summary */}
               <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0">
                 <div className="flex items-center justify-between text-xs">

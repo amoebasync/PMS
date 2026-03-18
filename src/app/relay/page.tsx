@@ -60,6 +60,7 @@ export default function RelayListPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [driverSearch, setDriverSearch] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [mapKey, setMapKey] = useState(0); // マップ再マウント用キー
   const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
   const [showRouteOpt, setShowRouteOpt] = useState(false);
   const dragItem = useRef<number | null>(null);
@@ -235,6 +236,8 @@ export default function RelayListPage() {
   }).slice(0, 10);
 
   const handleShowMap = () => {
+    // 既にマップ表示中の場合はキーを変えて再マウント（center反映のため）
+    setMapKey(k => k + 1);
     setShowMap(true);
     if (!editForm.latitude && !editForm.longitude) {
       // ポリゴンが既に取得済みならそこから中心座標を計算
@@ -596,8 +599,8 @@ export default function RelayListPage() {
 
       {/* Edit Modal */}
       {editTask && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-lg overflow-hidden flex flex-col max-h-full md:max-h-[90vh]">
+        <div className="fixed inset-0 z-[200] flex items-end md:items-center justify-center md:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-t-2xl md:rounded-xl shadow-xl w-full md:max-w-lg overflow-hidden flex flex-col max-h-[92vh] md:max-h-[90vh]">
             <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base text-slate-800">
                 <i className={`bi ${editForm.type === 'COLLECTION' ? 'bi-box-arrow-in-left text-purple-500' : editForm.type === 'FULL_RELAY' ? 'bi-truck text-green-500' : 'bi-truck text-orange-500'} mr-2`}></i>
@@ -605,7 +608,7 @@ export default function RelayListPage() {
               </h3>
               <button onClick={() => { setEditTask(null); setShowMap(false); }} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
             </div>
-            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-auto">
+            <div className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto overscroll-contain">
               {/* Type */}
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_type')}</label>
@@ -633,7 +636,7 @@ export default function RelayListPage() {
                     placeholder={t('field_driver_placeholder')}
                     className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
                   {driverSearch && !editForm.driverId && filteredEmployees.length > 0 && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 max-h-40 overflow-auto">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-40 overflow-auto">
                       {filteredEmployees.map(e => (
                         <button key={e.id} onClick={() => { setEditForm({ ...editForm, driverId: e.id }); setDriverSearch(`${e.lastNameJa} ${e.firstNameJa}`); }}
                           className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2">
@@ -688,6 +691,7 @@ export default function RelayListPage() {
                 {showMap && isLoaded && editForm.latitude && editForm.longitude && (
                   <div className="w-full h-40 mt-2 rounded-lg border border-slate-200 overflow-hidden">
                     <GoogleMap
+                      key={mapKey}
                       mapContainerStyle={{ width: '100%', height: '100%' }}
                       center={{ lat: editForm.latitude, lng: editForm.longitude }}
                       zoom={15}
@@ -712,7 +716,7 @@ export default function RelayListPage() {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 resize-none" />
               </div>
             </div>
-            <div className="px-4 md:px-6 py-3 border-t border-slate-100 flex justify-end gap-2 shrink-0">
+            <div className="px-4 md:px-6 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] border-t border-slate-100 flex justify-end gap-2 shrink-0 bg-white">
               <button onClick={() => { setEditTask(null); setShowMap(false); }} className="px-4 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-lg">
                 {t('btn_cancel')}
               </button>
