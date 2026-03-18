@@ -2,7 +2,7 @@
   "page_title": "LINE連携管理",
   "import_followers": "フォロワー取込",
   "importing": "取込中...",
-  "import_success": "取込完了: {imported}件の新規ユーザーを追加しました（全{total}件中）",
+  "import_success": "取込完了: {{imported}}件の新規ユーザーを追加しました（全{{total}}件中）",
   "import_failed": "取込に失敗しました",
   "filter_all": "すべて",
   "filter_linked": "紐付け済み",
@@ -25,5 +25,5 @@
   "total": "合計",
   "linked": "紐付け済",
   "unlinked": "未紐付",
-  "stats_description": "{total}人中 {linked}人が紐付け済み"
+  "stats_description": "{{total}}人中 {{linked}}人が紐付け済み"
 }

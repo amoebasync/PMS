@@ -2,7 +2,7 @@
   "page_title": "LINE Integration",
   "import_followers": "Import Followers",
   "importing": "Importing...",
-  "import_success": "Import complete: {imported} new users added (out of {total})",
+  "import_success": "Import complete: {{imported}} new users added (out of {{total}})",
   "import_failed": "Import failed",
   "filter_all": "All",
   "filter_linked": "Linked",
@@ -25,5 +25,5 @@
   "total": "Total",
   "linked": "Linked",
   "unlinked": "Unlinked",
-  "stats_description": "{linked} of {total} users linked"
+  "stats_description": "{{linked}} of {{total}} users linked"
 }
