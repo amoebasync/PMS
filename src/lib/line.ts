@@ -1,16 +1,17 @@
 import crypto from 'crypto';
 
-const CHANNEL_ACCESS_TOKEN = process.env.LINE_CHANNEL_ACCESS_TOKEN || '';
-const CHANNEL_SECRET = process.env.LINE_CHANNEL_SECRET || '';
-
 const LINE_API_BASE = 'https://api.line.me/v2/bot';
+
+/** 環境変数を実行時に取得（モジュール初期化時のキャッシュ問題を回避） */
+function getAccessToken() { return process.env.LINE_CHANNEL_ACCESS_TOKEN || ''; }
+function getChannelSecret() { return process.env.LINE_CHANNEL_SECRET || ''; }
 
 /** LINE API にリクエストを送信 */
 async function lineApiFetch(path: string, options?: RequestInit) {
   const res = await fetch(`${LINE_API_BASE}${path}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${CHANNEL_ACCESS_TOKEN}`,
+      Authorization: `Bearer ${getAccessToken()}`,
       'Content-Type': 'application/json',
       ...options?.headers,
     },
@@ -25,7 +26,7 @@ async function lineApiFetch(path: string, options?: RequestInit) {
 /** Webhook 署名を検証 */
 export function verifySignature(body: string, signature: string): boolean {
   const hash = crypto
-    .createHmac('SHA256', CHANNEL_SECRET)
+    .createHmac('SHA256', getChannelSecret())
     .update(body)
     .digest('base64');
   return hash === signature;
@@ -143,5 +144,5 @@ export function buildRegistrationFlexMessage() {
 
 /** LINE設定が有効か確認 */
 export function isLineConfigured(): boolean {
-  return !!CHANNEL_ACCESS_TOKEN && !!CHANNEL_SECRET;
+  return !!getAccessToken() && !!getChannelSecret();
 }
