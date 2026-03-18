@@ -53,9 +53,51 @@ export async function GET(
       return NextResponse.json({ error: '配布セッションがまだ開始されていません' }, { status: 404 });
     }
 
-    // エリア内の禁止物件を取得
+    // エリア内の禁止物件を取得（Posting System API → PMS DB フォールバック）
     let prohibitedProperties: any[] = [];
-    if (schedule.areaId) {
+    const addressCode = schedule.area?.address_code;
+    if (addressCode) {
+      // Posting System API から禁止物件を取得
+      try {
+        const customerIds = [...new Set(schedule.items.map(i => i.customerId).filter(Boolean))];
+        let clientCodes = '';
+        if (customerIds.length > 0) {
+          const customers = await prisma.customer.findMany({
+            where: { id: { in: customerIds as number[] } },
+            select: { customerCode: true },
+          });
+          clientCodes = customers.map(c => c.customerCode).join(',');
+        }
+        const psUrl = `https://postingsystem.net/postingmanage/GetForbiddenBuildingsExec.php?areaCode=${encodeURIComponent(addressCode)}&clientCodes=${encodeURIComponent(clientCodes)}`;
+        const psRes = await fetch(psUrl, { signal: AbortSignal.timeout(5000) });
+        if (psRes.ok) {
+          const psBody = await psRes.text();
+          let rows: any[] = [];
+          try {
+            const parsed = JSON.parse(psBody);
+            rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
+          } catch { /* ignore parse error */ }
+          prohibitedProperties = rows
+            .filter((r: any) => {
+              const lat = parseFloat(r.lat || '0');
+              const lng = parseFloat(r.lng || '0');
+              return lat !== 0 || lng !== 0;
+            })
+            .map((r: any) => ({
+              id: null,
+              latitude: parseFloat(r.lat || '0'),
+              longitude: parseFloat(r.lng || '0'),
+              address: r.address || null,
+              buildingName: r.buildingName || null,
+              pinColor: r.pinColor || null,
+            }));
+        }
+      } catch (e) {
+        console.warn('Posting System forbidden buildings fetch failed, falling back to PMS DB:', e);
+      }
+    }
+    // PMS DB フォールバック
+    if (prohibitedProperties.length === 0 && schedule.areaId) {
       prohibitedProperties = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: schedule.areaId,

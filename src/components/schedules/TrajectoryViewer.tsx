@@ -41,11 +41,12 @@ interface PauseEvent {
 }
 
 interface ProhibitedProperty {
-  id: number;
+  id: number | null;
   latitude: number | null;
   longitude: number | null;
   address: string | null;
   buildingName: string | null;
+  pinColor?: string | null;
 }
 
 interface TrajectoryData {
@@ -685,23 +686,27 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                   ))}
 
                   {/* Prohibited property markers */}
-                  {data.prohibitedProperties.map((pp) =>
-                    pp.latitude && pp.longitude ? (
+                  {data.prohibitedProperties.map((pp, idx) => {
+                    if (!pp.latitude || !pp.longitude) return null;
+                    const color = pp.pinColor && pp.pinColor !== '#000000'
+                      ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
+                      : '#ef4444';
+                    return (
                       <Marker
-                        key={`pp-${pp.id}`}
+                        key={`pp-${pp.id ?? idx}-${pp.latitude}-${pp.longitude}`}
                         position={{ lat: pp.latitude, lng: pp.longitude }}
                         icon={{
                           path: google.maps.SymbolPath.CIRCLE,
-                          scale: 5,
-                          fillColor: '#ef4444',
-                          fillOpacity: 0.6,
-                          strokeColor: '#ef4444',
-                          strokeWeight: 1,
+                          scale: 7,
+                          fillColor: color,
+                          fillOpacity: 0.7,
+                          strokeColor: '#ffffff',
+                          strokeWeight: 2,
                         }}
                         title={pp.buildingName || pp.address || '禁止物件'}
                       />
-                    ) : null
-                  )}
+                    );
+                  })}
                 </>
               )}
 
