@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { removeFromGoogleGroup, isGooglePlayTesterConfigured } from '@/lib/google-play-tester';
 import { removeBetaTester, isAppStoreConnectConfigured } from '@/lib/appstore-connect';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { isPostingSystemSyncConfigured, syncStaffToPostingSystem, syncStaffRatesToPostingSystem } from '@/lib/posting-system-sync';
+import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
 const parseFloatSafe = (n: any) => n ? parseFloat(n) : null;
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
-function buildInitialPassword(birthday: string | null | undefined): string | null {
+async function buildInitialPassword(birthday: string | null | undefined): Promise<string | null> {
   if (!birthday) return null;
   const d = new Date(birthday);
   if (isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
+  return hashPassword(birthdayToYYYYMMDD(d));
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -86,7 +83,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
     // パスワードリセット（誕生日に戻す）が要求された場合
     const passwordData = body.resetPassword
-      ? { passwordHash: buildInitialPassword(body.birthday), isPasswordTemp: true }
+      ? { passwordHash: await buildInitialPassword(body.birthday), isPasswordTemp: true }
       : {};
 
     // 退職処理: leaveDate が新たに設定された場合、テスターリストから自動削除

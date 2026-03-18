@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import crypto from 'crypto';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
 
 
 const parseDate = (d: any) => d ? new Date(d) : null;
 const parseFloatSafe = (n: any) => n ? parseFloat(n) : null;
 const parseIntSafe = (n: any) => n ? parseInt(n, 10) : null;
 
-function buildInitialPassword(birthday: string | null | undefined): string | null {
+async function buildInitialPassword(birthday: string | null | undefined): Promise<string | null> {
   if (!birthday) return null;
   const d = new Date(birthday);
   if (isNaN(d.getTime())) return null;
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return crypto.createHash('sha256').update(`${y}${m}${day}`).digest('hex');
+  return hashPassword(birthdayToYYYYMMDD(d));
 }
 
 export async function GET(request: Request) {
@@ -92,7 +89,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const passwordHash = buildInitialPassword(body.birthday);
+    const passwordHash = await buildInitialPassword(body.birthday);
 
     const branchId = parseIntSafe(body.branchId);
 

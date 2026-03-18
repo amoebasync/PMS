@@ -4,13 +4,10 @@ import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { sendDistributorWelcomeEmail } from '@/lib/mailer';
 import { isPostingSystemSyncConfigured, syncStaffToPostingSystem } from '@/lib/posting-system-sync';
-import crypto from 'crypto';
+import { hashPassword, birthdayToYYYYMMDD } from '@/lib/password';
 
-function buildInitialPassword(birthday: Date): string {
-  const y = birthday.getFullYear();
-  const m = String(birthday.getMonth() + 1).padStart(2, '0');
-  const d = String(birthday.getDate()).padStart(2, '0');
-  return crypto.createHash('sha256').update(`${y}${m}${d}`).digest('hex');
+async function buildInitialPassword(birthday: Date): Promise<string> {
+  return hashPassword(birthdayToYYYYMMDD(birthday));
 }
 
 // POST /api/applicants/[id]/register-as-distributor
@@ -51,7 +48,7 @@ export async function POST(
     const ip = getIpAddress(request);
 
     // 初期パスワードを生成（応募者の生年月日から）
-    const passwordHash = buildInitialPassword(applicant.birthday);
+    const passwordHash = await buildInitialPassword(applicant.birthday);
 
     const newDistributor = await prisma.$transaction(async (tx) => {
       let resolvedStaffId = staffId;

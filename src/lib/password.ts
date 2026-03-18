@@ -48,3 +48,36 @@ export async function verifyPassword(
   const verified = sha256 === storedHash;
   return { verified, needsUpgrade: verified }; // 一致した場合はアップグレードが必要
 }
+
+/**
+ * 誕生日パスワードの柔軟マッチ
+ * ユーザーがゼロ省略で入力しても（例: 1993111 → 19931101）ログインできるようにする。
+ * 入力値を誕生日のYYYYMMDDと照合し、ゼロ省略版でも一致すればtrueを返す。
+ */
+export function matchesBirthdayPassword(input: string, birthday: Date): boolean {
+  const y = birthday.getFullYear();
+  const m = birthday.getMonth() + 1;
+  const d = birthday.getDate();
+  const canonical = `${y}${String(m).padStart(2, '0')}${String(d).padStart(2, '0')}`;
+
+  // 正規入力（YYYYMMDD）
+  if (input === canonical) return true;
+
+  // ゼロ省略パターン（YYYYMD, YYYYMMD, YYYYMDD）
+  const variants = [
+    `${y}${m}${d}`,
+    `${y}${String(m).padStart(2, '0')}${d}`,
+    `${y}${m}${String(d).padStart(2, '0')}`,
+  ];
+  return variants.includes(input);
+}
+
+/**
+ * 誕生日からYYYYMMDD形式の正規文字列を返す
+ */
+export function birthdayToYYYYMMDD(birthday: Date): string {
+  const y = birthday.getFullYear();
+  const m = String(birthday.getMonth() + 1).padStart(2, '0');
+  const d = String(birthday.getDate()).padStart(2, '0');
+  return `${y}${m}${d}`;
+}

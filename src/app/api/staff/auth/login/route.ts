@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
-import { verifyPassword, hashPassword } from '@/lib/password';
+import { verifyPassword, hashPassword, matchesBirthdayPassword, birthdayToYYYYMMDD } from '@/lib/password';
 import { writeAuditLog, getIpAddress } from '@/lib/audit';
 
 
@@ -32,7 +32,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'メールアドレスまたはパスワードが間違っています。' }, { status: 401 });
     }
 
-    const { verified, needsUpgrade } = await verifyPassword(password, distributor.passwordHash ?? '');
+    let { verified, needsUpgrade } = await verifyPassword(password, distributor.passwordHash ?? '');
+
+    // 初期パスワード（誕生日）の場合、ゼロ省略入力を許容する
+    // 例: 19931101 を 1993111 と入力してもログイン可能
+    if (!verified && distributor.isPasswordTemp && distributor.birthday) {
+      if (matchesBirthdayPassword(password, distributor.birthday)) {
+        // 正規のYYYYMMDDで検証し直す
+        const canonical = birthdayToYYYYMMDD(distributor.birthday);
+        const retryResult = await verifyPassword(canonical, distributor.passwordHash ?? '');
+        verified = retryResult.verified;
+        needsUpgrade = retryResult.needsUpgrade;
+      }
+    }
+
     if (!verified) {
       await writeAuditLog({
         actorType: 'STAFF',
@@ -49,7 +62,11 @@ export async function POST(request: Request) {
     }
 
     if (needsUpgrade) {
-      const newHash = await hashPassword(password);
+      // ゼロ省略入力の場合も正規のYYYYMMDDでbcryptにアップグレード
+      const canonicalPassword = (distributor.isPasswordTemp && distributor.birthday)
+        ? birthdayToYYYYMMDD(distributor.birthday)
+        : password;
+      const newHash = await hashPassword(canonicalPassword);
       await prisma.flyerDistributor.update({ where: { id: distributor.id }, data: { passwordHash: newHash } });
     }
 
