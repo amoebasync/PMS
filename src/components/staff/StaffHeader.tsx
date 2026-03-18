@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon }: { name?: string; missingResidenceCard?: boolean; visaExpiringSoon?: boolean }) {
+export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon, contractUnsigned }: { name?: string; missingResidenceCard?: boolean; visaExpiringSoon?: boolean; contractUnsigned?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const [loggingOut, setLoggingOut] = useState(false);
@@ -70,6 +70,29 @@ export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon }: { 
             <Link href="/staff/profile" className="text-xs font-bold text-amber-700 hover:underline">
               在留カードの写真をマイページからアップロードしてください
             </Link>
+          </div>
+        </div>
+      )}
+
+      {/* 業務委託契約書未署名警告 */}
+      {contractUnsigned && (
+        <div className="bg-indigo-50 border-b border-indigo-200">
+          <div className="max-w-lg mx-auto px-4 py-2.5 flex items-center gap-2">
+            <i className="bi bi-pen-fill text-indigo-500 shrink-0"></i>
+            <button
+              onClick={() => {
+                fetch('/api/staff/contract')
+                  .then(r => r.json())
+                  .then(d => {
+                    if (d.signingUrl) {
+                      window.open(d.signingUrl, '_blank');
+                    }
+                  });
+              }}
+              className="text-xs font-bold text-indigo-700 hover:underline text-left"
+            >
+              業務委託契約書の電子署名が未完了です。こちらをタップして署名してください
+            </button>
           </div>
         </div>
       )}

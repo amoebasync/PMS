@@ -641,6 +641,11 @@ model FlyerDistributor {
   visaExpiryDate        DateTime? @map("visa_expiry_date") @db.Date
   hasAgreedPersonalInfo Boolean   @default(false) @map("has_agreed_personal_info") // 個人情報同意 (○)
   hasSignedContract     Boolean   @default(false) @map("has_signed_contract") // 業務委託締結 (○)
+  contractStatus        String?   @map("contract_status") @db.VarChar(20) // UNSIGNED / SENT / SIGNED
+  contractDate          DateTime? @map("contract_date") // 署名完了日
+  contractPdfUrl        String?   @map("contract_pdf_url") @db.Text // S3上の署名済みPDF URL
+  docusealSubmissionId  Int?      @map("docuseal_submission_id") // DocuSeal submission ID
+  docusealSubmitterId   Int?      @map("docuseal_submitter_id") // DocuSeal submitter ID
   hasResidenceCard      Boolean   @default(false) @map("has_residence_card") // 在留カード (○)
   residenceCardFrontUrl String?   @map("residence_card_front_url") @db.Text // 在留カード表面画像URL
   residenceCardBackUrl  String?   @map("residence_card_back_url") @db.Text // 在留カード裏面画像URL

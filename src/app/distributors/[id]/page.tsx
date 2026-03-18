@@ -870,7 +870,55 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="入社日" value={d.joinDate ? d.joinDate.slice(0, 10) : null} />
               <InfoRow label="退社日" value={d.leaveDate ? d.leaveDate.slice(0, 10) : null} />
               <InfoRow label="個人情報同意" value={d.hasAgreedPersonalInfo} />
-              <InfoRow label="業務委託契約" value={d.hasSignedContract} />
+              {/* 業務委託契約 — DocuSeal連携 */}
+              <div className="flex items-start gap-2 py-2 border-b border-slate-100">
+                <span className="text-xs text-slate-500 w-32 shrink-0 pt-0.5">業務委託契約</span>
+                <div className="flex-1 flex items-center gap-2 flex-wrap">
+                  {d.contractStatus === 'SIGNED' ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">署名済 ✓</span>
+                  ) : d.contractStatus === 'SENT' ? (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">送信済（未署名）</span>
+                  ) : (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-400">未送信</span>
+                  )}
+                  {d.contractDate && (
+                    <span className="text-[10px] text-slate-400">{d.contractDate.slice(0, 10)}</span>
+                  )}
+                  {d.contractPdfUrl && (
+                    <a
+                      href={`/api/s3-proxy?key=${encodeURIComponent(d.contractPdfUrl)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold"
+                    >
+                      <i className="bi bi-file-earmark-pdf mr-0.5"></i>PDF
+                    </a>
+                  )}
+                  {d.contractStatus !== 'SIGNED' && d.email && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`${d.name} に業務委託契約書を送信しますか？\n送信先: ${d.email}`)) return;
+                        try {
+                          const res = await fetch(`/api/distributors/${d.id}/contract`, { method: 'POST' });
+                          const json = await res.json();
+                          if (res.ok) {
+                            showToast('契約書を送信しました', 'success');
+                            loadDistributor();
+                          } else {
+                            showToast(json.error || '送信に失敗しました', 'error');
+                          }
+                        } catch {
+                          showToast('送信に失敗しました', 'error');
+                        }
+                      }}
+                      className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded-lg transition-colors"
+                    >
+                      <i className="bi bi-send mr-1"></i>
+                      {d.contractStatus === 'SENT' ? '再送信' : '契約書送信'}
+                    </button>
+                  )}
+                </div>
+              </div>
               <InfoRow label="在留カード確認" value={d.hasResidenceCard} />
               {/* AI検証ステータス */}
               {d.residenceCardFrontUrl && (

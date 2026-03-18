@@ -43,7 +43,19 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
   const [success, setSuccess] = useState<string | null>(null);
 
   // 紐付け可能なスケジュール（セッション未紐付け）
-  const linkableSchedules = schedules.filter(s => !s.session && s.status !== 'COMPLETED');
+  // 選択セッションの配布員名と一致→部分一致→それ以外の順でソート
+  const selectedOrphan = orphans.find(o => o.id === selectedSession);
+  const linkableSchedules = schedules
+    .filter(s => !s.session && s.status !== 'COMPLETED')
+    .sort((a, b) => {
+      if (!selectedOrphan) return 0;
+      const name = selectedOrphan.distributorName.toLowerCase();
+      const aName = (a.distributor?.name || '').toLowerCase();
+      const bName = (b.distributor?.name || '').toLowerCase();
+      const aExact = aName === name ? 2 : aName.includes(name) || name.includes(aName) ? 1 : 0;
+      const bExact = bName === name ? 2 : bName.includes(name) || name.includes(bName) ? 1 : 0;
+      return bExact - aExact;
+    });
 
   const fetchOrphans = useCallback(async () => {
     setLoading(true);
@@ -110,7 +122,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-2xl overflow-hidden flex flex-col md:max-h-[80vh]" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full max-h-full md:h-auto md:max-w-2xl overflow-hidden flex flex-col md:max-h-[80vh]" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
           <h3 className="font-bold text-base md:text-lg text-slate-800">
@@ -150,7 +162,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
                 {t('orphan_empty')}
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-48 overflow-y-auto">
+              <div className="space-y-1.5">
                 {orphans.map((s) => (
                   <label
                     key={s.id}
@@ -204,7 +216,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
                   {t('orphan_no_schedules')}
                 </div>
               ) : (
-                <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                <div className="space-y-1.5">
                   {linkableSchedules.map((s) => (
                     <label
                       key={s.id}
