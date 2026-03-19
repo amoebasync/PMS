@@ -1037,11 +1037,12 @@ export default function ScheduleListPage() {
                     {/* Expected Arrival (ETA) */}
                     <td className="px-2 py-2.5 text-center">
                       {s.expectedArrival ? (
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        <span className={`inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-black ${
                           s.expectedArrival === 'other'
-                            ? 'bg-slate-100 text-slate-500'
-                            : 'bg-emerald-100 text-emerald-700'
+                            ? 'bg-slate-50 text-slate-500 border border-slate-200'
+                            : 'bg-blue-600 text-white shadow-sm'
                         }`}>
+                          <i className="bi bi-clock text-[9px]"></i>
                           {s.expectedArrival === 'other' ? t('expected_arrival_other') : s.expectedArrival}
                         </span>
                       ) : (
