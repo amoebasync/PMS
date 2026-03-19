@@ -828,19 +828,32 @@ export default function ScheduleListPage() {
     }
     return true;
   }).sort((a, b) => {
-    // 1. 全中継（FULL_RELAY）があるスケジュールを最上位
+    // 1. 支店名でソート（高田馬場を最上位、その後50音順）
+    const aBranch = a.branch?.nameJa || '';
+    const bBranch = b.branch?.nameJa || '';
+    const aBranchOrder = aBranch.includes('高田馬場') ? 0 : 1;
+    const bBranchOrder = bBranch.includes('高田馬場') ? 0 : 1;
+    if (aBranchOrder !== bBranchOrder) return aBranchOrder - bBranchOrder;
+    const branchCmp = aBranch.localeCompare(bBranch, 'ja');
+    if (branchCmp !== 0) return branchCmp;
+
+    // 2. 同じ支店内: 全中継ありスタッフが上
     const aHasFullRelay = (a.relayTasks || []).some((r: any) => r.type === 'FULL_RELAY');
     const bHasFullRelay = (b.relayTasks || []).some((r: any) => r.type === 'FULL_RELAY');
     if (aHasFullRelay && !bHasFullRelay) return -1;
     if (!aHasFullRelay && bHasFullRelay) return 1;
 
-    // 2. 支店名でソート（高田馬場を最上位）
-    const aBranch = a.branch?.nameJa || '';
-    const bBranch = b.branch?.nameJa || '';
-    const aIsTop = aBranch.includes('高田馬場') ? 0 : 1;
-    const bIsTop = bBranch.includes('高田馬場') ? 0 : 1;
-    if (aIsTop !== bIsTop) return aIsTop - bIsTop;
-    return aBranch.localeCompare(bBranch, 'ja');
+    // 3. 同じ支店・同じ全中継状態内: 出勤予定時刻が早い順（未回答は最後）
+    const aTime = a.expectedArrival || '';
+    const bTime = b.expectedArrival || '';
+    if (aTime && !bTime) return -1;
+    if (!aTime && bTime) return 1;
+    if (aTime && bTime) {
+      if (aTime === 'other' && bTime !== 'other') return 1;
+      if (aTime !== 'other' && bTime === 'other') return -1;
+      return aTime.localeCompare(bTime);
+    }
+    return 0;
   });
 
   const getStatusKey = (status: string) => {
