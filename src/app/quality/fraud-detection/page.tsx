@@ -22,8 +22,15 @@ type FraudItem = {
   reviewedAt: string | null;
   createdAt: string;
   distributor: { id: number; name: string; staffId: string };
-  schedule: { id: number; date: string; area: { town_name: string; chome_name: string; name_en: string | null } | null } | null;
+  schedule: { id: number; date: string; area: { town_name: string; chome_name: string; name_en: string | null; prefecture?: { name: string }; city?: { name: string } } | null } | null;
   reviewedBy: { id: number; lastNameJa: string; firstNameJa: string } | null;
+};
+
+type KpiData = {
+  totalAnalyzed: number;
+  highCriticalCount: number;
+  unreviewedCount: number;
+  averageScore: number;
 };
 
 const RISK_COLORS: Record<string, string> = {
@@ -44,6 +51,8 @@ const INDICATOR_KEYS = [
   'speedAnomaly', 'gpsGapRatio', 'workRatio',
 ] as const;
 
+const PAGE_SIZE = 20;
+
 export default function FraudDetectionPage() {
   const { t } = useTranslation('fraud-detection');
   const [items, setItems] = useState<FraudItem[]>([]);
@@ -54,205 +63,320 @@ export default function FraudDetectionPage() {
   const [selectedItem, setSelectedItem] = useState<FraudItem | null>(null);
   const [reviewForm, setReviewForm] = useState({ result: '', note: '' });
   const [reviewing, setReviewing] = useState(false);
-  const [kpis, setKpis] = useState({ today: 0, week: 0, unreviewed: 0, confirmed: 0 });
+  const [kpis, setKpis] = useState<KpiData>({ totalAnalyzed: 0, highCriticalCount: 0, unreviewedCount: 0, averageScore: 0 });
+
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    const params = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE) });
     if (filters.riskLevel) params.set('riskLevel', filters.riskLevel);
     if (filters.reviewResult) params.set('reviewResult', filters.reviewResult);
     if (filters.dateFrom) params.set('dateFrom', filters.dateFrom);
     if (filters.dateTo) params.set('dateTo', filters.dateTo);
 
-    const res = await fetch(`/api/fraud-analysis?${params}`);
-    if (res.ok) {
-      const data = await res.json();
-      setItems(data.items);
-      setTotal(data.total);
+    try {
+      const res = await fetch(`/api/fraud-analysis?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.items);
+        setTotal(data.total);
+        if (data.kpis) {
+          setKpis(data.kpis);
+        }
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [page, filters]);
 
-  const fetchKpis = useCallback(async () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
-
-    const [todayRes, weekRes, unreviewedRes, confirmedRes] = await Promise.all([
-      fetch(`/api/fraud-analysis?riskLevel=HIGH,CRITICAL&dateFrom=${today}&limit=1`),
-      fetch(`/api/fraud-analysis?riskLevel=HIGH,CRITICAL&dateFrom=${weekAgo}&limit=1`),
-      fetch(`/api/fraud-analysis?riskLevel=HIGH,CRITICAL&reviewResult=unreviewed&limit=1`),
-      fetch(`/api/fraud-analysis?reviewResult=CONFIRMED_FRAUD&limit=1`),
-    ]);
-
-    const [todayData, weekData, unreviewedData, confirmedData] = await Promise.all([
-      todayRes.ok ? todayRes.json() : { total: 0 },
-      weekRes.ok ? weekRes.json() : { total: 0 },
-      unreviewedRes.ok ? unreviewedRes.json() : { total: 0 },
-      confirmedRes.ok ? confirmedRes.json() : { total: 0 },
-    ]);
-
-    setKpis({
-      today: todayData.total,
-      week: weekData.total,
-      unreviewed: unreviewedData.total,
-      confirmed: confirmedData.total,
-    });
-  }, []);
-
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { fetchKpis(); }, [fetchKpis]);
 
   const handleReview = async () => {
     if (!selectedItem || !reviewForm.result) return;
     setReviewing(true);
-    const res = await fetch(`/api/fraud-analysis/${selectedItem.id}/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reviewForm),
-    });
-    if (res.ok) {
-      setSelectedItem(null);
-      setReviewForm({ result: '', note: '' });
-      fetchData();
-      fetchKpis();
+    try {
+      const res = await fetch(`/api/fraud-analysis/${selectedItem.id}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewForm),
+      });
+      if (res.ok) {
+        setSelectedItem(null);
+        setReviewForm({ result: '', note: '' });
+        fetchData();
+      }
+    } catch (err) {
+      console.error('Review error:', err);
+    } finally {
+      setReviewing(false);
     }
-    setReviewing(false);
   };
 
   const detail = selectedItem?.analysisDetail ? JSON.parse(selectedItem.analysisDetail) : null;
-  const totalPages = Math.ceil(total / 20);
+
+  // Pagination helper (same pattern as complaints page)
+  const getPageNumbers = (): (number | string)[] => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    const pages: (number | string)[] = [1];
+    if (page > 3) pages.push('...');
+    for (let i = Math.max(2, page - 1); i <= Math.min(totalPages - 1, page + 1); i++) {
+      pages.push(i);
+    }
+    if (page < totalPages - 2) pages.push('...');
+    pages.push(totalPages);
+    return pages;
+  };
+
+  const startItem = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const endItem = Math.min(page * PAGE_SIZE, total);
+
+  // Area display helper (prefecture + city + chome_name)
+  const formatArea = (schedule: FraudItem['schedule']) => {
+    if (!schedule?.area) return '-';
+    const area = schedule.area;
+    if (area.prefecture && area.city) {
+      return `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name}`;
+    }
+    return area.chome_name || area.town_name || '-';
+  };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-black text-slate-800">{t('page_title')}</h1>
-
+    <div className="max-w-[1400px] mx-auto">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: t('kpi_today'), value: kpis.today, color: 'text-orange-600', bg: 'bg-orange-50' },
-          { label: t('kpi_week'), value: kpis.week, color: 'text-red-600', bg: 'bg-red-50' },
-          { label: t('kpi_unreviewed'), value: kpis.unreviewed, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: t('kpi_confirmed'), value: kpis.confirmed, color: 'text-slate-600', bg: 'bg-slate-50' },
-        ].map((kpi) => (
-          <div key={kpi.label} className={`${kpi.bg} rounded-xl p-4 border`}>
-            <p className="text-xs font-bold text-slate-500">{kpi.label}</p>
-            <p className={`text-3xl font-black ${kpi.color}`}>{kpi.value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="text-xs font-bold text-slate-500 block mb-1">{t('filter_risk_level')}</label>
-          <select
-            value={filters.riskLevel}
-            onChange={(e) => { setFilters((f) => ({ ...f, riskLevel: e.target.value })); setPage(1); }}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5"
-          >
-            <option value="">{t('filter_all')}</option>
-            <option value="CRITICAL">{t('level_CRITICAL')}</option>
-            <option value="HIGH">{t('level_HIGH')}</option>
-            <option value="MEDIUM">{t('level_MEDIUM')}</option>
-            <option value="HIGH,CRITICAL">{t('level_HIGH')} + {t('level_CRITICAL')}</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-bold text-slate-500 block mb-1">{t('filter_review')}</label>
-          <select
-            value={filters.reviewResult}
-            onChange={(e) => { setFilters((f) => ({ ...f, reviewResult: e.target.value })); setPage(1); }}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5"
-          >
-            <option value="">{t('filter_all')}</option>
-            <option value="unreviewed">{t('filter_unreviewed')}</option>
-            <option value="FALSE_POSITIVE">{t('review_FALSE_POSITIVE')}</option>
-            <option value="SUSPICIOUS">{t('review_SUSPICIOUS')}</option>
-            <option value="CONFIRMED_FRAUD">{t('review_CONFIRMED_FRAUD')}</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-xs font-bold text-slate-500 block mb-1">{t('filter_date_from')}</label>
-          <input type="date" value={filters.dateFrom} onChange={(e) => { setFilters((f) => ({ ...f, dateFrom: e.target.value })); setPage(1); }} className="text-sm border border-slate-200 rounded-lg px-3 py-1.5" />
-        </div>
-        <div>
-          <label className="text-xs font-bold text-slate-500 block mb-1">{t('filter_date_to')}</label>
-          <input type="date" value={filters.dateTo} onChange={(e) => { setFilters((f) => ({ ...f, dateTo: e.target.value })); setPage(1); }} className="text-sm border border-slate-200 rounded-lg px-3 py-1.5" />
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-bold text-slate-500">{t('col_date')}</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-slate-500">{t('col_distributor')}</th>
-                <th className="text-left px-4 py-3 text-xs font-bold text-slate-500">{t('col_area')}</th>
-                <th className="text-center px-4 py-3 text-xs font-bold text-slate-500">{t('col_risk_score')}</th>
-                <th className="text-center px-4 py-3 text-xs font-bold text-slate-500">{t('col_risk_level')}</th>
-                <th className="text-center px-4 py-3 text-xs font-bold text-slate-500">{t('col_review')}</th>
-                <th className="text-center px-4 py-3 text-xs font-bold text-slate-500">{t('col_actions')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400">{t('loading')}</td></tr>
-              ) : items.length === 0 ? (
-                <tr><td colSpan={7} className="text-center py-12 text-slate-400">{t('no_data')}</td></tr>
-              ) : items.map((item) => (
-                <tr key={item.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" onClick={() => { setSelectedItem(item); setReviewForm({ result: item.reviewResult || '', note: item.reviewNote || '' }); }}>
-                  <td className="px-4 py-3 text-slate-600">{item.schedule?.date?.slice(0, 10) || item.createdAt.slice(0, 10)}</td>
-                  <td className="px-4 py-3">
-                    <span className="font-bold text-slate-800">{item.distributor.name}</span>
-                    <span className="text-xs text-slate-400 ml-1">({item.distributor.staffId})</span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600">{item.schedule?.area?.chome_name || item.schedule?.area?.town_name || '-'}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-black text-lg">{item.riskScore}</span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${RISK_COLORS[item.riskLevel] || ''}`}>
-                      {t(`level_${item.riskLevel}`)}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {item.reviewResult ? (
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${REVIEW_COLORS[item.reviewResult] || ''}`}>
-                        {t(`review_${item.reviewResult}`)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-300">-</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    {item.scheduleId && (
-                      <a
-                        href={`/schedules?trajectory=${item.scheduleId}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-indigo-600 hover:text-indigo-800 font-bold"
-                      >
-                        <i className="bi bi-geo-alt-fill mr-0.5"></i>GPS
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-slate-50">
-            <span className="text-xs text-slate-500">{total} 件</span>
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(totalPages, 10) }, (_, i) => i + 1).map((p) => (
-                <button key={p} onClick={() => setPage(p)} className={`w-8 h-8 rounded-lg text-xs font-bold ${p === page ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:bg-slate-200'}`}>{p}</button>
-              ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
+        {/* Total Analyzed */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+              <i className="bi bi-shield-check text-indigo-600 text-lg"></i>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-500 truncate">{t('kpi_total_analyzed')}</p>
+              <p className="text-2xl md:text-3xl font-black text-slate-800">{kpis.totalAnalyzed.toLocaleString()}</p>
             </div>
           </div>
+        </div>
+
+        {/* High + Critical */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
+              <i className="bi bi-exclamation-triangle-fill text-red-500 text-lg"></i>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-500 truncate">{t('kpi_high_critical')}</p>
+              <p className={`text-2xl md:text-3xl font-black ${kpis.highCriticalCount > 0 ? 'text-red-600' : 'text-slate-800'}`}>{kpis.highCriticalCount.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Unreviewed (HIGH/CRITICAL) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+              <i className="bi bi-clock-history text-amber-600 text-lg"></i>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-500 truncate">{t('kpi_unreviewed')}</p>
+              <p className={`text-2xl md:text-3xl font-black ${kpis.unreviewedCount > 0 ? 'text-amber-600' : 'text-slate-800'}`}>{kpis.unreviewedCount.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Average Score */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <i className="bi bi-graph-up text-slate-600 text-lg"></i>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-bold text-slate-500 truncate">{t('kpi_avg_score')}</p>
+              <p className="text-2xl md:text-3xl font-black text-slate-800">{kpis.averageScore}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filter Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_risk_level')}</label>
+            <select
+              value={filters.riskLevel}
+              onChange={(e) => { setFilters((f) => ({ ...f, riskLevel: e.target.value })); setPage(1); }}
+              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="">{t('filter_all')}</option>
+              <option value="CRITICAL">{t('level_CRITICAL')}</option>
+              <option value="HIGH">{t('level_HIGH')}</option>
+              <option value="MEDIUM">{t('level_MEDIUM')}</option>
+              <option value="LOW">{t('level_LOW')}</option>
+              <option value="HIGH,CRITICAL">{t('level_HIGH')} + {t('level_CRITICAL')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_review')}</label>
+            <select
+              value={filters.reviewResult}
+              onChange={(e) => { setFilters((f) => ({ ...f, reviewResult: e.target.value })); setPage(1); }}
+              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="">{t('filter_all')}</option>
+              <option value="unreviewed">{t('filter_unreviewed')}</option>
+              <option value="FALSE_POSITIVE">{t('review_FALSE_POSITIVE')}</option>
+              <option value="SUSPICIOUS">{t('review_SUSPICIOUS')}</option>
+              <option value="CONFIRMED_FRAUD">{t('review_CONFIRMED_FRAUD')}</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_date_from')}</label>
+            <input
+              type="date"
+              value={filters.dateFrom}
+              onChange={(e) => { setFilters((f) => ({ ...f, dateFrom: e.target.value })); setPage(1); }}
+              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_date_to')}</label>
+            <input
+              type="date"
+              value={filters.dateTo}
+              onChange={(e) => { setFilters((f) => ({ ...f, dateTo: e.target.value })); setPage(1); }}
+              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Table Card */}
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+            <span className="ml-3 text-sm text-slate-500">{t('loading')}</span>
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+            <i className="bi bi-inbox text-4xl mb-3"></i>
+            <p className="text-sm">{t('no_data')}</p>
+          </div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_date')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_distributor')}</th>
+                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_area')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_risk_score')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_risk_level')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_review')}</th>
+                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('col_actions')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => (
+                    <tr
+                      key={item.id}
+                      onClick={() => { setSelectedItem(item); setReviewForm({ result: item.reviewResult || '', note: item.reviewNote || '' }); }}
+                      className="border-b border-slate-100 hover:bg-indigo-50/50 cursor-pointer transition-colors"
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap text-slate-700">{item.schedule?.date?.slice(0, 10) || item.createdAt.slice(0, 10)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="font-medium text-slate-800">{item.distributor.name}</span>
+                        <span className="text-xs text-slate-400 ml-1.5 font-mono">({item.distributor.staffId})</span>
+                      </td>
+                      <td className="px-4 py-3 text-slate-600 max-w-[200px] truncate">{formatArea(item.schedule)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-black text-lg">{item.riskScore}</span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${RISK_COLORS[item.riskLevel] || ''}`}>
+                          {t(`level_${item.riskLevel}`)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        {item.reviewResult ? (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold ${REVIEW_COLORS[item.reviewResult] || ''}`}>
+                            {t(`review_${item.reviewResult}`)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-300">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          {item.scheduleId && (
+                            <a
+                              href={`/schedules?trajectory=${item.scheduleId}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
+                            >
+                              <i className="bi bi-geo-alt-fill mr-0.5"></i>GPS
+                            </a>
+                          )}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setSelectedItem(item); setReviewForm({ result: item.reviewResult || '', note: item.reviewNote || '' }); }}
+                            className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
+                          >
+                            {t('details')}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-3 border-t border-slate-100 gap-3">
+                <p className="text-xs text-slate-500">
+                  {t('pagination_showing', { total: String(total), start: String(startItem), end: String(endItem) })}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setPage(Math.max(1, page - 1))}
+                    disabled={page <= 1}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <i className="bi bi-chevron-left"></i>
+                  </button>
+                  {getPageNumbers().map((p, idx) =>
+                    typeof p === 'string' ? (
+                      <span key={`dots-${idx}`} className="px-2 text-slate-400 text-xs">...</span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => setPage(p)}
+                        className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                          page === p
+                            ? 'bg-indigo-600 text-white border-indigo-600 font-bold'
+                            : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                  <button
+                    onClick={() => setPage(Math.min(totalPages, page + 1))}
+                    disabled={page >= totalPages}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <i className="bi bi-chevron-right"></i>
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -270,7 +394,7 @@ export default function FraudDetectionPage() {
                 <span className={`px-3 py-1 rounded-full text-sm font-black ${RISK_COLORS[selectedItem.riskLevel]}`}>
                   {selectedItem.riskScore} {t(`level_${selectedItem.riskLevel}`)}
                 </span>
-                <button onClick={() => setSelectedItem(null)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center">
+                <button onClick={() => setSelectedItem(null)} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors">
                   <i className="bi bi-x-lg text-slate-400"></i>
                 </button>
               </div>
@@ -371,7 +495,7 @@ export default function FraudDetectionPage() {
                   value={reviewForm.note}
                   onChange={(e) => setReviewForm((f) => ({ ...f, note: e.target.value }))}
                   placeholder={t('review_note_placeholder')}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none h-20"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm resize-none h-20 outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <div className="flex items-center justify-between">
                   {selectedItem.reviewedBy && (
@@ -382,7 +506,7 @@ export default function FraudDetectionPage() {
                   <button
                     onClick={handleReview}
                     disabled={reviewing || !reviewForm.result}
-                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-lg disabled:opacity-50 flex items-center gap-2 transition-colors"
                   >
                     {reviewing && <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                     {t('review_submit')}

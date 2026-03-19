@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
 
 /**
- * GET /api/fraud-analysis — 不正検知分析一覧
+ * GET /api/fraud-analysis — 不正検知分析一覧 + KPIデータ
  */
 export async function GET(request: Request) {
   const { error } = await requireAdminSession();
@@ -43,7 +43,8 @@ export async function GET(request: Request) {
       where.reviewResult = reviewResult;
     }
 
-    const [items, total] = await Promise.all([
+    // Fetch items, total count, and KPI data in parallel
+    const [items, total, kpiData] = await Promise.all([
       prisma.fraudAnalysis.findMany({
         where,
         include: {
@@ -51,7 +52,13 @@ export async function GET(request: Request) {
           schedule: {
             select: {
               id: true, date: true,
-              area: { select: { town_name: true, chome_name: true, name_en: true } },
+              area: {
+                select: {
+                  town_name: true, chome_name: true, name_en: true,
+                  prefecture: { select: { name: true } },
+                  city: { select: { name: true } },
+                },
+              },
             },
           },
           reviewedBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
@@ -61,11 +68,58 @@ export async function GET(request: Request) {
         take: limit,
       }),
       prisma.fraudAnalysis.count({ where }),
+      computeKpis(),
     ]);
 
-    return NextResponse.json({ items, total, page, limit });
+    return NextResponse.json({ items, total, page, limit, kpis: kpiData });
   } catch (err) {
     console.error('Fraud Analysis List Error:', err);
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });
+  }
+}
+
+/**
+ * Compute KPI data for the fraud detection dashboard.
+ * Returns: totalAnalyzed, highCriticalCount, unreviewedCount, averageScore
+ */
+async function computeKpis() {
+  try {
+    const [totalAnalyzed, highCriticalCount, unreviewedCount, avgResult] = await Promise.all([
+      // Total analyzed records
+      prisma.fraudAnalysis.count(),
+
+      // HIGH + CRITICAL count
+      prisma.fraudAnalysis.count({
+        where: { riskLevel: { in: ['HIGH', 'CRITICAL'] } },
+      }),
+
+      // Unreviewed among HIGH/CRITICAL
+      prisma.fraudAnalysis.count({
+        where: {
+          riskLevel: { in: ['HIGH', 'CRITICAL'] },
+          reviewResult: null,
+        },
+      }),
+
+      // Average risk score
+      prisma.fraudAnalysis.aggregate({
+        _avg: { riskScore: true },
+      }),
+    ]);
+
+    return {
+      totalAnalyzed,
+      highCriticalCount,
+      unreviewedCount,
+      averageScore: Math.round(avgResult._avg.riskScore ?? 0),
+    };
+  } catch (err) {
+    console.error('KPI computation error:', err);
+    return {
+      totalAnalyzed: 0,
+      highCriticalCount: 0,
+      unreviewedCount: 0,
+      averageScore: 0,
+    };
   }
 }

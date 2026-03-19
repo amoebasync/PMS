@@ -1,9 +1,9 @@
 {
   "page_title": "不正検知",
-  "kpi_today": "本日",
-  "kpi_week": "今週",
+  "kpi_total_analyzed": "分析済み",
+  "kpi_high_critical": "要注意以上",
   "kpi_unreviewed": "未レビュー",
-  "kpi_confirmed": "不正確定",
+  "kpi_avg_score": "平均スコア",
   "filter_risk_level": "リスクレベル",
   "filter_distributor": "配布員",
   "filter_date_from": "開始日",
@@ -47,9 +47,11 @@
   "review_submit": "保存",
   "review_by": "レビュー者",
   "view_trajectory": "軌跡を表示",
+  "details": "詳細",
   "min": "分",
   "per_hour": "枚/時",
   "meters": "m",
   "no_data": "データがありません",
-  "loading": "読み込み中..."
+  "loading": "読み込み中...",
+  "pagination_showing": "{total}件中 {start}〜{end}件を表示"
 }

@@ -1,9 +1,9 @@
 {
   "page_title": "Fraud Detection",
-  "kpi_today": "Today",
-  "kpi_week": "This Week",
+  "kpi_total_analyzed": "Analyzed",
+  "kpi_high_critical": "High + Critical",
   "kpi_unreviewed": "Unreviewed",
-  "kpi_confirmed": "Confirmed",
+  "kpi_avg_score": "Avg. Score",
   "filter_risk_level": "Risk Level",
   "filter_distributor": "Distributor",
   "filter_date_from": "From",
@@ -47,9 +47,11 @@
   "review_submit": "Save",
   "review_by": "Reviewed by",
   "view_trajectory": "View Trajectory",
+  "details": "Details",
   "min": "min",
   "per_hour": "/hr",
   "meters": "m",
   "no_data": "No data",
-  "loading": "Loading..."
+  "loading": "Loading...",
+  "pagination_showing": "Showing {start}-{end} of {total}"
 }
