@@ -97,8 +97,8 @@ async function sendRelayCompletionNotification(task: any) {
   if (!setting?.value) return;
 
   const groupId = setting.value;
-  const isRelay = task.type === 'RELAY';
-  const typeLabel = isRelay ? '中継' : '回収';
+  const isRelay = task.type === 'RELAY' || task.type === 'FULL_RELAY';
+  const typeLabel = task.type === 'FULL_RELAY' ? '全中継' : isRelay ? '中継' : '回収';
   const emoji = isRelay ? '\u{1F4E6}' : '\u{1F69A}';
   const accentColor = isRelay ? '#3756E8' : '#10B981';
   const branch = task.schedule?.branch?.nameJa || '—';
