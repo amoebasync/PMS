@@ -19,7 +19,7 @@ async function buildInitialPassword(birthday: string | null | undefined): Promis
 }
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = await requireAdminSession();
+  const { error, employee } = await requireAdminSession();
   if (error) return error;
   try {
     const { id } = await params;
@@ -39,6 +39,23 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
     if (!distributor) return NextResponse.json({ error: 'Not found' }, { status: 404 });
     const { passwordHash, ...safe } = distributor;
+
+    // スーパー管理者のみパスワード情報を含める
+    let passwordInfo: string | null = null;
+    if (employee) {
+      const empWithRoles = await prisma.employee.findUnique({
+        where: { id: employee.id },
+        select: { roles: { select: { role: { select: { code: true } } } } },
+      });
+      const isSuperAdmin = empWithRoles?.roles?.some(r => r.role.code === 'SUPER_ADMIN');
+      if (isSuperAdmin) {
+        if (distributor.isPasswordTemp && distributor.birthday) {
+          passwordInfo = birthdayToYYYYMMDD(distributor.birthday);
+        } else if (!distributor.isPasswordTemp) {
+          passwordInfo = '（変更済み）';
+        }
+      }
+    }
 
     // 累計出勤日数: 同日に複数スケジュールがあっても1日=1出勤
     const daysResult = await prisma.$queryRaw<[{ days: bigint }]>`
@@ -67,7 +84,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     });
     const aiVerificationEnabled = aiVerificationSetting?.value === 'true';
 
-    return NextResponse.json({ ...safe, aiVerificationEnabled, avgDistributionRate, totalWorkDays });
+    return NextResponse.json({ ...safe, aiVerificationEnabled, avgDistributionRate, totalWorkDays, passwordInfo });
   } catch (error) {
     console.error('Get Error:', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });

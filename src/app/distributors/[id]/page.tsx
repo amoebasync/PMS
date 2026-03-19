@@ -1702,6 +1702,15 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                     </div>
                     <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
                       <p className="text-xs font-bold text-blue-700 flex items-center gap-1.5 mb-2"><i className="bi bi-shield-lock-fill"></i>ログインパスワード</p>
+                      {distributor?.passwordInfo && (
+                        <div className="flex items-center gap-2 mb-2 bg-white border border-blue-200 rounded-lg px-3 py-2">
+                          <span className="text-xs text-slate-500">現在のパスワード:</span>
+                          <span className="text-sm font-mono font-bold text-slate-800">{distributor.passwordInfo}</span>
+                          {distributor.isPasswordTemp && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">初期PW</span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center justify-between">
                         <p className="text-xs text-blue-600">パスワードを生年月日にリセットできます。</p>
                         <button type="button" onClick={resetPassword}
