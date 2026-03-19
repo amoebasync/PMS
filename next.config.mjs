@@ -28,6 +28,7 @@ const nextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: '55mb',
+      allowedOrigins: ['pms.tiramis.co.jp', 'localhost:3000'],
     },
     proxyClientMaxBodySize: '55mb',
   },
