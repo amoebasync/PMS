@@ -13,12 +13,19 @@ const API_URL = process.env.POSTING_SYSTEM_API_URL;
 const API_KEY = process.env.POSTING_SYSTEM_API_KEY;
 
 /**
- * PMS支店名 → Posting System 店舗名（SHOP_CD）マッピング
- * Posting System の m_shop テーブルの SHOP_CD はそのまま表示名
- * PMS側と異なる名前のみ定義（一致するものはそのまま渡す）
+ * PMS支店名 → Posting System 店舗コード（SHOP_CD）マッピング
+ * postingrealdb.m_shop テーブルのSHOP_CDは短縮コード
  */
 const BRANCH_TO_SHOP_CD: Record<string, string> = {
-  '高田馬場': '馬場',
+  '高田馬場': 'MBF',
+  '横浜': 'MYO',
+  '新松戸': 'MMA',
+  '浦和': 'MUr',
+  '西新井': 'MNA',
+  '新小岩': 'MKO',
+  '蒲田': 'MKA',
+  '赤羽': 'MAK',
+  '吉祥寺': 'MKI',
 };
 
 /**
