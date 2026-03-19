@@ -116,6 +116,13 @@ async function sendRelayCompletionNotification(task: any) {
   const hasLocation = task.latitude && task.longitude;
   const mapsUrl = hasLocation ? `https://www.google.com/maps?q=${task.latitude},${task.longitude}` : null;
 
+  // 備品数
+  const bagCount = task.bagCount || 0;
+  const trolleyCount = task.trolleyCount || 0;
+  const otherCount = task.otherCount || 0;
+  const hasEquipment = bagCount > 0 || trolleyCount > 0 || otherCount > 0;
+  const note = task.note || '';
+
   // ── 中継の場合: 配布員にLINE通知 ──
   let distributorNotified = false;
   let distributorLineStatus = '';
@@ -134,7 +141,7 @@ async function sendRelayCompletionNotification(task: any) {
       const lang = dist?.language || 'ja';
 
       try {
-        const distMessage = buildDistributorDeliveryMessage(lang, location, area, now, mapsUrl, heroImageUrl);
+        const distMessage = buildDistributorDeliveryMessage(lang, location, area, now, mapsUrl, heroImageUrl, { bagCount, trolleyCount, otherCount });
         await pushMessage(lineUser.lineUserId, [distMessage]);
         distributorNotified = true;
         distributorLineStatus = '\u2705 配布員へLINE伝達済み';
@@ -183,6 +190,23 @@ async function sendRelayCompletionNotification(task: any) {
     },
   ];
 
+  // 備品数
+  if (hasEquipment) {
+    bodyContents.push({ type: 'separator', margin: 'md' });
+    bodyContents.push({ type: 'text', text: '\u{1F392} 備品', size: 'xs', color: '#6366F1', weight: 'bold', margin: 'md' });
+    const equipLines: any[] = [];
+    if (bagCount > 0) equipLines.push({ type: 'text', text: `・バッグ  ${bagCount}個`, size: 'xs', color: '#333333' });
+    if (trolleyCount > 0) equipLines.push({ type: 'text', text: `・台車  ${trolleyCount}台`, size: 'xs', color: '#333333' });
+    if (otherCount > 0) equipLines.push({ type: 'text', text: `・その他  ${otherCount}個`, size: 'xs', color: '#333333' });
+    bodyContents.push({ type: 'box', layout: 'vertical', margin: 'sm', spacing: 'xs', contents: equipLines });
+  }
+
+  // メモ（グループ通知のみ）
+  if (note) {
+    bodyContents.push({ type: 'separator', margin: 'md' });
+    bodyContents.push({ type: 'text', text: `\u{1F4DD} ${note}`, size: 'xs', color: '#555555', wrap: true, margin: 'md' });
+  }
+
   // 配布員LINE通知ステータスをグループ通知に追記（中継のみ）
   if (isRelay && distributorLineStatus) {
     bodyContents.push({ type: 'separator', margin: 'md' });
@@ -226,8 +250,37 @@ async function sendRelayCompletionNotification(task: any) {
 }
 
 /** 配布員向け中継完了通知メッセージを構築（JA/EN対応） */
-function buildDistributorDeliveryMessage(lang: string, location: string, area: string, time: string, mapsUrl: string | null, heroImageUrl: string | null) {
+function buildDistributorDeliveryMessage(lang: string, location: string, area: string, time: string, mapsUrl: string | null, heroImageUrl: string | null, equipment?: { bagCount: number; trolleyCount: number; otherCount: number }) {
   const isJa = lang === 'ja';
+
+  const infoRows: any[] = [
+    { type: 'box', layout: 'horizontal', contents: [
+      { type: 'text', text: isJa ? '場所' : 'Location', size: 'xs', color: '#aaaaaa', flex: 2 },
+      { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+    ]},
+    { type: 'box', layout: 'horizontal', contents: [
+      { type: 'text', text: isJa ? 'エリア' : 'Area', size: 'xs', color: '#aaaaaa', flex: 2 },
+      { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
+    ]},
+    { type: 'box', layout: 'horizontal', contents: [
+      { type: 'text', text: isJa ? '時刻' : 'Time', size: 'xs', color: '#aaaaaa', flex: 2 },
+      { type: 'text', text: time, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+    ]},
+  ];
+
+  // 備品数を追加
+  if (equipment) {
+    const equipLines: string[] = [];
+    if (equipment.bagCount > 0) equipLines.push(isJa ? `バッグ ${equipment.bagCount}個` : `Bag x${equipment.bagCount}`);
+    if (equipment.trolleyCount > 0) equipLines.push(isJa ? `台車 ${equipment.trolleyCount}台` : `Trolley x${equipment.trolleyCount}`);
+    if (equipment.otherCount > 0) equipLines.push(isJa ? `その他 ${equipment.otherCount}個` : `Other x${equipment.otherCount}`);
+    if (equipLines.length > 0) {
+      infoRows.push({ type: 'box', layout: 'horizontal', contents: [
+        { type: 'text', text: isJa ? '備品' : 'Items', size: 'xs', color: '#aaaaaa', flex: 2 },
+        { type: 'text', text: equipLines.join('\n'), size: 'xs', color: '#333333', flex: 5, weight: 'bold', wrap: true },
+      ]});
+    }
+  }
 
   const bodyContents: any[] = [
     { type: 'text', text: isJa ? '\u{1F4E6} 中継が完了しました' : '\u{1F4E6} Delivery Completed', weight: 'bold', size: 'md', color: '#3756E8' },
@@ -238,23 +291,7 @@ function buildDistributorDeliveryMessage(lang: string, location: string, area: s
         ? 'チラシの中継が以下の場所に届いています。'
         : 'Your flyers have been delivered to the following location.',
     },
-    {
-      type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
-      contents: [
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: isJa ? '場所' : 'Location', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: isJa ? 'エリア' : 'Area', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: isJa ? '時刻' : 'Time', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: time, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-        ]},
-      ],
-    },
+    { type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm', contents: infoRows },
     { type: 'separator', margin: 'lg' },
     {
       type: 'box', layout: 'vertical', margin: 'lg', spacing: 'md',
