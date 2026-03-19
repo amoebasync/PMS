@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 import { pushMessage, isLineConfigured } from '@/lib/line';
+import { getPresignedUrl } from '@/lib/s3';
 
 async function authorize() {
   const cookieStore = await cookies();
@@ -86,6 +87,7 @@ async function sendRelayCompletionNotification(task: any) {
   const isRelay = task.type === 'RELAY';
   const typeLabel = isRelay ? '中継' : '回収';
   const emoji = isRelay ? '\u{1F4E6}' : '\u{1F69A}';
+  const accentColor = isRelay ? '#3756E8' : '#10B981';
   const branch = task.schedule?.branch?.nameJa || '—';
   const distributor = task.schedule?.distributor?.name || '—';
   const area = task.schedule?.area
@@ -97,95 +99,103 @@ async function sendRelayCompletionNotification(task: any) {
   const location = task.locationName || '—';
   const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
 
+  // エビデンス写真（1枚目）の署名付きURL
+  const evidenceUrls: string[] = Array.isArray(task.evidenceUrls) ? task.evidenceUrls : [];
+  let heroImageUrl: string | null = null;
+  if (evidenceUrls.length > 0) {
+    try {
+      const proxyUrl = evidenceUrls[0];
+      // /api/s3-proxy?key=xxx からS3キーを抽出
+      const keyMatch = proxyUrl.match(/[?&]key=([^&]+)/);
+      if (keyMatch) {
+        const s3Key = decodeURIComponent(keyMatch[1]);
+        heroImageUrl = await getPresignedUrl(s3Key, 86400); // 24時間有効
+      }
+    } catch (e) {
+      console.error('[RelayTask] Failed to get presigned URL:', e);
+    }
+  }
+
   // Google Maps リンク
   const hasLocation = task.latitude && task.longitude;
   const mapsUrl = hasLocation
     ? `https://www.google.com/maps?q=${task.latitude},${task.longitude}`
     : null;
 
-  // Flex Message 本体
-  const bodyContents: any[] = [
-    {
-      type: 'text',
-      text: `${emoji} ${typeLabel}完了`,
-      weight: 'bold',
-      size: 'md',
-      color: isRelay ? '#3756E8' : '#10B981',
-    },
-    { type: 'separator', margin: 'md' },
-    {
+  // Flex Message（写真付きカード）
+  const bubble: any = {
+    type: 'bubble',
+    size: 'kilo',
+    body: {
       type: 'box',
       layout: 'vertical',
-      margin: 'md',
-      spacing: 'sm',
       contents: [
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: '支店', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: branch, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: '配布員', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: distributor, size: 'xs', color: '#333333', flex: 5 },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: 'エリア', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: '場所', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5 },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: '担当', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: driver, size: 'xs', color: '#333333', flex: 5 },
-        ]},
-        { type: 'box', layout: 'horizontal', contents: [
-          { type: 'text', text: '完了', size: 'xs', color: '#aaaaaa', flex: 2 },
-          { type: 'text', text: now, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-        ]},
+        { type: 'text', text: `${emoji} ${typeLabel}完了`, weight: 'bold', size: 'md', color: accentColor },
+        { type: 'separator', margin: 'md' },
+        {
+          type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+          contents: [
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '支店', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: branch, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '配布員', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: distributor, size: 'xs', color: '#333333', flex: 5 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: 'エリア', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '場所', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '担当', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: driver, size: 'xs', color: '#333333', flex: 5 },
+            ]},
+            { type: 'box', layout: 'horizontal', contents: [
+              { type: 'text', text: '完了', size: 'xs', color: '#aaaaaa', flex: 2 },
+              { type: 'text', text: now, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+            ]},
+          ],
+        },
       ],
-    },
-  ];
-
-  // Google Maps ボタン
-  const footer = mapsUrl ? {
-    type: 'box',
-    layout: 'vertical',
-    contents: [{
-      type: 'button',
-      action: { type: 'uri', label: '\u{1F4CD} Google Maps で確認', uri: mapsUrl },
-      style: 'link',
-      height: 'sm',
-    }],
-  } : undefined;
-
-  const flexMessage: any = {
-    type: 'flex',
-    altText: `${emoji} ${typeLabel}完了: ${branch} ${distributor}`,
-    contents: {
-      type: 'bubble',
-      size: 'kilo',
-      body: { type: 'box', layout: 'vertical', contents: bodyContents },
-      ...(footer ? { footer } : {}),
     },
   };
 
-  // メッセージ配列: Flex + エビデンス写真（最大4枚、合計5メッセージまで）
-  const messages: any[] = [flexMessage];
-
-  const evidenceUrls: string[] = Array.isArray(task.evidenceUrls) ? task.evidenceUrls : [];
-  const baseUrl = 'https://pms.tiramis.co.jp';
-  for (const url of evidenceUrls.slice(0, 4)) {
-    const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
-    messages.push({
+  // エビデンス写真をheroに設定
+  if (heroImageUrl) {
+    bubble.hero = {
       type: 'image',
-      originalContentUrl: fullUrl,
-      previewImageUrl: fullUrl,
-    });
+      url: heroImageUrl,
+      size: 'full',
+      aspectRatio: '20:13',
+      aspectMode: 'cover',
+    };
   }
 
-  await pushMessage(groupId, messages);
-  console.log(`[RelayTask] LINE notification sent: ${typeLabel} ${branch} ${distributor} (${evidenceUrls.length} photos)`);
+  // Google Maps ボタン
+  if (mapsUrl) {
+    bubble.footer = {
+      type: 'box',
+      layout: 'vertical',
+      contents: [{
+        type: 'button',
+        action: { type: 'uri', label: '\u{1F4CD} Google Maps で確認', uri: mapsUrl },
+        style: 'link',
+        height: 'sm',
+      }],
+    };
+  }
+
+  await pushMessage(groupId, [{
+    type: 'flex',
+    altText: `${emoji} ${typeLabel}完了: ${branch} ${distributor}`,
+    contents: bubble,
+  }]);
+  console.log(`[RelayTask] LINE notification sent: ${typeLabel} ${branch} ${distributor}`);
 }
 
 // DELETE: 中継/回収タスク削除
