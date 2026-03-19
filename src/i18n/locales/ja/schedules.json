@@ -213,5 +213,8 @@
   "orphan_link_success": "セッションをスケジュールに紐付けました",
 
   "relay_duplicate_warning": "同じスケジュールに{{type}}タスクが既に{{count}}件あります。追加しますか？",
-  "relay_duplicate_confirm": "追加する"
+  "relay_duplicate_confirm": "追加する",
+
+  "expected_arrival": "出勤予定",
+  "expected_arrival_other": "その他"
 }

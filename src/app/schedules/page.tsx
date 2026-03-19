@@ -939,6 +939,7 @@ export default function ScheduleListPage() {
                 <th className="px-3 py-2.5 w-[80px]">{t('th_status')}</th>
                 <th className="pl-3 pr-1 py-2.5">{t('th_staff_name')}</th>
                 <th className="px-2 py-2.5 w-[40px] text-center">{t('th_attendance')}</th>
+                <th className="px-2 py-2.5 w-[60px] text-center">{t('expected_arrival')}</th>
                 <th className="pl-1 pr-3 py-2.5">{t('th_branch')}</th>
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
@@ -950,7 +951,7 @@ export default function ScheduleListPage() {
             <tbody className="divide-y divide-slate-100">
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
                     <i className="bi bi-calendar-x text-3xl block mb-2"></i>
                     {t('no_results')}
                   </td>
@@ -1017,6 +1018,21 @@ export default function ScheduleListPage() {
                         </span>
                       ) : (
                         <span className="text-slate-300 text-[10px]">-</span>
+                      )}
+                    </td>
+
+                    {/* Expected Arrival (ETA) */}
+                    <td className="px-2 py-2.5 text-center">
+                      {s.expectedArrival ? (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          s.expectedArrival === 'other'
+                            ? 'bg-slate-100 text-slate-500'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {s.expectedArrival === 'other' ? t('expected_arrival_other') : s.expectedArrival}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-[10px]">&mdash;</span>
                       )}
                     </td>
 

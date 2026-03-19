@@ -872,6 +872,10 @@ model DistributionSchedule {
   checkedAt         DateTime? @map("checked_at")
   checkedBy         Employee? @relation("ComplianceChecker", fields: [checkedById], references: [id])
 
+  // 出勤確認
+  expectedArrival   String?   @map("expected_arrival") @db.VarChar(10)
+  arrivalAnsweredAt DateTime? @map("arrival_answered_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -83,6 +83,16 @@ if [ -n "$CRON_SECRET" ]; then
     echo "CRON既存: 面接・研修リマインダーメール（スキップ）"
   fi
 
+  # --- 出勤確認LINE送信 CRON 登録（重複時はスキップ） ---
+  # 毎朝6:00 JST = UTC 21:00前日
+  ATTENDANCE_CRON_JOB="0 21 * * * curl -s -X POST -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/send-attendance-check >> /tmp/pms-cron-send-attendance-check.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "send-attendance-check"; then
+    (crontab -l 2>/dev/null; echo "$ATTENDANCE_CRON_JOB") | crontab -
+    echo "CRON登録: 出勤確認LINE送信（毎日06:00 JST）"
+  else
+    echo "CRON既存: 出勤確認LINE送信（スキップ）"
+  fi
+
   # --- ハウスキープ CRON 登録（重複時はスキップ） ---
   # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
   HOUSEKEEP_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"
