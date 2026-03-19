@@ -439,14 +439,12 @@ export default function EmployeePage() {
     if (!await showConfirm(t('password_reset_confirm'), { variant: 'warning', confirmLabel: t('password_reset_btn') })) return;
     try {
       const res = await fetch(`/api/employees/${currentId}/reset`, { method: 'POST' });
-      if (!res.ok) throw new Error('Reset failed');
       const data = await res.json();
-      await showConfirm(t('password_reset_new', { password: data.newPassword }), {
-        title: t('password_reset_success'),
-        infoOnly: true,
-        confirmLabel: t('btn_close'),
-        variant: 'success',
-      });
+      if (!res.ok) {
+        showToast(data.error || t('password_reset_error'), 'error');
+        return;
+      }
+      showToast(t('password_reset_success'), 'success');
     } catch (error) { showToast(t('password_reset_error'), 'error'); }
   };
 
