@@ -17,7 +17,7 @@ const API_KEY = process.env.POSTING_SYSTEM_API_KEY;
  * postingrealdb.m_shop テーブルのSHOP_CDは短縮コード
  */
 const BRANCH_TO_SHOP_CD: Record<string, string> = {
-  '高田馬場': 'MBF',
+  '高田馬場': 'MBA',
   '横浜': 'MYO',
   '新松戸': 'MMA',
   '浦和': 'MUr',
