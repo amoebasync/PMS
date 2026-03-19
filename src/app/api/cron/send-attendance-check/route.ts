@@ -63,6 +63,7 @@ export async function POST(request: Request) {
       distributorId: number;
       lineUserId: string;
       language: string;
+      name: string;
     }>();
 
     for (const s of eligibleSchedules) {
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
         distributorId: s.distributorId,
         lineUserId: lineUser.lineUserId,
         language: s.distributor.language || 'ja',
+        name: s.distributor.name,
       });
     }
 
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
       try {
         const message = buildAttendanceFlexMessage(
           info.language,
+          info.name,
           info.distributorId,
           todayStr
         );
@@ -123,108 +126,77 @@ export async function POST(request: Request) {
   }
 }
 
-/** 出勤確認 Flex Message を構築（JA/EN対応） */
+/** 出勤確認 Flex Message を構築（JA/EN対応、名前入り） */
 function buildAttendanceFlexMessage(
   lang: string,
+  name: string,
   distributorId: number,
   dateStr: string
 ) {
   const isJa = lang === 'ja';
+  const firstName = name.split(/\s+/)[0];
 
-  // 7:00〜11:00の30分刻み = 9ボタン
-  const timeSlots = [
-    '7:00', '7:30', '8:00',
-    '8:30', '9:00', '9:30',
-    '10:00', '10:30', '11:00',
-  ];
+  const timeSlots = ['7:00','7:30','8:00','8:30','9:00','9:30','10:00','10:30','11:00'];
 
-  // 3列 x 3行のgrid
   const rows: any[] = [];
   for (let i = 0; i < timeSlots.length; i += 3) {
-    const rowButtons = timeSlots.slice(i, i + 3).map(time => ({
-      type: 'button',
-      action: {
-        type: 'postback',
-        label: time,
-        data: `action=attendance&distributorId=${distributorId}&date=${dateStr}&time=${time}`,
-        displayText: time,
-      },
-      style: 'secondary',
-      height: 'sm',
-      flex: 1,
-    }));
     rows.push({
-      type: 'box',
-      layout: 'horizontal',
-      spacing: 'sm',
-      contents: rowButtons,
+      type: 'box', layout: 'horizontal', spacing: 'sm',
+      margin: i === 0 ? 'lg' : 'sm',
+      contents: timeSlots.slice(i, i + 3).map(time => ({
+        type: 'button',
+        action: {
+          type: 'postback', label: time,
+          data: `action=attendance&distributorId=${distributorId}&date=${dateStr}&time=${time}`,
+          displayText: isJa ? `${time} に出勤します` : `I will arrive at ${time}`,
+        },
+        style: 'secondary', height: 'sm', color: '#EEF2FF',
+      })),
     });
   }
 
-  // 「その他 / Other」ボタン
   rows.push({
-    type: 'box',
-    layout: 'horizontal',
-    spacing: 'sm',
-    contents: [
-      {
-        type: 'button',
-        action: {
-          type: 'postback',
-          label: isJa ? 'その他' : 'Other',
-          data: `action=attendance&distributorId=${distributorId}&date=${dateStr}&time=other`,
-          displayText: isJa ? 'その他' : 'Other',
-        },
-        style: 'primary',
-        color: '#7C3AED',
-        height: 'sm',
-        flex: 1,
+    type: 'box', layout: 'horizontal', margin: 'lg',
+    contents: [{
+      type: 'button',
+      action: {
+        type: 'postback',
+        label: isJa ? '\u23F0 その他の時間' : '\u23F0 Other time',
+        data: `action=attendance&distributorId=${distributorId}&date=${dateStr}&time=other`,
+        displayText: isJa ? 'その他の時間に出勤します' : 'I will arrive at a different time',
       },
-    ],
+      style: 'primary', color: '#6366F1', height: 'sm',
+    }],
   });
-
-  const bubble = {
-    type: 'bubble',
-    size: 'mega',
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      contents: [
-        {
-          type: 'text',
-          text: isJa ? '\u{1F4CB} \u672C\u65E5\u306E\u51FA\u52E4\u78BA\u8A8D' : '\u{1F4CB} Today\'s Attendance Check',
-          weight: 'bold',
-          size: 'lg',
-          color: '#1E293B',
-        },
-        {
-          type: 'separator',
-          margin: 'lg',
-        },
-        {
-          type: 'text',
-          text: isJa
-            ? '\u304A\u306F\u3088\u3046\u3054\u3056\u3044\u307E\u3059\u3002\n\u672C\u65E5\u306E\u914D\u5E03\u30B9\u30B1\u30B8\u30E5\u30FC\u30EB\u304C\u767B\u9332\u3055\u308C\u3066\u3044\u307E\u3059\u3002\n\u51FA\u52E4\u4E88\u5B9A\u6642\u523B\u3092\u6559\u3048\u3066\u304F\u3060\u3055\u3044\u3002'
-            : 'Good morning.\nYou have a distribution schedule today.\nPlease let us know your expected arrival time.',
-          wrap: true,
-          size: 'sm',
-          color: '#555555',
-          margin: 'lg',
-        },
-      ],
-    },
-    footer: {
-      type: 'box',
-      layout: 'vertical',
-      spacing: 'sm',
-      margin: 'lg',
-      contents: rows,
-    },
-  };
 
   return {
     type: 'flex',
-    altText: isJa ? '\u{1F4CB} \u672C\u65E5\u306E\u51FA\u52E4\u78BA\u8A8D' : '\u{1F4CB} Today\'s Attendance Check',
-    contents: bubble,
+    altText: isJa ? `\u2600\uFE0F ${firstName}さん、本日の出勤確認` : `\u2600\uFE0F ${firstName}, Today's Attendance`,
+    contents: {
+      type: 'bubble', size: 'mega',
+      styles: { header: { backgroundColor: '#3756E8' } },
+      header: {
+        type: 'box', layout: 'vertical', paddingTop: 'xl', paddingBottom: 'xl',
+        contents: [
+          { type: 'text', text: '\u2600\uFE0F', size: 'xxl', align: 'center' },
+          { type: 'text', text: isJa ? `おはようございます、${firstName}さん！` : `Good morning, ${firstName}!`, color: '#FFFFFF', weight: 'bold', size: 'md', align: 'center', margin: 'sm' },
+          { type: 'text', text: isJa ? '本日の出勤予定を教えてください' : 'When do you plan to arrive today?', color: '#C7D2FE', size: 'xs', align: 'center', margin: 'sm' },
+        ],
+      },
+      body: {
+        type: 'box', layout: 'vertical',
+        contents: [
+          { type: 'text', text: isJa ? '出勤予定時刻を選択' : 'Select your arrival time', weight: 'bold', size: 'sm', color: '#333333' },
+          { type: 'text', text: isJa ? 'タップするだけで出勤予定が登録されます。' : 'Just tap to register your expected arrival.', size: 'xs', color: '#999999', margin: 'sm', wrap: true },
+          ...rows,
+        ],
+      },
+      footer: {
+        type: 'box', layout: 'vertical', paddingTop: 'md', paddingBottom: 'md',
+        contents: [
+          { type: 'text', text: isJa ? '\u{1F4AA} 本日もよろしくお願いします！' : '\u{1F4AA} Have a great day!', size: 'xs', color: '#999999', align: 'center' },
+        ],
+      },
+    },
   };
 }
