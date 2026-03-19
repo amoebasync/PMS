@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import SkeletonRow from '@/components/ui/SkeletonRow';
 import EmptyState from '@/components/ui/EmptyState';
 import Pagination from '@/components/ui/Pagination';
@@ -83,6 +84,8 @@ export default function OrdersListPage() {
     } catch (e) { console.error(e); }
     setIsLoading(false);
   }, []);
+
+  useRefreshOnFocus(() => fetchOrders(buildQuery()));
 
   // Initial load: fetch orders + salesReps for dropdown
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import type { AlertDefinition } from '@prisma/client';
+import { notificationEmitter } from '@/lib/notification-emitter';
 
 /**
  * アラート定義のターゲット設定に基づいて対象社員IDリストを解決する
@@ -76,4 +77,9 @@ export async function createAlertNotification(
       alertId: alertId,
     })),
   });
+
+  // SSE通知: 各対象社員にイベントを発火
+  for (const empId of employeeIds) {
+    notificationEmitter.emit({ type: 'ALERT', recipientId: empId });
+  }
 }

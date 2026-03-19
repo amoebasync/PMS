@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 
 /* ------------------------------------------------------------------ */
 /*  Constants                                                         */
@@ -110,42 +111,45 @@ export default function Dashboard() {
   const [showBlocking, setShowBlocking] = useState(false);
   const [markingRead, setMarkingRead] = useState(false);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [dashRes, announcementsRes, profileRes, blockingRes] = await Promise.all([
-          fetch('/api/dashboard'),
-          fetch('/api/announcements'),
-          fetch('/api/profile'),
-          fetch('/api/announcements/blocking'),
-        ]);
-        if (dashRes.ok) setData(await dashRes.json());
-        if (announcementsRes.ok) {
-          const ann = await announcementsRes.json();
-          setAnnouncements(Array.isArray(ann) ? ann : []);
-        }
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
-          const roles: string[] = profile?.roles?.map((r: any) => r.role?.code) || [];
-          const primaryRoleCode: string = profile?.role?.code || '';
-          setIsSuperAdmin(roles.includes('SUPER_ADMIN') || primaryRoleCode === 'SUPER_ADMIN');
-        }
-        if (blockingRes.ok) {
-          const blockingData = await blockingRes.json();
-          const items = blockingData.announcements || [];
-          if (items.length > 0) {
-            // sessionStorage で「次回読む」を管理
-            const dismissed = JSON.parse(sessionStorage.getItem('blocking_dismissed') || '[]');
-            const filtered = items.filter((a: any) => !dismissed.includes(a.id));
-            setBlockingAnnouncements(filtered);
-            if (filtered.length > 0) {
-              setBlockingIndex(0);
-              setShowBlocking(true);
-            }
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const [dashRes, announcementsRes, profileRes, blockingRes] = await Promise.all([
+        fetch('/api/dashboard'),
+        fetch('/api/announcements'),
+        fetch('/api/profile'),
+        fetch('/api/announcements/blocking'),
+      ]);
+      if (dashRes.ok) setData(await dashRes.json());
+      if (announcementsRes.ok) {
+        const ann = await announcementsRes.json();
+        setAnnouncements(Array.isArray(ann) ? ann : []);
+      }
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        const roles: string[] = profile?.roles?.map((r: any) => r.role?.code) || [];
+        const primaryRoleCode: string = profile?.role?.code || '';
+        setIsSuperAdmin(roles.includes('SUPER_ADMIN') || primaryRoleCode === 'SUPER_ADMIN');
+      }
+      if (blockingRes.ok) {
+        const blockingData = await blockingRes.json();
+        const items = blockingData.announcements || [];
+        if (items.length > 0) {
+          // sessionStorage で「次回読む」を管理
+          const dismissed = JSON.parse(sessionStorage.getItem('blocking_dismissed') || '[]');
+          const filtered = items.filter((a: any) => !dismissed.includes(a.id));
+          setBlockingAnnouncements(filtered);
+          if (filtered.length > 0) {
+            setBlockingIndex(0);
+            setShowBlocking(true);
           }
         }
-      } catch (e) { console.error(e); }
-    };
+      }
+    } catch (e) { console.error(e); }
+  }, []);
+
+  useRefreshOnFocus(fetchDashboardData);
+
+  useEffect(() => {
     fetchDashboardData();
 
     const checkHealth = async () => {

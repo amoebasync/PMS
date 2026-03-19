@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { handlePhoneChange } from '@/lib/formatters';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 
 type Distributor = any;
 type FormTab = 'basic' | 'contract' | 'bank' | 'rate';
@@ -145,6 +146,8 @@ export default function DistributorPage() {
       setIsLoading(false);
     }
   };
+
+  useRefreshOnFocus(loadData);
 
   useEffect(() => { loadData(); }, []);
 

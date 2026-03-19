@@ -8,6 +8,7 @@ import timeGridPlugin from '@fullcalendar/timegrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import Pagination from '@/components/ui/Pagination';
 
 // ──────────────────────────────────────────
@@ -932,6 +933,8 @@ export default function ApplicantsPage() {
       setSendingInvitation(false);
     }
   };
+
+  useRefreshOnFocus(() => { fetchApplicants(page, true); fetchSlots(undefined, true); });
 
   // ── 初回ロード ──
   useEffect(() => {

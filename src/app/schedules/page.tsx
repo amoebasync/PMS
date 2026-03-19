@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { GoogleMap, useJsApiLoader, Marker, Polygon } from '@react-google-maps/api';
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
@@ -562,6 +563,8 @@ export default function ScheduleListPage() {
     } catch (e) { console.error(e); }
     setIsLoading(false);
   };
+
+  useRefreshOnFocus(() => { if (filterDate) fetchSchedules(filterDate); });
 
   useEffect(() => { if (filterDate) fetchSchedules(filterDate); }, [filterDate]);
 

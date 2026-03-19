@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import {
   AssigneeMultiSelect,
   AutocompleteInput,
@@ -257,6 +258,8 @@ export default function CrmTasksPage() {
     }
     setIsLoadingTasks(false);
   }, [filterStatus, filterAssignee, filterPriority, filterDue, filterCategoryId, filterMyTasks]);
+
+  useRefreshOnFocus(fetchTasks);
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
 

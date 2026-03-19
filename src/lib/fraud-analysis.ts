@@ -6,6 +6,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
+import { notificationEmitter } from '@/lib/notification-emitter';
 
 // --- 定数 ---
 const EARTH_RADIUS_M = 6371000;
@@ -416,6 +417,7 @@ export async function analyzeFraudIndicators(sessionId: number): Promise<void> {
         distributorId: session.distributorId,
       },
     });
+    notificationEmitter.emit({ type: 'ALERT' });
   }
 
   console.log(`[FraudAnalysis] session=${sessionId} score=${riskScore} level=${riskLevel}`);

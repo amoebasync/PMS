@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
+import { notificationEmitter } from '@/lib/notification-emitter';
 
 // POST /api/staff/distribution/start — 配布セッション開始
 // scheduleId は任意 — なければスケジュール未紐付けの孤児セッションを作成
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
             distributorId: distributor.id,
           },
         });
+        notificationEmitter.emit({ type: 'DISTRIBUTION_START' });
       } catch (e) {
         console.error('通知作成エラー:', e);
       }
@@ -151,6 +153,7 @@ export async function POST(request: Request) {
           distributorId: distributor.id,
         },
       });
+      notificationEmitter.emit({ type: 'DISTRIBUTION_START' });
     } catch (e) {
       console.error('通知作成エラー:', e);
     }

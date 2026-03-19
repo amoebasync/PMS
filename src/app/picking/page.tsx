@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from '@/i18n';
+import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -147,6 +148,8 @@ export default function PickingPage() {
       setLoading(false);
     }
   }, [date]);
+
+  useRefreshOnFocus(fetchData);
 
   useEffect(() => {
     fetchData();

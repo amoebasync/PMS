@@ -24,7 +24,8 @@ export default function NotificationBell() {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const lastNotifIdRef = useRef<number>(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function NotificationBell() {
     }
   }, [permissionGranted]);
 
-  // Fetch notifications
+  // Fetch notifications via regular API (initial load + fallback)
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/notifications?limit=20');
@@ -71,31 +72,119 @@ export default function NotificationBell() {
       setNotifications(data.notifications);
       setUnreadCount(data.unreadCount);
 
-      // Check for new notifications and show OS notification
+      // Update lastNotifIdRef without triggering OS notifications on initial load
       if (data.notifications.length > 0) {
-        const latestId = data.notifications[0].id;
-        if (lastNotifIdRef.current > 0 && latestId > lastNotifIdRef.current) {
-          // New notification(s) arrived
-          const newOnes = data.notifications.filter((n: Notification) => n.id > lastNotifIdRef.current);
-          for (const n of newOnes) {
-            showBrowserNotification(n.type === 'ALERT' ? 'PMS アラート' : 'PMS 配布通知', n.title);
-          }
-        }
-        lastNotifIdRef.current = latestId;
+        lastNotifIdRef.current = data.notifications[0].id;
       }
     } catch {
       // Silently fail
     }
+  }, []);
+
+  // Connect to SSE stream
+  const connectSSE = useCallback(() => {
+    // Close existing connection
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+
+    const es = new EventSource('/api/admin/notifications/stream');
+    eventSourceRef.current = es;
+
+    es.addEventListener('connected', () => {
+      // Connection established
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    });
+
+    es.addEventListener('notification', (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.notifications && Array.isArray(data.notifications)) {
+          const newNotifs: Notification[] = data.notifications.map((n: Record<string, unknown>) => ({
+            id: n.id as number,
+            type: n.type as string,
+            title: n.title as string,
+            message: (n.message as string) || null,
+            scheduleId: (n.scheduleId as number) || null,
+            distributorName: (n.distributor as Record<string, unknown>)?.name as string || null,
+            alertDefinitionId: (n.alertDefinitionId as number) || null,
+            alertId: (n.alertId as number) || null,
+            isRead: (n.isRead as boolean) || false,
+            createdAt: n.createdAt as string,
+          }));
+
+          // Show OS notification for each new item
+          for (const n of newNotifs) {
+            if (n.id > lastNotifIdRef.current) {
+              showBrowserNotification(
+                n.type === 'ALERT' ? 'PMS アラート' : 'PMS 配布通知',
+                n.title
+              );
+            }
+          }
+
+          // Update lastNotifIdRef
+          if (newNotifs.length > 0) {
+            const maxId = Math.max(...newNotifs.map(n => n.id));
+            if (maxId > lastNotifIdRef.current) {
+              lastNotifIdRef.current = maxId;
+            }
+          }
+
+          // Prepend new notifications to existing list, deduplicate by id
+          setNotifications(prev => {
+            const existingIds = new Set(prev.map(n => n.id));
+            const uniqueNew = newNotifs.filter(n => !existingIds.has(n.id));
+            const merged = [...uniqueNew, ...prev].slice(0, 20);
+            return merged;
+          });
+
+          // Update unread count
+          setUnreadCount(prev => {
+            const newUnread = newNotifs.filter(n => !n.isRead).length;
+            return prev + newUnread;
+          });
+        }
+      } catch {
+        // Parse error, ignore
+      }
+    });
+
+    es.onerror = () => {
+      // EventSource will auto-reconnect, but if it closes permanently, reconnect manually
+      if (es.readyState === EventSource.CLOSED) {
+        eventSourceRef.current = null;
+        // Reconnect after 5 seconds
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectSSE();
+        }, 5000);
+      }
+    };
   }, [showBrowserNotification]);
 
-  // Start polling
+  // Initial load + SSE connection
   useEffect(() => {
+    // Fetch initial notifications via regular API
     fetchNotifications();
-    pollingRef.current = setInterval(fetchNotifications, 60000);
+
+    // Then connect to SSE for real-time updates
+    connectSSE();
+
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+        eventSourceRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
     };
-  }, [fetchNotifications]);
+  }, [fetchNotifications, connectSSE]);
 
   // Mark all as read
   const markAllRead = async () => {

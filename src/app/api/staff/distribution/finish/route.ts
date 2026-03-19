@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 import { analyzeFraudIndicators } from '@/lib/fraud-analysis';
+import { notificationEmitter } from '@/lib/notification-emitter';
 
 // POST /api/staff/distribution/finish — 配布終了
 export async function POST(request: Request) {
@@ -121,6 +122,7 @@ export async function POST(request: Request) {
           distributorId: distributor.id,
         },
       });
+      notificationEmitter.emit({ type: 'DISTRIBUTION_FINISH' });
     } catch (e) {
       console.error('通知作成エラー:', e);
     }
