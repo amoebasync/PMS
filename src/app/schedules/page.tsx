@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
@@ -497,6 +498,7 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
 export default function ScheduleListPage() {
   const { t } = useTranslation('schedules');
   const { showToast, showConfirm } = useNotification();
+  const searchParams = useSearchParams();
   const [schedules, setSchedules] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -506,7 +508,10 @@ export default function ScheduleListPage() {
 
   const [editingSchedule, setEditingSchedule] = useState<any>(null);
   const [remarksInput, setRemarksInput] = useState('');
-  const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(null);
+  const [trajectoryScheduleId, setTrajectoryScheduleId] = useState<number | null>(() => {
+    const tid = searchParams.get('trajectory');
+    return tid ? parseInt(tid) : null;
+  });
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' | 'FULL_RELAY' } | null>(null);
