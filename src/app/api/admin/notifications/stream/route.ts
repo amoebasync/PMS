@@ -40,31 +40,26 @@ export async function GET(request: NextRequest) {
       // Send initial connection event
       controller.enqueue(encoder.encode(`event: connected\ndata: ${JSON.stringify({ employeeId })}\n\n`));
 
+      const safeSend = (msg: string) => {
+        if (closed) return;
+        try { controller.enqueue(encoder.encode(msg)); } catch { closed = true; }
+      };
+
       // Listen for in-memory events (same-process instant push)
       const unsubscribe = notificationEmitter.subscribe(async (data) => {
         if (closed) return;
-        // Check if this notification is relevant (global or for this employee)
-        if (data.recipientId !== undefined && data.recipientId !== null && data.recipientId !== employeeId) {
-          return; // Not for this user
-        }
+        if (data.recipientId !== undefined && data.recipientId !== null && data.recipientId !== employeeId) return;
         try {
-          // Fetch latest unread notifications
           const notifications = await prisma.adminNotification.findMany({
-            where: {
-              id: { gt: lastCheckedId },
-              OR: [{ recipientId: null }, { recipientId: employeeId }],
-            },
-            orderBy: { id: 'desc' },
-            take: 10,
+            where: { id: { gt: lastCheckedId }, OR: [{ recipientId: null }, { recipientId: employeeId }] },
+            orderBy: { id: 'desc' }, take: 10,
             include: { distributor: { select: { name: true, staffId: true } } },
           });
           if (notifications.length > 0) {
             lastCheckedId = Math.max(...notifications.map(n => n.id));
-            controller.enqueue(encoder.encode(`event: notification\ndata: ${JSON.stringify({ notifications })}\n\n`));
+            safeSend(`event: notification\ndata: ${JSON.stringify({ notifications })}\n\n`);
           }
-        } catch (e) {
-          console.error('[SSE] Error fetching notifications:', e);
-        }
+        } catch (e) { if (!closed) console.error('[SSE] Error:', e); }
       });
 
       // DB polling fallback (for notifications from the other EC2 instance)
@@ -72,33 +67,21 @@ export async function GET(request: NextRequest) {
         if (closed) return;
         try {
           const notifications = await prisma.adminNotification.findMany({
-            where: {
-              id: { gt: lastCheckedId },
-              OR: [{ recipientId: null }, { recipientId: employeeId }],
-            },
-            orderBy: { id: 'desc' },
-            take: 10,
+            where: { id: { gt: lastCheckedId }, OR: [{ recipientId: null }, { recipientId: employeeId }] },
+            orderBy: { id: 'desc' }, take: 10,
             include: { distributor: { select: { name: true, staffId: true } } },
           });
           if (notifications.length > 0) {
             lastCheckedId = Math.max(...notifications.map(n => n.id));
-            controller.enqueue(encoder.encode(`event: notification\ndata: ${JSON.stringify({ notifications })}\n\n`));
+            safeSend(`event: notification\ndata: ${JSON.stringify({ notifications })}\n\n`);
           }
-        } catch (e) {
-          console.error('[SSE] Poll error:', e);
-        }
-      }, 15000); // 15 seconds
+        } catch (e) { if (!closed) console.error('[SSE] Poll error:', e); }
+      }, 15000);
 
       // Heartbeat to keep connection alive
       const heartbeatInterval = setInterval(() => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(`event: heartbeat\ndata: {}\n\n`));
-        } catch (e) {
-          // Connection likely closed
-          closed = true;
-        }
-      }, 30000); // 30 seconds
+        safeSend(`event: heartbeat\ndata: {}\n\n`);
+      }, 30000);
 
       // Cleanup on close
       request.signal.addEventListener('abort', () => {

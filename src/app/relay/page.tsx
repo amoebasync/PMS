@@ -300,8 +300,12 @@ export default function RelayListPage() {
         // tasks 一覧も更新
         setTasks(prev => prev.map(t => t.id === editTask.id ? { ...t, evidenceUrls: data.evidenceUrls } : t));
         showToast(t('evidence_upload_success'), 'success');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Evidence upload failed:', res.status, err);
+        showToast(err.error || t('save_error'), 'error');
       }
-    } catch { showToast(t('save_error'), 'error'); }
+    } catch (err) { console.error('Evidence upload error:', err); showToast(t('save_error'), 'error'); }
     setEvidenceUploading(false);
   };
 
