@@ -2,9 +2,8 @@ import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { addBetaTester } from '@/lib/appstore-connect';
-import { addToGoogleGroup, isGooglePlayTesterConfigured } from '@/lib/google-play-tester';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
-import { sendAndroidTestInviteEmail } from '@/lib/mailer';
+import { sendAndroidOpenTestEmail } from '@/lib/mailer';
 
 // GET /api/distributors/[id]/app-distribution
 // 配信履歴取得
@@ -66,9 +65,6 @@ export async function POST(
     if (!platform || !['APPLE', 'ANDROID'].includes(platform)) {
       return NextResponse.json({ error: 'プラットフォームを選択してください' }, { status: 400 });
     }
-    if (platform === 'ANDROID' && !isGooglePlayTesterConfigured()) {
-      return NextResponse.json({ error: 'Google Play テスター管理APIが設定されていません' }, { status: 400 });
-    }
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return NextResponse.json({ error: '有効なメールアドレスを入力してください' }, { status: 400 });
     }
@@ -85,7 +81,7 @@ export async function POST(
     const { actorId, actorName } = await getAdminActorInfo();
     const ip = getIpAddress(request);
 
-    // 1. ログを PENDING で作成（外部API呼び出し前）
+    // 1. ログを PENDING で作成
     const log = await prisma.appDistributionLog.create({
       data: {
         distributorId,
@@ -96,19 +92,24 @@ export async function POST(
       },
     });
 
-    // 2. Apple TestFlight 招待送信
+    // 2. プラットフォーム別処理
     let result: { success: boolean; error?: string; alreadyExists?: boolean };
 
     if (platform === 'APPLE') {
-      // 配布員の名前を firstName/lastName に分割（スペースで分割）
+      // iOS: TestFlight 招待送信
       const nameParts = distributor.name.trim().split(/\s+/);
       const lastName = nameParts.length > 1 ? nameParts[0] : undefined;
       const firstName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
-
       result = await addBetaTester(email, firstName, lastName);
     } else {
-      // Android: Google グループにメンバー追加
-      result = await addToGoogleGroup(email);
+      // Android: オープンテスト案内メール送信（Googleグループ追加不要）
+      try {
+        await sendAndroidOpenTestEmail(email, distributor.name);
+        result = { success: true };
+      } catch (mailErr: any) {
+        console.error('[AppDist] Failed to send Android open test email:', mailErr);
+        result = { success: false, error: mailErr.message || 'メール送信に失敗しました' };
+      }
     }
 
     // 3. ログを最終ステータスに更新
@@ -137,58 +138,27 @@ export async function POST(
       afterData: updatedLog as unknown as Record<string, unknown>,
       ipAddress: ip,
       description: (() => {
-        const platformLabel = platform === 'APPLE' ? 'TestFlight招待' : 'Google Playテスター追加';
+        const platformLabel = platform === 'APPLE' ? 'TestFlight招待' : 'Google Playアプリ案内';
         return result.success
-          ? `配布スタッフ「${distributor.name}」に${platformLabel}を送信（${email}）${result.alreadyExists ? '（既に登録済み）' : ''}`
+          ? `配布スタッフ「${distributor.name}」に${platformLabel}を送信（${email}）`
           : `配布スタッフ「${distributor.name}」への${platformLabel}送信に失敗（${email}）: ${result.error}`;
       })(),
     });
 
     if (!result.success) {
       return NextResponse.json(
-        {
-          error: result.error || '送信に失敗しました',
-          log: updatedLog,
-        },
+        { error: result.error || '送信に失敗しました', log: updatedLog },
         { status: 500 },
       );
     }
 
-    // 5. Android: オプトインURL付き案内メール送信
-    if (platform === 'ANDROID' && !result.alreadyExists) {
-      try {
-        const mStatus = (result as any).memberStatus as string | undefined;
-        await sendAndroidTestInviteEmail(email, distributor.name, mStatus);
-        console.log(`[AppDist] Android test invite email sent to ${email}`);
-      } catch (mailErr) {
-        console.error('[AppDist] Failed to send Android invite email:', mailErr);
-        // メール送信失敗してもグループ追加は成功しているため、エラーにしない
-      }
-    }
-
-    const memberStatus = (result as any).memberStatus;
-
-    const messages = {
-      APPLE: {
-        success: 'TestFlight招待を送信しました',
-        exists: 'このメールアドレスは既にTestFlightに登録されています',
-      },
-      ANDROID: {
-        success: 'Googleグループに追加しました。Play Storeから内部テスト版をインストールできます',
-        exists: 'このメールアドレスは既にGoogleグループに登録されています',
-      },
-    };
-    const msg = messages[platform as 'APPLE' | 'ANDROID'];
-
-    let message = result.alreadyExists ? msg.exists : msg.success;
-    if (platform === 'ANDROID' && memberStatus === 'INVITED') {
-      message = 'Googleグループに招待しました。メンバーが招待メールを承認する必要があります';
-    }
+    const message = platform === 'APPLE'
+      ? (result.alreadyExists ? 'このメールアドレスは既にTestFlightに登録されています' : 'TestFlight招待を送信しました')
+      : 'アプリインストール案内メールを送信しました';
 
     return NextResponse.json({
       message,
       alreadyExists: result.alreadyExists || false,
-      memberStatus,
       log: updatedLog,
     });
   } catch (error) {

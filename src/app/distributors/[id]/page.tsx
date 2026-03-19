@@ -2006,7 +2006,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                 <p className="text-xs text-slate-400 mt-1">
                   {appDistPlatform === 'APPLE'
                     ? 'TestFlight招待メールがこのアドレスに送信されます'
-                    : 'Googleグループに追加され、Play Storeから内部テスト版をインストールできます'}
+                    : 'Google Playからのインストール案内メールが送信されます'}
                 </p>
               </div>
 

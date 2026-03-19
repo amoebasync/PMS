@@ -1109,45 +1109,20 @@ export const sendInterviewCancelEmail = async (
 };
 
 // ─────────────────────────────────────────────────────────
-// 12. Android内部テスト案内メール（配布員向け）
+// 12. Android オープンテスト案内メール（配布員向け）
 // ─────────────────────────────────────────────────────────
-const ANDROID_OPT_IN_URL = 'https://play.google.com/apps/testing/net.postingsystem.postingapp';
+const ANDROID_PLAY_STORE_URL = 'https://play.google.com/store/apps/details?id=net.postingsystem.postingapp';
 
-export const sendAndroidTestInviteEmail = async (
+export const sendAndroidOpenTestEmail = async (
   toEmail: string,
   distributorName: string,
-  memberStatus?: string,
 ) => {
-  const isInvited = memberStatus === 'INVITED';
-
-  // INVITED状態の場合のみ、Googleグループ招待承認の案内を表示
-  const groupInviteNotice = isInvited ? `
-    <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
-      <p style="margin:0;font-size:13px;color:#1e40af;">
-        <strong>★ まず最初に（重要）</strong><br>
-        Googleから<strong>「グループへの招待」</strong>という件名のメールが別途届きます。<br>
-        そのメール内の<strong>「招待を承認」</strong>ボタンを先にタップしてください。<br>
-        招待を承認してから、以下の手順に進んでください。
-      </p>
-    </div>
-  ` : '';
-
-  const groupInviteStep = isInvited ? `
-          <tr>
-            <td style="padding:6px 0;color:#166534;font-weight:bold;width:32px;vertical-align:top;">1.</td>
-            <td style="padding:6px 0;">Googleからの<strong>グループ招待メール</strong>を承認する（上記参照）</td>
-          </tr>` : '';
-
-  const stepOffset = isInvited ? 1 : 0;
-
   const contentHtml = `
     <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${distributorName} さん</p>
     <p style="margin:0 0 16px;">
-      配布アプリ（Android版）の内部テストにご招待いたします。<br>
+      配布アプリ（Android版）のインストール案内です。<br>
       以下の手順でアプリをインストールしてください。
     </p>
-
-    ${groupInviteNotice}
 
     <table cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;margin:24px 0;width:100%;">
       <tr><td style="padding:20px 24px;">
@@ -1155,61 +1130,46 @@ export const sendAndroidTestInviteEmail = async (
           📱 インストール手順
         </p>
         <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
-          ${groupInviteStep}
           <tr>
-            <td style="padding:6px 0;color:#166534;font-weight:bold;width:32px;vertical-align:top;">${1 + stepOffset}.</td>
-            <td style="padding:6px 0;">このメールアドレス（${toEmail}）の<strong>Googleアカウント</strong>でログインした状態で、下の「テストに参加する」ボタンをタップ</td>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;width:32px;vertical-align:top;">1.</td>
+            <td style="padding:6px 0;">下の「Google Playでインストール」ボタンをタップ</td>
           </tr>
           <tr>
-            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">${2 + stepOffset}.</td>
-            <td style="padding:6px 0;">表示されたページで「テスターになる」をタップして参加します</td>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">2.</td>
+            <td style="padding:6px 0;">Google Play Storeで「インストール」をタップ</td>
           </tr>
           <tr>
-            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">${3 + stepOffset}.</td>
-            <td style="padding:6px 0;">Google Play Storeからアプリをインストールできるようになります</td>
+            <td style="padding:6px 0;color:#166534;font-weight:bold;vertical-align:top;">3.</td>
+            <td style="padding:6px 0;">インストール完了後、アプリを開いてログインしてください</td>
           </tr>
         </table>
       </td></tr>
     </table>
 
     <div style="text-align:center;margin:32px 0;">
-      <a href="${ANDROID_OPT_IN_URL}" style="display:inline-block;background:#16a34a;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">テストに参加する</a>
+      <a href="${ANDROID_PLAY_STORE_URL}" style="display:inline-block;background:#16a34a;color:#ffffff;font-weight:bold;font-size:15px;padding:14px 40px;border-radius:10px;text-decoration:none;">Google Playでインストール</a>
     </div>
 
     <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:14px 18px;margin:0 0 24px;">
       <p style="margin:0;font-size:13px;color:#854d0e;">
         <strong>⚠ 注意事項</strong><br>
-        ${isInvited ? '・<strong>Googleグループの招待を承認してから</strong>上のボタンをタップしてください。承認前にタップするとテストページが表示されません<br>' : ''}
-        ・このメールアドレス（${toEmail}）の<strong>Googleアカウント（Gmail等）</strong>でログインしている必要があります<br>
-        ・テスターとして登録されてからGoogle Playに反映されるまで<strong>最大数時間</strong>かかる場合があります。すぐに表示されない場合は時間をおいて再度お試しください<br>
-        ・テスト版のため、予期しない動作が発生する場合があります
+        ・テスト版のため、予期しない動作が発生する場合があります<br>
+        ・問題が発生した場合は管理者にご連絡ください
       </p>
     </div>
 
     <p style="margin:0;color:#64748b;font-size:13px;">
       ボタンが機能しない場合は、以下のURLをブラウザにコピー＆ペーストしてください。<br>
-      <span style="color:#16a34a;word-break:break-all;">${ANDROID_OPT_IN_URL}</span>
+      <span style="color:#16a34a;word-break:break-all;">${ANDROID_PLAY_STORE_URL}</span>
     </p>
   `;
-
-  const groupInviteTextNotice = isInvited
-    ? '\n【★ まず最初に（重要）】\nGoogleから「グループへの招待」という件名のメールが別途届きます。\nそのメール内の「招待を承認」ボタンを先にタップしてください。\n招待を承認してから、以下の手順に進んでください。\n'
-    : '';
-
-  const textSteps = isInvited
-    ? `1. Googleからのグループ招待メールを承認する（上記参照）\n2. このメールアドレス（${toEmail}）のGoogleアカウントでログインした状態で、以下のURLにアクセスしてください\n3. 表示されたページで「テスターになる」をタップして参加します\n4. Google Play Storeからアプリをインストールできるようになります`
-    : `1. このメールアドレス（${toEmail}）のGoogleアカウントでログインした状態で、以下のURLにアクセスしてください\n2. 表示されたページで「テスターになる」をタップして参加します\n3. Google Play Storeからアプリをインストールできるようになります`;
-
-  const groupInviteTextNote = isInvited
-    ? '※ Googleグループの招待を承認してから上のURLにアクセスしてください。承認前にアクセスするとテストページが表示されません\n'
-    : '';
 
   await transporter.sendMail({
     from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
     to: toEmail,
-    subject: '【Tiramis】配布アプリ（Android版）テスト参加のご案内',
+    subject: '【Tiramis】配布アプリ（Android版）インストールのご案内',
     html: htmlWrapper(contentHtml),
-    text: `${distributorName} さん\n\n配布アプリ（Android版）の内部テストにご招待いたします。\n${groupInviteTextNotice}\n【インストール手順】\n${textSteps}\n\nテスト参加URL:\n${ANDROID_OPT_IN_URL}\n\n${groupInviteTextNote}※ このメールアドレス（${toEmail}）のGoogleアカウント（Gmail等）でログインしている必要があります\n※ テスターとして登録されてからGoogle Playに反映されるまで最大数時間かかる場合があります。すぐに表示されない場合は時間をおいて再度お試しください\n※ テスト版のため、予期しない動作が発生する場合があります`,
+    text: `${distributorName} さん\n\n配布アプリ（Android版）のインストール案内です。\n\n【インストール手順】\n1. 以下のURLにアクセスしてください\n2. Google Play Storeで「インストール」をタップ\n3. インストール完了後、アプリを開いてログインしてください\n\nGoogle Play Store:\n${ANDROID_PLAY_STORE_URL}\n\n※ テスト版のため、予期しない動作が発生する場合があります\n※ 問題が発生した場合は管理者にご連絡ください`,
   });
 };
 
