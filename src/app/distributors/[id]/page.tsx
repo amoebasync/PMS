@@ -849,6 +849,17 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
             <InfoRow label="性別" value={d.gender} />
             <InfoRow label="国籍" value={d.country?.name} />
             <InfoRow label="ポータル言語" value={d.language === 'en' ? 'English' : '日本語'} />
+            {d.passwordInfo && (
+              <div className="flex items-center justify-between py-2.5 border-t border-slate-100">
+                <span className="text-xs text-slate-400 w-24 shrink-0">パスワード</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-sm font-bold text-slate-800">{d.passwordInfo}</span>
+                  {d.isPasswordTemp && (
+                    <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">初期PW</span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-5">
