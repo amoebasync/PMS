@@ -74,7 +74,20 @@ export async function PUT(
   }
 }
 
-/** LINE グループに中継/回収完了通知を送信 */
+/** エビデンス写真の署名付きURLを取得 */
+async function getEvidenceHeroUrl(task: any): Promise<string | null> {
+  const evidenceUrls: string[] = Array.isArray(task.evidenceUrls) ? task.evidenceUrls : [];
+  if (evidenceUrls.length === 0) return null;
+  try {
+    const keyMatch = evidenceUrls[0].match(/[?&]key=([^&]+)/);
+    if (keyMatch) return await getPresignedUrl(decodeURIComponent(keyMatch[1]), 86400);
+  } catch (e) {
+    console.error('[RelayTask] Failed to get presigned URL:', e);
+  }
+  return null;
+}
+
+/** LINE グループに中継/回収完了通知を送信 + 配布員にも通知（中継のみ） */
 async function sendRelayCompletionNotification(task: any) {
   if (!isLineConfigured()) return;
 
@@ -99,95 +112,108 @@ async function sendRelayCompletionNotification(task: any) {
   const location = task.locationName || '—';
   const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
 
-  // エビデンス写真（1枚目）の署名付きURL
-  const evidenceUrls: string[] = Array.isArray(task.evidenceUrls) ? task.evidenceUrls : [];
-  let heroImageUrl: string | null = null;
-  if (evidenceUrls.length > 0) {
-    try {
-      const proxyUrl = evidenceUrls[0];
-      // /api/s3-proxy?key=xxx からS3キーを抽出
-      const keyMatch = proxyUrl.match(/[?&]key=([^&]+)/);
-      if (keyMatch) {
-        const s3Key = decodeURIComponent(keyMatch[1]);
-        heroImageUrl = await getPresignedUrl(s3Key, 86400); // 24時間有効
+  const heroImageUrl = await getEvidenceHeroUrl(task);
+  const hasLocation = task.latitude && task.longitude;
+  const mapsUrl = hasLocation ? `https://www.google.com/maps?q=${task.latitude},${task.longitude}` : null;
+
+  // ── 中継の場合: 配布員にLINE通知 ──
+  let distributorNotified = false;
+  let distributorLineStatus = '';
+
+  if (isRelay && task.schedule?.distributor?.id) {
+    const lineUser = await prisma.lineUser.findUnique({
+      where: { distributorId: task.schedule.distributor.id },
+    });
+
+    if (lineUser?.lineUserId && lineUser.isFollowing) {
+      // 配布員の言語設定を取得
+      const dist = await prisma.flyerDistributor.findUnique({
+        where: { id: task.schedule.distributor.id },
+        select: { language: true },
+      });
+      const lang = dist?.language || 'ja';
+
+      try {
+        const distMessage = buildDistributorDeliveryMessage(lang, location, area, now, mapsUrl, heroImageUrl);
+        await pushMessage(lineUser.lineUserId, [distMessage]);
+        distributorNotified = true;
+        distributorLineStatus = '\u2705 配布員へLINE伝達済み';
+        console.log(`[RelayTask] Distributor notified via LINE: ${distributor} (${lang})`);
+      } catch (e) {
+        console.error('[RelayTask] Failed to notify distributor:', e);
+        distributorLineStatus = '\u26A0\uFE0F 配布員へのLINE送信に失敗しました';
       }
-    } catch (e) {
-      console.error('[RelayTask] Failed to get presigned URL:', e);
+    } else {
+      distributorLineStatus = '\u26A0\uFE0F LINE未連携のため配布員に通知できませんでした';
     }
   }
 
-  // Google Maps リンク
-  const hasLocation = task.latitude && task.longitude;
-  const mapsUrl = hasLocation
-    ? `https://www.google.com/maps?q=${task.latitude},${task.longitude}`
-    : null;
+  // ── グループ通知 ──
+  const bodyContents: any[] = [
+    { type: 'text', text: `${emoji} ${typeLabel}完了`, weight: 'bold', size: 'md', color: accentColor },
+    { type: 'separator', margin: 'md' },
+    {
+      type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+      contents: [
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: '支店', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: branch, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: '配布員', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: distributor, size: 'xs', color: '#333333', flex: 5 },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: 'エリア', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: '場所', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5 },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: '担当', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: driver, size: 'xs', color: '#333333', flex: 5 },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: '完了', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: now, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+        ]},
+      ],
+    },
+  ];
 
-  // Flex Message（写真付きカード）
+  // 配布員LINE通知ステータスをグループ通知に追記（中継のみ）
+  if (isRelay && distributorLineStatus) {
+    bodyContents.push({ type: 'separator', margin: 'md' });
+    bodyContents.push({
+      type: 'text',
+      text: distributorLineStatus,
+      size: 'xs',
+      color: distributorNotified ? '#10B981' : '#E53E3E',
+      margin: 'md',
+      weight: 'bold',
+    });
+  }
+
   const bubble: any = {
     type: 'bubble',
     size: 'kilo',
-    body: {
-      type: 'box',
-      layout: 'vertical',
-      contents: [
-        { type: 'text', text: `${emoji} ${typeLabel}完了`, weight: 'bold', size: 'md', color: accentColor },
-        { type: 'separator', margin: 'md' },
-        {
-          type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
-          contents: [
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '支店', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: branch, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-            ]},
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '配布員', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: distributor, size: 'xs', color: '#333333', flex: 5 },
-            ]},
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: 'エリア', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
-            ]},
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '場所', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5 },
-            ]},
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '担当', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: driver, size: 'xs', color: '#333333', flex: 5 },
-            ]},
-            { type: 'box', layout: 'horizontal', contents: [
-              { type: 'text', text: '完了', size: 'xs', color: '#aaaaaa', flex: 2 },
-              { type: 'text', text: now, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
-            ]},
-          ],
-        },
-      ],
-    },
+    body: { type: 'box', layout: 'vertical', contents: bodyContents },
   };
 
-  // エビデンス写真をheroに設定（タップで拡大表示）
   if (heroImageUrl) {
     bubble.hero = {
-      type: 'image',
-      url: heroImageUrl,
-      size: 'full',
-      aspectRatio: '20:13',
-      aspectMode: 'cover',
+      type: 'image', url: heroImageUrl, size: 'full',
+      aspectRatio: '20:13', aspectMode: 'cover',
       action: { type: 'uri', label: '写真を拡大', uri: heroImageUrl },
     };
   }
 
-  // Google Maps ボタン
   if (mapsUrl) {
     bubble.footer = {
-      type: 'box',
-      layout: 'vertical',
-      contents: [{
-        type: 'button',
-        action: { type: 'uri', label: '\u{1F4CD} Google Maps で確認', uri: mapsUrl },
-        style: 'link',
-        height: 'sm',
-      }],
+      type: 'box', layout: 'vertical',
+      contents: [{ type: 'button', action: { type: 'uri', label: '\u{1F4CD} Google Maps で確認', uri: mapsUrl }, style: 'link', height: 'sm' }],
     };
   }
 
@@ -196,7 +222,91 @@ async function sendRelayCompletionNotification(task: any) {
     altText: `${emoji} ${typeLabel}完了: ${branch} ${distributor}`,
     contents: bubble,
   }]);
-  console.log(`[RelayTask] LINE notification sent: ${typeLabel} ${branch} ${distributor}`);
+  console.log(`[RelayTask] Group notification sent: ${typeLabel} ${branch} ${distributor}`);
+}
+
+/** 配布員向け中継完了通知メッセージを構築（JA/EN対応） */
+function buildDistributorDeliveryMessage(lang: string, location: string, area: string, time: string, mapsUrl: string | null, heroImageUrl: string | null) {
+  const isJa = lang === 'ja';
+
+  const bodyContents: any[] = [
+    { type: 'text', text: isJa ? '\u{1F4E6} 中継が完了しました' : '\u{1F4E6} Delivery Completed', weight: 'bold', size: 'md', color: '#3756E8' },
+    { type: 'separator', margin: 'md' },
+    {
+      type: 'text', wrap: true, size: 'xs', color: '#555555', margin: 'md',
+      text: isJa
+        ? 'チラシの中継が以下の場所に届いています。'
+        : 'Your flyers have been delivered to the following location.',
+    },
+    {
+      type: 'box', layout: 'vertical', margin: 'md', spacing: 'sm',
+      contents: [
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: isJa ? '場所' : 'Location', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: location, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: isJa ? 'エリア' : 'Area', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
+        ]},
+        { type: 'box', layout: 'horizontal', contents: [
+          { type: 'text', text: isJa ? '時刻' : 'Time', size: 'xs', color: '#aaaaaa', flex: 2 },
+          { type: 'text', text: time, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+        ]},
+      ],
+    },
+    { type: 'separator', margin: 'lg' },
+    {
+      type: 'box', layout: 'vertical', margin: 'lg', spacing: 'md',
+      contents: [
+        { type: 'text', text: isJa ? '\u26A0\uFE0F 注意事項' : '\u26A0\uFE0F Reminders', weight: 'bold', size: 'xs', color: '#E53E3E' },
+        { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'text', text: '\u2022', size: 'xs', color: '#E53E3E', flex: 0 },
+          { type: 'text', wrap: true, size: 'xs', color: '#555555',
+            text: isJa
+              ? '配布前に地図とチラシの種類を必ず確認して、漏れが無い様にしてください。'
+              : 'Before distributing, always check the map and flyer types to ensure nothing is missed.' },
+        ]},
+        { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'text', text: '\u2022', size: 'xs', color: '#E53E3E', flex: 0 },
+          { type: 'text', wrap: true, size: 'xs', color: '#555555',
+            text: isJa
+              ? '雨が予想される日には必ずプラスチックバッグでチラシが濡れない様にしてください。'
+              : 'On rainy days, always use plastic bags to keep the flyers dry.' },
+        ]},
+        { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [
+          { type: 'text', text: '\u2022', size: 'xs', color: '#E53E3E', flex: 0 },
+          { type: 'text', wrap: true, size: 'xs', color: '#555555',
+            text: isJa
+              ? '配布開始前にチラシの写真を撮ってLINEで送ってください。'
+              : 'Before starting distribution, take a photo of the flyers and send it via LINE.' },
+        ]},
+      ],
+    },
+  ];
+
+  const bubble: any = {
+    type: 'bubble',
+    size: 'mega',
+    body: { type: 'box', layout: 'vertical', contents: bodyContents },
+  };
+
+  if (heroImageUrl) {
+    bubble.hero = {
+      type: 'image', url: heroImageUrl, size: 'full',
+      aspectRatio: '20:13', aspectMode: 'cover',
+      action: { type: 'uri', label: isJa ? '写真を拡大' : 'View photo', uri: heroImageUrl },
+    };
+  }
+
+  if (mapsUrl) {
+    bubble.footer = {
+      type: 'box', layout: 'vertical',
+      contents: [{ type: 'button', action: { type: 'uri', label: isJa ? '\u{1F4CD} 場所を確認' : '\u{1F4CD} View Location', uri: mapsUrl }, style: 'primary', color: '#3756E8', height: 'sm' }],
+    };
+  }
+
+  return { type: 'flex', altText: isJa ? '\u{1F4E6} 中継完了のお知らせ' : '\u{1F4E6} Delivery Completed', contents: bubble };
 }
 
 // DELETE: 中継/回収タスク削除
