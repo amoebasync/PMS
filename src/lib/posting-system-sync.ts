@@ -80,7 +80,7 @@ export async function syncStaffToPostingSystem(
       body: JSON.stringify({
         staffCd: params.staffCd,
         staffName: params.staffName,
-        staffTel: params.staffTel,
+        staffTel: params.staffTel.replace(/[-\s]/g, ''),
         shopCd: params.shopCd,
         joinDate: params.joinDate || new Date().toISOString().slice(0, 10),
         staffDutyDiv: params.staffDutyDiv ?? STAFF_DUTY_DIV_POSTING,
