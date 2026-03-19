@@ -50,6 +50,23 @@ export async function broadcastMessage(messages: any[]): Promise<void> {
   });
 }
 
+/** 特定のユーザーまたはグループにプッシュメッセージ送信 */
+export async function pushMessage(to: string, messages: any[]): Promise<void> {
+  await lineApiFetch('/message/push', {
+    method: 'POST',
+    body: JSON.stringify({ to, messages }),
+  });
+}
+
+/** グループのプロフィール（名前等）を取得 */
+export async function getGroupSummary(groupId: string): Promise<{
+  groupId: string;
+  groupName: string;
+  pictureUrl?: string;
+}> {
+  return lineApiFetch(`/group/${groupId}/summary`);
+}
+
 /** 特定ユーザーにリプライメッセージ送信 */
 export async function replyMessage(replyToken: string, messages: any[]): Promise<void> {
   await lineApiFetch('/message/reply', {

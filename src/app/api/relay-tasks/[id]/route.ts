@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { pushMessage, isLineConfigured } from '@/lib/line';
 
 async function authorize() {
   const cookieStore = await cookies();
@@ -58,11 +59,97 @@ export async function PUT(
       },
     });
 
+    // ── LINE通知: 中継/回収が完了した場合 ──
+    if (body.status === 'COMPLETED' && existing.status !== 'COMPLETED') {
+      sendRelayCompletionNotification(task).catch(e =>
+        console.error('[RelayTask] LINE notification error:', e)
+      );
+    }
+
     return NextResponse.json(task);
   } catch (error) {
     console.error('RelayTask PUT error:', error);
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
+}
+
+/** LINE グループに中継/回収完了通知を送信 */
+async function sendRelayCompletionNotification(task: any) {
+  if (!isLineConfigured()) return;
+
+  // SystemSetting から通知先グループIDを取得
+  const setting = await prisma.systemSetting.findUnique({
+    where: { key: 'lineRelayNotificationGroupId' },
+  });
+  if (!setting?.value) return;
+
+  const groupId = setting.value;
+  const isRelay = task.type === 'RELAY';
+  const typeLabel = isRelay ? '中継' : '回収';
+  const emoji = isRelay ? '\u{1F4E6}' : '\u{1F69A}';
+  const branch = task.schedule?.branch?.nameJa || '—';
+  const distributor = task.schedule?.distributor?.name || '—';
+  const area = task.schedule?.area
+    ? `${task.schedule.area.prefecture?.name || ''}${task.schedule.area.city?.name || ''}${task.schedule.area.chome_name || ''}`
+    : '—';
+  const driver = task.driver
+    ? `${task.driver.lastNameJa || ''}${task.driver.firstNameJa || ''}`
+    : task.driverName || '—';
+  const now = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' });
+
+  const message = {
+    type: 'flex',
+    altText: `${emoji} ${typeLabel}完了: ${branch} ${distributor}`,
+    contents: {
+      type: 'bubble',
+      size: 'kilo',
+      body: {
+        type: 'box',
+        layout: 'vertical',
+        contents: [
+          {
+            type: 'text',
+            text: `${emoji} ${typeLabel}完了`,
+            weight: 'bold',
+            size: 'md',
+            color: isRelay ? '#3756E8' : '#10B981',
+          },
+          { type: 'separator', margin: 'md' },
+          {
+            type: 'box',
+            layout: 'vertical',
+            margin: 'md',
+            spacing: 'sm',
+            contents: [
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: '支店', size: 'xs', color: '#aaaaaa', flex: 2 },
+                { type: 'text', text: branch, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+              ]},
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: '配布員', size: 'xs', color: '#aaaaaa', flex: 2 },
+                { type: 'text', text: distributor, size: 'xs', color: '#333333', flex: 5 },
+              ]},
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: 'エリア', size: 'xs', color: '#aaaaaa', flex: 2 },
+                { type: 'text', text: area, size: 'xs', color: '#333333', flex: 5 },
+              ]},
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: '担当', size: 'xs', color: '#aaaaaa', flex: 2 },
+                { type: 'text', text: driver, size: 'xs', color: '#333333', flex: 5 },
+              ]},
+              { type: 'box', layout: 'horizontal', contents: [
+                { type: 'text', text: '完了', size: 'xs', color: '#aaaaaa', flex: 2 },
+                { type: 'text', text: now, size: 'xs', color: '#333333', flex: 5, weight: 'bold' },
+              ]},
+            ],
+          },
+        ],
+      },
+    },
+  };
+
+  await pushMessage(groupId, [message]);
+  console.log(`[RelayTask] LINE notification sent: ${typeLabel} ${branch} ${distributor}`);
 }
 
 // DELETE: 中継/回収タスク削除
