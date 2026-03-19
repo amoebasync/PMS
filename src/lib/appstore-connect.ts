@@ -95,9 +95,29 @@ export async function addBetaTester(
       body: JSON.stringify(body),
     });
 
-    // 409 Conflict: テスターが既にグループに存在する
+    // 409 Conflict: テスターが既にグループに存在する → 削除して再追加（招待メール再送）
     if (response.status === 409) {
-      console.log(`[AppStoreConnect] Tester ${email} already exists in beta group`);
+      console.log(`[AppStoreConnect] Tester ${email} already exists, removing and re-adding...`);
+      const removeResult = await removeBetaTester(email);
+      if (!removeResult.success && !removeResult.notFound) {
+        return { success: false, error: `再招待のための削除に失敗: ${removeResult.error}` };
+      }
+      // 少し待ってから再追加
+      await new Promise(r => setTimeout(r, 1000));
+      const retryResponse = await fetch(`${API_BASE}/betaTesters`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${generateJWT()}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (!retryResponse.ok) {
+        const retryError = await retryResponse.json().catch(() => null);
+        const retryMsg = retryError?.errors?.[0]?.detail || `HTTP ${retryResponse.status}`;
+        return { success: false, error: `再招待に失敗: ${retryMsg}` };
+      }
+      console.log(`[AppStoreConnect] Successfully re-invited beta tester: ${email}`);
       return { success: true, alreadyExists: true };
     }
 
