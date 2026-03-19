@@ -165,7 +165,7 @@ async function sendRelayCompletionNotification(task: any) {
     },
   };
 
-  // エビデンス写真をheroに設定
+  // エビデンス写真をheroに設定（タップで拡大表示）
   if (heroImageUrl) {
     bubble.hero = {
       type: 'image',
@@ -173,6 +173,7 @@ async function sendRelayCompletionNotification(task: any) {
       size: 'full',
       aspectRatio: '20:13',
       aspectMode: 'cover',
+      action: { type: 'uri', label: '写真を拡大', uri: heroImageUrl },
     };
   }
 
