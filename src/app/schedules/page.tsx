@@ -1042,7 +1042,7 @@ export default function ScheduleListPage() {
                 <th className="px-3 py-2.5 w-[80px]">{t('th_status')}</th>
                 <th className="pl-3 pr-1 py-2.5">{t('th_staff_name')}</th>
                 <th className="px-2 py-2.5 w-[40px] text-center">{t('th_attendance')}</th>
-                <th className="px-2 py-2.5 w-[60px] text-center">{t('expected_arrival')}</th>
+                <th className="px-2 py-2.5 w-[50px] text-center">{t('arrival_time')}</th>
                 <th className="pl-1 pr-3 py-2.5">{t('th_branch')}</th>
                 <th className="px-3 py-2.5">{t('th_area')}</th>
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
@@ -1125,15 +1125,12 @@ export default function ScheduleListPage() {
                       )}
                     </td>
 
-                    {/* Expected Arrival (ETA) */}
+                    {/* Expected Arrival */}
                     <td className="px-2 py-2.5 text-center">
                       {s.expectedArrival ? (
-                        <span className={`inline-flex items-center gap-0.5 px-2 py-1 rounded-lg text-xs font-black ${
-                          s.expectedArrival === 'other'
-                            ? 'bg-slate-50 text-slate-500 border border-slate-200'
-                            : 'bg-blue-600 text-white shadow-sm'
+                        <span className={`text-[10px] font-bold ${
+                          s.expectedArrival === 'other' ? 'text-slate-400' : 'text-slate-600'
                         }`}>
-                          <i className="bi bi-clock text-[9px]"></i>
                           {s.expectedArrival === 'other' ? t('expected_arrival_other') : s.expectedArrival}
                         </span>
                       ) : (
@@ -1227,7 +1224,7 @@ export default function ScheduleListPage() {
                             {pendingRelays.length === 0 && pendingFullRelays.length === 0 && pendingCollections.length === 0 && (
                               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold whitespace-nowrap bg-blue-100 text-blue-600">
                                 <i className="bi bi-check-circle text-[8px]"></i>
-                                {relays.length + fullRelays.length + collections.length}
+                                {t('relay_completed_label') || '完了'}
                               </span>
                             )}
                           </div>

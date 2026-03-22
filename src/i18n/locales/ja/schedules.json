@@ -219,7 +219,9 @@
   "relay_duplicate_confirm": "追加する",
 
   "expected_arrival": "出勤予定",
+  "arrival_time": "出勤時間",
   "expected_arrival_other": "その他",
+  "relay_completed_label": "完了",
 
   "inspection_assign_title": "巡回チェック・指導を割り当て",
   "inspection_category": "種別",

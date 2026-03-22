@@ -219,7 +219,9 @@
   "relay_duplicate_confirm": "Add Anyway",
 
   "expected_arrival": "ETA",
+  "arrival_time": "Arrival",
   "expected_arrival_other": "Other",
+  "relay_completed_label": "Done",
 
   "inspection_assign_title": "Assign Inspection / Guidance",
   "inspection_category": "Category",
