@@ -85,6 +85,7 @@ interface TrajectoryData {
 interface Props {
   scheduleId: number;
   onClose: () => void;
+  onSwitchToGoogle?: () => void;
 }
 
 // ============================================================
@@ -229,7 +230,7 @@ const dwellLabel = (ms: number) => {
 // ============================================================
 // Component
 // ============================================================
-export default function MapboxTrajectoryViewer({ scheduleId, onClose }: Props) {
+export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchToGoogle }: Props) {
   const mapRef = useRef<MapRef>(null);
 
   const [data, setData] = useState<TrajectoryData | null>(null);
@@ -548,9 +549,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose }: Props) {
             <h2 className="font-bold text-slate-800 text-sm md:text-base truncate">
               {data.schedule.distributorName}
               <span className="text-slate-400 font-normal text-xs md:text-sm ml-1 md:ml-2">({data.schedule.distributorStaffId})</span>
-              <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-violet-100 text-violet-700 rounded text-[10px] font-bold">
-                Mapbox
-              </span>
+              {onSwitchToGoogle && (
+                <span className="ml-2 inline-flex bg-slate-100 rounded-md p-0.5">
+                  <button onClick={onSwitchToGoogle} className="px-2 py-0.5 text-[10px] font-bold rounded text-slate-500 hover:text-slate-700 transition-colors">Google</button>
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-white text-indigo-600 shadow-sm">Mapbox</span>
+                </span>
+              )}
             </h2>
             <p className="text-[10px] md:text-xs text-slate-500 truncate">
               {data.area ? (data.area.chomeName || data.area.townName) : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
@@ -619,6 +623,19 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose }: Props) {
             }}
             style={{ width: '100%', height: '100%' }}
             mapStyle="mapbox://styles/mapbox/streets-v12"
+            onLoad={(e) => {
+              const map = e.target;
+              // 番地番号のフォントサイズを大きくする
+              if (map.getLayer('housenum-label')) {
+                map.setPaintProperty('housenum-label', 'text-color', '#333');
+                map.setLayoutProperty('housenum-label', 'text-size', 14);
+              }
+              // 建物のアウトラインを強調
+              if (map.getLayer('building')) {
+                map.setPaintProperty('building', 'fill-color', '#e2e8f0');
+                map.setPaintProperty('building', 'fill-outline-color', '#94a3b8');
+              }
+            }}
           >
             <NavigationControl position="top-right" />
 

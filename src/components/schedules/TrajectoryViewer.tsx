@@ -83,6 +83,7 @@ interface TrajectoryData {
 interface Props {
   scheduleId: number;
   onClose: () => void;
+  onSwitchToMapbox?: () => void;
 }
 
 // ============================================================
@@ -248,7 +249,7 @@ const dwellLabel = (ms: number) => {
 // ============================================================
 // Component
 // ============================================================
-export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
+export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox }: Props) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
   });
@@ -504,6 +505,12 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
             <h2 className="font-bold text-slate-800 text-sm md:text-base truncate">
               {data.schedule.distributorName}
               <span className="text-slate-400 font-normal text-xs md:text-sm ml-1 md:ml-2">({data.schedule.distributorStaffId})</span>
+              {onSwitchToMapbox && (
+                <span className="ml-2 inline-flex bg-slate-100 rounded-md p-0.5">
+                  <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-white text-indigo-600 shadow-sm">Google</span>
+                  <button onClick={onSwitchToMapbox} className="px-2 py-0.5 text-[10px] font-bold rounded text-slate-500 hover:text-slate-700 transition-colors">Mapbox</button>
+                </span>
+              )}
             </h2>
             <p className="text-[10px] md:text-xs text-slate-500 truncate">
               {data.area ? (data.area.chomeName || data.area.townName) : ''} / {new Date(data.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
