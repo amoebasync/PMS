@@ -1009,13 +1009,14 @@ export default function ScheduleListPage() {
                 <th className="px-3 py-2.5">{t('th_flyers')}</th>
                 <th className="px-3 py-2.5 w-[80px] text-center">{t('th_relay')}</th>
                 <th className="px-3 py-2.5 w-[60px] text-center">{t('th_compliance')}</th>
+                <th className="px-2 py-2.5 w-[70px] text-center">{t('th_field_inspection')}</th>
                 <th className="px-3 py-2.5 w-[80px] text-center">{t('th_actions')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredSchedules.length === 0 && !isLoading && (
                 <tr>
-                  <td colSpan={10} className="px-6 py-12 text-center text-slate-400">
+                  <td colSpan={11} className="px-6 py-12 text-center text-slate-400">
                     <i className="bi bi-calendar-x text-3xl block mb-2"></i>
                     {t('no_results')}
                   </td>
@@ -1207,6 +1208,30 @@ export default function ScheduleListPage() {
                       </button>
                     </td>
 
+                    {/* Field Inspection */}
+                    <td className="px-2 py-2.5 text-center">
+                      {s.fieldInspections && s.fieldInspections.length > 0 ? (
+                        <div className="flex flex-col items-center gap-0.5">
+                          {s.fieldInspections.map((fi: any) => (
+                            <span key={fi.id} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
+                              fi.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
+                              fi.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-700' :
+                              fi.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 line-through' :
+                              'bg-slate-50 text-slate-500'
+                            }`}>
+                              <i className={`bi ${fi.category === 'CHECK' ? 'bi-clipboard-check' : 'bi-person-raised-hand'} text-[9px]`}></i>
+                              {fi.category === 'CHECK' ? t('inspection_check') : t('inspection_guidance')}
+                              {fi.status === 'COMPLETED' && fi.confirmationRate != null && (
+                                <span className="ml-0.5">{Math.round(fi.confirmationRate * 100)}%</span>
+                              )}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-slate-300 text-[10px]">—</span>
+                      )}
+                    </td>
+
                     {/* Actions */}
                     <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
@@ -1237,17 +1262,6 @@ export default function ScheduleListPage() {
                           );
                         })()}
 
-                        {/* Inspection assign */}
-                        {(s.status === 'COMPLETED' || s.status === 'DISTRIBUTING') && (
-                          <button
-                            onClick={() => openInspectionModal(s)}
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
-                            title={t('inspection_btn_title')}
-                          >
-                            <i className="bi bi-clipboard-check text-sm"></i>
-                          </button>
-                        )}
-
                         {/* More actions */}
                         <div className="relative">
                           <button
@@ -1277,6 +1291,17 @@ export default function ScheduleListPage() {
                                 className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-purple-600">
                                 <i className="bi bi-box-arrow-in-left"></i>
                                 {t('add_collection')}
+                              </button>
+                              <div className="border-t border-slate-100 my-1"></div>
+                              <button onClick={() => { setInspectionCategory('CHECK'); openInspectionModal(s); setActionMenuId(null); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-blue-600">
+                                <i className="bi bi-clipboard-check"></i>
+                                {t('inspection_add_check')}
+                              </button>
+                              <button onClick={() => { setInspectionCategory('GUIDANCE'); openInspectionModal(s); setActionMenuId(null); }}
+                                className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-violet-600">
+                                <i className="bi bi-person-raised-hand"></i>
+                                {t('inspection_add_guidance')}
                               </button>
                               {s.distributor && s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
                                 <button onClick={() => handleUnassign(s)}
@@ -1376,18 +1401,10 @@ export default function ScheduleListPage() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${s.remarks ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
                       <i className={`bi ${s.remarks ? 'bi-chat-text-fill' : 'bi-chat-text'} text-sm`}></i>
                     </button>
-                    {(s.status === 'COMPLETED' || s.status === 'DISTRIBUTING') && (
-                      <button onClick={() => openInspectionModal(s)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors">
-                        <i className="bi bi-clipboard-check text-sm"></i>
-                      </button>
-                    )}
-                    {s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
-                      <button onClick={() => setActionMenuId(actionMenuId === s.id ? null : s.id)}
-                        className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400">
-                        <i className="bi bi-three-dots-vertical text-sm"></i>
-                      </button>
-                    )}
+                    <button onClick={() => setActionMenuId(actionMenuId === s.id ? null : s.id)}
+                      className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400">
+                      <i className="bi bi-three-dots-vertical text-sm"></i>
+                    </button>
                   </div>
                 </div>
 

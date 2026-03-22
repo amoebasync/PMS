@@ -231,5 +231,10 @@
   "inspection_assign_btn": "割り当てる",
   "inspection_assign_success": "巡回を割り当てました",
   "inspection_assign_error": "巡回の割り当てに失敗しました",
-  "inspection_btn_title": "巡回チェック・指導を割り当て"
+  "inspection_btn_title": "巡回チェック・指導を割り当て",
+  "inspection_add_check": "チェック割り当て",
+  "inspection_add_guidance": "指導割り当て",
+  "inspection_check": "チェック",
+  "inspection_guidance": "指導",
+  "th_field_inspection": "現場確認"
 }

@@ -231,5 +231,10 @@
   "inspection_assign_btn": "Assign",
   "inspection_assign_success": "Inspection assigned",
   "inspection_assign_error": "Failed to assign inspection",
-  "inspection_btn_title": "Assign Inspection / Guidance"
+  "inspection_btn_title": "Assign Inspection / Guidance",
+  "inspection_add_check": "Assign Check",
+  "inspection_add_guidance": "Assign Guidance",
+  "inspection_check": "Check",
+  "inspection_guidance": "Guidance",
+  "th_field_inspection": "Inspection"
 }
