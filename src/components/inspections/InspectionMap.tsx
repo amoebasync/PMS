@@ -1,0 +1,381 @@
+'use client';
+
+import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
+import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, Circle } from '@react-google-maps/api';
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface GpsPoint {
+  lat: number;
+  lng: number;
+  timestamp: string;
+}
+
+interface ProhibitedProperty {
+  id: number;
+  lat: number;
+  lng: number;
+  address: string;
+  buildingName: string | null;
+  severity: string | null;
+}
+
+interface Checkpoint {
+  id: number;
+  lat: number;
+  lng: number;
+  result: 'CONFIRMED' | 'NOT_FOUND' | 'UNABLE' | null;
+  note: string | null;
+  photoUrl: string | null;
+  createdAt: string;
+}
+
+interface ProhibitedCheck {
+  id: number;
+  prohibitedPropertyId: number;
+  result: 'COMPLIANT' | 'VIOLATION' | 'UNABLE' | null;
+  note: string | null;
+  photoUrl: string | null;
+  createdAt: string;
+}
+
+interface MapData {
+  areaBoundary: string | null;
+  distributorGpsPoints: GpsPoint[];
+  prohibitedProperties: ProhibitedProperty[];
+  inspectorGpsPoints: GpsPoint[];
+  checkpoints: Checkpoint[];
+  prohibitedChecks: (ProhibitedCheck & { lat: number; lng: number })[];
+}
+
+interface Props {
+  mapData: MapData | null;
+  checkpoints: Checkpoint[];
+  prohibitedChecks: ProhibitedCheck[];
+  inspectorPosition: { lat: number; lng: number } | null;
+  inspectorGpsPoints: GpsPoint[];
+}
+
+/* ------------------------------------------------------------------ */
+/*  GeoJSON parser (same pattern as TrajectoryViewer)                  */
+/* ------------------------------------------------------------------ */
+
+const extractPaths = (geojsonStr: string) => {
+  if (!geojsonStr) return [];
+  const trimmed = geojsonStr.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      const getCoords = (geom: any): any[][] => {
+        if (!geom) return [];
+        if (geom.type === 'FeatureCollection') return geom.features.flatMap((f: any) => getCoords(f.geometry || f));
+        if (geom.type === 'Feature') return getCoords(geom.geometry);
+        if (geom.type === 'Polygon') return [geom.coordinates[0]];
+        if (geom.type === 'MultiPolygon') return geom.coordinates.map((poly: any[]) => poly[0]);
+        return [];
+      };
+      const rawPolygons = getCoords(parsed);
+      return rawPolygons
+        .map((poly: any[]) =>
+          poly
+            .map((c: any[]) => ({ lat: parseFloat(c[1]), lng: parseFloat(c[0]) }))
+            .filter((c: any) => !isNaN(c.lat) && !isNaN(c.lng))
+        )
+        .filter((p: any[]) => p.length > 0);
+    } catch {
+      // invalid JSON
+    }
+  }
+  return [];
+};
+
+/* ------------------------------------------------------------------ */
+/*  Libraries constant (stable reference for useJsApiLoader)          */
+/* ------------------------------------------------------------------ */
+
+const LIBRARIES: ('geometry' | 'visualization')[] = ['geometry', 'visualization'];
+
+/* ------------------------------------------------------------------ */
+/*  Checkpoint marker color                                            */
+/* ------------------------------------------------------------------ */
+
+const checkpointColor = (result: string | null) => {
+  switch (result) {
+    case 'CONFIRMED': return '#22c55e';   // green
+    case 'NOT_FOUND': return '#ef4444';   // red
+    case 'UNABLE': return '#9ca3af';      // gray
+    default: return '#ffffff';            // white (pending)
+  }
+};
+
+const checkpointBorder = (result: string | null) => {
+  switch (result) {
+    case 'CONFIRMED': return '#16a34a';
+    case 'NOT_FOUND': return '#dc2626';
+    case 'UNABLE': return '#6b7280';
+    default: return '#d1d5db';
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  Prohibited check overlay color                                     */
+/* ------------------------------------------------------------------ */
+
+const prohibitedCheckColor = (result: string | null) => {
+  switch (result) {
+    case 'COMPLIANT': return '#22c55e';
+    case 'VIOLATION': return '#ef4444';
+    case 'UNABLE': return '#9ca3af';
+    default: return null; // no overlay
+  }
+};
+
+/* ------------------------------------------------------------------ */
+/*  Component                                                          */
+/* ------------------------------------------------------------------ */
+
+export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints }: Props) {
+  const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    libraries: LIBRARIES,
+  });
+
+  const mapRef = useRef<google.maps.Map | null>(null);
+  const heatmapRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+
+  /* ---- Area polygons ---- */
+  const areaPolygons = useMemo(() => {
+    if (!mapData?.areaBoundary) return [];
+    return extractPaths(mapData.areaBoundary);
+  }, [mapData?.areaBoundary]);
+
+  /* ---- Distributor trajectory ---- */
+  const distributorPath = useMemo(() => {
+    if (!mapData?.distributorGpsPoints) return [];
+    return mapData.distributorGpsPoints.map((p) => ({ lat: p.lat, lng: p.lng }));
+  }, [mapData?.distributorGpsPoints]);
+
+  /* ---- Inspector trajectory (combine stored + real-time) ---- */
+  const inspectorPath = useMemo(() => {
+    const stored = inspectorGpsPoints.map((p) => ({ lat: p.lat, lng: p.lng }));
+    if (inspectorPosition) {
+      stored.push(inspectorPosition);
+    }
+    return stored;
+  }, [inspectorGpsPoints, inspectorPosition]);
+
+  /* ---- Map center ---- */
+  const center = useMemo(() => {
+    // Priority: inspector position > area center > distributor center > default
+    if (inspectorPosition) return inspectorPosition;
+    if (areaPolygons.length > 0 && areaPolygons[0].length > 0) {
+      const pts = areaPolygons[0];
+      const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
+      const lng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
+      return { lat, lng };
+    }
+    if (distributorPath.length > 0) return distributorPath[0];
+    return { lat: 35.6812, lng: 139.7671 }; // Tokyo
+  }, [inspectorPosition, areaPolygons, distributorPath]);
+
+  /* ---- Prohibited check status map ---- */
+  const prohibitedCheckMap = useMemo(() => {
+    const m = new Map<number, ProhibitedCheck>();
+    prohibitedChecks.forEach((c) => m.set(c.prohibitedPropertyId, c));
+    return m;
+  }, [prohibitedChecks]);
+
+  /* ---- Heatmap ---- */
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !mapData?.distributorGpsPoints?.length) return;
+    if (!window.google?.maps?.visualization) return;
+
+    // Remove old heatmap
+    if (heatmapRef.current) {
+      heatmapRef.current.setMap(null);
+      heatmapRef.current = null;
+    }
+
+    const points = mapData.distributorGpsPoints.map((p, i) => {
+      // Weight by time spent (difference to next point, capped at 60s)
+      let weight = 1;
+      if (i < mapData.distributorGpsPoints.length - 1) {
+        const dt = new Date(mapData.distributorGpsPoints[i + 1].timestamp).getTime() - new Date(p.timestamp).getTime();
+        weight = Math.min(dt / 1000, 60); // cap at 60 seconds
+        weight = Math.max(weight, 1);
+      }
+      return {
+        location: new google.maps.LatLng(p.lat, p.lng),
+        weight,
+      };
+    });
+
+    const heatmap = new google.maps.visualization.HeatmapLayer({
+      data: points,
+      map: mapRef.current,
+      radius: 20,
+      opacity: 0.4,
+      gradient: [
+        'rgba(0, 0, 255, 0)',
+        'rgba(0, 100, 255, 0.4)',
+        'rgba(0, 200, 255, 0.6)',
+        'rgba(0, 255, 100, 0.7)',
+        'rgba(255, 255, 0, 0.8)',
+        'rgba(255, 150, 0, 0.9)',
+        'rgba(255, 0, 0, 1)',
+      ],
+    });
+    heatmapRef.current = heatmap;
+
+    return () => {
+      if (heatmapRef.current) {
+        heatmapRef.current.setMap(null);
+        heatmapRef.current = null;
+      }
+    };
+  }, [mapReady, mapData?.distributorGpsPoints]);
+
+  const onMapLoad = useCallback((map: google.maps.Map) => {
+    mapRef.current = map;
+    setMapReady(true);
+  }, []);
+
+  if (!isLoaded) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-slate-100">
+        <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  return (
+    <GoogleMap
+      mapContainerClassName="w-full h-full"
+      center={center}
+      zoom={16}
+      onLoad={onMapLoad}
+      options={{
+        disableDefaultUI: true,
+        zoomControl: true,
+        zoomControlOptions: { position: google.maps.ControlPosition.RIGHT_CENTER },
+        gestureHandling: 'greedy',
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: false,
+      }}
+    >
+      {/* Area polygon */}
+      {areaPolygons.map((path, i) => (
+        <Polygon
+          key={`area-${i}`}
+          paths={path}
+          options={{
+            fillColor: '#3b82f6',
+            fillOpacity: 0.1,
+            strokeColor: '#3b82f6',
+            strokeOpacity: 0.5,
+            strokeWeight: 2,
+          }}
+        />
+      ))}
+
+      {/* Distributor GPS trajectory (blue) */}
+      {distributorPath.length > 1 && (
+        <Polyline
+          path={distributorPath}
+          options={{
+            strokeColor: '#3b82f6',
+            strokeOpacity: 0.7,
+            strokeWeight: 3,
+          }}
+        />
+      )}
+
+      {/* Inspector GPS trajectory (orange) */}
+      {inspectorPath.length > 1 && (
+        <Polyline
+          path={inspectorPath}
+          options={{
+            strokeColor: '#f97316',
+            strokeOpacity: 0.9,
+            strokeWeight: 3,
+          }}
+        />
+      )}
+
+      {/* Inspector current position */}
+      {inspectorPosition && (
+        <Marker
+          position={inspectorPosition}
+          icon={{
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: '#f97316',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 3,
+          }}
+          zIndex={100}
+        />
+      )}
+
+      {/* Prohibited properties (red markers) */}
+      {mapData?.prohibitedProperties?.map((pp) => {
+        const check = prohibitedCheckMap.get(pp.id);
+        const overlayColor = check ? prohibitedCheckColor(check.result) : null;
+
+        return (
+          <React.Fragment key={`pp-${pp.id}`}>
+            <Marker
+              position={{ lat: pp.lat, lng: pp.lng }}
+              icon={{
+                path: 'M10 20S3 10.87 3 7a7 7 0 0 1 14 0c0 3.87-7 13-7 13zm0-11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
+                fillColor: '#ef4444',
+                fillOpacity: 1,
+                strokeColor: '#991b1b',
+                strokeWeight: 1,
+                scale: 1.2,
+                anchor: new google.maps.Point(10, 20),
+              }}
+              title={pp.address}
+              zIndex={50}
+            />
+            {/* Check status overlay circle */}
+            {overlayColor && (
+              <Circle
+                center={{ lat: pp.lat, lng: pp.lng }}
+                radius={8}
+                options={{
+                  fillColor: overlayColor,
+                  fillOpacity: 0.7,
+                  strokeColor: overlayColor,
+                  strokeWeight: 2,
+                  zIndex: 55,
+                }}
+              />
+            )}
+          </React.Fragment>
+        );
+      })}
+
+      {/* Checkpoint markers */}
+      {checkpoints.map((cp) => (
+        <Circle
+          key={`cp-${cp.id}`}
+          center={{ lat: cp.lat, lng: cp.lng }}
+          radius={6}
+          options={{
+            fillColor: checkpointColor(cp.result),
+            fillOpacity: 1,
+            strokeColor: checkpointBorder(cp.result),
+            strokeWeight: 2,
+            zIndex: 60,
+          }}
+        />
+      ))}
+    </GoogleMap>
+  );
+}

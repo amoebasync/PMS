@@ -73,6 +73,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { nameKey: 'complaint_management', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
       { nameKey: 'prohibited_properties', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
       { nameKey: 'fraud_detection', href: '/quality/fraud-detection', icon: 'bi-shield-exclamation' },
+      { nameKey: 'field_inspections', href: '/inspections', icon: 'bi-clipboard-check' },
     ],
   },
   {

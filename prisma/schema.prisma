@@ -889,6 +889,7 @@ model DistributionSchedule {
   relayTasks         RelayTask[]
   pickingVerification PickingVerification?
   fraudAnalyses       FraudAnalysis[]
+  fieldInspections    FieldInspection[]
 
   @@index([distributorId, date])
   @@index([branchId, date])
@@ -2643,6 +2644,25 @@ enum InspectionCategory {
   GUIDANCE   // 指導（配布指導）
 }
 
+enum FieldInspectionStatus {
+  PENDING       // 割り当て済み・未開始
+  IN_PROGRESS   // 巡回中（GPS記録中）
+  COMPLETED     // 完了
+  CANCELLED     // キャンセル
+}
+
+enum CheckpointResult {
+  CONFIRMED       // チラシ確認済み
+  NOT_FOUND       // チラシなし
+  UNABLE_TO_CHECK // 確認不可（施錠等）
+}
+
+enum ProhibitedCheckResult {
+  COMPLIANT       // 遵守（チラシなし）
+  VIOLATION       // 違反（チラシあり）
+  UNABLE_TO_CHECK // 確認不可
+}
+
 enum FraudType {
   DISPOSAL
   SKIP
@@ -2750,6 +2770,7 @@ model ProhibitedProperty {
   prohibitedReason ProhibitedReason? @relation(fields: [prohibitedReasonId], references: [id])
   complaint        Complaint?        @relation(fields: [complaintId], references: [id])
   skipEvents       SkipEvent[]
+  inspectionChecks InspectionProhibitedCheck[]
 
   @@index([areaId, isActive])
   @@index([customerId])
@@ -2879,30 +2900,40 @@ model DistributorEvaluation {
 
 // --- 現場巡回記録 ---
 model FieldInspection {
-  id              Int                @id @default(autoincrement())
-  distributorId   Int                @map("distributor_id")
-  distributor     FlyerDistributor   @relation(fields: [distributorId], references: [id], onDelete: Cascade)
-  inspectorId     Int                @map("inspector_id")
-  inspector       Employee           @relation(fields: [inspectorId], references: [id])
-  scheduleId      Int?               @map("schedule_id")
+  id              Int                    @id @default(autoincrement())
+  distributorId   Int                    @map("distributor_id")
+  distributor     FlyerDistributor       @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  inspectorId     Int                    @map("inspector_id")
+  inspector       Employee               @relation(fields: [inspectorId], references: [id])
+  scheduleId      Int?                   @map("schedule_id")
+  schedule        DistributionSchedule?  @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
 
-  inspectedAt     DateTime           @map("inspected_at")
-  category        InspectionCategory @default(CHECK)
+  inspectedAt     DateTime               @map("inspected_at")
+  category        InspectionCategory     @default(CHECK)
+
+  // ワークフローステータス
+  status          FieldInspectionStatus  @default(PENDING)
+  startedAt       DateTime?              @map("started_at")
+  completedAt     DateTime?              @map("completed_at")
 
   // === チェック項目 ===
   coverageChecked       Int?         @map("coverage_checked")       // 確認件数
   coverageFound         Int?         @map("coverage_found")         // チラシ確認件数
   prohibitedTotal       Int?         @map("prohibited_total")       // 禁止物件数
   prohibitedViolations  Int?         @map("prohibited_violations")  // 禁止物件投函数
-  multipleInsertion     String?      @map("multiple_insertion") @db.VarChar(20)  // NONE/MINOR/SOME/MANY
-  fraudTrace            String?      @map("fraud_trace") @db.VarChar(20)         // NONE/SUSPICIOUS/FOUND
+  multipleInsertion     String?      @map("multiple_insertion") @db.VarChar(20)
+  fraudTrace            String?      @map("fraud_trace") @db.VarChar(20)
 
   // === 指導項目 ===
-  distributionSpeed     String?      @map("distribution_speed") @db.VarChar(20)    // VERY_SLOW/SLOW/NORMAL/FAST/VERY_FAST
-  stickerCompliance     String?      @map("sticker_compliance") @db.VarChar(20)    // NO_MISTAKES/SOME/MANY
-  prohibitedCompliance  String?      @map("prohibited_compliance") @db.VarChar(20) // NO_MISTAKES/SOME/MANY
-  mapComprehension      String?      @map("map_comprehension") @db.VarChar(20)     // BAD/NORMAL/GOOD
-  workAttitude          String?      @map("work_attitude") @db.VarChar(20)         // BAD/NORMAL/GOOD
+  distributionSpeed     String?      @map("distribution_speed") @db.VarChar(20)
+  stickerCompliance     String?      @map("sticker_compliance") @db.VarChar(20)
+  prohibitedCompliance  String?      @map("prohibited_compliance") @db.VarChar(20)
+  mapComprehension      String?      @map("map_comprehension") @db.VarChar(20)
+  workAttitude          String?      @map("work_attitude") @db.VarChar(20)
+
+  // === 自動計算サマリー ===
+  confirmationRate      Float?       @map("confirmation_rate")   // coverageFound / coverageChecked
+  complianceRate        Float?       @map("compliance_rate")     // compliant / (compliant + violation)
 
   // 共通
   note               String?         @db.Text
@@ -2911,8 +2942,101 @@ model FieldInspection {
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")
 
+  // リレーション
+  checkpoints         InspectionCheckpoint[]
+  prohibitedChecks    InspectionProhibitedCheck[]
+  inspectionSession   InspectionSession?
+
   @@index([distributorId, inspectedAt])
+  @@index([status, inspectedAt])
+  @@index([inspectorId, status])
+  @@index([scheduleId])
   @@map("field_inspections")
+}
+
+// --- チェックポイント（サンプリング配布確認） ---
+model InspectionCheckpoint {
+  id              Int                @id @default(autoincrement())
+  inspectionId    Int                @map("inspection_id")
+  inspection      FieldInspection    @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+
+  // 確認対象の座標（配布員の軌跡からサンプリング）
+  targetLat       Float              @map("target_lat")
+  targetLng       Float              @map("target_lng")
+  targetAddress   String?            @map("target_address") @db.VarChar(500)
+
+  // チェック担当者の実際の位置
+  actualLat       Float?             @map("actual_lat")
+  actualLng       Float?             @map("actual_lng")
+
+  result          CheckpointResult
+  photoUrl        String?            @map("photo_url") @db.VarChar(500)
+  note            String?            @db.Text
+
+  checkedAt       DateTime           @map("checked_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+
+  @@index([inspectionId])
+  @@map("inspection_checkpoints")
+}
+
+// --- 配布禁止物件チェック ---
+model InspectionProhibitedCheck {
+  id                    Int                    @id @default(autoincrement())
+  inspectionId          Int                    @map("inspection_id")
+  inspection            FieldInspection        @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  prohibitedPropertyId  Int?                   @map("prohibited_property_id")
+  prohibitedProperty    ProhibitedProperty?    @relation(fields: [prohibitedPropertyId], references: [id], onDelete: SetNull)
+
+  latitude              Float?
+  longitude             Float?
+  address               String?                @db.VarChar(500)
+
+  result                ProhibitedCheckResult
+  photoUrl              String?                @map("photo_url") @db.VarChar(500)
+  note                  String?                @db.Text
+
+  checkedAt             DateTime               @map("checked_at")
+  createdAt             DateTime               @default(now()) @map("created_at")
+
+  @@index([inspectionId])
+  @@map("inspection_prohibited_checks")
+}
+
+// --- 巡回セッション（チェック担当者のGPS軌跡） ---
+model InspectionSession {
+  id              Int              @id @default(autoincrement())
+  inspectionId    Int              @unique @map("inspection_id")
+  inspection      FieldInspection  @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  inspectorId     Int              @map("inspector_id")
+
+  startedAt       DateTime         @map("started_at")
+  finishedAt      DateTime?        @map("finished_at")
+
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+
+  gpsPoints       InspectionGpsPoint[]
+
+  @@index([inspectorId])
+  @@map("inspection_sessions")
+}
+
+// --- 巡回GPS座標 ---
+model InspectionGpsPoint {
+  id         Int      @id @default(autoincrement())
+  sessionId  Int      @map("session_id")
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  timestamp  DateTime
+
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  session    InspectionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, timestamp])
+  @@map("inspection_gps_points")
 }
 
 // ==========================================

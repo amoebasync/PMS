@@ -536,6 +536,14 @@ export default function ScheduleListPage() {
   // 孤児セッション紐付けモーダル
   const [showOrphanLinker, setShowOrphanLinker] = useState(false);
 
+  // 巡回割り当てモーダル
+  const [inspectionAssignSchedule, setInspectionAssignSchedule] = useState<any>(null);
+  const [inspectionCategory, setInspectionCategory] = useState<'CHECK' | 'GUIDANCE'>('CHECK');
+  const [inspectionInspectorId, setInspectionInspectorId] = useState<number | null>(null);
+  const [inspectionDate, setInspectionDate] = useState(getTodayStr());
+  const [inspectionEmployees, setInspectionEmployees] = useState<any[]>([]);
+  const [inspectionSaving, setInspectionSaving] = useState(false);
+
   // 配布員だけ割り当てモーダル
   const [showAddDistModal, setShowAddDistModal] = useState(false);
   const [addDistCandidates, setAddDistCandidates] = useState<any[]>([]);
@@ -695,6 +703,49 @@ export default function ScheduleListPage() {
       }
     } catch { showToast(t('communication_error'), 'error'); }
     setRelaySaving(false);
+  };
+
+  // 巡回割り当てモーダルを開く
+  const openInspectionModal = useCallback(async (schedule: any) => {
+    setInspectionAssignSchedule(schedule);
+    setInspectionCategory('CHECK');
+    setInspectionInspectorId(null);
+    setInspectionDate(getTodayStr());
+    if (inspectionEmployees.length === 0) {
+      try {
+        const res = await fetch('/api/employees?limit=100&active=true');
+        if (res.ok) {
+          const data = await res.json();
+          setInspectionEmployees(data.data || data || []);
+        }
+      } catch { /* silent */ }
+    }
+  }, [inspectionEmployees.length]);
+
+  const handleInspectionAssign = async () => {
+    if (!inspectionAssignSchedule || !inspectionInspectorId) return;
+    setInspectionSaving(true);
+    try {
+      const res = await fetch('/api/inspections', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: inspectionAssignSchedule.id,
+          inspectorId: inspectionInspectorId,
+          category: inspectionCategory,
+          inspectedAt: `${inspectionDate}T09:00:00`,
+        }),
+      });
+      if (res.ok) {
+        showToast(t('inspection_assign_success'), 'success');
+        setInspectionAssignSchedule(null);
+      } else {
+        showToast(t('inspection_assign_error'), 'error');
+      }
+    } catch {
+      showToast(t('communication_error'), 'error');
+    }
+    setInspectionSaving(false);
   };
 
   // 配布員割り当てモーダルを開く
@@ -1172,6 +1223,17 @@ export default function ScheduleListPage() {
                           <i className="bi bi-geo-alt-fill text-sm"></i>
                         </button>
 
+                        {/* Inspection assign */}
+                        {(s.status === 'COMPLETED' || s.status === 'DISTRIBUTING') && (
+                          <button
+                            onClick={() => openInspectionModal(s)}
+                            className="w-7 h-7 rounded-full flex items-center justify-center text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors"
+                            title={t('inspection_btn_title')}
+                          >
+                            <i className="bi bi-clipboard-check text-sm"></i>
+                          </button>
+                        )}
+
                         {/* More actions */}
                         <div className="relative">
                           <button
@@ -1300,6 +1362,12 @@ export default function ScheduleListPage() {
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${s.remarks ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
                       <i className={`bi ${s.remarks ? 'bi-chat-text-fill' : 'bi-chat-text'} text-sm`}></i>
                     </button>
+                    {(s.status === 'COMPLETED' || s.status === 'DISTRIBUTING') && (
+                      <button onClick={() => openInspectionModal(s)}
+                        className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 transition-colors">
+                        <i className="bi bi-clipboard-check text-sm"></i>
+                      </button>
+                    )}
                     {s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
                       <button onClick={() => setActionMenuId(actionMenuId === s.id ? null : s.id)}
                         className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-100 text-slate-400">
@@ -1693,6 +1761,84 @@ export default function ScheduleListPage() {
             onLinked={() => fetchSchedules(filterDate)}
           />
         </Suspense>
+      )}
+
+      {/* Inspection Assignment Modal */}
+      {inspectionAssignSchedule && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-0 md:p-4 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-none md:rounded-xl shadow-xl w-full h-full md:h-auto md:max-w-md overflow-hidden flex flex-col md:block">
+            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-slate-100 flex justify-between items-center shrink-0">
+              <h3 className="font-bold text-base md:text-lg text-slate-800">
+                <i className="bi bi-clipboard-check text-indigo-500 mr-2"></i>{t('inspection_assign_title')}
+              </h3>
+              <button onClick={() => setInspectionAssignSchedule(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="p-4 md:p-6 flex-1 md:flex-none overflow-auto space-y-4">
+              {/* Schedule info */}
+              <div className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 flex items-center gap-3">
+                <span className="font-bold text-slate-700">{inspectionAssignSchedule.distributor?.name || '-'}</span>
+                <span className="text-slate-300">|</span>
+                <span>{formatAreaName(inspectionAssignSchedule.area?.town_name, inspectionAssignSchedule.area?.chome_name)}</span>
+                <span className="text-slate-300">|</span>
+                <span>{filterDate}</span>
+              </div>
+
+              {/* Category toggle */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600">{t('inspection_category')}</label>
+                <div className="flex bg-slate-100 rounded-lg p-0.5">
+                  <button
+                    onClick={() => setInspectionCategory('CHECK')}
+                    className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-colors ${inspectionCategory === 'CHECK' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    <i className="bi bi-search mr-1"></i>{t('inspection_category_check')}
+                  </button>
+                  <button
+                    onClick={() => setInspectionCategory('GUIDANCE')}
+                    className={`flex-1 px-3 py-2 rounded-md text-xs font-bold transition-colors ${inspectionCategory === 'GUIDANCE' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500'}`}
+                  >
+                    <i className="bi bi-mortarboard mr-1"></i>{t('inspection_category_guidance')}
+                  </button>
+                </div>
+              </div>
+
+              {/* Inspector selector */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600">{t('inspection_inspector')}</label>
+                <select
+                  value={inspectionInspectorId || ''}
+                  onChange={e => setInspectionInspectorId(e.target.value ? parseInt(e.target.value) : null)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="">{t('inspection_inspector_placeholder')}</option>
+                  {inspectionEmployees.map((emp: any) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.lastNameJa} {emp.firstNameJa}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Date picker */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600">{t('inspection_date')}</label>
+                <input
+                  type="date"
+                  value={inspectionDate}
+                  onChange={e => setInspectionDate(e.target.value)}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+            </div>
+            <div className="px-4 md:px-6 py-3 md:py-4 bg-slate-50 flex justify-end gap-3 shrink-0">
+              <button onClick={() => setInspectionAssignSchedule(null)} className="px-4 py-2 text-xs md:text-sm font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors">{t('cancel')}</button>
+              <button onClick={handleInspectionAssign} disabled={inspectionSaving || !inspectionInspectorId}
+                className="px-4 py-2 text-xs md:text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg shadow-sm transition-colors">
+                {inspectionSaving ? <span className="inline-flex items-center gap-1"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>{t('saving')}</span> : t('inspection_assign_btn')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

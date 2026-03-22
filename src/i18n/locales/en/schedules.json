@@ -218,5 +218,17 @@
   "relay_duplicate_confirm": "Add Anyway",
 
   "expected_arrival": "ETA",
-  "expected_arrival_other": "Other"
+  "expected_arrival_other": "Other",
+
+  "inspection_assign_title": "Assign Inspection / Guidance",
+  "inspection_category": "Category",
+  "inspection_category_check": "Check",
+  "inspection_category_guidance": "Guidance",
+  "inspection_inspector": "Inspector",
+  "inspection_inspector_placeholder": "Select inspector...",
+  "inspection_date": "Scheduled Date",
+  "inspection_assign_btn": "Assign",
+  "inspection_assign_success": "Inspection assigned",
+  "inspection_assign_error": "Failed to assign inspection",
+  "inspection_btn_title": "Assign Inspection / Guidance"
 }

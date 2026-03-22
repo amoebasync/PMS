@@ -218,5 +218,17 @@
   "relay_duplicate_confirm": "追加する",
 
   "expected_arrival": "出勤予定",
-  "expected_arrival_other": "その他"
+  "expected_arrival_other": "その他",
+
+  "inspection_assign_title": "巡回チェック・指導を割り当て",
+  "inspection_category": "種別",
+  "inspection_category_check": "チェック",
+  "inspection_category_guidance": "指導",
+  "inspection_inspector": "担当者",
+  "inspection_inspector_placeholder": "担当者を選択...",
+  "inspection_date": "実施予定日",
+  "inspection_assign_btn": "割り当てる",
+  "inspection_assign_success": "巡回を割り当てました",
+  "inspection_assign_error": "巡回の割り当てに失敗しました",
+  "inspection_btn_title": "巡回チェック・指導を割り当て"
 }
