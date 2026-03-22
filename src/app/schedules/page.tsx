@@ -1239,32 +1239,27 @@ export default function ScheduleListPage() {
                         {(() => {
                           const hasSession = !!s.session;
                           const hasStaffId = !!s.distributor?.staffId;
-                          const isDistributing = s.status === 'DISTRIBUTING';
+                          const isDistributing = s.status === 'DISTRIBUTING' || (s.status === 'IN_PROGRESS' && !hasSession && hasStaffId);
                           const isCompleted = s.status === 'COMPLETED';
                           const canClick = hasSession || hasStaffId;
-                          // 配布中: PMS session or PS fallback
-                          const isActiveNoSession = !hasSession && hasStaffId && !isCompleted && s.status !== 'UNSTARTED';
                           return (
                             <button
                               onClick={() => canClick && setTrajectoryScheduleId(s.id)}
                               disabled={!canClick}
                               className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
                                 isDistributing ? 'bg-emerald-500 text-white shadow-sm animate-pulse'
-                                : isCompleted && hasSession ? 'bg-blue-500 text-white shadow-sm'
-                                : isCompleted && hasStaffId ? 'bg-blue-400 text-white shadow-sm'
-                                : isActiveNoSession ? 'bg-amber-400 text-white shadow-sm animate-pulse'
+                                : isCompleted ? 'bg-blue-500 text-white shadow-sm'
                                 : hasStaffId ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-slate-200'
                                 : 'text-slate-200 cursor-not-allowed'
                               }`}
                               title={
                                 isDistributing ? t('gps_realtime')
                                 : isCompleted ? t('gps_trajectory')
-                                : isActiveNoSession ? t('gps_posting_system')
                                 : hasStaffId ? t('gps_posting_system')
                                 : t('gps_not_started')
                               }
                             >
-                              <i className={`bi ${isDistributing || isActiveNoSession ? 'bi-broadcast' : 'bi-geo-alt-fill'} text-sm`}></i>
+                              <i className={`bi ${isDistributing ? 'bi-broadcast' : 'bi-geo-alt-fill'} text-sm`}></i>
                             </button>
                           );
                         })()}
