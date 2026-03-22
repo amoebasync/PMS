@@ -89,18 +89,18 @@ export async function GET(
     }
 
     // GPS ポイントを PMS の TrajectoryViewer が期待する形式に変換
-    // TERMINAL_TIME: "2026-03-22 07:30:00" 形式 → ISO 8601 (JST)
+    // TERMINAL_TIME: "HH:MM:SS" 形式（時刻のみ）→ targetDate と結合して ISO 8601 (JST)
     const gpsPoints = rows
       .filter((r: any) => {
         const lat = parseFloat(r.LATITUDE || '0');
         const lng = parseFloat(r.LONGITUDE || '0');
-        return lat !== 0 || lng !== 0;
+        return lat !== 0 && lng !== 0;
       })
       .map((r: any) => {
-        const terminalTime = r.TERMINAL_TIME || '';
-        // "2026-03-22 07:30:00" → "2026-03-22T07:30:00+09:00"
+        const terminalTime = (r.TERMINAL_TIME || '').trim();
+        // "07:30:09" → "2026-03-22T07:30:09+09:00"
         const isoTimestamp = terminalTime
-          ? terminalTime.replace(' ', 'T') + '+09:00'
+          ? `${targetDate}T${terminalTime}+09:00`
           : new Date().toISOString();
 
         return {
@@ -111,9 +111,16 @@ export async function GET(
       })
       .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
+    // サンプリング（1000ポイント以上の場合は間引く）
+    let sampledPoints = gpsPoints;
+    if (gpsPoints.length > 1000) {
+      const step = Math.ceil(gpsPoints.length / 1000);
+      sampledPoints = gpsPoints.filter((_: any, i: number) => i % step === 0 || i === gpsPoints.length - 1);
+    }
+
     return NextResponse.json({
       source: 'posting-system',
-      gpsPoints: gpsPoints.map((p: any) => ({
+      gpsPoints: sampledPoints.map((p: any) => ({
         lat: p.latitude,
         lng: p.longitude,
         accuracy: null,
