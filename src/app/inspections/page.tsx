@@ -290,21 +290,6 @@ export default function InspectionsPage() {
 
   return (
     <div className="space-y-4 max-w-7xl mx-auto">
-      {/* ---- Page header ---- */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <i className="bi bi-clipboard-check text-lg text-indigo-600" />
-          <h1 className="text-lg font-bold text-slate-800">{t('page_title')}</h1>
-        </div>
-        <button
-          onClick={() => setShowAssignModal(true)}
-          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
-        >
-          <i className="bi bi-plus-lg" />
-          {t('btn_new_assign')}
-        </button>
-      </div>
-
       {/* ---- Inline stat badges ---- */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
@@ -393,8 +378,8 @@ export default function InspectionsPage() {
           </div>
         </div>
 
-        {/* Refresh button */}
-        <div className="md:ml-auto">
+        {/* Actions */}
+        <div className="md:ml-auto flex items-center gap-2">
           <button
             onClick={fetchData}
             disabled={loading}
@@ -402,6 +387,13 @@ export default function InspectionsPage() {
           >
             <i className={`bi bi-arrow-clockwise ${loading ? 'animate-spin' : ''}`} />
             {t('refresh')}
+          </button>
+          <button
+            onClick={() => setShowAssignModal(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
+          >
+            <i className="bi bi-plus-lg" />
+            {t('btn_new_assign')}
           </button>
         </div>
       </div>

@@ -46,6 +46,8 @@ const PAGE_ICONS: Record<string, string> = {
   '/announcements':                 'bi-megaphone',
   '/pricing':                       'bi-tags-fill',
   '/settings/company':              'bi-building',
+  '/inspections':                   'bi-clipboard-check',
+  '/quality/fraud-detection':       'bi-shield-exclamation',
 };
 
 // パス → 翻訳キー（sidebar.json の page_titles）
@@ -82,6 +84,8 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
   '/announcements':                 'page_titles.announcements',
   '/pricing':                       'page_titles.pricing',
   '/settings/company':              'page_titles.company_settings',
+  '/inspections':                   'page_titles.field_inspections',
+  '/quality/fraud-detection':       'page_titles.fraud_detection',
 };
 
 function getPageIcon(pathname: string): string {
