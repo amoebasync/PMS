@@ -774,6 +774,7 @@ export default function ScheduleListPage() {
       if (res.ok) {
         showToast(t('inspection_assign_success'), 'success');
         setInspectionAssignSchedule(null);
+        if (filterDate) fetchSchedules(filterDate);
       } else {
         showToast(t('inspection_assign_error'), 'error');
       }
