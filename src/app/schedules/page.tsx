@@ -8,6 +8,7 @@ import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
 import { GoogleMap, useJsApiLoader, Marker, Polygon } from '@react-google-maps/api';
 
 const TrajectoryViewer = lazy(() => import('@/components/schedules/TrajectoryViewer'));
+const MapboxTrajectoryViewer = lazy(() => import('@/components/schedules/MapboxTrajectoryViewer'));
 const AllTrajectoriesViewer = lazy(() => import('@/components/schedules/AllTrajectoriesViewer'));
 const DistributorDetailModal = lazy(() => import('@/components/schedules/DistributorDetailModal'));
 const OrphanSessionLinker = lazy(() => import('@/components/schedules/OrphanSessionLinker'));
@@ -512,6 +513,7 @@ export default function ScheduleListPage() {
     const tid = searchParams.get('trajectory');
     return tid ? parseInt(tid) : null;
   });
+  const [mapEngine, setMapEngine] = useState<'google' | 'mapbox'>('google');
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' | 'FULL_RELAY' } | null>(null);
@@ -1280,24 +1282,35 @@ export default function ScheduleListPage() {
                           const isCompleted = s.status === 'COMPLETED';
                           const canClick = hasSession || hasPsGps || hasStaffId;
                           return (
-                            <button
-                              onClick={() => canClick && setTrajectoryScheduleId(s.id)}
-                              disabled={!canClick}
-                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                isDistributing ? 'bg-emerald-500 text-white shadow-sm animate-pulse'
-                                : isCompleted ? 'bg-blue-500 text-white shadow-sm'
-                                : hasStaffId ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-slate-200'
-                                : 'text-slate-200 cursor-not-allowed'
-                              }`}
-                              title={
-                                isDistributing ? t('gps_realtime')
-                                : isCompleted ? t('gps_trajectory')
-                                : hasStaffId ? t('gps_posting_system')
-                                : t('gps_not_started')
-                              }
-                            >
-                              <i className={`bi ${isDistributing ? 'bi-broadcast' : 'bi-geo-alt-fill'} text-sm`}></i>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => { setMapEngine('google'); canClick && setTrajectoryScheduleId(s.id); }}
+                                disabled={!canClick}
+                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                  isDistributing ? 'bg-emerald-500 text-white shadow-sm animate-pulse'
+                                  : isCompleted ? 'bg-blue-500 text-white shadow-sm'
+                                  : hasStaffId ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-slate-200'
+                                  : 'text-slate-200 cursor-not-allowed'
+                                }`}
+                                title={
+                                  isDistributing ? t('gps_realtime')
+                                  : isCompleted ? t('gps_trajectory')
+                                  : hasStaffId ? t('gps_posting_system')
+                                  : t('gps_not_started')
+                                }
+                              >
+                                <i className={`bi ${isDistributing ? 'bi-broadcast' : 'bi-geo-alt-fill'} text-sm`}></i>
+                              </button>
+                              {(hasSession || isCompleted) && (
+                                <button
+                                  onClick={() => { setMapEngine('mapbox'); setTrajectoryScheduleId(s.id); }}
+                                  className="w-5 h-5 rounded flex items-center justify-center text-[8px] font-black text-indigo-500 hover:bg-indigo-50 border border-indigo-200 transition-colors"
+                                  title="Mapboxで開く"
+                                >
+                                  M
+                                </button>
+                              )}
+                            </>
                           );
                         })()}
 
@@ -1812,7 +1825,11 @@ export default function ScheduleListPage() {
             </div>
           </div>
         }>
-          <TrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => setTrajectoryScheduleId(null)} />
+          {mapEngine === 'mapbox' ? (
+            <MapboxTrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => { setTrajectoryScheduleId(null); setMapEngine('google'); }} />
+          ) : (
+            <TrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => setTrajectoryScheduleId(null)} />
+          )}
         </Suspense>
       )}
 
