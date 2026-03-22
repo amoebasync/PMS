@@ -48,13 +48,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    // JSTで当日の日付を取得
+    // JSTで前日の日付を取得（朝5:00実行のため前日分を分析）
     const nowJst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+    nowJst.setDate(nowJst.getDate() - 1);
     const todayStr = `${nowJst.getFullYear()}-${String(nowJst.getMonth() + 1).padStart(2, '0')}-${String(nowJst.getDate()).padStart(2, '0')}`;
     const todayStart = new Date(`${todayStr}T00:00:00+09:00`);
     const todayEnd = new Date(`${todayStr}T23:59:59+09:00`);
 
-    // 1. 当日の完了スケジュールでPMSセッションがないものを取得
+    // 1. 前日の完了スケジュールでPMSセッションがないものを取得
     const schedules = await prisma.distributionSchedule.findMany({
       where: {
         date: { gte: todayStart, lte: todayEnd },

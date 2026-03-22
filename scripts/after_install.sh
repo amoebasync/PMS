@@ -94,11 +94,11 @@ if [ -n "$CRON_SECRET" ]; then
   fi
 
   # --- PS不正検知分析 CRON 登録（重複時はスキップ） ---
-  # 毎日21:00 JST = UTC 12:00
-  PS_FRAUD_CRON_JOB="0 12 * * * curl -s -X POST -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/analyze-ps-fraud >> /tmp/pms-cron-analyze-ps-fraud.log 2>&1"
+  # 毎日05:00 JST = UTC 20:00（前日分を分析）
+  PS_FRAUD_CRON_JOB="0 20 * * * curl -s -X POST -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/analyze-ps-fraud >> /tmp/pms-cron-analyze-ps-fraud.log 2>&1"
   if ! crontab -l 2>/dev/null | grep -q "analyze-ps-fraud"; then
     (crontab -l 2>/dev/null; echo "$PS_FRAUD_CRON_JOB") | crontab -
-    echo "CRON登録: PS不正検知分析（毎日21:00 JST）"
+    echo "CRON登録: PS不正検知分析（毎日05:00 JST）"
   else
     echo "CRON既存: PS不正検知分析（スキップ）"
   fi
