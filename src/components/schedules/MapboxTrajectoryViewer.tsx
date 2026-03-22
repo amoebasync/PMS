@@ -242,7 +242,16 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showProhibited, setShowProhibited] = useState(true);
+  const [show3D, setShow3D] = useState(false);
   const [selectedDwellSpot, setSelectedDwellSpot] = useState<DwellSpot | null>(null);
+
+  // Coverage analysis
+  const [showCoverage, setShowCoverage] = useState(false);
+  const [coverageRate, setCoverageRate] = useState<number | null>(null);
+
+  // Route suggestion
+  const [suggestedRoute, setSuggestedRoute] = useState<any>(null);
+  const [loadingRoute, setLoadingRoute] = useState(false);
 
   // Playback state
   const [sliderValue, setSliderValue] = useState(1000);
@@ -352,6 +361,36 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [isPlaying, playbackSpeed]);
 
+  // 3D buildings toggle — pitch + fill-extrusion layer
+  useEffect(() => {
+    const map = mapRef.current?.getMap();
+    if (!map || !map.isStyleLoaded()) return;
+
+    if (show3D) {
+      map.easeTo({ pitch: 45, duration: 500 });
+      if (!map.getLayer('3d-buildings')) {
+        map.addLayer({
+          id: '3d-buildings',
+          source: 'composite',
+          'source-layer': 'building',
+          type: 'fill-extrusion',
+          minzoom: 14,
+          paint: {
+            'fill-extrusion-color': '#e2e8f0',
+            'fill-extrusion-height': ['get', 'height'],
+            'fill-extrusion-base': ['get', 'min_height'],
+            'fill-extrusion-opacity': 0.7,
+          },
+        });
+      }
+    } else {
+      map.easeTo({ pitch: 0, duration: 500 });
+      if (map.getLayer('3d-buildings')) {
+        map.removeLayer('3d-buildings');
+      }
+    }
+  }, [show3D]);
+
   // ============================================================
   // GeoJSON data for Mapbox layers (memoized)
   // ============================================================
@@ -453,6 +492,33 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     return { type: 'FeatureCollection' as const, features };
   }, [data]);
 
+  // Prohibited properties 3D GeoJSON — small square polygons for fill-extrusion columns
+  const prohibited3DData = useMemo(() => {
+    if (!data) return null;
+    const SIZE = 0.000025; // ~2.5m in degrees ≈ 5m x 5m square
+    const features = data.prohibitedProperties
+      .filter(pp => pp.latitude && pp.longitude)
+      .map((pp, idx) => {
+        const lng = pp.longitude!;
+        const lat = pp.latitude!;
+        return {
+          type: 'Feature' as const,
+          properties: { id: pp.id ?? idx },
+          geometry: {
+            type: 'Polygon' as const,
+            coordinates: [[
+              [lng - SIZE, lat - SIZE],
+              [lng + SIZE, lat - SIZE],
+              [lng + SIZE, lat + SIZE],
+              [lng - SIZE, lat + SIZE],
+              [lng - SIZE, lat - SIZE],
+            ]],
+          },
+        };
+      });
+    return { type: 'FeatureCollection' as const, features };
+  }, [data]);
+
   // Dwell spots GeoJSON (circles)
   const dwellGeoJson = useMemo(() => {
     if (dwellSpots.length === 0) return null;
@@ -472,6 +538,121 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     }));
     return { type: 'FeatureCollection' as const, features };
   }, [dwellSpots]);
+
+  // Coverage grid GeoJSON
+  const coverageGeoJson = useMemo(() => {
+    if (!showCoverage || !data || !areaGeoJson || data.gpsPoints.length === 0) return null;
+    // Compute bounding box of area polygon
+    const allCoords: number[][] = [];
+    for (const feature of areaGeoJson.features) {
+      const geom = feature.geometry as any;
+      if (geom.type === 'Polygon') {
+        allCoords.push(...geom.coordinates[0]);
+      } else if (geom.type === 'MultiPolygon') {
+        for (const poly of geom.coordinates) allCoords.push(...poly[0]);
+      }
+    }
+    if (allCoords.length === 0) return null;
+    const minLng = Math.min(...allCoords.map(c => c[0]));
+    const maxLng = Math.max(...allCoords.map(c => c[0]));
+    const minLat = Math.min(...allCoords.map(c => c[1]));
+    const maxLat = Math.max(...allCoords.map(c => c[1]));
+
+    const cellSize = 0.0002; // ~20m at Tokyo latitude
+    const gpsPoints = data.gpsPoints;
+    const features: any[] = [];
+    let covered = 0;
+    let total = 0;
+
+    for (let lng = minLng; lng < maxLng; lng += cellSize) {
+      for (let lat = minLat; lat < maxLat; lat += cellSize) {
+        const hasCoverage = gpsPoints.some(p =>
+          p.lng >= lng && p.lng < lng + cellSize &&
+          p.lat >= lat && p.lat < lat + cellSize
+        );
+        total++;
+        if (hasCoverage) covered++;
+        features.push({
+          type: 'Feature' as const,
+          properties: { covered: hasCoverage },
+          geometry: {
+            type: 'Polygon' as const,
+            coordinates: [[[lng, lat], [lng + cellSize, lat], [lng + cellSize, lat + cellSize], [lng, lat + cellSize], [lng, lat]]],
+          },
+        });
+      }
+    }
+    const rate = total > 0 ? covered / total : 0;
+    setCoverageRate(rate);
+    return { type: 'FeatureCollection' as const, features };
+  }, [showCoverage, data, areaGeoJson]);
+
+  // Route suggestion handler
+  const generateSuggestedRoute = useCallback(async () => {
+    if (!areaGeoJson || loadingRoute) return;
+
+    // If already showing route, toggle off
+    if (suggestedRoute) {
+      setSuggestedRoute(null);
+      return;
+    }
+
+    setLoadingRoute(true);
+
+    // Compute bounding box of area polygon
+    const allCoords: number[][] = [];
+    for (const feature of areaGeoJson.features) {
+      const geom = feature.geometry as any;
+      if (geom.type === 'Polygon') {
+        allCoords.push(...geom.coordinates[0]);
+      } else if (geom.type === 'MultiPolygon') {
+        for (const poly of geom.coordinates) allCoords.push(...poly[0]);
+      }
+    }
+    if (allCoords.length === 0) { setLoadingRoute(false); return; }
+
+    const minLng = Math.min(...allCoords.map(c => c[0]));
+    const maxLng = Math.max(...allCoords.map(c => c[0]));
+    const minLat = Math.min(...allCoords.map(c => c[1]));
+    const maxLat = Math.max(...allCoords.map(c => c[1]));
+
+    const step = 0.001; // ~100m
+    const points: [number, number][] = [];
+
+    for (let lng = minLng; lng <= maxLng; lng += step) {
+      for (let lat = minLat; lat <= maxLat; lat += step) {
+        points.push([lng, lat]);
+      }
+    }
+
+    // Sample max 12 points evenly
+    const sampled = points.length <= 12 ? points :
+      points.filter((_, i) => i % Math.ceil(points.length / 12) === 0).slice(0, 12);
+
+    if (sampled.length < 2) { setLoadingRoute(false); return; }
+
+    try {
+      const res = await fetch('/api/mapbox/optimization', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coordinates: sampled, profile: 'walking', roundtrip: false }),
+      });
+      const resData = await res.json();
+      if (resData.trips?.[0]?.geometry) {
+        setSuggestedRoute({
+          type: 'Feature',
+          geometry: resData.trips[0].geometry,
+          properties: {
+            distance: resData.trips[0].distance,
+            duration: resData.trips[0].duration,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Route suggestion error:', e);
+    }
+    setLoadingRoute(false);
+  }, [areaGeoJson, loadingRoute, suggestedRoute]);
 
   // ============================================================
   // Loading / Error states
@@ -744,6 +925,53 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Source>
                 )}
 
+                {/* Coverage grid overlay */}
+                {showCoverage && coverageGeoJson && (
+                  <Source id="coverage-grid" type="geojson" data={coverageGeoJson}>
+                    <Layer
+                      id="coverage-grid-fill"
+                      type="fill"
+                      paint={{
+                        'fill-color': ['case', ['get', 'covered'], '#22c55e', '#ef4444'],
+                        'fill-opacity': ['case', ['get', 'covered'], 0.2, 0.15],
+                      }}
+                    />
+                  </Source>
+                )}
+
+                {/* Suggested route overlay */}
+                {suggestedRoute && (
+                  <Source id="suggested-route" type="geojson" data={suggestedRoute}>
+                    <Layer
+                      id="suggested-route-line"
+                      type="line"
+                      paint={{
+                        'line-color': '#3b82f6',
+                        'line-width': 4,
+                        'line-dasharray': [2, 2],
+                        'line-opacity': 0.8,
+                      }}
+                      layout={{ 'line-join': 'round', 'line-cap': 'round' }}
+                    />
+                  </Source>
+                )}
+
+                {/* Prohibited property 3D red columns */}
+                {show3D && showProhibited && prohibited3DData && (
+                  <Source id="prohibited-3d" type="geojson" data={prohibited3DData}>
+                    <Layer
+                      id="prohibited-3d-extrusion"
+                      type="fill-extrusion"
+                      paint={{
+                        'fill-extrusion-color': '#ef4444',
+                        'fill-extrusion-height': 30,
+                        'fill-extrusion-base': 0,
+                        'fill-extrusion-opacity': 0.8,
+                      }}
+                    />
+                  </Source>
+                )}
+
                 {/* Start marker */}
                 {points.length > 0 && (
                   <Marker
@@ -930,6 +1158,60 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
               >
                 <i className="bi bi-slash-circle mr-1"></i>
                 禁止物件
+              </button>
+              <button
+                onClick={() => setShow3D(!show3D)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                  show3D
+                    ? 'bg-purple-600 text-white border-purple-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <i className="bi bi-badge-3d"></i>
+                3D建物
+              </button>
+              <button
+                onClick={() => setShowCoverage(!showCoverage)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                  showCoverage
+                    ? 'bg-teal-600 text-white border-teal-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <i className="bi bi-grid-3x3"></i>
+                カバレッジ
+              </button>
+              <button
+                onClick={generateSuggestedRoute}
+                disabled={loadingRoute}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                  suggestedRoute
+                    ? 'bg-blue-600 text-white border-blue-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                } ${loadingRoute ? 'opacity-50' : ''}`}
+              >
+                <i className={`bi ${loadingRoute ? 'bi-arrow-repeat animate-spin' : 'bi-signpost-2'}`}></i>
+                ルート提案
+              </button>
+            </div>
+          )}
+
+          {/* Coverage stat badge */}
+          {showCoverage && coverageRate !== null && (
+            <div className="absolute top-16 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg border border-slate-200 text-sm font-bold z-10">
+              <i className="bi bi-grid-3x3 text-teal-500 mr-1.5"></i>
+              カバレッジ: <span className={coverageRate > 0.8 ? 'text-emerald-600' : coverageRate > 0.5 ? 'text-amber-600' : 'text-red-600'}>{Math.round(coverageRate * 100)}%</span>
+            </div>
+          )}
+
+          {/* Route info badge */}
+          {suggestedRoute && (
+            <div className="absolute top-16 right-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg border border-slate-200 text-xs z-10">
+              <div className="font-bold text-blue-600 mb-1"><i className="bi bi-signpost-2 mr-1"></i>推奨ルート</div>
+              <div>距離: {(suggestedRoute.properties.distance / 1000).toFixed(1)} km</div>
+              <div>所要時間: {Math.round(suggestedRoute.properties.duration / 60)} 分</div>
+              <button onClick={() => setSuggestedRoute(null)} className="mt-1 text-slate-400 hover:text-slate-600 text-[10px]">
+                <i className="bi bi-x-circle mr-0.5"></i>クリア
               </button>
             </div>
           )}
