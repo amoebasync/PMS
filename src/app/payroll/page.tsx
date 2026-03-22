@@ -345,8 +345,12 @@ export default function PayrollPage() {
           </select>
         </div>
 
+        <a href="/payroll/statement"
+          className="ml-auto bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
+          <i className="bi bi-file-earmark-pdf"></i> 支払明細書
+        </a>
         <button onClick={handleCalculate} disabled={isCalculating}
-          className="ml-auto bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
+          className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-5 py-2 rounded-lg font-bold text-sm shadow-md transition-all flex items-center gap-2">
           {isCalculating ? <><i className="bi bi-arrow-repeat animate-spin"></i> {t('calculating')}</> : <><i className="bi bi-calculator-fill"></i> {t('btn_calculate_label')}</>}
         </button>
       </div>
