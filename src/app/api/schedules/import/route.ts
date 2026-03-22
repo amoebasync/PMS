@@ -445,9 +445,13 @@ export async function POST(request: Request) {
 
       // ── 孤児セッションの再紐付け ──
       // スケジュール削除でscheduleId=nullになったセッションを、同じ配布員+同じ日の新スケジュールに紐付ける
+      // インポートした日付のセッションのみ対象（他日のオーファンには触れない）
       if (isLastChunk && createdIds.length > 0) {
+        const dateFilters = [...importedDates].map(d => ({
+          startedAt: { gte: new Date(`${d}T00:00:00+09:00`), lt: new Date(`${d}T23:59:59+09:00`) },
+        }));
         const orphanedSessions = await tx.distributionSession.findMany({
-          where: { scheduleId: null },
+          where: { scheduleId: null, OR: dateFilters },
           select: { id: true, distributorId: true, startedAt: true },
         });
 
