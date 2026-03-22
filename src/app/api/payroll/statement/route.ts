@@ -30,6 +30,7 @@ export async function GET(request: Request) {
       where: { id: employeeId },
       select: {
         id: true, employeeCode: true, lastNameJa: true, firstNameJa: true,
+        employmentType: true,
         linkedDistributor: { select: { id: true, staffId: true, name: true } },
       },
     });
@@ -96,6 +97,7 @@ export async function GET(request: Request) {
     let totalSchedulePay = 0;
     let totalExpensePay = 0;
     const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土'];
+    const payLabel = employee.employmentType === 'OUTSOURCE' ? '業務委託報酬' : '社員報酬';
 
     // ── 社員 PayrollRecord ──
     const empRecords = await prisma.payrollRecord.findMany({
@@ -109,14 +111,15 @@ export async function GET(request: Request) {
 
     if (month) {
       for (const rec of empRecords) {
+        if (rec.grossPay === 0) continue;
         const d = new Date(rec.periodStart.toISOString().slice(0, 10) + 'T00:00:00');
         const dEnd = new Date(rec.periodEnd.toISOString().slice(0, 10) + 'T00:00:00');
         const label = rec.paymentCycle === 'MONTHLY'
           ? `${d.getMonth() + 1}/${d.getDate()}〜`
           : `${d.getMonth() + 1}/${d.getDate()}(${DAY_LABELS[d.getDay()]})`;
         const desc = rec.paymentCycle === 'MONTHLY'
-          ? `社員報酬（${d.getMonth() + 1}/${d.getDate()}〜${dEnd.getMonth() + 1}/${dEnd.getDate()}）`
-          : `社員報酬`;
+          ? `${payLabel}（${d.getMonth() + 1}/${d.getDate()}〜${dEnd.getMonth() + 1}/${dEnd.getDate()}）`
+          : payLabel;
         totalSchedulePay += rec.grossPay;
         rows.push({ label, description: desc, schedulePay: rec.grossPay, expensePay: 0, grossPay: rec.grossPay });
       }
@@ -124,12 +127,13 @@ export async function GET(request: Request) {
       // 年間: 月別
       const monthMap = new Map<number, number>();
       for (const rec of empRecords) {
+        if (rec.grossPay === 0) continue;
         const m = rec.periodStart.getMonth() + 1;
         monthMap.set(m, (monthMap.get(m) || 0) + rec.grossPay);
       }
       for (const [m, pay] of monthMap) {
         totalSchedulePay += pay;
-        rows.push({ label: `${m}月`, description: '社員報酬', schedulePay: pay, expensePay: 0, grossPay: pay });
+        rows.push({ label: `${m}月`, description: payLabel, schedulePay: pay, expensePay: 0, grossPay: pay });
       }
     }
 

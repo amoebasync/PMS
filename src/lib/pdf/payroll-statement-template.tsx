@@ -144,7 +144,7 @@ export function PayrollStatementPDF({
         {/* 内訳サマリー */}
         <View style={{ flexDirection: 'row', marginBottom: 8, gap: 8 }}>
           <View style={{ flex: 1, backgroundColor: '#f0f9ff', borderRadius: 3, padding: '4 8' }}>
-            <Text style={{ fontSize: 6, color: '#64748b' }}>配布報酬</Text>
+            <Text style={{ fontSize: 6, color: '#64748b' }}>報酬</Text>
             <Text style={{ fontSize: 9, fontWeight: 700, color: '#4f46e5' }}>{yen(data.totalSchedulePay)}</Text>
           </View>
           <View style={{ flex: 1, backgroundColor: '#f0fdf4', borderRadius: 3, padding: '4 8' }}>
@@ -158,7 +158,7 @@ export function PayrollStatementPDF({
           <View style={S.tHead}>
             <Text style={[S.tHeadText, S.colDate]}>日付</Text>
             <Text style={[S.tHeadText, S.colDesc]}>内容</Text>
-            <Text style={[S.tHeadText, S.colSchedule]}>配布報酬</Text>
+            <Text style={[S.tHeadText, S.colSchedule]}>報酬</Text>
             <Text style={[S.tHeadText, S.colExpense]}>交通費</Text>
             <Text style={[S.tHeadText, S.colTotal]}>合計</Text>
           </View>

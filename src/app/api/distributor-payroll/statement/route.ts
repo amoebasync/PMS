@@ -202,6 +202,12 @@ export async function GET(request: Request) {
     // 紐付け社員の給与データを合算
     let totalEmployeePay = 0;
     if (distributor.linkedEmployeeId) {
+      const linkedEmp = await prisma.employee.findUnique({
+        where: { id: distributor.linkedEmployeeId },
+        select: { employmentType: true },
+      });
+      const empPayLabel = linkedEmp?.employmentType === 'OUTSOURCE' ? '業務委託報酬' : '社員報酬';
+
       const empRecords = await prisma.payrollRecord.findMany({
         where: {
           employeeId: distributor.linkedEmployeeId,
@@ -212,8 +218,8 @@ export async function GET(request: Request) {
       });
 
       if (month) {
-        // 月間: 社員給与レコードを行に追加
         for (const rec of empRecords) {
+          if (rec.grossPay === 0) continue;
           const dateStr = rec.periodStart.toISOString().slice(0, 10);
           const endStr = rec.periodEnd.toISOString().slice(0, 10);
           const d = new Date(dateStr + 'T00:00:00');
@@ -222,48 +228,29 @@ export async function GET(request: Request) {
             ? `${d.getMonth() + 1}/${d.getDate()}〜`
             : `${d.getMonth() + 1}/${d.getDate()}(${DAY_LABELS[d.getDay()]})`;
           const desc = rec.paymentCycle === 'MONTHLY'
-            ? `社員報酬（${d.getMonth() + 1}/${d.getDate()}〜${new Date(endStr + 'T00:00:00').getMonth() + 1}/${new Date(endStr + 'T00:00:00').getDate()}）`
-            : `社員報酬`;
-          const pay = rec.grossPay;
-          totalEmployeePay += pay;
-          rows.push({
-            label,
-            description: desc,
-            schedulePay: pay,
-            expensePay: 0,
-            grossPay: pay,
-          });
+            ? `${empPayLabel}（${d.getMonth() + 1}/${d.getDate()}〜${new Date(endStr + 'T00:00:00').getMonth() + 1}/${new Date(endStr + 'T00:00:00').getDate()}）`
+            : empPayLabel;
+          totalEmployeePay += rec.grossPay;
+          rows.push({ label, description: desc, schedulePay: rec.grossPay, expensePay: 0, grossPay: rec.grossPay });
         }
       } else {
-        // 年間: 月別にまとめて追加
         const empMonthMap = new Map<number, number>();
         for (const rec of empRecords) {
+          if (rec.grossPay === 0) continue;
           const m = rec.periodStart.getMonth() + 1;
           empMonthMap.set(m, (empMonthMap.get(m) || 0) + rec.grossPay);
         }
         for (const [m, pay] of empMonthMap) {
           totalEmployeePay += pay;
-          // 既存の月行があれば合算、なければ追加
           const existing = rows.find(r => r.label === `${m}月`);
           if (existing) {
             existing.schedulePay += pay;
             existing.grossPay += pay;
           } else {
-            rows.push({
-              label: `${m}月`,
-              description: '社員報酬',
-              schedulePay: pay,
-              expensePay: 0,
-              grossPay: pay,
-            });
+            rows.push({ label: `${m}月`, description: empPayLabel, schedulePay: pay, expensePay: 0, grossPay: pay });
           }
         }
-        // 年間の場合は月順にソート
-        rows.sort((a, b) => {
-          const am = parseInt(a.label) || 99;
-          const bm = parseInt(b.label) || 99;
-          return am - bm;
-        });
+        rows.sort((a, b) => (parseInt(a.label) || 99) - (parseInt(b.label) || 99));
       }
       totalSchedulePay += totalEmployeePay;
     }
