@@ -225,8 +225,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
 
     return NextResponse.json(updated);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Update Error:', error);
+    if (error?.code === 'P2002') {
+      const target = error.meta?.target;
+      if (target?.includes('staff_id')) {
+        return NextResponse.json({ error: 'このスタッフIDは既に使用されています' }, { status: 409 });
+      }
+      if (target?.includes('email')) {
+        return NextResponse.json({ error: 'このメールアドレスは既に使用されています' }, { status: 409 });
+      }
+      return NextResponse.json({ error: '重複データが存在します' }, { status: 409 });
+    }
     return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }

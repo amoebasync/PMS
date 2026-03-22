@@ -611,7 +611,11 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || '保存に失敗しました', 'error');
+        return;
+      }
       setIsEditOpen(false);
       loadDistributor();
     } catch { showToast('保存に失敗しました', 'error'); }

@@ -242,6 +242,9 @@ model Employee {
   pickingAsPicker             PickingVerification[] @relation("PickingPicker")
   pickingAsChecker            PickingVerification[] @relation("PickingChecker")
 
+  // 配布員紐付け（同一人物が社員と配布員の両方として働く場合）
+  linkedDistributor           FlyerDistributor?     @relation("EmployeeDistributorLink")
+
   @@map("employees")
 }
 
@@ -724,6 +727,10 @@ model FlyerDistributor {
   fieldInspections      FieldInspection[]
   fraudAnalyses         FraudAnalysis[]
   lineUser              LineUser?
+
+  // 社員紐付け（同一人物が社員と配布員の両方として働く場合）
+  linkedEmployeeId Int?      @unique @map("linked_employee_id")
+  linkedEmployee   Employee? @relation("EmployeeDistributorLink", fields: [linkedEmployeeId], references: [id])
 
   @@index([branchId])
   @@index([visaExpiryDate])

@@ -72,6 +72,7 @@ export async function GET(request: Request) {
         visaType: true,
         financial: true,
         manager: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+        linkedDistributor: { select: { id: true, staffId: true, name: true } },
       };
 
       const [total, employees] = await Promise.all([
@@ -114,7 +115,8 @@ export async function GET(request: Request) {
         country: true,
         visaType: true,
         financial: true,
-        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } }
+        manager: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+        linkedDistributor: { select: { id: true, staffId: true, name: true } },
       }
     });
     return NextResponse.json(employees);

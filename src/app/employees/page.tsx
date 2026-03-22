@@ -58,6 +58,7 @@ type Employee = {
   address?: string | null;
   buildingName?: string | null;
   language?: string | null;
+  linkedDistributor?: { id: number; staffId: string; name: string } | null;
 };
 
 const EMP_TYPE_LABEL_KEYS: Record<string, string> = { FULL_TIME: 'emp_type_full_time', PART_TIME: 'emp_type_part_time', OUTSOURCE: 'emp_type_outsource' };
@@ -148,6 +149,10 @@ export default function EmployeePage() {
   const [pendingWelcomeEmp, setPendingWelcomeEmp] = useState<Employee | null>(null);
   const [sendingWorkspaceNotify, setSendingWorkspaceNotify] = useState(false);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  // 配布員紐付け
+  const [distLinkSearch, setDistLinkSearch] = useState('');
+  const [distLinkResults, setDistLinkResults] = useState<any[]>([]);
+  const [distLinking, setDistLinking] = useState(false);
   const [leaveForm, setLeaveForm] = useState({
     date: new Date().toISOString().split('T')[0], type: 'GRANTED', days: '', validUntil: '', note: ''
   });
@@ -534,6 +539,60 @@ export default function EmployeePage() {
       showToast(t('comm_error'), 'error');
     }
     setSendingWorkspaceNotify(false);
+  };
+
+  // 配布員紐付け
+  const searchDistributors = async (q: string) => {
+    setDistLinkSearch(q);
+    if (!q || q.length < 1) { setDistLinkResults([]); return; }
+    try {
+      const res = await fetch(`/api/distributors?search=${encodeURIComponent(q)}&limit=10`);
+      if (res.ok) { const data = await res.json(); setDistLinkResults(Array.isArray(data) ? data : data.data || []); }
+    } catch { /* ignore */ }
+  };
+
+  const handleLinkDistributor = async (distributorId: number) => {
+    if (!selectedEmployee) return;
+    setDistLinking(true);
+    try {
+      const res = await fetch(`/api/employees/${selectedEmployee.id}/link-distributor`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ distributorId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast('配布員を紐付けました', 'success');
+        setDistLinkSearch('');
+        setDistLinkResults([]);
+        fetchEmployees(buildEmpQuery());
+        // selectedEmployee を更新
+        const empRes = await fetch(`/api/employees?page=1&limit=1&search=${selectedEmployee.employeeCode || selectedEmployee.lastNameJa}`);
+        if (empRes.ok) {
+          const empData = await empRes.json();
+          const found = (empData.data || []).find((e: any) => e.id === selectedEmployee.id);
+          if (found) setSelectedEmployee(found);
+        }
+      } else {
+        showToast(data.error || '紐付けに失敗しました', 'error');
+      }
+    } catch { showToast('紐付けに失敗しました', 'error'); }
+    setDistLinking(false);
+  };
+
+  const handleUnlinkDistributor = async () => {
+    if (!selectedEmployee) return;
+    if (!confirm('配布員の紐付けを解除しますか？')) return;
+    setDistLinking(true);
+    try {
+      const res = await fetch(`/api/employees/${selectedEmployee.id}/link-distributor`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('紐付けを解除しました', 'success');
+        fetchEmployees(buildEmpQuery());
+        setSelectedEmployee({ ...selectedEmployee, linkedDistributor: null });
+      }
+    } catch { showToast('解除に失敗しました', 'error'); }
+    setDistLinking(false);
   };
 
   const executeDelete = async () => {
@@ -1130,9 +1189,59 @@ export default function EmployeePage() {
                 </div>
               )}
 
+              {/* 配布員紐付け */}
+              {canEdit && (
+                <div className="mt-8 border-t border-slate-200 pt-6">
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+                    <i className="bi bi-link-45deg mr-1 text-orange-500"></i> 配布員紐付け
+                  </h4>
+                  {selectedEmployee.linkedDistributor ? (
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-orange-200 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
+                          <i className="bi bi-person-walking text-orange-600"></i>
+                        </div>
+                        <div>
+                          <div className="text-sm font-bold text-slate-800">{selectedEmployee.linkedDistributor.name}</div>
+                          <div className="text-xs text-slate-500 font-mono">{selectedEmployee.linkedDistributor.staffId}</div>
+                        </div>
+                      </div>
+                      <button onClick={handleUnlinkDistributor} disabled={distLinking}
+                        className="px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-50 border border-rose-200 rounded-lg transition-colors disabled:opacity-50">
+                        <i className="bi bi-x-lg mr-1"></i>解除
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={distLinkSearch}
+                          onChange={e => searchDistributors(e.target.value)}
+                          placeholder="配布員を名前またはIDで検索..."
+                          className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-400 outline-none"
+                        />
+                        {distLinkResults.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-40 overflow-auto">
+                            {distLinkResults.map((d: any) => (
+                              <button key={d.id} onClick={() => handleLinkDistributor(d.id)} disabled={distLinking}
+                                className="w-full text-left px-3 py-2 text-sm hover:bg-orange-50 flex items-center gap-2 transition-colors disabled:opacity-50">
+                                <span className="text-xs text-slate-400 font-mono">{d.staffId}</span>
+                                <span className="font-bold text-slate-700">{d.name}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-1.5">同一人物が社員と配布員の両方で働く場合に紐付けます</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {canEdit && (
                 <div className="mt-8 flex justify-end">
-                  <button 
+                  <button
                     onClick={() => { setIsDetailModalOpen(false); openFormModal(selectedEmployee); }}
                     className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center gap-2"
                   >
