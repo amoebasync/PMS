@@ -20,6 +20,7 @@ export function middleware(request: NextRequest) {
     path === '/portal/cart' ||
     path === '/portal/terms' ||
     path === '/portal/privacy' ||
+    path === '/portal/support' ||
     path === '/app-privacy' ||
     path.startsWith('/api/portal/pricing') ||
     path.startsWith('/api/locations') ||
