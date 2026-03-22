@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const { coordinates, profile = 'walking', roundtrip = false } = body;
+  const { coordinates, profile = 'walking', roundtrip = true } = body;
 
   if (!coordinates || !Array.isArray(coordinates) || coordinates.length < 2) {
     return NextResponse.json({ error: 'At least 2 coordinates required' }, { status: 400 });

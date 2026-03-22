@@ -699,7 +699,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       const res = await fetch('/api/mapbox/optimization', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinates: sampled, profile: 'walking', roundtrip: false }),
+        body: JSON.stringify({ coordinates: sampled, profile: 'walking', roundtrip: true }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
