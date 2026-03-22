@@ -885,36 +885,46 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 </div>
               )}
 
-              {/* Stats — PMS session only */}
-              {dataSource === 'pms' && (
+              {/* Stats — PMS session or PS completed */}
+              {(dataSource === 'pms' || (dataSource === 'posting-system' && isFinished)) && (
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-speedometer2 mr-1"></i>
                     パフォーマンス
                   </h3>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-blue-50 rounded-lg p-2 text-center">
-                      <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
-                      <div className="text-blue-400">km</div>
-                    </div>
-                    <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                      <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
-                      <div className="text-emerald-400">歩</div>
-                    </div>
-                    <div className="bg-orange-50 rounded-lg p-2 text-center">
-                      <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
-                      <div className="text-orange-400">kcal</div>
-                    </div>
+                  <div className={`grid ${dataSource === 'pms' ? 'grid-cols-2' : 'grid-cols-2'} gap-2 text-xs`}>
+                    {dataSource === 'pms' && (
+                      <>
+                        <div className="bg-blue-50 rounded-lg p-2 text-center">
+                          <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
+                          <div className="text-blue-400">km</div>
+                        </div>
+                        <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                          <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
+                          <div className="text-emerald-400">歩</div>
+                        </div>
+                        <div className="bg-orange-50 rounded-lg p-2 text-center">
+                          <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
+                          <div className="text-orange-400">kcal</div>
+                        </div>
+                      </>
+                    )}
                     <div className="bg-purple-50 rounded-lg p-2 text-center">
                       <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
                       <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
                     </div>
+                    {isFinished && totalMailboxes > 0 && (
+                      <div className="bg-indigo-50 rounded-lg p-2 text-center">
+                        <div className="text-indigo-600 font-black text-lg">{durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0}</div>
+                        <div className="text-indigo-400">枚/時</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
 
-              {/* Per-hour metrics — PMS session only */}
-              {dataSource === 'pms' && (
+              {/* Per-hour metrics — PMS session only (PS has no steps/distance data) */}
+              {dataSource === 'pms' && isFinished && (
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-graph-up mr-1"></i>
@@ -1064,7 +1074,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                           <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[0].timestamp)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-500">終了</span>
+                          <span className="text-slate-500">{isFinished ? '終了' : '最終GPS'}</span>
                           <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[data.gpsPoints.length - 1].timestamp)}</span>
                         </div>
                       </>
