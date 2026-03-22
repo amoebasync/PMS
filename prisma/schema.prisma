@@ -876,6 +876,10 @@ model DistributionSchedule {
   expectedArrival   String?   @map("expected_arrival") @db.VarChar(10)
   arrivalAnsweredAt DateTime? @map("arrival_answered_at")
 
+  // Posting System GPS キャッシュ
+  psGpsAvailable Boolean? @map("ps_gps_available") // null=未チェック, true=GPSデータあり, false=なし
+  psGpsLastTime  String?  @map("ps_gps_last_time") @db.VarChar(10) // 最終GPS時刻 "14:37"
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

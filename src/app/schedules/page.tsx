@@ -572,9 +572,36 @@ export default function ScheduleListPage() {
     setIsLoading(true);
     try {
       const res = await fetch(`/api/schedules?date=${dateStr}`);
-      if (res.ok) setSchedules(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setSchedules(data);
+        // PS GPS 未チェックのスケジュールを一括チェック
+        checkPsGps(data);
+      }
     } catch (e) { console.error(e); }
     setIsLoading(false);
+  };
+
+  // PS GPS 未チェック分を一括チェックしてキャッシュ
+  const checkPsGps = async (data: any[]) => {
+    const unchecked = data.filter((s: any) =>
+      !s.session && s.distributor?.staffId && s.psGpsAvailable === null
+    );
+    if (unchecked.length === 0) return;
+    try {
+      const res = await fetch('/api/schedules/check-ps-gps', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleIds: unchecked.map((s: any) => s.id) }),
+      });
+      if (res.ok) {
+        const { results } = await res.json();
+        setSchedules(prev => prev.map(s => {
+          const r = results[s.id];
+          return r ? { ...s, psGpsAvailable: r.available, psGpsLastTime: r.lastTime } : s;
+        }));
+      }
+    } catch { /* silent */ }
   };
 
   useRefreshOnFocus(() => { if (filterDate) fetchSchedules(filterDate); });
@@ -1239,9 +1266,10 @@ export default function ScheduleListPage() {
                         {(() => {
                           const hasSession = !!s.session;
                           const hasStaffId = !!s.distributor?.staffId;
-                          const isDistributing = s.status === 'DISTRIBUTING' || (s.status === 'IN_PROGRESS' && !hasSession && hasStaffId);
+                          const hasPsGps = s.psGpsAvailable === true;
+                          const isDistributing = s.status === 'DISTRIBUTING' || (!hasSession && hasPsGps && s.status !== 'COMPLETED');
                           const isCompleted = s.status === 'COMPLETED';
-                          const canClick = hasSession || hasStaffId;
+                          const canClick = hasSession || hasPsGps || hasStaffId;
                           return (
                             <button
                               onClick={() => canClick && setTrajectoryScheduleId(s.id)}
