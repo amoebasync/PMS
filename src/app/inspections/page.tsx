@@ -14,18 +14,18 @@ type InspectionCategory = 'CHECK' | 'GUIDANCE';
 
 interface Inspection {
   id: number;
-  date: string;
+  inspectedAt: string;
   status: InspectionStatus;
   category: InspectionCategory;
   confirmationRate: number | null;
   complianceRate: number | null;
+  distributor: {
+    id: number;
+    name: string;
+    staffId: string;
+  } | null;
   schedule: {
     id: number;
-    distributor: {
-      id: number;
-      name: string;
-      staffId: string;
-    } | null;
     area: {
       chome_name: string;
       town_name: string;
