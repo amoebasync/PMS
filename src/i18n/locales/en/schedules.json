@@ -211,6 +211,8 @@
   "orphan_count": "unlinked session(s)",
   "orphan_link_btn": "Link",
   "orphan_link_success": "Session linked to schedule successfully",
+  "orphan_area_analyzing": "Analyzing area...",
+  "orphan_area_recommended": "Recommended",
 
   "relay_duplicate_warning": "This schedule already has {{count}} {{type}} task(s). Add another?",
   "relay_duplicate_confirm": "Add Anyway",

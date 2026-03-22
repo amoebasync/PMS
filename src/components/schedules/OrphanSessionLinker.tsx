@@ -25,6 +25,18 @@ interface Schedule {
   session: { id: number } | null;
 }
 
+interface AreaMatchResult {
+  scheduleId: number;
+  areaName: string;
+  matchedPoints: number;
+  matchRate: number;
+}
+
+interface AreaMatchData {
+  totalPoints: number;
+  matches: AreaMatchResult[];
+}
+
 interface OrphanSessionLinkerProps {
   date: string;
   schedules: Schedule[];
@@ -42,8 +54,11 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Area match state
+  const [areaMatch, setAreaMatch] = useState<AreaMatchData | null>(null);
+  const [areaMatchLoading, setAreaMatchLoading] = useState(false);
+
   // 紐付け可能なスケジュール（セッション未紐付け）
-  // 選択セッションの配布員名と一致→部分一致→それ以外の順でソート
   const selectedOrphan = orphans.find(o => o.id === selectedSession);
   const linkableSchedules = schedules
     .filter(s => !s.session && s.status !== 'COMPLETED')
@@ -52,10 +67,26 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
       const name = selectedOrphan.distributorName.toLowerCase();
       const aName = (a.distributor?.name || '').toLowerCase();
       const bName = (b.distributor?.name || '').toLowerCase();
+
+      // First priority: distributor name match
       const aExact = aName === name ? 2 : aName.includes(name) || name.includes(aName) ? 1 : 0;
       const bExact = bName === name ? 2 : bName.includes(name) || name.includes(bName) ? 1 : 0;
-      return bExact - aExact;
+      if (bExact !== aExact) return bExact - aExact;
+
+      // Second priority: area match rate (within same distributor match tier)
+      if (areaMatch) {
+        const aRate = areaMatch.matches.find(m => m.scheduleId === a.id)?.matchRate || 0;
+        const bRate = areaMatch.matches.find(m => m.scheduleId === b.id)?.matchRate || 0;
+        return bRate - aRate;
+      }
+
+      return 0;
     });
+
+  // Find the best match schedule ID
+  const bestMatchScheduleId = areaMatch && areaMatch.matches.length > 0 && areaMatch.matches[0].matchRate > 0
+    ? areaMatch.matches[0].scheduleId
+    : null;
 
   const fetchOrphans = useCallback(async () => {
     setLoading(true);
@@ -69,6 +100,44 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
   }, [date]);
 
   useEffect(() => { fetchOrphans(); }, [fetchOrphans]);
+
+  // Fetch area match data when session is selected and there are GPS-enabled linkable schedules
+  useEffect(() => {
+    if (!selectedSession) {
+      setAreaMatch(null);
+      return;
+    }
+
+    const orphan = orphans.find(o => o.id === selectedSession);
+    if (!orphan?.hasGpsData) {
+      setAreaMatch(null);
+      return;
+    }
+
+    const candidateSchedules = schedules.filter(s => !s.session && s.status !== 'COMPLETED');
+    if (candidateSchedules.length === 0) {
+      setAreaMatch(null);
+      return;
+    }
+
+    const scheduleIds = candidateSchedules.map(s => s.id).join(',');
+
+    let cancelled = false;
+    setAreaMatchLoading(true);
+    fetch(`/api/sessions/${selectedSession}/area-match?scheduleIds=${scheduleIds}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!cancelled && data) {
+          setAreaMatch(data);
+        }
+      })
+      .catch(() => { /* silent */ })
+      .finally(() => {
+        if (!cancelled) setAreaMatchLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedSession, orphans, schedules]);
 
   const handleLink = async () => {
     if (!selectedSession || !selectedSchedule) return;
@@ -84,6 +153,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
         setSuccess(t('orphan_link_success'));
         setSelectedSession(null);
         setSelectedSchedule(null);
+        setAreaMatch(null);
         await fetchOrphans();
         onLinked();
       } else {
@@ -118,6 +188,21 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
     const chome = s.area?.chome_name || s.area?.town_name || '';
     if (!pref && !city && !chome) return '-';
     return `${pref}${city}${chome}`;
+  };
+
+  const getMatchRate = (scheduleId: number): number | null => {
+    if (!areaMatch) return null;
+    const match = areaMatch.matches.find(m => m.scheduleId === scheduleId);
+    return match ? match.matchRate : null;
+  };
+
+  const formatMatchRate = (rate: number) => `${Math.round(rate * 100)}%`;
+
+  const getMatchRateColor = (rate: number) => {
+    if (rate >= 0.6) return 'text-emerald-600 bg-emerald-50 border-emerald-200';
+    if (rate >= 0.3) return 'text-amber-600 bg-amber-50 border-amber-200';
+    if (rate > 0) return 'text-slate-500 bg-slate-50 border-slate-200';
+    return 'text-slate-400 bg-slate-50 border-slate-200';
   };
 
   return (
@@ -176,7 +261,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
                       type="radio"
                       name="orphanSession"
                       checked={selectedSession === s.id}
-                      onChange={() => setSelectedSession(s.id)}
+                      onChange={() => { setSelectedSession(s.id); setSelectedSchedule(null); }}
                       className="accent-amber-500"
                     />
                     <div className="flex-1 min-w-0">
@@ -210,6 +295,12 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
               <h4 className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
                 <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-black">2</span>
                 {t('orphan_step2')}
+                {areaMatchLoading && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-[10px] text-indigo-500 font-normal">
+                    <div className="w-3 h-3 border-2 border-indigo-200 border-t-indigo-500 rounded-full animate-spin"></div>
+                    {t('orphan_area_analyzing')}
+                  </span>
+                )}
               </h4>
               {linkableSchedules.length === 0 ? (
                 <div className="text-center py-4 text-slate-400 text-xs">
@@ -217,40 +308,64 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  {linkableSchedules.map((s) => (
-                    <label
-                      key={s.id}
-                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
-                        selectedSchedule === s.id
-                          ? 'border-indigo-400 bg-indigo-50 shadow-sm'
-                          : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="targetSchedule"
-                        checked={selectedSchedule === s.id}
-                        onChange={() => setSelectedSchedule(s.id)}
-                        className="accent-indigo-500"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-bold text-slate-800 truncate">
-                            {s.distributor?.name || t('unassigned')}
-                          </span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                            s.status === 'UNSTARTED' ? 'bg-slate-100 text-slate-600' :
-                            s.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-                          }`}>
-                            {t(`status_${s.status.toLowerCase()}`)}
-                          </span>
+                  {linkableSchedules.map((s) => {
+                    const matchRate = getMatchRate(s.id);
+                    const isBestMatch = bestMatchScheduleId === s.id;
+                    return (
+                      <label
+                        key={s.id}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
+                          selectedSchedule === s.id
+                            ? 'border-indigo-400 bg-indigo-50 shadow-sm'
+                            : isBestMatch
+                              ? 'border-emerald-300 bg-emerald-50/50 hover:border-emerald-400'
+                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="targetSchedule"
+                          checked={selectedSchedule === s.id}
+                          onChange={() => setSelectedSchedule(s.id)}
+                          className="accent-indigo-500"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-slate-800 truncate">
+                              {s.distributor?.name || t('unassigned')}
+                            </span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                              s.status === 'UNSTARTED' ? 'bg-slate-100 text-slate-600' :
+                              s.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {t(`status_${s.status.toLowerCase()}`)}
+                            </span>
+                            {isBestMatch && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-0.5">
+                                <i className="bi bi-stars"></i>
+                                {t('orphan_area_recommended')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[11px] text-slate-500 truncate">
+                              <i className="bi bi-geo-alt mr-1"></i>{formatAreaName(s)}
+                            </span>
+                            {matchRate !== null && matchRate > 0 && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded border font-bold whitespace-nowrap ${getMatchRateColor(matchRate)}`}>
+                                <i className="bi bi-crosshair mr-0.5"></i>{formatMatchRate(matchRate)}
+                              </span>
+                            )}
+                            {matchRate !== null && matchRate === 0 && areaMatch && areaMatch.totalPoints > 0 && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded border border-slate-200 bg-slate-50 text-slate-400 font-bold whitespace-nowrap">
+                                <i className="bi bi-crosshair mr-0.5"></i>0%
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-slate-500 mt-0.5 truncate">
-                          <i className="bi bi-geo-alt mr-1"></i>{formatAreaName(s)}
-                        </div>
-                      </div>
-                    </label>
-                  ))}
+                      </label>
+                    );
+                  })}
                 </div>
               )}
             </div>
