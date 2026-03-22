@@ -313,12 +313,16 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
       const psRes = await fetch(`/api/schedules/${scheduleId}/trajectory/posting-system`);
       if (psRes.ok) {
         const psJson = await psRes.json();
+        const isCompleted = psJson.schedule?.status === 'COMPLETED';
         // Wrap Posting System data into TrajectoryData shape
         const wrapped: TrajectoryData = {
           session: {
             id: 0,
             startedAt: psJson.gpsPoints.length > 0 ? psJson.gpsPoints[0].timestamp : new Date().toISOString(),
-            finishedAt: psJson.gpsPoints.length > 0 ? psJson.gpsPoints[psJson.gpsPoints.length - 1].timestamp : null,
+            // 配布完了時のみ finishedAt を設定（未完了は null → 現在地ピン表示）
+            finishedAt: isCompleted && psJson.gpsPoints.length > 0
+              ? psJson.gpsPoints[psJson.gpsPoints.length - 1].timestamp
+              : null,
             totalSteps: 0,
             totalDistance: 0,
             totalCalories: 0,
@@ -335,7 +339,8 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
         };
         setData(wrapped);
         setDataSource('posting-system');
-        setIsLive(false);
+        // 配布中なら20秒ポーリングで最新位置を更新
+        setIsLive(!isCompleted);
         return;
       }
 
@@ -352,16 +357,17 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
     fetchData();
   }, [fetchData]);
 
-  // Live polling for active sessions
+  // Live polling for active sessions (PMS: 15秒, Posting System: 20秒)
   useEffect(() => {
     if (!isLive) return;
+    const interval = dataSource === 'posting-system' ? 20000 : 15000;
     pollingRef.current = setInterval(() => {
       fetchData();
-    }, 15000);
+    }, interval);
     return () => {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [isLive, fetchData]);
+  }, [isLive, fetchData, dataSource]);
 
   // Tick every second for live duration display
   useEffect(() => {

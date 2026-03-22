@@ -1239,25 +1239,32 @@ export default function ScheduleListPage() {
                         {(() => {
                           const hasSession = !!s.session;
                           const hasStaffId = !!s.distributor?.staffId;
-                          const isActive = s.status === 'DISTRIBUTING' || s.status === 'COMPLETED';
-                          const canClick = isActive || (!hasSession && hasStaffId);
+                          const isDistributing = s.status === 'DISTRIBUTING';
+                          const isCompleted = s.status === 'COMPLETED';
+                          const canClick = hasSession || hasStaffId;
+                          // 配布中: PMS session or PS fallback
+                          const isActiveNoSession = !hasSession && hasStaffId && !isCompleted && s.status !== 'UNSTARTED';
                           return (
                             <button
                               onClick={() => canClick && setTrajectoryScheduleId(s.id)}
+                              disabled={!canClick}
                               className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                s.status === 'DISTRIBUTING' ? 'text-emerald-500 hover:bg-emerald-50 animate-pulse'
-                                : s.status === 'COMPLETED' ? 'text-blue-500 hover:bg-blue-50'
-                                : (!hasSession && hasStaffId) ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
-                                : 'text-slate-300 cursor-not-allowed'
+                                isDistributing ? 'bg-emerald-500 text-white shadow-sm animate-pulse'
+                                : isCompleted && hasSession ? 'bg-blue-500 text-white shadow-sm'
+                                : isCompleted && hasStaffId ? 'bg-blue-400 text-white shadow-sm'
+                                : isActiveNoSession ? 'bg-amber-400 text-white shadow-sm animate-pulse'
+                                : hasStaffId ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-slate-200'
+                                : 'text-slate-200 cursor-not-allowed'
                               }`}
                               title={
-                                s.status === 'DISTRIBUTING' ? t('gps_realtime')
-                                : s.status === 'COMPLETED' ? t('gps_trajectory')
-                                : (!hasSession && hasStaffId) ? t('gps_posting_system')
+                                isDistributing ? t('gps_realtime')
+                                : isCompleted ? t('gps_trajectory')
+                                : isActiveNoSession ? t('gps_posting_system')
+                                : hasStaffId ? t('gps_posting_system')
                                 : t('gps_not_started')
                               }
                             >
-                              <i className="bi bi-geo-alt-fill text-sm"></i>
+                              <i className={`bi ${isDistributing || isActiveNoSession ? 'bi-broadcast' : 'bi-geo-alt-fill'} text-sm`}></i>
                             </button>
                           );
                         })()}
