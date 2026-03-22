@@ -60,13 +60,14 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
   const fetchOrphans = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/sessions/orphans?date=${date}`);
+      // 全日付の未紐付けセッションを表示（日付フィルタなし）
+      const res = await fetch(`/api/sessions/orphans`);
       if (res.ok) {
         setOrphans(await res.json());
       }
     } catch { /* silent */ }
     setLoading(false);
-  }, [date]);
+  }, []);
 
   useEffect(() => { fetchOrphans(); }, [fetchOrphans]);
 
