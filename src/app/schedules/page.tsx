@@ -598,7 +598,13 @@ export default function ScheduleListPage() {
         const { results } = await res.json();
         setSchedules(prev => prev.map(s => {
           const r = results[s.id];
-          return r ? { ...s, psGpsAvailable: r.available, psGpsLastTime: r.lastTime } : s;
+          if (!r) return s;
+          const updated = { ...s, psGpsAvailable: r.available, psGpsLastTime: r.lastTime };
+          // PS GPS ありなら配布中ステータスに反映（フロントも同期）
+          if (r.available && (s.status === 'UNSTARTED' || s.status === 'IN_PROGRESS')) {
+            updated.status = 'DISTRIBUTING';
+          }
+          return updated;
         }));
       }
     } catch { /* silent */ }
@@ -975,10 +981,16 @@ export default function ScheduleListPage() {
           <div className="flex items-center gap-3 md:ml-auto flex-wrap">
             {/* Summary stats */}
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
-                <i className="bi bi-people-fill text-slate-500"></i>
-                {t('summary_workers')}: {new Set(filteredSchedules.filter(s => s.distributorId).map(s => s.distributorId)).size}
-              </span>
+              {(() => {
+                const allDistIds = new Set(filteredSchedules.filter(s => s.distributorId).map(s => s.distributorId));
+                const activeDistIds = new Set(filteredSchedules.filter(s => s.distributorId && (s.status === 'DISTRIBUTING' || s.status === 'COMPLETED')).map(s => s.distributorId));
+                return (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
+                    <i className="bi bi-people-fill text-slate-500"></i>
+                    {t('summary_workers')}: <span className="text-emerald-600">{activeDistIds.size}</span>/{allDistIds.size}
+                  </span>
+                );
+              })()}
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
                 <i className="bi bi-file-earmark text-amber-500"></i>
                 {t('summary_main_count')}: {filteredSchedules.reduce((sum, s) => {

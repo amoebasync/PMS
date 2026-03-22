@@ -95,11 +95,19 @@ export async function POST(request: Request) {
             } catch { /* parse error */ }
           }
 
-          // DB キャッシュ更新
+          // DB キャッシュ更新 + GPSデータありなら配布中ステータスに変更
+          const updateData: any = { psGpsAvailable: available, psGpsLastTime: lastTime };
           await prisma.distributionSchedule.updateMany({
             where: { id: { in: entry.scheduleIds } },
-            data: { psGpsAvailable: available, psGpsLastTime: lastTime },
+            data: updateData,
           });
+          if (available) {
+            // UNSTARTED/IN_PROGRESS → DISTRIBUTING に変更（COMPLETEDは触らない）
+            await prisma.distributionSchedule.updateMany({
+              where: { id: { in: entry.scheduleIds }, status: { in: ['UNSTARTED', 'IN_PROGRESS'] } },
+              data: { status: 'DISTRIBUTING' },
+            });
+          }
 
           for (const sid of entry.scheduleIds) {
             results[sid] = { available, lastTime };
