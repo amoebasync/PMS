@@ -143,9 +143,9 @@ export default function InspectionDetailPage() {
       const data = await res.json();
       setInspection(data);
     } catch {
-      showToast(t('error_generic'), 'error');
+      // エラーハンドリングは useEffect 内で行う（無限ループ防止）
     }
-  }, [inspectionId, showToast, t]);
+  }, [inspectionId]);
 
   /* ---- Fetch map data ---- */
   const fetchMapData = useCallback(async () => {
@@ -160,12 +160,14 @@ export default function InspectionDetailPage() {
   }, [inspectionId]);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       setLoading(true);
       await Promise.all([fetchInspection(), fetchMapData()]);
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     };
     load();
+    return () => { cancelled = true; };
   }, [fetchInspection, fetchMapData]);
 
   /* ---- GPS tracking when IN_PROGRESS ---- */
