@@ -80,10 +80,10 @@ interface Employee {
 /* ------------------------------------------------------------------ */
 
 const STATUS_STYLE: Record<string, string> = {
-  PENDING: 'bg-slate-100 text-slate-700',
+  PENDING: 'bg-slate-100 text-slate-600',
   IN_PROGRESS: 'bg-amber-100 text-amber-700',
   COMPLETED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-rose-100 text-rose-700',
+  CANCELLED: 'bg-slate-100 text-slate-400 line-through',
 };
 
 const STATUS_ICON: Record<string, string> = {
@@ -256,7 +256,7 @@ export default function InspectionsPage() {
   const renderStatusBadge = (status: InspectionStatus) => {
     const statusKey = `status_${status.toLowerCase()}` as string;
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${STATUS_STYLE[status] || 'bg-gray-100 text-gray-600'}`}>
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-md ${STATUS_STYLE[status] || 'bg-gray-100 text-gray-600'}`}>
         <i className={`bi ${STATUS_ICON[status] || 'bi-circle'} text-[10px]`} />
         {t(statusKey)}
       </span>
@@ -267,7 +267,7 @@ export default function InspectionsPage() {
   const renderCategoryBadge = (category: InspectionCategory) => {
     const categoryKey = `category_${category.toLowerCase()}` as string;
     return (
-      <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full ${CATEGORY_STYLE[category] || 'bg-gray-100 text-gray-600'}`}>
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold rounded-md ${CATEGORY_STYLE[category] || 'bg-gray-100 text-gray-600'}`}>
         <i className={`bi ${CATEGORY_ICON[category] || 'bi-tag'} text-[10px]`} />
         {t(categoryKey)}
       </span>
@@ -276,10 +276,10 @@ export default function InspectionsPage() {
 
   /* ---- Rate display ---- */
   const renderRate = (rate: number | null) => {
-    if (rate === null || rate === undefined) return <span className="text-gray-400">-</span>;
+    if (rate === null || rate === undefined) return <span className="text-slate-400">-</span>;
     const pct = Math.round(rate * 100);
     const color = pct >= 90 ? 'text-emerald-600' : pct >= 70 ? 'text-amber-600' : 'text-rose-600';
-    return <span className={`font-semibold ${color}`}>{pct}%</span>;
+    return <span className={`font-bold ${color}`}>{pct}%</span>;
   };
 
   const stats = data?.stats || { total: 0, pending: 0, inProgress: 0, completed: 0 };
@@ -289,158 +289,159 @@ export default function InspectionsPage() {
   /* ================================================================ */
 
   return (
-    <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto">
-      {/* ---- Header ---- */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          {/* Date filter */}
-          <div className="flex items-center gap-2">
-            <i className="bi bi-calendar3 text-gray-400" />
-            <label className="text-sm text-gray-500 hidden sm:inline">{t('filter_date')}</label>
-            <input
-              type="date"
-              value={filterDate}
-              onChange={(e) => setFilterDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-            {filterDate && (
-              <button
-                onClick={() => setFilterDate('')}
-                className="text-gray-400 hover:text-gray-600 text-sm"
-                title={t('clear_date')}
-              >
-                <i className="bi bi-x-circle" />
-              </button>
-            )}
-          </div>
-          {/* Refresh */}
-          <button
-            onClick={fetchData}
-            disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 text-sm"
-          >
-            <i className={`bi bi-arrow-clockwise ${loading ? 'animate-spin' : ''}`} />
-            <span className="hidden sm:inline">{t('refresh')}</span>
-          </button>
+    <div className="space-y-4 max-w-7xl mx-auto">
+      {/* ---- Page header ---- */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <i className="bi bi-clipboard-check text-lg text-indigo-600" />
+          <h1 className="text-lg font-bold text-slate-800">{t('page_title')}</h1>
         </div>
-        {/* New assignment button */}
         <button
           onClick={() => setShowAssignModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+          className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1.5"
         >
           <i className="bi bi-plus-lg" />
           {t('btn_new_assign')}
         </button>
       </div>
 
-      {/* ---- Stats cards ---- */}
-      <div className="grid grid-cols-4 gap-2 md:gap-4">
-        <div className="bg-white rounded-lg border p-2.5 md:p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <i className="bi bi-list-check text-gray-400 text-sm" />
-          </div>
-          <div className="text-[10px] md:text-sm text-gray-500 truncate">{t('stats_total')}</div>
-          <div className="text-lg md:text-2xl font-bold text-gray-900">{stats.total}</div>
-        </div>
-        <div className="bg-white rounded-lg border p-2.5 md:p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <i className="bi bi-clock text-slate-400 text-sm" />
-          </div>
-          <div className="text-[10px] md:text-sm text-slate-500 truncate">{t('stats_pending')}</div>
-          <div className="text-lg md:text-2xl font-bold text-slate-600">{stats.pending}</div>
-        </div>
-        <div className="bg-white rounded-lg border p-2.5 md:p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <i className="bi bi-play-circle text-amber-400 text-sm" />
-          </div>
-          <div className="text-[10px] md:text-sm text-amber-500 truncate">{t('stats_in_progress')}</div>
-          <div className="text-lg md:text-2xl font-bold text-amber-600">{stats.inProgress}</div>
-        </div>
-        <div className="bg-white rounded-lg border p-2.5 md:p-4 text-center">
-          <div className="flex items-center justify-center gap-1.5 mb-1">
-            <i className="bi bi-check-circle-fill text-emerald-400 text-sm" />
-          </div>
-          <div className="text-[10px] md:text-sm text-emerald-500 truncate">{t('stats_completed')}</div>
-          <div className="text-lg md:text-2xl font-bold text-emerald-600">{stats.completed}</div>
-        </div>
+      {/* ---- Inline stat badges ---- */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
+          <i className="bi bi-list-check text-slate-500" />
+          {t('stats_total')}: {stats.total}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
+          <i className="bi bi-clock text-slate-500" />
+          {t('stats_pending')}: {stats.pending}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
+          <i className="bi bi-play-circle text-amber-500" />
+          {t('stats_in_progress')}: {stats.inProgress}
+        </span>
+        <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 rounded-lg text-xs font-bold text-emerald-700">
+          <i className="bi bi-check-circle-fill text-emerald-500" />
+          {t('stats_completed')}: {stats.completed}
+        </span>
       </div>
 
-      {/* ---- Filter tabs ---- */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        {/* Status tabs */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          {(['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((s) => {
-            const isActive = filterStatus === s;
-            const key = s === 'ALL' ? 'status_all' : `status_${s.toLowerCase()}`;
-            return (
+      {/* ---- Filter bar ---- */}
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:flex-wrap gap-3 md:gap-4 md:items-end">
+        {/* Date filter */}
+        <div>
+          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('filter_date')}</label>
+          <div className="flex items-center gap-1.5">
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="border border-slate-300 rounded-lg text-xs md:text-sm px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            />
+            {filterDate && (
               <button
-                key={s}
-                onClick={() => setFilterStatus(s)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  isActive ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                onClick={() => setFilterDate('')}
+                className="text-slate-400 hover:text-slate-600 text-sm"
+                title={t('clear_date')}
               >
-                {t(key)}
+                <i className="bi bi-x-circle" />
               </button>
-            );
-          })}
+            )}
+          </div>
         </div>
+
+        {/* Status tabs */}
+        <div>
+          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('col_status')}</label>
+          <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+            {(['ALL', 'PENDING', 'IN_PROGRESS', 'COMPLETED'] as const).map((s) => {
+              const isActive = filterStatus === s;
+              const key = s === 'ALL' ? 'status_all' : `status_${s.toLowerCase()}`;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                    isActive ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {t(key)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         {/* Category tabs */}
-        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
-          {(['ALL', 'CHECK', 'GUIDANCE'] as const).map((c) => {
-            const isActive = filterCategory === c;
-            const key = c === 'ALL' ? 'category_all' : `category_${c.toLowerCase()}`;
-            return (
-              <button
-                key={c}
-                onClick={() => setFilterCategory(c)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                  isActive ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                {t(key)}
-              </button>
-            );
-          })}
+        <div>
+          <label className="text-xs font-bold text-slate-500 mb-1 block">{t('col_category')}</label>
+          <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+            {(['ALL', 'CHECK', 'GUIDANCE'] as const).map((c) => {
+              const isActive = filterCategory === c;
+              const key = c === 'ALL' ? 'category_all' : `category_${c.toLowerCase()}`;
+              return (
+                <button
+                  key={c}
+                  onClick={() => setFilterCategory(c)}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                    isActive ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {t(key)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Refresh button */}
+        <div className="md:ml-auto">
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-bold text-slate-600 transition-colors"
+          >
+            <i className={`bi bi-arrow-clockwise ${loading ? 'animate-spin' : ''}`} />
+            {t('refresh')}
+          </button>
         </div>
       </div>
 
       {/* ---- Desktop table ---- */}
-      <div className="hidden md:block bg-white rounded-xl border shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table className="w-full text-left text-xs">
           <thead>
-            <tr className="border-b bg-gray-50">
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_distributor')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_area')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_date')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_inspector')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_status')}</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-500">{t('col_category')}</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">{t('col_confirmation_rate')}</th>
-              <th className="text-right px-4 py-3 font-medium text-gray-500">{t('col_compliance_rate')}</th>
+            <tr className="bg-slate-50">
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_distributor')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_area')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_date')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_inspector')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_status')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_category')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_confirmation_rate')}</th>
+              <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_compliance_rate')}</th>
             </tr>
           </thead>
-          <tbody className="divide-y">
+          <tbody className="divide-y divide-slate-100">
             {data?.data.map((inspection) => (
               <tr
                 key={inspection.id}
                 onClick={() => router.push(`/inspections/${inspection.id}`)}
-                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                className="hover:bg-indigo-50/30 cursor-pointer transition-colors"
               >
-                <td className="px-4 py-3">
-                  <div className="font-medium text-gray-900">
+                <td className="px-3 py-3">
+                  <div className="font-bold text-slate-800">
                     {inspection.schedule?.distributor?.name || t('unassigned')}
                   </div>
                   {inspection.schedule?.distributor?.staffId && (
-                    <div className="text-xs text-gray-400 font-mono">
+                    <div className="text-[10px] text-slate-400 font-mono mt-0.5">
                       {inspection.schedule.distributor.staffId}
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-700">
+                <td className="px-3 py-3 text-slate-600">
                   {inspection.schedule?.area ? formatArea(inspection.schedule.area) : '-'}
                 </td>
-                <td className="px-4 py-3 text-gray-700">
+                <td className="px-3 py-3 text-slate-600">
                   {new Date(inspection.date).toLocaleDateString('ja-JP', {
                     timeZone: 'Asia/Tokyo',
                     year: 'numeric',
@@ -448,15 +449,15 @@ export default function InspectionsPage() {
                     day: '2-digit',
                   })}
                 </td>
-                <td className="px-4 py-3 text-gray-700">
+                <td className="px-3 py-3 text-slate-600">
                   {inspection.inspector
                     ? `${inspection.inspector.lastNameJa} ${inspection.inspector.firstNameJa}`
                     : '-'}
                 </td>
-                <td className="px-4 py-3">{renderStatusBadge(inspection.status)}</td>
-                <td className="px-4 py-3">{renderCategoryBadge(inspection.category)}</td>
-                <td className="px-4 py-3 text-right">{renderRate(inspection.confirmationRate)}</td>
-                <td className="px-4 py-3 text-right">{renderRate(inspection.complianceRate)}</td>
+                <td className="px-3 py-3">{renderStatusBadge(inspection.status)}</td>
+                <td className="px-3 py-3">{renderCategoryBadge(inspection.category)}</td>
+                <td className="px-3 py-3 text-right">{renderRate(inspection.confirmationRate)}</td>
+                <td className="px-3 py-3 text-right">{renderRate(inspection.complianceRate)}</td>
               </tr>
             ))}
           </tbody>
@@ -464,34 +465,34 @@ export default function InspectionsPage() {
 
         {/* Empty state in table */}
         {data && data.data.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <i className="bi bi-clipboard-x text-4xl mb-3 block" />
-            <p>{t('no_inspections')}</p>
+          <div className="px-6 py-12 text-center text-slate-400">
+            <i className="bi bi-clipboard-x text-3xl block mb-2" />
+            <p className="text-sm">{t('no_inspections')}</p>
           </div>
         )}
       </div>
 
       {/* ---- Mobile card list ---- */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-2">
         {data?.data.map((inspection) => (
           <div
             key={inspection.id}
             onClick={() => router.push(`/inspections/${inspection.id}`)}
-            className="bg-white rounded-xl border shadow-sm p-4 active:bg-gray-50 cursor-pointer transition-colors"
+            className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 active:bg-indigo-50/30 cursor-pointer transition-colors"
           >
             {/* Top row: distributor + badges */}
-            <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-start justify-between gap-2 mb-1.5">
               <div className="min-w-0">
-                <div className="font-semibold text-gray-900 truncate">
+                <div className="font-bold text-slate-800 text-sm truncate">
                   {inspection.schedule?.distributor?.name || t('unassigned')}
                 </div>
                 {inspection.schedule?.distributor?.staffId && (
-                  <span className="text-xs text-gray-400 font-mono">
+                  <span className="text-[10px] text-slate-400 font-mono">
                     {inspection.schedule.distributor.staffId}
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
                 {renderCategoryBadge(inspection.category)}
                 {renderStatusBadge(inspection.status)}
               </div>
@@ -499,16 +500,16 @@ export default function InspectionsPage() {
 
             {/* Area */}
             {inspection.schedule?.area && (
-              <div className="flex items-center gap-1.5 text-sm text-gray-600 mb-1.5">
-                <i className="bi bi-geo-alt text-gray-400 text-xs" />
+              <div className="flex items-center gap-1.5 text-xs text-slate-600 mb-1">
+                <i className="bi bi-geo-alt text-slate-400 text-[10px]" />
                 <span className="truncate">{formatArea(inspection.schedule.area)}</span>
               </div>
             )}
 
             {/* Date + Inspector */}
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 mb-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-1.5">
               <span>
-                <i className="bi bi-calendar3 text-gray-400 mr-1" />
+                <i className="bi bi-calendar3 text-slate-400 mr-1" />
                 {new Date(inspection.date).toLocaleDateString('ja-JP', {
                   timeZone: 'Asia/Tokyo',
                   year: 'numeric',
@@ -517,7 +518,7 @@ export default function InspectionsPage() {
                 })}
               </span>
               <span>
-                <i className="bi bi-person text-gray-400 mr-1" />
+                <i className="bi bi-person text-slate-400 mr-1" />
                 {inspection.inspector
                   ? `${inspection.inspector.lastNameJa} ${inspection.inspector.firstNameJa}`
                   : '-'}
@@ -525,13 +526,13 @@ export default function InspectionsPage() {
             </div>
 
             {/* Rates */}
-            <div className="flex gap-4 text-xs">
+            <div className="flex gap-4 text-[11px]">
               <div>
-                <span className="text-gray-400">{t('col_confirmation_rate')}: </span>
+                <span className="text-slate-400">{t('col_confirmation_rate')}: </span>
                 {renderRate(inspection.confirmationRate)}
               </div>
               <div>
-                <span className="text-gray-400">{t('col_compliance_rate')}: </span>
+                <span className="text-slate-400">{t('col_compliance_rate')}: </span>
                 {renderRate(inspection.complianceRate)}
               </div>
             </div>
@@ -540,24 +541,24 @@ export default function InspectionsPage() {
 
         {/* Empty state mobile */}
         {data && data.data.length === 0 && (
-          <div className="text-center py-16 text-gray-400">
-            <i className="bi bi-clipboard-x text-4xl mb-3 block" />
-            <p>{t('no_inspections')}</p>
+          <div className="px-6 py-12 text-center text-slate-400">
+            <i className="bi bi-clipboard-x text-3xl block mb-2" />
+            <p className="text-sm">{t('no_inspections')}</p>
           </div>
         )}
       </div>
 
       {/* ---- Loading ---- */}
       {loading && !data && (
-        <div className="text-center py-16 text-gray-400">
-          <i className="bi bi-arrow-repeat animate-spin text-3xl mb-3 block" />
+        <div className="px-6 py-12 text-center text-slate-400">
+          <i className="bi bi-arrow-repeat animate-spin text-3xl block mb-2" />
         </div>
       )}
 
       {/* ---- Pagination ---- */}
       {data && data.totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white rounded-lg border px-4 py-3">
-          <div className="text-sm text-gray-500">
+        <div className="flex items-center justify-between bg-white rounded-xl shadow-sm border border-slate-200 px-4 py-3">
+          <div className="text-xs text-slate-500">
             {t('pagination_showing', {
               start: String((page - 1) * LIMIT + 1),
               end: String(Math.min(page * LIMIT, data.total)),
@@ -568,31 +569,31 @@ export default function InspectionsPage() {
             <button
               onClick={() => setPage(1)}
               disabled={page === 1}
-              className="px-2.5 py-1.5 text-sm border rounded-md disabled:opacity-30 hover:bg-gray-50 disabled:hover:bg-white transition-colors"
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md disabled:opacity-30 hover:bg-slate-50 disabled:hover:bg-white transition-colors text-slate-600"
             >
               <i className="bi bi-chevron-double-left" />
             </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-2.5 py-1.5 text-sm border rounded-md disabled:opacity-30 hover:bg-gray-50 disabled:hover:bg-white transition-colors"
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md disabled:opacity-30 hover:bg-slate-50 disabled:hover:bg-white transition-colors text-slate-600"
             >
               <i className="bi bi-chevron-left" />
             </button>
-            <span className="px-3 py-1.5 text-sm font-medium text-gray-700">
+            <span className="px-3 py-1.5 text-xs font-bold text-slate-700">
               {page} / {data.totalPages}
             </span>
             <button
               onClick={() => setPage((p) => Math.min(data.totalPages, p + 1))}
               disabled={page === data.totalPages}
-              className="px-2.5 py-1.5 text-sm border rounded-md disabled:opacity-30 hover:bg-gray-50 disabled:hover:bg-white transition-colors"
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md disabled:opacity-30 hover:bg-slate-50 disabled:hover:bg-white transition-colors text-slate-600"
             >
               <i className="bi bi-chevron-right" />
             </button>
             <button
               onClick={() => setPage(data.totalPages)}
               disabled={page === data.totalPages}
-              className="px-2.5 py-1.5 text-sm border rounded-md disabled:opacity-30 hover:bg-gray-50 disabled:hover:bg-white transition-colors"
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md disabled:opacity-30 hover:bg-slate-50 disabled:hover:bg-white transition-colors text-slate-600"
             >
               <i className="bi bi-chevron-double-right" />
             </button>
@@ -616,16 +617,16 @@ export default function InspectionsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal header */}
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">{t('assign_title')}</h2>
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
+              <h2 className="text-sm font-bold text-slate-800">{t('assign_title')}</h2>
               <button
                 onClick={() => {
                   setShowAssignModal(false);
                   resetAssignForm();
                 }}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
               >
-                <i className="bi bi-x-lg text-xl" />
+                <i className="bi bi-x-lg text-lg" />
               </button>
             </div>
 
@@ -633,32 +634,32 @@ export default function InspectionsPage() {
             <div className="p-4 space-y-4">
               {/* Date */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('assign_date')}</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('assign_date')}</label>
                 <input
                   type="date"
                   value={assignForm.date}
                   onChange={(e) => setAssignForm((f) => ({ ...f, date: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-slate-300 rounded-lg text-xs md:text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 />
               </div>
 
               {/* Schedule search */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('assign_schedule')}</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('assign_schedule')}</label>
                 {selectedSchedule ? (
-                  <div className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
                     <div>
-                      <div className="font-medium text-gray-900 text-sm">
+                      <div className="font-bold text-slate-800 text-xs">
                         {selectedSchedule.distributor?.name || t('unassigned')}
                         {selectedSchedule.distributor?.staffId && (
-                          <span className="text-xs text-gray-400 font-mono ml-1.5">
+                          <span className="text-[10px] text-slate-400 font-mono ml-1.5">
                             ({selectedSchedule.distributor.staffId})
                           </span>
                         )}
                       </div>
                       {selectedSchedule.area && (
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          <i className="bi bi-geo-alt text-gray-400 mr-1" />
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          <i className="bi bi-geo-alt text-slate-400 mr-1" />
                           {formatArea(selectedSchedule.area)}
                         </div>
                       )}
@@ -669,28 +670,31 @@ export default function InspectionsPage() {
                         setAssignForm((f) => ({ ...f, scheduleId: 0 }));
                         setScheduleSearch('');
                       }}
-                      className="text-gray-400 hover:text-gray-600"
+                      className="text-slate-400 hover:text-slate-600"
                     >
                       <i className="bi bi-x-lg" />
                     </button>
                   </div>
                 ) : (
                   <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                      <i className="bi bi-search text-slate-400 text-xs" />
+                    </div>
                     <input
                       type="text"
                       value={scheduleSearch}
                       onChange={(e) => setScheduleSearch(e.target.value)}
                       placeholder={t('assign_schedule_search')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg text-xs md:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                     />
                     {scheduleSearching && (
                       <div className="absolute right-3 top-2.5">
-                        <i className="bi bi-arrow-repeat animate-spin text-gray-400" />
+                        <i className="bi bi-arrow-repeat animate-spin text-slate-400" />
                       </div>
                     )}
                     {/* Search results dropdown */}
                     {scheduleResults.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {scheduleResults.map((s) => (
                           <button
                             key={s.id}
@@ -700,19 +704,19 @@ export default function InspectionsPage() {
                               setScheduleSearch('');
                               setScheduleResults([]);
                             }}
-                            className="w-full text-left px-3 py-2.5 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                            className="w-full text-left px-3 py-2.5 hover:bg-indigo-50/30 border-b border-slate-100 last:border-b-0 transition-colors"
                           >
-                            <div className="font-medium text-sm text-gray-900">
+                            <div className="font-bold text-xs text-slate-800">
                               {s.distributor?.name || t('unassigned')}
                               {s.distributor?.staffId && (
-                                <span className="text-xs text-gray-400 font-mono ml-1.5">
+                                <span className="text-[10px] text-slate-400 font-mono ml-1.5">
                                   ({s.distributor.staffId})
                                 </span>
                               )}
                             </div>
                             {s.area && (
-                              <div className="text-xs text-gray-500 mt-0.5">
-                                <i className="bi bi-geo-alt text-gray-400 mr-1" />
+                              <div className="text-[11px] text-slate-500 mt-0.5">
+                                <i className="bi bi-geo-alt text-slate-400 mr-1" />
                                 {formatArea(s.area)}
                               </div>
                             )}
@@ -721,7 +725,7 @@ export default function InspectionsPage() {
                       </div>
                     )}
                     {scheduleSearch.length >= 2 && !scheduleSearching && scheduleResults.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-sm text-gray-400 text-center">
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-3 text-xs text-slate-400 text-center">
                         {t('assign_no_results')}
                       </div>
                     )}
@@ -731,11 +735,11 @@ export default function InspectionsPage() {
 
               {/* Inspector */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('assign_inspector')}</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('assign_inspector')}</label>
                 <select
                   value={assignForm.inspectorId}
                   onChange={(e) => setAssignForm((f) => ({ ...f, inspectorId: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-slate-300 rounded-lg text-xs md:text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
                 >
                   <option value={0}>{t('assign_inspector')}</option>
                   {employees.map((emp) => (
@@ -749,7 +753,7 @@ export default function InspectionsPage() {
 
               {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">{t('assign_category')}</label>
+                <label className="text-xs font-bold text-slate-500 mb-1 block">{t('assign_category')}</label>
                 <div className="flex gap-2">
                   {(['CHECK', 'GUIDANCE'] as const).map((c) => {
                     const isActive = assignForm.category === c;
@@ -757,12 +761,12 @@ export default function InspectionsPage() {
                       <button
                         key={c}
                         onClick={() => setAssignForm((f) => ({ ...f, category: c }))}
-                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors ${
+                        className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-lg border text-xs font-bold transition-colors ${
                           isActive
                             ? c === 'CHECK'
                               ? 'bg-blue-50 border-blue-300 text-blue-700'
                               : 'bg-violet-50 border-violet-300 text-violet-700'
-                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            : 'bg-white border-slate-300 text-slate-500 hover:bg-slate-50'
                         }`}
                       >
                         <i className={`bi ${CATEGORY_ICON[c]}`} />
@@ -775,20 +779,20 @@ export default function InspectionsPage() {
             </div>
 
             {/* Modal footer */}
-            <div className="flex justify-end gap-2 p-4 border-t">
+            <div className="flex justify-end gap-2 p-4 border-t border-slate-200">
               <button
                 onClick={() => {
                   setShowAssignModal(false);
                   resetAssignForm();
                 }}
-                className="px-4 py-2 text-sm text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-2 text-xs font-bold text-slate-600 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
               >
                 {t('btn_cancel')}
               </button>
               <button
                 onClick={handleAssign}
                 disabled={assigning || !assignForm.scheduleId || !assignForm.inspectorId || !assignForm.date}
-                className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {assigning && <i className="bi bi-arrow-repeat animate-spin" />}
                 {t('assign_submit')}
