@@ -748,7 +748,7 @@ export default function ScheduleListPage() {
     setInspectionDate(getTodayStr());
     if (inspectionEmployees.length === 0) {
       try {
-        const res = await fetch('/api/employees?limit=100&active=true');
+        const res = await fetch('/api/employees?simple=true');
         if (res.ok) {
           const data = await res.json();
           setInspectionEmployees(data.data || data || []);
