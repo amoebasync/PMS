@@ -539,9 +539,36 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     return { type: 'FeatureCollection' as const, features };
   }, [dwellSpots]);
 
-  // Road-based coverage analysis
-  // Mapboxの道路レイヤーからレンダリング済みの道路セグメントを取得し、
-  // GPS軌跡がカバーしている道路の割合を算出する
+  // Point-in-polygon判定（ray casting algorithm）
+  const pointInPolygon = useCallback((lng: number, lat: number, polygon: number[][]) => {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i][0], yi = polygon[i][1];
+      const xj = polygon[j][0], yj = polygon[j][1];
+      if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) {
+        inside = !inside;
+      }
+    }
+    return inside;
+  }, []);
+
+  // エリアポリゴン内かどうか判定
+  const isInsideArea = useCallback((lng: number, lat: number) => {
+    if (!areaGeoJson) return true; // ポリゴンがなければ全域対象
+    for (const feature of areaGeoJson.features) {
+      const geom = feature.geometry as any;
+      if (geom.type === 'Polygon') {
+        if (pointInPolygon(lng, lat, geom.coordinates[0])) return true;
+      } else if (geom.type === 'MultiPolygon') {
+        for (const poly of geom.coordinates) {
+          if (pointInPolygon(lng, lat, poly[0])) return true;
+        }
+      }
+    }
+    return false;
+  }, [areaGeoJson, pointInPolygon]);
+
+  // Road-based coverage analysis（配布エリアポリゴン内の道路のみ対象）
   const [coverageGeoJson, setCoverageGeoJson] = useState<any>(null);
 
   useEffect(() => {
@@ -570,7 +597,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     }
 
     if (roadFeatures.length === 0) {
-      // フォールバック: 道路レイヤーが取得できない場合、全道路名レイヤーを試す
       const allLayers = map.getStyle()?.layers?.map((l: any) => l.id) || [];
       const roadish = allLayers.filter((id: string) => /road|street|path|pedestrian|track/i.test(id));
       if (roadish.length > 0) {
@@ -590,13 +616,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         }
       }
 
-      // 道路ポイントを間引き（重複排除）
+      // 道路ポイントを間引き（重複排除）+ エリアポリゴン内のみフィルタ
       const seen = new Set<string>();
       const uniqueRoadPoints = roadPoints.filter(p => {
         const key = `${(p[0] * 10000).toFixed(0)},${(p[1] * 10000).toFixed(0)}`;
         if (seen.has(key)) return false;
         seen.add(key);
-        return true;
+        // 配布エリアポリゴン内のポイントのみ対象
+        return isInsideArea(p[0], p[1]);
       });
 
       // 各道路ポイントがGPS軌跡でカバーされているか判定
@@ -607,7 +634,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
           Math.abs(gp.lng - rp[0]) < PROXIMITY && Math.abs(gp.lat - rp[1]) < PROXIMITY
         );
         if (hasCoverage) coveredCount++;
-        // 未カバーの道路ポイントのみ表示（赤い点）
         if (!hasCoverage) {
           features.push({
             type: 'Feature' as const,
@@ -620,11 +646,10 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       setCoverageRate(rate);
       setCoverageGeoJson({ type: 'FeatureCollection' as const, features });
     } else {
-      // 道路データが取得できない場合はカバレッジ不明
       setCoverageRate(null);
       setCoverageGeoJson(null);
     }
-  }, [showCoverage, data]);
+  }, [showCoverage, data, isInsideArea]);
 
   // Route suggestion handler
   const generateSuggestedRoute = useCallback(async () => {
