@@ -256,6 +256,7 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
   const [data, setData] = useState<TrajectoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [dataSource, setDataSource] = useState<'pms' | 'posting-system'>('pms');
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
@@ -296,18 +297,50 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
     };
   }, [dwellSpots]);
 
-  // Fetch trajectory data
+  // Fetch trajectory data (PMS session first, then fallback to Posting System)
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch(`/api/schedules/${scheduleId}/trajectory`);
-      if (!res.ok) {
-        const err = await res.json();
-        setError(err.error || 'データの取得に失敗しました');
+      if (res.ok) {
+        const json = await res.json();
+        setData(json);
+        setDataSource('pms');
+        setIsLive(json.session.finishedAt === null);
         return;
       }
-      const json = await res.json();
-      setData(json);
-      setIsLive(json.session.finishedAt === null);
+
+      // PMS session not available — try Posting System fallback
+      const psRes = await fetch(`/api/schedules/${scheduleId}/trajectory/posting-system`);
+      if (psRes.ok) {
+        const psJson = await psRes.json();
+        // Wrap Posting System data into TrajectoryData shape
+        const wrapped: TrajectoryData = {
+          session: {
+            id: 0,
+            startedAt: psJson.gpsPoints.length > 0 ? psJson.gpsPoints[0].timestamp : new Date().toISOString(),
+            finishedAt: psJson.gpsPoints.length > 0 ? psJson.gpsPoints[psJson.gpsPoints.length - 1].timestamp : null,
+            totalSteps: 0,
+            totalDistance: 0,
+            totalCalories: 0,
+            incompleteReason: null,
+            incompleteNote: null,
+          },
+          gpsPoints: psJson.gpsPoints,
+          progressEvents: [],
+          skipEvents: [],
+          pauseEvents: [],
+          area: psJson.area,
+          prohibitedProperties: psJson.prohibitedProperties || [],
+          schedule: psJson.schedule,
+        };
+        setData(wrapped);
+        setDataSource('posting-system');
+        setIsLive(false);
+        return;
+      }
+
+      const err = await psRes.json().catch(() => ({}));
+      setError(err.error || 'データの取得に失敗しました');
     } catch {
       setError('データの取得に失敗しました');
     } finally {
@@ -474,35 +507,50 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                   LIVE
                 </span>
               )}
+              {dataSource === 'posting-system' && (
+                <span className="ml-2 inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold">
+                  <i className="bi bi-cloud-arrow-down"></i>
+                  Posting System GPS
+                </span>
+              )}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1 md:gap-2 shrink-0">
-          {/* View mode toggle */}
-          <div className="flex bg-slate-100 rounded-lg p-0.5">
-            <button
-              onClick={() => { setViewMode('trajectory'); setSelectedDwellSpot(null); }}
-              className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
-                viewMode === 'trajectory'
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <i className="bi bi-bezier2 mr-1"></i>
-              <span className="hidden md:inline">軌跡</span>
-            </button>
-            <button
-              onClick={() => { setViewMode('dwell'); setSelectedDwellSpot(null); setIsPlaying(false); }}
-              className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
-                viewMode === 'dwell'
-                  ? 'bg-white text-orange-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              <i className="bi bi-clock-fill mr-1"></i>
-              <span className="hidden md:inline">滞在時間</span>
-            </button>
-          </div>
+          {/* View mode toggle — hide dwell mode for Posting System data */}
+          {dataSource === 'pms' ? (
+            <div className="flex bg-slate-100 rounded-lg p-0.5">
+              <button
+                onClick={() => { setViewMode('trajectory'); setSelectedDwellSpot(null); }}
+                className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                  viewMode === 'trajectory'
+                    ? 'bg-white text-indigo-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <i className="bi bi-bezier2 mr-1"></i>
+                <span className="hidden md:inline">軌跡</span>
+              </button>
+              <button
+                onClick={() => { setViewMode('dwell'); setSelectedDwellSpot(null); setIsPlaying(false); }}
+                className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                  viewMode === 'dwell'
+                    ? 'bg-white text-orange-600 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <i className="bi bi-clock-fill mr-1"></i>
+                <span className="hidden md:inline">滞在時間</span>
+              </button>
+            </div>
+          ) : (
+            <div className="flex bg-slate-100 rounded-lg p-0.5">
+              <div className="px-2 md:px-3 py-1 rounded-md text-xs font-bold bg-white text-indigo-600 shadow-sm">
+                <i className="bi bi-bezier2 mr-1"></i>
+                <span className="hidden md:inline">軌跡</span>
+              </div>
+            </div>
+          )}
           <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
             <i className="bi bi-arrow-clockwise"></i>
           </button>
@@ -821,64 +869,78 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
         `}>
           {viewMode === 'trajectory' ? (
             <>
-              {/* Stats */}
-              <div className="p-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-700 text-sm mb-3">
-                  <i className="bi bi-speedometer2 mr-1"></i>
-                  パフォーマンス
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="bg-blue-50 rounded-lg p-2 text-center">
-                    <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
-                    <div className="text-blue-400">km</div>
-                  </div>
-                  <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                    <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
-                    <div className="text-emerald-400">歩</div>
-                  </div>
-                  <div className="bg-orange-50 rounded-lg p-2 text-center">
-                    <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
-                    <div className="text-orange-400">kcal</div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-2 text-center">
-                    <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
-                    <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
+              {/* Posting System data source notice */}
+              {dataSource === 'posting-system' && (
+                <div className="p-4 border-b border-slate-100">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <i className="bi bi-info-circle mr-1"></i>
+                    PMS GPS セッションなし。Posting System の GPS データを表示中。
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Per-hour metrics */}
-              <div className="p-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-700 text-sm mb-3">
-                  <i className="bi bi-graph-up mr-1"></i>
-                  時間あたり
-                </h3>
-                {totalPausedMs > 0 && (
-                  <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
-                    * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
-                  </div>
-                )}
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">配布ペース</span>
-                    <span className="font-bold text-slate-700">
-                      {durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} ポスト/h
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">歩数</span>
-                    <span className="font-bold text-slate-700">
-                      {durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-slate-500">移動距離</span>
-                    <span className="font-bold text-slate-700">
-                      {durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
-                    </span>
+              {/* Stats — PMS session only */}
+              {dataSource === 'pms' && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-speedometer2 mr-1"></i>
+                    パフォーマンス
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-blue-50 rounded-lg p-2 text-center">
+                      <div className="text-blue-600 font-black text-lg">{(data.session.totalDistance / 1000).toFixed(1)}</div>
+                      <div className="text-blue-400">km</div>
+                    </div>
+                    <div className="bg-emerald-50 rounded-lg p-2 text-center">
+                      <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
+                      <div className="text-emerald-400">歩</div>
+                    </div>
+                    <div className="bg-orange-50 rounded-lg p-2 text-center">
+                      <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
+                      <div className="text-orange-400">kcal</div>
+                    </div>
+                    <div className="bg-purple-50 rounded-lg p-2 text-center">
+                      <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
+                      <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Per-hour metrics — PMS session only */}
+              {dataSource === 'pms' && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-graph-up mr-1"></i>
+                    時間あたり
+                  </h3>
+                  {totalPausedMs > 0 && (
+                    <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
+                      * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
+                    </div>
+                  )}
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">配布ペース</span>
+                      <span className="font-bold text-slate-700">
+                        {durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} ポスト/h
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">歩数</span>
+                      <span className="font-bold text-slate-700">
+                        {durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">移動距離</span>
+                      <span className="font-bold text-slate-700">
+                        {durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Distribution items */}
               <div className="p-4 border-b border-slate-100">
@@ -905,75 +967,105 @@ export default function TrajectoryViewer({ scheduleId, onClose }: Props) {
                 )}
               </div>
 
-              {/* Progress timeline */}
-              <div className="p-4 border-b border-slate-100">
-                <h3 className="font-bold text-slate-700 text-sm mb-3">
-                  <i className="bi bi-clock-history mr-1"></i>
-                  配布進捗
-                </h3>
-                <div className="space-y-1 text-xs">
-                  {[
-                    { time: data.session.startedAt, type: 'START' as const },
-                    ...data.progressEvents.map((e) => ({ time: e.timestamp, type: 'PROGRESS' as const, mailboxCount: e.mailboxCount })),
-                    ...data.skipEvents.map((e) => ({ time: e.timestamp, type: 'SKIP' as const })),
-                    ...(data.pauseEvents || []).flatMap((e) => [
-                      { time: e.pausedAt, type: 'PAUSE' as const },
-                      ...(e.resumedAt ? [{ time: e.resumedAt, type: 'RESUME' as const }] : []),
-                    ]),
-                    ...(data.session.finishedAt ? [{ time: data.session.finishedAt, type: 'FINISH' as const }] : []),
-                  ]
-                    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
-                    .map((item, idx) => {
-                      if (item.type === 'START') return (
-                        <div key={`start-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-emerald-600">START</span>
-                        </div>
-                      );
-                      if (item.type === 'PROGRESS') return (
-                        <div key={`p-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-blue-600">{'mailboxCount' in item ? item.mailboxCount : 0}枚</span>
-                        </div>
-                      );
-                      if (item.type === 'SKIP') return (
-                        <div key={`s-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-orange-600">SKIP</span>
-                        </div>
-                      );
-                      if (item.type === 'PAUSE') return (
-                        <div key={`pause-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-yellow-600">PAUSE</span>
-                        </div>
-                      );
-                      if (item.type === 'RESUME') return (
-                        <div key={`resume-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-teal-400 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-teal-600">RESUME</span>
-                        </div>
-                      );
-                      return (
-                        <div key={`finish-${idx}`} className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
-                          <span className="text-slate-500">{fmtTime(item.time)}</span>
-                          <span className="font-bold text-red-600">FINISH</span>
-                        </div>
-                      );
-                    })}
-                  {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
-                    <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
-                      現在一時停止中
-                    </div>
-                  )}
+              {/* Progress timeline — PMS session only */}
+              {dataSource === 'pms' && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-clock-history mr-1"></i>
+                    配布進捗
+                  </h3>
+                  <div className="space-y-1 text-xs">
+                    {[
+                      { time: data.session.startedAt, type: 'START' as const },
+                      ...data.progressEvents.map((e) => ({ time: e.timestamp, type: 'PROGRESS' as const, mailboxCount: e.mailboxCount })),
+                      ...data.skipEvents.map((e) => ({ time: e.timestamp, type: 'SKIP' as const })),
+                      ...(data.pauseEvents || []).flatMap((e) => [
+                        { time: e.pausedAt, type: 'PAUSE' as const },
+                        ...(e.resumedAt ? [{ time: e.resumedAt, type: 'RESUME' as const }] : []),
+                      ]),
+                      ...(data.session.finishedAt ? [{ time: data.session.finishedAt, type: 'FINISH' as const }] : []),
+                    ]
+                      .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
+                      .map((item, idx) => {
+                        if (item.type === 'START') return (
+                          <div key={`start-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-emerald-500 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-emerald-600">START</span>
+                          </div>
+                        );
+                        if (item.type === 'PROGRESS') return (
+                          <div key={`p-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-blue-400 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-blue-600">{'mailboxCount' in item ? item.mailboxCount : 0}枚</span>
+                          </div>
+                        );
+                        if (item.type === 'SKIP') return (
+                          <div key={`s-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-orange-400 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-orange-600">SKIP</span>
+                          </div>
+                        );
+                        if (item.type === 'PAUSE') return (
+                          <div key={`pause-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-yellow-600">PAUSE</span>
+                          </div>
+                        );
+                        if (item.type === 'RESUME') return (
+                          <div key={`resume-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-teal-400 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-teal-600">RESUME</span>
+                          </div>
+                        );
+                        return (
+                          <div key={`finish-${idx}`} className="flex items-center gap-2">
+                            <span className="w-2 h-2 bg-red-500 rounded-full shrink-0"></span>
+                            <span className="text-slate-500">{fmtTime(item.time)}</span>
+                            <span className="font-bold text-red-600">FINISH</span>
+                          </div>
+                        );
+                      })}
+                    {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
+                      <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
+                        現在一時停止中
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* GPS points summary — Posting System only */}
+              {dataSource === 'posting-system' && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-geo-alt mr-1"></i>
+                    GPS データ
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">GPS ポイント数</span>
+                      <span className="font-bold text-slate-700">{data.gpsPoints.length}</span>
+                    </div>
+                    {data.gpsPoints.length > 0 && (
+                      <>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">開始</span>
+                          <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[0].timestamp)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">終了</span>
+                          <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[data.gpsPoints.length - 1].timestamp)}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>

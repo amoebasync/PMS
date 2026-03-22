@@ -40,6 +40,7 @@
 
   "gps_realtime": "Show real-time trajectory",
   "gps_trajectory": "Show distribution trajectory",
+  "gps_posting_system": "Show Posting System GPS",
   "gps_not_started": "Session not started",
   "remarks_add": "Add remarks",
 

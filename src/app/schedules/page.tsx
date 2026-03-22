@@ -1211,17 +1211,31 @@ export default function ScheduleListPage() {
                     <td className="px-3 py-2.5 text-center" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-center gap-1">
                         {/* GPS */}
-                        <button
-                          onClick={() => (s.status === 'DISTRIBUTING' || s.status === 'COMPLETED') && setTrajectoryScheduleId(s.id)}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                            s.status === 'DISTRIBUTING' ? 'text-emerald-500 hover:bg-emerald-50 animate-pulse'
-                            : s.status === 'COMPLETED' ? 'text-blue-500 hover:bg-blue-50'
-                            : 'text-slate-300 cursor-not-allowed'
-                          }`}
-                          title={s.status === 'DISTRIBUTING' ? t('gps_realtime') : s.status === 'COMPLETED' ? t('gps_trajectory') : t('gps_not_started')}
-                        >
-                          <i className="bi bi-geo-alt-fill text-sm"></i>
-                        </button>
+                        {(() => {
+                          const hasSession = !!s.session;
+                          const hasStaffId = !!s.distributor?.staffId;
+                          const isActive = s.status === 'DISTRIBUTING' || s.status === 'COMPLETED';
+                          const canClick = isActive || (!hasSession && hasStaffId);
+                          return (
+                            <button
+                              onClick={() => canClick && setTrajectoryScheduleId(s.id)}
+                              className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
+                                s.status === 'DISTRIBUTING' ? 'text-emerald-500 hover:bg-emerald-50 animate-pulse'
+                                : s.status === 'COMPLETED' ? 'text-blue-500 hover:bg-blue-50'
+                                : (!hasSession && hasStaffId) ? 'text-slate-400 hover:bg-slate-100 hover:text-slate-600'
+                                : 'text-slate-300 cursor-not-allowed'
+                              }`}
+                              title={
+                                s.status === 'DISTRIBUTING' ? t('gps_realtime')
+                                : s.status === 'COMPLETED' ? t('gps_trajectory')
+                                : (!hasSession && hasStaffId) ? t('gps_posting_system')
+                                : t('gps_not_started')
+                              }
+                            >
+                              <i className="bi bi-geo-alt-fill text-sm"></i>
+                            </button>
+                          );
+                        })()}
 
                         {/* Inspection assign */}
                         {(s.status === 'COMPLETED' || s.status === 'DISTRIBUTING') && (

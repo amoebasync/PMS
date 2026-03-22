@@ -40,6 +40,7 @@
 
   "gps_realtime": "リアルタイム軌跡を表示",
   "gps_trajectory": "配布軌跡を表示",
+  "gps_posting_system": "Posting System GPS を表示",
   "gps_not_started": "セッション未開始",
   "remarks_add": "備考を追加",
 
