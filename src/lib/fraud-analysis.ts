@@ -12,7 +12,7 @@ import { notificationEmitter } from '@/lib/notification-emitter';
 const EARTH_RADIUS_M = 6371000;
 const DWELL_RADIUS_M = 30;       // 滞在スポットのクラスタ半径（メートル）
 const DWELL_MIN_MS = 30_000;     // 最低滞在時間（30秒）
-const OUT_OF_AREA_DWELL_THRESHOLD_MS = 10 * 60_000; // エリア外滞在の警告閾値（10分）
+export const OUT_OF_AREA_DWELL_THRESHOLD_MS = 10 * 60_000; // エリア外滞在の警告閾値（10分）
 
 // 各指標の重み（合計100）
 const WEIGHTS = {
@@ -29,7 +29,7 @@ const RISK_THRESHOLDS = { CRITICAL: 80, HIGH: 60, MEDIUM: 30 };
 
 // --- Geo ユーティリティ ---
 
-function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -39,7 +39,7 @@ function haversineM(lat1: number, lng1: number, lat2: number, lng2: number): num
 }
 
 /** GeoJSONからポリゴン配列を抽出（TrajectoryViewer.tsx と同一ロジック） */
-function extractPolygons(geojsonStr: string): Array<Array<{ lat: number; lng: number }>> {
+export function extractPolygons(geojsonStr: string): Array<Array<{ lat: number; lng: number }>> {
   if (!geojsonStr) return [];
   const trimmed = geojsonStr.trim();
   if (!trimmed.startsWith('{')) return [];
@@ -66,7 +66,7 @@ function extractPolygons(geojsonStr: string): Array<Array<{ lat: number; lng: nu
 }
 
 /** Ray-casting法によるPoint-in-Polygon判定 */
-function pointInPolygon(lat: number, lng: number, polygon: Array<{ lat: number; lng: number }>): boolean {
+export function pointInPolygon(lat: number, lng: number, polygon: Array<{ lat: number; lng: number }>): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const yi = polygon[i].lat, xi = polygon[i].lng;
@@ -79,13 +79,13 @@ function pointInPolygon(lat: number, lng: number, polygon: Array<{ lat: number; 
 }
 
 /** いずれかのポリゴン内に点があるか */
-function pointInAnyPolygon(lat: number, lng: number, polygons: Array<Array<{ lat: number; lng: number }>>): boolean {
+export function pointInAnyPolygon(lat: number, lng: number, polygons: Array<Array<{ lat: number; lng: number }>>): boolean {
   return polygons.some((poly) => pointInPolygon(lat, lng, poly));
 }
 
 // --- 滞在スポットクラスタリング ---
 
-interface DwellSpot {
+export interface DwellSpot {
   centerLat: number;
   centerLng: number;
   dwellMs: number;
@@ -93,7 +93,7 @@ interface DwellSpot {
   endTime: Date;
 }
 
-function clusterDwellSpots(points: Array<{ lat: number; lng: number; timestamp: Date }>): DwellSpot[] {
+export function clusterDwellSpots(points: Array<{ lat: number; lng: number; timestamp: Date }>): DwellSpot[] {
   if (points.length < 2) return [];
   const spots: DwellSpot[] = [];
   let clusterStart = 0;
@@ -204,12 +204,12 @@ async function getHistoricalStats(
   };
 }
 
-function mean(arr: number[]): number {
+export function mean(arr: number[]): number {
   if (arr.length === 0) return 0;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function stdDev(arr: number[]): number {
+export function stdDev(arr: number[]): number {
   if (arr.length < 2) return 0;
   const m = mean(arr);
   const variance = arr.reduce((sum, v) => sum + (v - m) ** 2, 0) / (arr.length - 1);

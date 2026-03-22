@@ -46,6 +46,7 @@ export function middleware(request: NextRequest) {
     path === '/api/cron/check-alert-definitions' ||
     path === '/api/cron/send-reminders' ||
     path === '/api/cron/send-attendance-check' ||
+    path === '/api/cron/analyze-ps-fraud' ||
     path === '/api/training-slots/available' ||
     path === '/api/training-booking' ||
     path === '/training-booking' ||

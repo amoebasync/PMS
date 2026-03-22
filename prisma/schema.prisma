@@ -3125,7 +3125,7 @@ model DistributionSession {
 // --- 不正検知分析結果 ---
 model FraudAnalysis {
   id                     Int               @id @default(autoincrement())
-  sessionId              Int               @unique @map("session_id")
+  sessionId              Int?              @unique @map("session_id")
   scheduleId             Int?              @map("schedule_id")
   distributorId          Int               @map("distributor_id")
 
@@ -3153,7 +3153,7 @@ model FraudAnalysis {
   createdAt              DateTime          @default(now()) @map("created_at")
   updatedAt              DateTime          @updatedAt @map("updated_at")
 
-  session                DistributionSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session                DistributionSession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
   distributor            FlyerDistributor    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
   schedule               DistributionSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
   reviewedBy             Employee?           @relation("FraudReviewer", fields: [reviewedById], references: [id])
