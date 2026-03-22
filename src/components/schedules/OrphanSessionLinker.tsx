@@ -61,7 +61,7 @@ export default function OrphanSessionLinker({ date, schedules, onClose, onLinked
   // 紐付け可能なスケジュール（セッション未紐付け）
   const selectedOrphan = orphans.find(o => o.id === selectedSession);
   const linkableSchedules = schedules
-    .filter(s => !s.session && s.status !== 'COMPLETED')
+    .filter(s => !s.session)
     .sort((a, b) => {
       if (!selectedOrphan) return 0;
       const name = selectedOrphan.distributorName.toLowerCase();
