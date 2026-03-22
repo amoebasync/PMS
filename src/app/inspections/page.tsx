@@ -422,11 +422,11 @@ export default function InspectionsPage() {
               >
                 <td className="px-3 py-3">
                   <div className="font-bold text-slate-800">
-                    {inspection.schedule?.distributor?.name || t('unassigned')}
+                    {inspection.distributor?.name || t('unassigned')}
                   </div>
-                  {inspection.schedule?.distributor?.staffId && (
+                  {inspection.distributor?.staffId && (
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      {inspection.schedule.distributor.staffId}
+                      {inspection.distributor.staffId}
                     </div>
                   )}
                 </td>
@@ -434,7 +434,7 @@ export default function InspectionsPage() {
                   {inspection.schedule?.area ? formatArea(inspection.schedule.area) : '-'}
                 </td>
                 <td className="px-3 py-3 text-slate-600">
-                  {new Date(inspection.date).toLocaleDateString('ja-JP', {
+                  {new Date(inspection.inspectedAt).toLocaleDateString('ja-JP', {
                     timeZone: 'Asia/Tokyo',
                     year: 'numeric',
                     month: '2-digit',
@@ -476,7 +476,7 @@ export default function InspectionsPage() {
             <div className="flex items-start justify-between gap-2 mb-1.5">
               <div className="min-w-0">
                 <div className="font-bold text-slate-800 text-sm truncate">
-                  {inspection.schedule?.distributor?.name || t('unassigned')}
+                  {inspection.distributor?.name || t('unassigned')}
                 </div>
                 {inspection.schedule?.distributor?.staffId && (
                   <span className="text-[10px] text-slate-400 font-mono">
@@ -502,7 +502,7 @@ export default function InspectionsPage() {
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500 mb-1.5">
               <span>
                 <i className="bi bi-calendar3 text-slate-400 mr-1" />
-                {new Date(inspection.date).toLocaleDateString('ja-JP', {
+                {new Date(inspection.inspectedAt).toLocaleDateString('ja-JP', {
                   timeZone: 'Asia/Tokyo',
                   year: 'numeric',
                   month: '2-digit',
