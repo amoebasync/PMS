@@ -478,9 +478,9 @@ export default function InspectionsPage() {
                 <div className="font-bold text-slate-800 text-sm truncate">
                   {inspection.distributor?.name || t('unassigned')}
                 </div>
-                {inspection.schedule?.distributor?.staffId && (
+                {inspection.distributor?.staffId && (
                   <span className="text-[10px] text-slate-400 font-mono">
-                    {inspection.schedule.distributor.staffId}
+                    {inspection.distributor.staffId}
                   </span>
                 )}
               </div>
