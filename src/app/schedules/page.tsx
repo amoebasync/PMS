@@ -1028,7 +1028,7 @@ export default function ScheduleListPage() {
       </div>
 
       {/* ===== Desktop table (redesigned compact) ===== */}
-      <div className="hidden md:flex flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-col relative">
+      <div className="hidden md:flex flex-1 bg-white border border-slate-200 rounded-xl shadow-sm overflow-visible flex-col relative">
         {isLoading && (
           <div className="absolute inset-0 bg-white/50 backdrop-blur-sm z-10 flex items-center justify-center">
             <div className="w-8 h-8 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
