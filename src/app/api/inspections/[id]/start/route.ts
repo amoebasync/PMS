@@ -19,8 +19,12 @@ export async function POST(
       return NextResponse.json({ error: '無効なIDです' }, { status: 400 });
     }
 
-    const body = await request.json();
-    const { latitude, longitude } = body;
+    let latitude: any = null, longitude: any = null;
+    try {
+      const body = await request.json();
+      latitude = body.latitude;
+      longitude = body.longitude;
+    } catch { /* bodyなしでもOK */ }
 
     const inspection = await prisma.fieldInspection.findUnique({
       where: { id: inspectionId },

@@ -246,12 +246,29 @@ export default function InspectionDetailPage() {
   const handleStart = async () => {
     setActionLoading(true);
     try {
-      const res = await fetch(`/api/inspections/${inspectionId}/start`, { method: 'POST' });
-      if (!res.ok) throw new Error();
+      // 現在位置を取得してstartリクエストに含める
+      let body: Record<string, any> = {};
+      try {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) =>
+          navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 })
+        );
+        body = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+      } catch { /* GPS取得失敗でもstartは可能 */ }
+
+      const res = await fetch(`/api/inspections/${inspectionId}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'start failed');
+      }
       showToast(t('success_started'), 'success');
       await fetchInspection();
-    } catch {
-      showToast(t('error_generic'), 'error');
+      startGpsTracking();
+    } catch (e: any) {
+      showToast(e.message || t('error_generic'), 'error');
     }
     setActionLoading(false);
   };
