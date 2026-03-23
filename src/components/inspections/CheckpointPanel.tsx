@@ -70,7 +70,9 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const { t } = useTranslation('inspections');
   const { showToast } = useNotification();
   const [sampleCount, setSampleCount] = useState(10);
+  const [sampleMode, setSampleMode] = useState<'trajectory' | 'area'>('trajectory');
   const [generating, setGenerating] = useState(false);
+  const [manualMode, setManualMode] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
   const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND' | 'UNABLE'>('CONFIRMED');
   const [recordNote, setRecordNote] = useState('');
@@ -84,7 +86,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const handleGenerate = async () => {
     setGenerating(true);
     try {
-      const res = await fetch(`/api/inspections/${inspectionId}/sample-points?count=${sampleCount}`);
+      const res = await fetch(`/api/inspections/${inspectionId}/sample-points?count=${sampleCount}&mode=${sampleMode}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       const points = (data.samplePoints || []).map((p: any) => ({
@@ -164,9 +166,29 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         </span>
       </div>
 
-      {/* Sample generation */}
+      {/* Sample generation + manual add */}
       {isActive && (
-        <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+        <div className="bg-slate-50 rounded-xl p-3 space-y-3">
+          {/* Mode toggle */}
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-slate-400 shrink-0">{t('sample_mode')}</span>
+            <div className="inline-flex bg-slate-200 rounded-lg p-0.5 flex-1">
+              <button
+                onClick={() => setSampleMode('trajectory')}
+                className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${sampleMode === 'trajectory' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+              >
+                {t('sample_mode_trajectory')}
+              </button>
+              <button
+                onClick={() => setSampleMode('area')}
+                className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${sampleMode === 'area' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+              >
+                {t('sample_mode_area')}
+              </button>
+            </div>
+          </div>
+
+          {/* Generate + count */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-bold text-slate-500 shrink-0">{t('sample_count')}</label>
             <input
@@ -190,6 +212,23 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
               {t('sample_generate')}
             </button>
           </div>
+
+          {/* Manual add */}
+          <button
+            onClick={() => {
+              if (currentPosition) {
+                const newPoint = { lat: currentPosition.lat, lng: currentPosition.lng, index: Date.now() };
+                onSamplePointsChange([...samplePoints, newPoint]);
+                showToast(t('success_checkpoint'), 'success');
+              } else {
+                showToast('GPS位置を取得できません', 'error');
+              }
+            }}
+            className="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-400 text-slate-500 hover:text-emerald-600 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
+          >
+            <i className="bi bi-plus-circle"></i>
+            {t('add_manual_checkpoint')}
+          </button>
         </div>
       )}
 

@@ -19,6 +19,7 @@ export async function GET(
     }
 
     const count = Math.min(50, Math.max(1, parseInt(request.nextUrl.searchParams.get('count') || '10')));
+    const mode = request.nextUrl.searchParams.get('mode') || 'trajectory'; // 'trajectory' or 'area'
 
     const inspection = await prisma.fieldInspection.findUnique({
       where: { id: inspectionId },
@@ -87,7 +88,78 @@ export async function GET(
       return NextResponse.json({ samplePoints: [], message: '配布員のGPSデータがありません' });
     }
 
-    // 速度を計算してフィルタ（低速=配布中の可能性が高いポイント）
+    // mode=area: エリアポリゴン全体からランダムサンプリング
+    if (mode === 'area') {
+      // エリアのバウンディングボックスを取得
+      const schedule = await prisma.distributionSchedule.findUnique({
+        where: { id: inspection.scheduleId },
+        select: { area: { select: { boundary_geojson: true } } },
+      });
+      const geojsonStr = schedule?.area?.boundary_geojson;
+      if (!geojsonStr) {
+        return NextResponse.json({ samplePoints: [], message: 'エリアポリゴンがありません' });
+      }
+
+      // GeoJSONからポリゴン座標を抽出
+      let polygons: number[][][] = [];
+      try {
+        const parsed = JSON.parse(geojsonStr);
+        const extractPolygons = (geom: any): void => {
+          if (!geom) return;
+          if (geom.type === 'FeatureCollection') geom.features.forEach((f: any) => extractPolygons(f.geometry || f));
+          else if (geom.type === 'Feature') extractPolygons(geom.geometry);
+          else if (geom.type === 'Polygon') polygons.push(geom.coordinates[0]);
+          else if (geom.type === 'MultiPolygon') geom.coordinates.forEach((p: any) => polygons.push(p[0]));
+        };
+        extractPolygons(parsed);
+      } catch { /* ignore parse error */ }
+
+      if (polygons.length === 0) {
+        return NextResponse.json({ samplePoints: [], message: 'ポリゴンの解析に失敗しました' });
+      }
+
+      // バウンディングボックス
+      const allCoords = polygons.flat();
+      const minLng = Math.min(...allCoords.map(c => c[0]));
+      const maxLng = Math.max(...allCoords.map(c => c[0]));
+      const minLat = Math.min(...allCoords.map(c => c[1]));
+      const maxLat = Math.max(...allCoords.map(c => c[1]));
+
+      // Point-in-polygon判定
+      const pointInPolygon = (lng: number, lat: number, poly: number[][]) => {
+        let inside = false;
+        for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+          const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+          if (((yi > lat) !== (yj > lat)) && (lng < (xj - xi) * (lat - yi) / (yj - yi) + xi)) inside = !inside;
+        }
+        return inside;
+      };
+
+      // ランダムにエリア内のポイントを生成
+      const samplePoints: Array<{ latitude: number; longitude: number; timestamp: Date; index: number }> = [];
+      let attempts = 0;
+      const maxAttempts = count * 100;
+      while (samplePoints.length < count && attempts < maxAttempts) {
+        attempts++;
+        const lng = minLng + Math.random() * (maxLng - minLng);
+        const lat = minLat + Math.random() * (maxLat - minLat);
+        const isInside = polygons.some(poly => pointInPolygon(lng, lat, poly));
+        if (!isInside) continue;
+        // 既存サンプルとの距離チェック（最低30m離す）
+        const tooClose = samplePoints.some(sp => {
+          const dlat = (sp.latitude - lat) * 111000;
+          const dlng = (sp.longitude - lng) * 111000 * Math.cos(lat * Math.PI / 180);
+          return Math.sqrt(dlat * dlat + dlng * dlng) < 30;
+        });
+        if (!tooClose) {
+          samplePoints.push({ latitude: lat, longitude: lng, timestamp: new Date(), index: samplePoints.length });
+        }
+      }
+
+      return NextResponse.json({ samplePoints, totalGpsPoints: gpsPoints.length, mode: 'area' });
+    }
+
+    // mode=trajectory: 軌跡上の低速ポイントからサンプリング（既存ロジック）
     // Haversine距離計算
     function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
       const R = 6371000; // メートル

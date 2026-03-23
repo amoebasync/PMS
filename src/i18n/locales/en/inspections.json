@@ -11,7 +11,7 @@
   "status_cancelled": "Cancelled",
   "category_all": "All",
   "category_check": "Check",
-  "category_guidance": "Guidance",
+  "category_guidance": "Training",
   "stats_total": "Total",
   "stats_pending": "Pending",
   "stats_in_progress": "In Progress",
@@ -48,7 +48,7 @@
   "map_inspector_trajectory": "Inspector Trajectory",
   "section_checkpoints": "Distribution Checkpoints",
   "section_prohibited": "Prohibited Property Checks",
-  "section_guidance": "Guidance Records",
+  "section_guidance": "Training Records",
   "section_summary": "Summary",
   "checkpoint_confirmed": "Confirmed",
   "checkpoint_not_found": "Not Found",
@@ -84,5 +84,23 @@
   "success_prohibited_check": "Prohibited property check recorded",
   "error_generic": "An error occurred",
   "clear_date": "Clear date",
-  "unassigned": "Unassigned"
+  "unassigned": "Unassigned",
+
+  "inspection_speed_very_slow": "Very Slow",
+  "inspection_speed_slow": "Slow",
+  "inspection_speed_normal": "Normal",
+  "inspection_speed_fast": "Fast",
+  "inspection_speed_very_fast": "Very Fast",
+  "inspection_no_mistakes": "No Issues",
+  "inspection_some_mistakes": "Some Issues",
+  "inspection_many_mistakes": "Many Issues",
+  "inspection_level_bad": "Poor",
+  "inspection_level_normal": "Normal",
+  "inspection_level_good": "Good",
+
+  "sample_mode": "Sample Mode",
+  "sample_mode_trajectory": "On Trajectory",
+  "sample_mode_area": "Entire Area",
+  "add_manual_checkpoint": "Add Manually",
+  "manual_checkpoint_instruction": "Tap a location on the map to add a checkpoint"
 }

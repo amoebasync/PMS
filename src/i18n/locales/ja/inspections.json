@@ -84,5 +84,23 @@
   "success_prohibited_check": "禁止物件チェックを記録しました",
   "error_generic": "エラーが発生しました",
   "clear_date": "日付クリア",
-  "unassigned": "未割当"
+  "unassigned": "未割当",
+
+  "inspection_speed_very_slow": "とても遅い",
+  "inspection_speed_slow": "遅い",
+  "inspection_speed_normal": "普通",
+  "inspection_speed_fast": "速い",
+  "inspection_speed_very_fast": "とても速い",
+  "inspection_no_mistakes": "問題なし",
+  "inspection_some_mistakes": "一部あり",
+  "inspection_many_mistakes": "多数あり",
+  "inspection_level_bad": "悪い",
+  "inspection_level_normal": "普通",
+  "inspection_level_good": "良い",
+
+  "sample_mode": "サンプルモード",
+  "sample_mode_trajectory": "軌跡上",
+  "sample_mode_area": "エリア全体",
+  "add_manual_checkpoint": "手動で追加",
+  "manual_checkpoint_instruction": "地図上でチェックしたい場所をタップしてください"
 }
