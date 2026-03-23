@@ -152,8 +152,27 @@ export default function InspectionDetailPage() {
     try {
       const res = await fetch(`/api/inspections/${inspectionId}/map-data`);
       if (!res.ok) throw new Error();
-      const data = await res.json();
-      setMapData(data);
+      const raw = await res.json();
+      // APIレスポンスのフィールド名をフロントの期待する形式に変換
+      setMapData({
+        areaBoundary: raw.areaGeojson || null,
+        distributorGpsPoints: (raw.distributorTrajectory || []).map((p: any) => ({
+          lat: p.latitude, lng: p.longitude, timestamp: p.timestamp,
+        })),
+        inspectorGpsPoints: (raw.inspectorTrajectory || []).map((p: any) => ({
+          lat: p.latitude, lng: p.longitude, timestamp: p.timestamp,
+        })),
+        prohibitedProperties: (raw.prohibitedProperties || []).map((p: any) => ({
+          id: p.id, lat: p.latitude, lng: p.longitude,
+          address: p.address, buildingName: p.buildingName, severity: null,
+        })),
+        checkpoints: raw.checkpoints || [],
+        prohibitedChecks: (raw.prohibitedChecks || []).map((pc: any) => ({
+          ...pc,
+          lat: pc.prohibitedProperty?.latitude || pc.latitude || 0,
+          lng: pc.prohibitedProperty?.longitude || pc.longitude || 0,
+        })),
+      });
     } catch {
       /* map data is optional */
     }
