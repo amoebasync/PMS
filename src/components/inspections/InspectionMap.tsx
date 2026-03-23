@@ -398,7 +398,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
       })}
 
       {/* Prohibited properties (red markers) */}
-      {mapData?.prohibitedProperties?.map((pp) => {
+      {mapData?.prohibitedProperties?.filter(pp => pp.lat && pp.lng).map((pp) => {
         const check = prohibitedCheckMap.get(pp.id);
         const overlayColor = check ? prohibitedCheckColor(check.result) : null;
 

@@ -25,6 +25,11 @@ interface InspectionDetail {
   complianceRate: number | null;
   note: string | null;
   followUpRequired: boolean;
+  distributor: {
+    id: number;
+    name: string;
+    staffId: string;
+  } | null;
   distributionSpeed: string | null;
   stickerCompliance: string | null;
   prohibitedCompliance: string | null;
@@ -373,7 +378,7 @@ export default function InspectionDetailPage() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-bold text-slate-800 truncate">
-              {inspection.schedule?.distributor?.name || '--'}
+              {inspection.distributor?.name || inspection.schedule?.distributor?.name || '--'}
             </span>
             {statusBadge(inspection.status, t)}
           </div>
@@ -388,8 +393,10 @@ export default function InspectionDetailPage() {
         )}
       </div>
 
+      {/* ── Main content: Map + Panel ── */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
       {/* ── Map area ── */}
-      <div className={`flex-1 relative transition-all duration-300 ${sheetExpanded ? 'pb-0' : 'pb-0'}`}>
+      <div className="flex-1 relative">
         <InspectionMap
           mapData={mapData}
           checkpoints={inspection.checkpoints}
@@ -397,7 +404,7 @@ export default function InspectionDetailPage() {
           inspectorPosition={inspectorPosition}
           inspectorGpsPoints={mapData?.inspectorGpsPoints || []}
           samplePoints={samplePoints}
-          onSamplePointsChange={inspection.status === 'IN_PROGRESS' ? setSamplePoints : undefined}
+          onSamplePointsChange={inspection.status !== 'COMPLETED' ? setSamplePoints : undefined}
         />
 
         {/* Action button overlay */}
@@ -436,16 +443,16 @@ export default function InspectionDetailPage() {
         )}
       </div>
 
-      {/* ── Bottom sheet ── */}
+      {/* ── Side panel (desktop) / Bottom sheet (mobile) ── */}
       {(inspection.status === 'IN_PROGRESS' || inspection.status === 'COMPLETED') && (
         <div
-          className={`bg-white border-t border-slate-200 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.1)] transition-all duration-300 shrink-0 flex flex-col ${
-            sheetExpanded ? 'max-h-[60vh]' : 'h-[52px]'
+          className={`bg-white border-t md:border-t-0 md:border-l border-slate-200 rounded-t-2xl md:rounded-none shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-none transition-all duration-300 shrink-0 flex flex-col md:w-[400px] md:h-full ${
+            sheetExpanded ? 'max-h-[50vh] md:max-h-none' : 'h-[52px] md:max-h-none'
           }`}
         >
-          {/* Drag handle */}
+          {/* Drag handle (mobile only) */}
           <div
-            className="flex flex-col items-center pt-2 pb-1 cursor-pointer"
+            className="md:hidden flex flex-col items-center pt-2 pb-1 cursor-pointer"
             onClick={() => setSheetExpanded(!sheetExpanded)}
           >
             <div className="w-10 h-1 bg-slate-300 rounded-full"></div>
@@ -473,8 +480,7 @@ export default function InspectionDetailPage() {
           </div>
 
           {/* Tab content */}
-          {sheetExpanded && (
-            <div className="flex-1 overflow-y-auto overscroll-contain">
+          <div className={`flex-1 overflow-y-auto overscroll-contain ${!sheetExpanded ? 'hidden md:block' : ''}`}>
               {activeTab === 'checkpoints' && (
                 <CheckpointPanel
                   inspectionId={inspectionId}
@@ -512,11 +518,10 @@ export default function InspectionDetailPage() {
                 />
               )}
             </div>
-          )}
 
           {/* Finish button in sheet */}
-          {inspection.status === 'IN_PROGRESS' && sheetExpanded && (
-            <div className="px-4 py-3 border-t border-slate-100 shrink-0 safe-area-bottom">
+          {inspection.status === 'IN_PROGRESS' && (
+            <div className={`px-4 py-3 border-t border-slate-100 shrink-0 safe-area-bottom ${!sheetExpanded ? 'hidden md:block' : ''}`}>
               <button
                 onClick={handleFinish}
                 disabled={actionLoading}
@@ -533,6 +538,7 @@ export default function InspectionDetailPage() {
           )}
         </div>
       )}
+      </div>{/* end flex-1 flex-col md:flex-row */}
     </div>
   );
 }
