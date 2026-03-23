@@ -901,6 +901,7 @@ model DistributionSchedule {
   pickingVerification PickingVerification?
   fraudAnalyses       FraudAnalysis[]
   fieldInspections    FieldInspection[]
+  photos              SchedulePhoto[]
 
   @@index([distributorId, date])
   @@index([branchId, date])
@@ -3428,4 +3429,17 @@ model LineUser {
   updatedAt     DateTime          @updatedAt @map("updated_at")
 
   @@map("line_users")
+}
+
+// ─── スケジュール写真（チラシ配布写真） ───
+model SchedulePhoto {
+  id          Int                  @id @default(autoincrement())
+  scheduleId  Int                  @map("schedule_id")
+  schedule    DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  photoUrl    String               @map("photo_url") @db.Text
+  source      String               @default("LINE") @db.VarChar(20) // LINE, MANUAL
+  createdAt   DateTime             @default(now()) @map("created_at")
+
+  @@index([scheduleId])
+  @@map("schedule_photos")
 }

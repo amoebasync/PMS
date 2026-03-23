@@ -518,7 +518,7 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
   const isAppPrivacyPage = pathname.startsWith('/app-privacy');
   const isApplyPage = pathname === '/apply' || pathname.startsWith('/apply/manage');
   const isPublicBookingPage = pathname === '/interview-booking' || pathname === '/training-booking';
-  const isPublicMapPage = pathname.startsWith('/map/');
+  const isPublicMapPage = pathname.startsWith('/map/') || pathname === '/flyer-photo';
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
