@@ -132,8 +132,12 @@ export async function POST(request: NextRequest) {
             ],
           },
           {
-            type: 'text', text: `${staffId ? staffId + ' | ' : ''}${schedDate} ${areaName}`,
-            size: 'xxs', color: '#888888', margin: 'xs', wrap: true,
+            type: 'text', text: `${staffId ? staffId + ' | ' : ''}${schedDate}`,
+            size: 'xxs', color: '#888888', margin: 'xs',
+          },
+          {
+            type: 'text', text: areaName,
+            size: 'xxs', color: '#888888',
           },
         ];
 
