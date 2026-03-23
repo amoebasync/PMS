@@ -344,25 +344,38 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
               ? haversineM(currentPosition.lat, currentPosition.lng, point.lat, point.lng)
               : null;
             return (
-              <button
+              <div
                 key={`sample-${i}`}
-                onClick={() => isActive && openRecording(i)}
-                disabled={!isActive || recordingIndex !== null}
-                className="w-full flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 transition-colors disabled:opacity-50 text-left"
+                className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 transition-colors"
               >
-                <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center shrink-0">
-                  <span className="text-xs font-bold text-slate-500">#{i + 1}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs text-slate-600 truncate">
-                    {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
-                  </p>
-                  {dist !== null && (
-                    <p className="text-[10px] text-slate-400">{formatDistance(dist)}</p>
-                  )}
-                </div>
-                <i className="bi bi-chevron-right text-slate-300"></i>
-              </button>
+                <button
+                  onClick={() => isActive && openRecording(i)}
+                  disabled={!isActive || recordingIndex !== null}
+                  className="flex-1 flex items-center gap-3 p-3 text-left disabled:opacity-50"
+                >
+                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
+                    <span className="text-xs font-black text-amber-700">{i + 1}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-slate-600 truncate">
+                      {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
+                    </p>
+                    {dist !== null && (
+                      <p className="text-[10px] text-slate-400">{formatDistance(dist)}</p>
+                    )}
+                  </div>
+                  <i className="bi bi-chevron-right text-slate-300"></i>
+                </button>
+                {isActive && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onSamplePointsChange(samplePoints.filter((_, j) => j !== i)); }}
+                    className="px-2 py-3 text-slate-300 hover:text-red-500 transition-colors shrink-0"
+                    title="削除"
+                  >
+                    <i className="bi bi-trash3 text-sm"></i>
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>

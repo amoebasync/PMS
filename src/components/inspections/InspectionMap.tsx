@@ -325,7 +325,6 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
 
       {/* Sample points (white/yellow dots — unchecked targets) */}
       {samplePoints.map((sp, idx) => {
-        // サンプルポイントが既にチェック済みか判定
         const isChecked = checkpoints.some(
           (cp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
         );
@@ -336,11 +335,17 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
             position={{ lat: sp.lat, lng: sp.lng }}
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
-              scale: 8,
+              scale: 14,
               fillColor: '#fbbf24',
-              fillOpacity: 0.9,
+              fillOpacity: 0.95,
               strokeColor: '#ffffff',
               strokeWeight: 2,
+            }}
+            label={{
+              text: String(idx + 1),
+              color: '#000000',
+              fontSize: '11px',
+              fontWeight: 'bold',
             }}
             zIndex={30}
             title={`サンプル #${idx + 1}`}
