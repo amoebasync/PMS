@@ -63,12 +63,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '該当日の現場確認予定がありません' }, { status: 400 });
     }
 
-    // 日付フォーマット
-    const d = new Date(`${date}T00:00:00+09:00`);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const dow = DAY_NAMES[d.getDay()];
-    const dateLabel = `${mm}/${dd}（${dow}）`;
+    // 日付フォーマット（UTCサーバー対応: YYYY-MM-DD文字列から直接パース）
+    const [, mmStr, ddStr] = date.split('-');
+    const jstDate = new Date(`${date}T12:00:00+09:00`);
+    const dow = DAY_NAMES[jstDate.getDay()];
+    const dateLabel = `${mmStr}/${ddStr}（${dow}）`;
 
     // メッセージ組み立て
     const lines: string[] = [`【現場確認予定 ${dateLabel}】`];
@@ -85,13 +84,14 @@ export async function POST(request: NextRequest) {
         ? `${insp.inspector.lastNameJa}${insp.inspector.firstNameJa}`
         : '-';
 
-      // 配布スケジュールの日付
+      // 配布スケジュールの日付（UTCサーバー対応）
       let schedDateLabel = '';
       if (insp.schedule?.date) {
         const sd = new Date(insp.schedule.date);
-        const smm = String(sd.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', month: 'numeric' })).padStart(2, '0');
-        const sdd = String(sd.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', day: 'numeric' })).padStart(2, '0');
-        const sdow = sd.toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo', weekday: 'short' });
+        const sJst = new Date(sd.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+        const smm = String(sJst.getMonth() + 1).padStart(2, '0');
+        const sdd = String(sJst.getDate()).padStart(2, '0');
+        const sdow = DAY_NAMES[sJst.getDay()];
         schedDateLabel = `${smm}/${sdd}（${sdow}）`;
       }
 
