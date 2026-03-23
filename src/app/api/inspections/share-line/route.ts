@@ -119,33 +119,23 @@ export async function POST(request: NextRequest) {
         const schedDate = insp.schedule?.date ? formatScheduleDate(new Date(insp.schedule.date)) : '-';
 
         bodyContents.push({
-          type: 'box', layout: 'vertical', margin: 'md',
-          paddingAll: 'md',
+          type: 'box', layout: 'vertical', margin: 'sm',
+          paddingStart: 'lg', paddingEnd: 'md', paddingTop: 'sm', paddingBottom: 'sm',
           backgroundColor: '#F8FAFC',
           cornerRadius: 'md',
           contents: [
             {
-              type: 'box', layout: 'horizontal', spacing: 'sm',
+              type: 'box', layout: 'baseline', spacing: 'sm',
               contents: [
-                { type: 'text', text: `${name}${staffId ? '（' + staffId + '）' : ''}`, size: 'sm', weight: 'bold', color: '#333333', wrap: true, flex: 1 },
+                { type: 'text', text: name, size: 'xs', weight: 'bold', color: '#333333', flex: 1 },
                 {
-                  type: 'box', layout: 'vertical', flex: 0,
-                  paddingStart: 'sm', paddingEnd: 'sm', paddingTop: '2px', paddingBottom: '2px',
-                  backgroundColor: categoryColor, cornerRadius: 'sm',
-                  contents: [
-                    { type: 'text', text: categoryLabel, size: 'xxs', color: '#FFFFFF', weight: 'bold', align: 'center' },
-                  ],
+                  type: 'text', text: categoryLabel, size: 'xxs', color: categoryColor, weight: 'bold', flex: 0,
                 },
               ],
             },
             {
-              type: 'box', layout: 'horizontal', margin: 'sm', spacing: 'md',
-              contents: [
-                { type: 'text', text: `配布日 ${schedDate}`, size: 'xxs', color: '#666666', flex: 0 },
-              ],
-            },
-            {
-              type: 'text', text: areaName, size: 'xxs', color: '#666666', margin: 'xs',
+              type: 'text', text: `${staffId ? staffId + ' | ' : ''}${schedDate} ${areaName}`,
+              size: 'xxs', color: '#888888', margin: 'xs', wrap: true,
             },
           ],
         });
