@@ -128,14 +128,15 @@ export async function POST(
       };
     });
 
-    // LINE notification (fire-and-forget)
+    // LINE Flex Message notification (fire-and-forget)
     try {
       if (isLineConfigured()) {
         const groupSetting = await prisma.systemSetting.findUnique({
           where: { key: 'lineInspectionNotificationGroupId' },
         });
         if (groupSetting?.value) {
-          const categoryLabel = result.category === 'CHECK' ? 'チェック' : '指導';
+          const categoryLabel = result.category === 'CHECK' ? 'チェックレポート' : '指導レポート';
+          const categoryEmoji = '📋';
           const distributorName = result.distributor?.name || '-';
           const staffId = result.distributor?.staffId || '';
           const inspectorName = result.inspector
@@ -145,49 +146,255 @@ export async function POST(
           const areaName = area
             ? `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name}`
             : '-';
-          const jstNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-          const dateStr = `${jstNow.getFullYear()}/${String(jstNow.getMonth() + 1).padStart(2, '0')}/${String(jstNow.getDate()).padStart(2, '0')} ${String(jstNow.getHours()).padStart(2, '0')}:${String(jstNow.getMinutes()).padStart(2, '0')}`;
+          const jstNow = now.toLocaleString('ja-JP', {
+            timeZone: 'Asia/Tokyo',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          });
 
-          let resultsText = '';
-          if (result.category === 'CHECK') {
-            const confRate = confirmationRate != null ? `${(confirmationRate * 100).toFixed(1)}%` : '-';
-            const compRate = complianceRate != null ? `${(complianceRate * 100).toFixed(1)}%` : '-';
-            resultsText = [
-              `確認率: ${confRate}`,
-              `遵守率: ${compRate}`,
-              `チェックポイント: ${confirmedCount}/${totalCheckpoints}件 確認`,
-              notFoundCount > 0 ? `未発見: ${notFoundCount}件` : null,
-              violationCount > 0 ? `禁止物件違反: ${violationCount}/${totalProhibited}件` : null,
-            ].filter(Boolean).join('\n');
-          } else {
-            // GUIDANCE
-            const ratingLabels: [string, string | null | undefined][] = [
-              ['配布速度', result.distributionSpeed],
-              ['シール遵守', result.stickerCompliance],
-              ['禁止物件遵守', result.prohibitedCompliance],
-              ['地図理解', result.mapComprehension],
-              ['勤務態度', result.workAttitude],
-            ];
-            resultsText = ratingLabels
-              .map(([label, val]) => `${label}: ${val || '-'}`)
-              .join('\n');
+          // Build Mapbox static map URL with checkpoint pins
+          const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
+          let mapImageUrl = '';
+          if (mapboxToken) {
+            // Calculate center from area polygon
+            let centerLng = 139.7;
+            let centerLat = 35.7;
+            if (area?.boundary_geojson) {
+              try {
+                const geojson = typeof area.boundary_geojson === 'string'
+                  ? JSON.parse(area.boundary_geojson)
+                  : area.boundary_geojson;
+                const coords: number[][] = geojson.type === 'Polygon'
+                  ? geojson.coordinates[0]
+                  : geojson.type === 'MultiPolygon'
+                    ? geojson.coordinates.flat(2)
+                    : geojson.coordinates?.[0] || [];
+                if (coords.length > 0) {
+                  const sumLng = coords.reduce((s: number, c: number[]) => s + c[0], 0);
+                  const sumLat = coords.reduce((s: number, c: number[]) => s + c[1], 0);
+                  centerLng = sumLng / coords.length;
+                  centerLat = sumLat / coords.length;
+                }
+              } catch {}
+            }
+
+            // Build pin markers for each checkpoint
+            const pins = checkpoints
+              .filter(cp => cp.targetLat != null && cp.targetLng != null)
+              .map(cp => {
+                if (cp.result === 'CONFIRMED') {
+                  return `pin-l+22c55e(${cp.targetLng},${cp.targetLat})`;
+                } else if (cp.result === 'NOT_FOUND') {
+                  return `pin-l-x+e74c3c(${cp.targetLng},${cp.targetLat})`;
+                } else {
+                  return `pin-l+95a5a6(${cp.targetLng},${cp.targetLat})`;
+                }
+              });
+
+            const overlay = pins.length > 0 ? pins.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
+            mapImageUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
           }
 
-          const messageText = [
-            `【巡回完了】${categoryLabel}`,
-            `━━━━━━━━━━━━━━`,
-            `配布員: ${distributorName}${staffId ? ` (${staffId})` : ''}`,
-            `エリア: ${areaName}`,
-            `巡回員: ${inspectorName}`,
-            ``,
-            `■ 結果`,
-            resultsText,
-            result.note ? `\n■ 備考\n${result.note}` : '',
-            `━━━━━━━━━━━━━━`,
-            dateStr,
-          ].filter(s => s !== undefined).join('\n');
+          // Translate note if mostly English
+          let noteSection: any[] = [];
+          if (result.note) {
+            const asciiLetters = (result.note.match(/[a-zA-Z]/g) || []).length;
+            const totalChars = result.note.replace(/\s/g, '').length;
+            const isEnglish = totalChars > 0 && asciiLetters / totalChars > 0.5;
 
-          await pushMessage(groupSetting.value, [{ type: 'text', text: messageText }]);
+            let translatedNote = '';
+            if (isEnglish && process.env.ANTHROPIC_API_KEY) {
+              try {
+                const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': process.env.ANTHROPIC_API_KEY,
+                    'anthropic-version': '2023-06-01',
+                  },
+                  body: JSON.stringify({
+                    model: 'claude-sonnet-4-20250514',
+                    max_tokens: 1024,
+                    system: 'Translate the following English text to Japanese. Return only the translation.',
+                    messages: [{ role: 'user', content: result.note }],
+                  }),
+                });
+                if (anthropicRes.ok) {
+                  const data = await anthropicRes.json();
+                  translatedNote = data.content?.[0]?.text || '';
+                }
+              } catch {}
+            }
+
+            noteSection = [
+              { type: 'separator', margin: 'lg' },
+              {
+                type: 'box', layout: 'vertical', margin: 'lg', spacing: 'sm',
+                contents: [
+                  { type: 'text', text: '📝 メモ', size: 'sm', color: '#555555', weight: 'bold' },
+                  { type: 'text', text: result.note, size: 'sm', color: '#333333', wrap: true },
+                  ...(translatedNote ? [{
+                    type: 'text' as const,
+                    text: `(翻訳) ${translatedNote}`,
+                    size: 'sm' as const,
+                    color: '#666666',
+                    wrap: true,
+                    margin: 'sm' as const,
+                    style: 'italic' as const,
+                  }] : []),
+                ],
+              },
+            ];
+          }
+
+          // Confirmation/compliance rate display
+          const confRateStr = confirmationRate != null ? `${(confirmationRate * 100).toFixed(0)}%` : '-';
+          const compRateStr = complianceRate != null ? `${(complianceRate * 100).toFixed(0)}%` : '-';
+          const unableCount = totalCheckpoints - confirmedCount - notFoundCount;
+
+          // Status color
+          const headerColor = result.category === 'CHECK' ? '#22c55e' : '#3b82f6';
+
+          const flexMessage = {
+            type: 'flex',
+            altText: `${categoryEmoji} ${categoryLabel} - ${distributorName} / ${areaName}`,
+            contents: {
+              type: 'bubble',
+              size: 'mega',
+              header: {
+                type: 'box',
+                layout: 'horizontal',
+                backgroundColor: headerColor,
+                paddingAll: 'lg',
+                contents: [
+                  {
+                    type: 'text',
+                    text: `${categoryEmoji} ${categoryLabel}`,
+                    color: '#FFFFFF',
+                    weight: 'bold',
+                    size: 'lg',
+                    flex: 1,
+                  },
+                  {
+                    type: 'text',
+                    text: '完了',
+                    color: '#FFFFFF',
+                    size: 'sm',
+                    align: 'end',
+                    gravity: 'center',
+                  },
+                ],
+              },
+              ...(mapImageUrl ? {
+                hero: {
+                  type: 'image',
+                  url: mapImageUrl,
+                  size: 'full',
+                  aspectRatio: '3:2',
+                  aspectMode: 'cover',
+                },
+              } : {}),
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                spacing: 'md',
+                paddingAll: 'lg',
+                contents: [
+                  // Distributor + StaffId
+                  {
+                    type: 'box', layout: 'horizontal', spacing: 'sm',
+                    contents: [
+                      { type: 'text', text: '配布員', size: 'sm', color: '#888888', flex: 2 },
+                      { type: 'text', text: `${distributorName}${staffId ? ` (${staffId})` : ''}`, size: 'sm', color: '#333333', flex: 5, weight: 'bold' },
+                    ],
+                  },
+                  // Area
+                  {
+                    type: 'box', layout: 'horizontal', spacing: 'sm',
+                    contents: [
+                      { type: 'text', text: 'エリア', size: 'sm', color: '#888888', flex: 2 },
+                      { type: 'text', text: areaName, size: 'sm', color: '#333333', flex: 5, wrap: true },
+                    ],
+                  },
+                  // Inspector
+                  {
+                    type: 'box', layout: 'horizontal', spacing: 'sm',
+                    contents: [
+                      { type: 'text', text: '巡回員', size: 'sm', color: '#888888', flex: 2 },
+                      { type: 'text', text: inspectorName, size: 'sm', color: '#333333', flex: 5 },
+                    ],
+                  },
+                  // Separator
+                  { type: 'separator', margin: 'lg' },
+                  // Rates
+                  {
+                    type: 'box', layout: 'horizontal', margin: 'lg',
+                    contents: [
+                      {
+                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                        contents: [
+                          { type: 'text', text: confRateStr, size: 'xxl', weight: 'bold', color: confirmationRate != null && confirmationRate >= 0.8 ? '#22c55e' : confirmationRate != null && confirmationRate >= 0.5 ? '#f59e0b' : '#ef4444' },
+                          { type: 'text', text: '確認率', size: 'xs', color: '#888888' },
+                        ],
+                      },
+                      { type: 'separator' },
+                      {
+                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                        contents: [
+                          { type: 'text', text: compRateStr, size: 'xxl', weight: 'bold', color: complianceRate != null && complianceRate >= 0.8 ? '#22c55e' : complianceRate != null && complianceRate >= 0.5 ? '#f59e0b' : '#ef4444' },
+                          { type: 'text', text: '遵守率', size: 'xs', color: '#888888' },
+                        ],
+                      },
+                    ],
+                  },
+                  // Separator
+                  { type: 'separator', margin: 'lg' },
+                  // Checkpoint counts
+                  {
+                    type: 'box', layout: 'horizontal', margin: 'lg', spacing: 'md',
+                    contents: [
+                      {
+                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                        contents: [
+                          { type: 'text', text: `✓ ${confirmedCount}`, size: 'md', weight: 'bold', color: '#22c55e' },
+                          { type: 'text', text: '確認', size: 'xxs', color: '#888888' },
+                        ],
+                      },
+                      {
+                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                        contents: [
+                          { type: 'text', text: `✗ ${notFoundCount}`, size: 'md', weight: 'bold', color: '#e74c3c' },
+                          { type: 'text', text: '未発見', size: 'xxs', color: '#888888' },
+                        ],
+                      },
+                      {
+                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                        contents: [
+                          { type: 'text', text: `? ${unableCount}`, size: 'md', weight: 'bold', color: '#95a5a6' },
+                          { type: 'text', text: '確認不可', size: 'xxs', color: '#888888' },
+                        ],
+                      },
+                    ],
+                  },
+                  // Note section (conditional)
+                  ...noteSection,
+                ],
+              },
+              footer: {
+                type: 'box',
+                layout: 'vertical',
+                paddingAll: 'md',
+                contents: [
+                  { type: 'text', text: jstNow, size: 'xs', color: '#AAAAAA', align: 'center' },
+                ],
+              },
+            },
+          };
+
+          await pushMessage(groupSetting.value, [flexMessage]);
         }
       }
     } catch (lineErr) {

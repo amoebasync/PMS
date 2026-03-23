@@ -57,6 +57,7 @@ interface Props {
   inspectorPosition: { lat: number; lng: number } | null;
   inspectorGpsPoints: GpsPoint[];
   samplePoints?: { lat: number; lng: number; index: number }[];
+  onSamplePointsChange?: (points: { lat: number; lng: number; index: number }[]) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -137,7 +138,7 @@ const prohibitedCheckColor = (result: string | null) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints, samplePoints = [] }: Props) {
+export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints, samplePoints = [], onSamplePointsChange }: Props) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: LIBRARIES,
@@ -363,11 +364,19 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
             />
           );
         }
-        // Pending sample point — yellow numbered
+        // Pending sample point — yellow numbered, draggable
         return (
           <Marker
             key={`sample-${idx}`}
             position={{ lat: sp.lat, lng: sp.lng }}
+            draggable={!!onSamplePointsChange}
+            onDragEnd={(e) => {
+              if (e.latLng && onSamplePointsChange) {
+                const newPoints = [...samplePoints];
+                newPoints[idx] = { ...newPoints[idx], lat: e.latLng.lat(), lng: e.latLng.lng() };
+                onSamplePointsChange(newPoints);
+              }
+            }}
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
               scale: 14,

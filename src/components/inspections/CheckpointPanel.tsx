@@ -227,7 +227,16 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                 onSamplePointsChange([...samplePoints, newPoint]);
                 showToast(t('success_checkpoint'), 'success');
               } else {
-                showToast('GPS位置を取得できません', 'error');
+                // Fallback: add at approximate center of existing sample points, or Tokyo default
+                if (samplePoints.length > 0) {
+                  const avgLat = samplePoints.reduce((s, p) => s + p.lat, 0) / samplePoints.length;
+                  const avgLng = samplePoints.reduce((s, p) => s + p.lng, 0) / samplePoints.length;
+                  const newPoint = { lat: avgLat, lng: avgLng, index: Date.now() };
+                  onSamplePointsChange([...samplePoints, newPoint]);
+                  showToast('マップ上でマーカーをドラッグして位置を調整してください', 'info');
+                } else {
+                  showToast('GPS位置を取得できません。位置情報の権限を許可してください。', 'error');
+                }
               }
             }}
             className="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-400 text-slate-500 hover:text-emerald-600 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"

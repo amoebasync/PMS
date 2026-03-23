@@ -139,6 +139,21 @@ export default function InspectionDetailPage() {
   const [samplePoints, setSamplePoints] = useState<{ lat: number; lng: number; index: number }[]>([]);
   const sampleSaveRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Request geolocation permission on page load
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    // Trigger permission prompt by making a one-time request
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setInspectorPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (err) => {
+        console.warn('Geolocation permission denied or unavailable:', err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, []);
+
   // サンプルポイントが変更されたらDBに自動保存（デバウンス1秒）
   useEffect(() => {
     if (!inspection || inspection.status === 'COMPLETED') return;
@@ -382,6 +397,7 @@ export default function InspectionDetailPage() {
           inspectorPosition={inspectorPosition}
           inspectorGpsPoints={mapData?.inspectorGpsPoints || []}
           samplePoints={samplePoints}
+          onSamplePointsChange={inspection.status === 'IN_PROGRESS' ? setSamplePoints : undefined}
         />
 
         {/* Action button overlay */}
