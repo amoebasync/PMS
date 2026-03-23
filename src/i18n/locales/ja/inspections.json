@@ -98,6 +98,13 @@
   "inspection_level_normal": "普通",
   "inspection_level_good": "良い",
 
+  "check_flyer_protrusion": "チラシのはみ出し",
+  "check_sticker_compliance": "貼り紙の順守",
+  "check_disposal": "捨て（チラシ廃棄）",
+  "check_disposal_none": "なし",
+  "check_disposal_suspicious": "疑いあり",
+  "check_disposal_found": "捨てあり",
+
   "sample_mode": "サンプルモード",
   "sample_mode_trajectory": "軌跡上",
   "sample_mode_area": "エリア全体",

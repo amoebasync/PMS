@@ -15,6 +15,8 @@ interface Inspection {
   prohibitedCompliance: string | null;
   mapComprehension: string | null;
   workAttitude: string | null;
+  multipleInsertion: string | null;
+  fraudTrace: string | null;
   note: string | null;
   followUpRequired: boolean;
 }
@@ -22,6 +24,7 @@ interface Inspection {
 interface Props {
   inspectionId: string;
   inspection: Inspection;
+  category: 'CHECK' | 'GUIDANCE';
   isActive: boolean;
   onUpdate: () => void;
 }
@@ -63,7 +66,7 @@ function SegmentButtons({ options, value, onChange, disabled }: {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function GuidancePanel({ inspectionId, inspection, isActive, onUpdate }: Props) {
+export default function GuidancePanel({ inspectionId, inspection, category, isActive, onUpdate }: Props) {
   const { t } = useTranslation('inspections');
   const { showToast } = useNotification();
 
@@ -73,6 +76,8 @@ export default function GuidancePanel({ inspectionId, inspection, isActive, onUp
   const [mapComprehension, setMapComprehension] = useState(inspection.mapComprehension || '');
   const [workAttitude, setWorkAttitude] = useState(inspection.workAttitude || '');
   const [note, setNote] = useState(inspection.note || '');
+  const [multipleInsertion, setMultipleInsertion] = useState(inspection.multipleInsertion || '');
+  const [fraudTrace, setFraudTrace] = useState(inspection.fraudTrace || '');
   const [followUpRequired, setFollowUpRequired] = useState(inspection.followUpRequired);
   const [saving, setSaving] = useState(false);
 
@@ -85,6 +90,8 @@ export default function GuidancePanel({ inspectionId, inspection, isActive, onUp
     setProhibitedCompliance(inspection.prohibitedCompliance || '');
     setMapComprehension(inspection.mapComprehension || '');
     setWorkAttitude(inspection.workAttitude || '');
+    setMultipleInsertion(inspection.multipleInsertion || '');
+    setFraudTrace(inspection.fraudTrace || '');
     setNote(inspection.note || '');
     setFollowUpRequired(inspection.followUpRequired);
   }, [inspection]);
@@ -178,60 +185,66 @@ export default function GuidancePanel({ inspectionId, inspection, isActive, onUp
         )}
       </div>
 
-      {/* Distribution speed */}
-      <div>
-        <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_speed')}</label>
-        <SegmentButtons
-          options={speedOptions}
-          value={distributionSpeed}
-          onChange={handleSpeedChange}
-          disabled={!isActive}
-        />
-      </div>
-
-      {/* Sticker compliance */}
-      <div>
-        <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_sticker')}</label>
-        <SegmentButtons
-          options={complianceOptions}
-          value={stickerCompliance}
-          onChange={handleStickerChange}
-          disabled={!isActive}
-        />
-      </div>
-
-      {/* Prohibited compliance */}
-      <div>
-        <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_prohibited')}</label>
-        <SegmentButtons
-          options={complianceOptions}
-          value={prohibitedCompliance}
-          onChange={handleProhibitedChange}
-          disabled={!isActive}
-        />
-      </div>
-
-      {/* Map comprehension */}
-      <div>
-        <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_map')}</label>
-        <SegmentButtons
-          options={levelOptions}
-          value={mapComprehension}
-          onChange={handleMapChange}
-          disabled={!isActive}
-        />
-      </div>
-
-      {/* Work attitude */}
-      <div>
-        <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_attitude')}</label>
-        <SegmentButtons
-          options={levelOptions}
-          value={workAttitude}
-          onChange={handleAttitudeChange}
-          disabled={!isActive}
-        />
-      </div>
+      {category === 'CHECK' ? (
+        <>
+          {/* チェック用項目 */}
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('check_flyer_protrusion')}</label>
+            <SegmentButtons
+              options={complianceOptions}
+              value={multipleInsertion}
+              onChange={(v) => { setMultipleInsertion(v); autoSave({ multipleInsertion: v || null }); }}
+              disabled={!isActive}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('check_sticker_compliance')}</label>
+            <SegmentButtons
+              options={complianceOptions}
+              value={stickerCompliance}
+              onChange={handleStickerChange}
+              disabled={!isActive}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('check_disposal')}</label>
+            <SegmentButtons
+              options={[
+                { value: 'NONE', label: t('check_disposal_none'), color: 'bg-emerald-600 text-white border-emerald-600' },
+                { value: 'SUSPICIOUS', label: t('check_disposal_suspicious'), color: 'bg-yellow-500 text-white border-yellow-500' },
+                { value: 'FOUND', label: t('check_disposal_found'), color: 'bg-red-500 text-white border-red-500' },
+              ]}
+              value={fraudTrace}
+              onChange={(v) => { setFraudTrace(v); autoSave({ fraudTrace: v || null }); }}
+              disabled={!isActive}
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {/* 指導用項目 */}
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_speed')}</label>
+            <SegmentButtons options={speedOptions} value={distributionSpeed} onChange={handleSpeedChange} disabled={!isActive} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_sticker')}</label>
+            <SegmentButtons options={complianceOptions} value={stickerCompliance} onChange={handleStickerChange} disabled={!isActive} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_prohibited')}</label>
+            <SegmentButtons options={complianceOptions} value={prohibitedCompliance} onChange={handleProhibitedChange} disabled={!isActive} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_map')}</label>
+            <SegmentButtons options={levelOptions} value={mapComprehension} onChange={handleMapChange} disabled={!isActive} />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">{t('guidance_attitude')}</label>
+            <SegmentButtons options={levelOptions} value={workAttitude} onChange={handleAttitudeChange} disabled={!isActive} />
+          </div>
+        </>
+      )}
 
       {/* Note */}
       <div>

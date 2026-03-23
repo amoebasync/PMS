@@ -30,6 +30,8 @@ interface InspectionDetail {
   prohibitedCompliance: string | null;
   mapComprehension: string | null;
   workAttitude: string | null;
+  multipleInsertion: string | null;
+  fraudTrace: string | null;
   schedule: {
     id: number;
     distributor: {
@@ -481,6 +483,7 @@ export default function InspectionDetailPage() {
                 <GuidancePanel
                   inspectionId={inspectionId}
                   inspection={inspection}
+                  category={inspection.category as 'CHECK' | 'GUIDANCE'}
                   isActive={inspection.status === 'IN_PROGRESS'}
                   onUpdate={fetchInspection}
                 />

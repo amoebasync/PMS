@@ -98,6 +98,13 @@
   "inspection_level_normal": "Normal",
   "inspection_level_good": "Good",
 
+  "check_flyer_protrusion": "Flyer Protrusion",
+  "check_sticker_compliance": "Sticker Compliance",
+  "check_disposal": "Flyer Disposal",
+  "check_disposal_none": "None",
+  "check_disposal_suspicious": "Suspicious",
+  "check_disposal_found": "Found",
+
   "sample_mode": "Sample Mode",
   "sample_mode_trajectory": "On Trajectory",
   "sample_mode_area": "Entire Area",
