@@ -27,12 +27,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ results: {} });
     }
 
-    // 未チェックのスケジュールを取得
+    // 未チェック or 当日falseのスケジュールを取得（当日分は再チェック対象）
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+    const todayStart = new Date(`${todayStr}T00:00:00+09:00`);
+    const todayEnd = new Date(`${todayStr}T23:59:59.999+09:00`);
     const schedules = await prisma.distributionSchedule.findMany({
       where: {
         id: { in: scheduleIds },
-        psGpsAvailable: null,
         session: null,
+        OR: [
+          { psGpsAvailable: null },
+          { psGpsAvailable: false, date: { gte: todayStart, lte: todayEnd } },
+        ],
       },
       select: {
         id: true,

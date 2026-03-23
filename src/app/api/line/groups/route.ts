@@ -14,26 +14,32 @@ export async function GET() {
   }).filter(Boolean);
 
   // 通知先設定も返す
-  const notifSetting = await prisma.systemSetting.findUnique({
-    where: { key: 'lineRelayNotificationGroupId' },
-  });
+  const [notifSetting, inspectionSetting] = await Promise.all([
+    prisma.systemSetting.findUnique({ where: { key: 'lineRelayNotificationGroupId' } }),
+    prisma.systemSetting.findUnique({ where: { key: 'lineInspectionNotificationGroupId' } }),
+  ]);
 
   return NextResponse.json({
     groups,
     relayNotificationGroupId: notifSetting?.value || null,
+    inspectionNotificationGroupId: inspectionSetting?.value || null,
   });
 }
 
 /**
- * PUT /api/line/groups — 中継/回収通知先グループを設定
- * body: { groupId: string }
+ * PUT /api/line/groups — 通知先グループを設定
+ * body: { groupId: string, type?: 'relay' | 'inspection' }
  */
 export async function PUT(request: Request) {
-  const { groupId } = await request.json();
+  const { groupId, type } = await request.json();
+
+  const key = type === 'inspection'
+    ? 'lineInspectionNotificationGroupId'
+    : 'lineRelayNotificationGroupId';
 
   await prisma.systemSetting.upsert({
-    where: { key: 'lineRelayNotificationGroupId' },
-    create: { key: 'lineRelayNotificationGroupId', value: groupId || '' },
+    where: { key },
+    create: { key, value: groupId || '' },
     update: { value: groupId || '' },
   });
 

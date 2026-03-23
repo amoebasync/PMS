@@ -102,5 +102,12 @@
   "sample_mode_trajectory": "On Trajectory",
   "sample_mode_area": "Entire Area",
   "add_manual_checkpoint": "Add Manually",
-  "manual_checkpoint_instruction": "Tap a location on the map to add a checkpoint"
+  "manual_checkpoint_instruction": "Tap a location on the map to add a checkpoint",
+
+  "line_share": "LINE Share",
+  "line_share_confirm": "Send inspection schedule to LINE group?",
+  "line_share_success": "Sent to LINE ({count} inspections)",
+  "line_group_select_title": "Select LINE Group",
+  "line_no_groups": "No LINE groups available",
+  "refresh": "Refresh"
 }

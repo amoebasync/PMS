@@ -129,6 +129,10 @@ export default function InspectionsPage() {
   const [filterStatus, setFilterStatus] = useState<'ALL' | InspectionStatus>('ALL');
   const [filterCategory, setFilterCategory] = useState<'ALL' | InspectionCategory>('ALL');
   const [page, setPage] = useState(1);
+  const [lineSending, setLineSending] = useState(false);
+  const [showLineGroupModal, setShowLineGroupModal] = useState(false);
+  const [lineGroups, setLineGroups] = useState<{ groupId: string; groupName: string }[]>([]);
+  const [lineGroupConfigured, setLineGroupConfigured] = useState<boolean | null>(null);
 
   // Assign modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -250,6 +254,67 @@ export default function InspectionsPage() {
     setScheduleSearch('');
     setScheduleResults([]);
     setSelectedSchedule(null);
+  };
+
+  /* ---- LINE share ---- */
+  const handleLineShare = async () => {
+    // グループ未設定なら選択モーダルを表示
+    if (lineGroupConfigured === null) {
+      try {
+        const res = await fetch('/api/line/groups');
+        if (res.ok) {
+          const { groups, inspectionNotificationGroupId } = await res.json();
+          setLineGroups(groups || []);
+          if (inspectionNotificationGroupId) {
+            setLineGroupConfigured(true);
+          } else {
+            setShowLineGroupModal(true);
+            return;
+          }
+        }
+      } catch { return; }
+    } else if (!lineGroupConfigured) {
+      setShowLineGroupModal(true);
+      return;
+    }
+    sendLineMessage();
+  };
+
+  const sendLineMessage = async () => {
+    const targetDate = filterDate || new Date().toISOString().split('T')[0];
+    if (!confirm(t('line_share_confirm'))) return;
+    setLineSending(true);
+    try {
+      const res = await fetch('/api/inspections/share-line', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: targetDate }),
+      });
+      if (res.ok) {
+        const { count } = await res.json();
+        alert(t('line_share_success', { count }));
+      } else {
+        const err = await res.json();
+        alert(err.error || t('error_generic'));
+      }
+    } catch {
+      alert(t('error_generic'));
+    } finally {
+      setLineSending(false);
+    }
+  };
+
+  const selectLineGroup = async (groupId: string) => {
+    try {
+      await fetch('/api/line/groups', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, type: 'inspection' }),
+      });
+      setLineGroupConfigured(true);
+      setShowLineGroupModal(false);
+      sendLineMessage();
+    } catch { /* silent */ }
   };
 
   /* ---- Status badge ---- */
@@ -380,6 +445,14 @@ export default function InspectionsPage() {
 
         {/* Actions */}
         <div className="md:ml-auto flex items-center gap-2">
+          <button
+            onClick={handleLineShare}
+            disabled={lineSending || !data?.data.length}
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-green-300 rounded-lg hover:bg-green-50 disabled:opacity-50 text-xs font-bold text-green-700 transition-colors"
+          >
+            <i className={`bi ${lineSending ? 'bi-arrow-repeat animate-spin' : 'bi-line'}`} />
+            {t('line_share')}
+          </button>
           <button
             onClick={fetchData}
             disabled={loading}
@@ -588,6 +661,48 @@ export default function InspectionsPage() {
               className="px-2 py-1.5 text-xs border border-slate-200 rounded-md disabled:opacity-30 hover:bg-slate-50 disabled:hover:bg-white transition-colors text-slate-600"
             >
               <i className="bi bi-chevron-double-right" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/*  LINE Group Select Modal                                         */}
+      {/* ================================================================ */}
+      {showLineGroupModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setShowLineGroupModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl shadow-xl w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-sm font-bold text-slate-800 mb-3 flex items-center gap-2">
+              <i className="bi bi-line text-green-600" />
+              {t('line_group_select_title')}
+            </h3>
+            {lineGroups.length === 0 ? (
+              <p className="text-xs text-slate-500">{t('line_no_groups')}</p>
+            ) : (
+              <div className="space-y-2">
+                {lineGroups.map((g) => (
+                  <button
+                    key={g.groupId}
+                    onClick={() => selectLineGroup(g.groupId)}
+                    className="w-full text-left px-3 py-2.5 rounded-lg border border-slate-200 hover:border-green-400 hover:bg-green-50 text-sm font-medium text-slate-700 transition-colors"
+                  >
+                    <i className="bi bi-people-fill text-green-500 mr-2" />
+                    {g.groupName}
+                  </button>
+                ))}
+              </div>
+            )}
+            <button
+              onClick={() => setShowLineGroupModal(false)}
+              className="mt-3 w-full text-center text-xs text-slate-400 hover:text-slate-600"
+            >
+              {t('btn_cancel')}
             </button>
           </div>
         </div>

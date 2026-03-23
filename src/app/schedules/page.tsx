@@ -584,10 +584,14 @@ export default function ScheduleListPage() {
     setIsLoading(false);
   };
 
-  // PS GPS 未チェック分を一括チェックしてキャッシュ
+  // PS GPS 未チェック分を一括チェックしてキャッシュ（当日falseも再チェック対象）
   const checkPsGps = async (data: any[]) => {
+    const todayStr = getTodayStr();
     const unchecked = data.filter((s: any) =>
-      !s.session && s.distributor?.staffId && s.psGpsAvailable === null
+      !s.session && s.distributor?.staffId && (
+        s.psGpsAvailable === null ||
+        (s.psGpsAvailable === false && s.date?.startsWith(todayStr))
+      )
     );
     if (unchecked.length === 0) return;
     try {
@@ -743,7 +747,6 @@ export default function ScheduleListPage() {
   // 巡回割り当てモーダルを開く
   const openInspectionModal = useCallback(async (schedule: any) => {
     setInspectionAssignSchedule(schedule);
-    setInspectionCategory('CHECK');
     setInspectionInspectorId(null);
     setInspectionDate(getTodayStr());
     if (inspectionEmployees.length === 0) {
