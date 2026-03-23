@@ -33,26 +33,59 @@ export async function GET(
       return NextResponse.json({ error: 'スケジュールが紐付いていません' }, { status: 400 });
     }
 
-    // 配布員のGPSデータを取得
+    // 配布員のGPSデータを取得（PMS → Posting System フォールバック）
+    let gpsPoints: { latitude: number; longitude: number; timestamp: Date }[] = [];
+
     const distributionSession = await prisma.distributionSession.findUnique({
       where: { scheduleId: inspection.scheduleId },
       select: {
         gpsPoints: {
           orderBy: { timestamp: 'asc' },
-          select: {
-            latitude: true,
-            longitude: true,
-            timestamp: true,
-          },
+          select: { latitude: true, longitude: true, timestamp: true },
         },
       },
     });
 
-    if (!distributionSession || distributionSession.gpsPoints.length === 0) {
-      return NextResponse.json({ samplePoints: [], message: '配布員のGPSデータがありません' });
+    if (distributionSession && distributionSession.gpsPoints.length > 0) {
+      gpsPoints = distributionSession.gpsPoints;
+    } else {
+      // Posting System フォールバック
+      const schedule = await prisma.distributionSchedule.findUnique({
+        where: { id: inspection.scheduleId },
+        select: { date: true, distributor: { select: { staffId: true } } },
+      });
+      const PS_API_URL = process.env.POSTING_SYSTEM_API_URL;
+      if (schedule?.distributor?.staffId && PS_API_URL && schedule.date) {
+        try {
+          const dateStr = new Date(schedule.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+          const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+          if (process.env.POSTING_SYSTEM_API_KEY) headers['X-API-Key'] = process.env.POSTING_SYSTEM_API_KEY;
+          const psRes = await fetch(`${PS_API_URL}/GetStaffGPS.php`, {
+            method: 'POST', headers,
+            body: new URLSearchParams({ STAFF_ID: schedule.distributor.staffId, TARGET_DATE: dateStr }).toString(),
+            signal: AbortSignal.timeout(10000),
+          });
+          if (psRes.ok) {
+            const rows = JSON.parse((await psRes.text()).trim());
+            if (Array.isArray(rows)) {
+              gpsPoints = rows
+                .filter((r: any) => parseFloat(r.LATITUDE || '0') !== 0 && parseFloat(r.LONGITUDE || '0') !== 0)
+                .map((r: any) => ({
+                  latitude: parseFloat(r.LATITUDE),
+                  longitude: parseFloat(r.LONGITUDE),
+                  timestamp: new Date(`${dateStr}T${(r.TERMINAL_TIME || '00:00:00').trim()}+09:00`),
+                }));
+            }
+          }
+        } catch (e) {
+          console.error('[sample-points] PS GPS fallback error:', e);
+        }
+      }
     }
 
-    const gpsPoints = distributionSession.gpsPoints;
+    if (gpsPoints.length === 0) {
+      return NextResponse.json({ samplePoints: [], message: '配布員のGPSデータがありません' });
+    }
 
     // 速度を計算してフィルタ（低速=配布中の可能性が高いポイント）
     // Haversine距離計算
