@@ -77,6 +77,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND' | 'UNABLE'>('CONFIRMED');
   const [recordNote, setRecordNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -419,7 +420,12 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                 {cp.note && <p className="text-[10px] truncate opacity-70">{cp.note}</p>}
               </div>
               {cp.photoUrl && (
-                <img src={cp.photoUrl} alt="" className="w-10 h-10 object-cover rounded-lg shrink-0" />
+                <img
+                  src={cp.photoUrl}
+                  alt=""
+                  className="w-10 h-10 object-cover rounded-lg shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={(e) => { e.stopPropagation(); setEnlargedPhoto(cp.photoUrl); }}
+                />
               )}
             </div>
           ))}
@@ -431,6 +437,23 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         <div className="py-8 text-center">
           <i className="bi bi-check-circle text-3xl text-slate-200 block mb-2"></i>
           <p className="text-xs text-slate-400">{t('empty_checkpoints')}</p>
+        </div>
+      )}
+      {/* Photo enlargement modal */}
+      {enlargedPhoto && (
+        <div
+          className="fixed inset-0 z-[300] bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setEnlargedPhoto(null)}
+        >
+          <div className="relative max-w-full max-h-full">
+            <img src={enlargedPhoto} alt="" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+            <button
+              onClick={() => setEnlargedPhoto(null)}
+              className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center hover:bg-black/70"
+            >
+              <i className="bi bi-x-lg"></i>
+            </button>
+          </div>
         </div>
       )}
     </div>
