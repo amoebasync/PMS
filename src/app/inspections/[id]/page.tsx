@@ -134,6 +134,7 @@ export default function InspectionDetailPage() {
   const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   const [inspectorPosition, setInspectorPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsActive, setGpsActive] = useState(false);
+  const [samplePoints, setSamplePoints] = useState<{ lat: number; lng: number; index: number }[]>([]);
 
   /* ---- Fetch inspection detail ---- */
   const fetchInspection = useCallback(async () => {
@@ -355,6 +356,7 @@ export default function InspectionDetailPage() {
           prohibitedChecks={inspection.prohibitedChecks}
           inspectorPosition={inspectorPosition}
           inspectorGpsPoints={mapData?.inspectorGpsPoints || []}
+          samplePoints={samplePoints}
         />
 
         {/* Action button overlay */}
@@ -442,6 +444,8 @@ export default function InspectionDetailPage() {
                   currentPosition={inspectorPosition}
                   isActive={inspection.status === 'IN_PROGRESS'}
                   onUpdate={() => { fetchInspection(); fetchMapData(); }}
+                  samplePoints={samplePoints}
+                  onSamplePointsChange={setSamplePoints}
                 />
               )}
               {activeTab === 'prohibited' && (

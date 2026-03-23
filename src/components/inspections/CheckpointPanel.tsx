@@ -30,6 +30,8 @@ interface Props {
   currentPosition: { lat: number; lng: number } | null;
   isActive: boolean;
   onUpdate: () => void;
+  samplePoints: SamplePoint[];
+  onSamplePointsChange: (points: SamplePoint[]) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -64,11 +66,9 @@ const resultColor = (result: string | null) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function CheckpointPanel({ inspectionId, checkpoints, currentPosition, isActive, onUpdate }: Props) {
+export default function CheckpointPanel({ inspectionId, checkpoints, currentPosition, isActive, onUpdate, samplePoints, onSamplePointsChange }: Props) {
   const { t } = useTranslation('inspections');
   const { showToast } = useNotification();
-
-  const [samplePoints, setSamplePoints] = useState<SamplePoint[]>([]);
   const [sampleCount, setSampleCount] = useState(10);
   const [generating, setGenerating] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
@@ -92,7 +92,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         lng: p.longitude,
         index: p.index,
       }));
-      setSamplePoints(points);
+      onSamplePointsChange(points);
     } catch {
       showToast(t('error_generic'), 'error');
     }
@@ -140,7 +140,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       showToast(t('success_checkpoint'), 'success');
 
       // Remove submitted sample from list
-      setSamplePoints((prev) => prev.filter((_, i) => i !== recordingIndex));
+      onSamplePointsChange(samplePoints.filter((_, i) => i !== recordingIndex));
       setRecordingIndex(null);
       setSelectedFile(null);
       setPreviewUrl(null);

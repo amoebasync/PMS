@@ -56,6 +56,7 @@ interface Props {
   prohibitedChecks: ProhibitedCheck[];
   inspectorPosition: { lat: number; lng: number } | null;
   inspectorGpsPoints: GpsPoint[];
+  samplePoints?: { lat: number; lng: number; index: number }[];
 }
 
 /* ------------------------------------------------------------------ */
@@ -136,7 +137,7 @@ const prohibitedCheckColor = (result: string | null) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints }: Props) {
+export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints, samplePoints = [] }: Props) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: LIBRARIES,
@@ -321,6 +322,31 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
           zIndex={100}
         />
       )}
+
+      {/* Sample points (white/yellow dots — unchecked targets) */}
+      {samplePoints.map((sp, idx) => {
+        // サンプルポイントが既にチェック済みか判定
+        const isChecked = checkpoints.some(
+          (cp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
+        );
+        if (isChecked) return null;
+        return (
+          <Marker
+            key={`sample-${idx}`}
+            position={{ lat: sp.lat, lng: sp.lng }}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 8,
+              fillColor: '#fbbf24',
+              fillOpacity: 0.9,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            }}
+            zIndex={30}
+            title={`サンプル #${idx + 1}`}
+          />
+        );
+      })}
 
       {/* Prohibited properties (red markers) */}
       {mapData?.prohibitedProperties?.map((pp) => {

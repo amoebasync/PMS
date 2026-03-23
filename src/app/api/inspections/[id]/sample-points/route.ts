@@ -140,7 +140,8 @@ export async function GET(
       speed: 0,
     }));
 
-    // タイムライン全体に均等分布するようにN個のサンプルを選択
+    // 空間的に分散したN個のサンプルを選択（全域にばらつくように）
+    // グリッドベース: エリアをN個のセルに分割し、各セルから1つずつ選択
     const samplePoints: Array<{
       latitude: number;
       longitude: number;
@@ -149,27 +150,61 @@ export async function GET(
     }> = [];
 
     if (pool.length <= count) {
-      // 候補数がcount以下ならすべて返す
       pool.forEach((p, i) => {
-        samplePoints.push({
-          latitude: p.latitude,
-          longitude: p.longitude,
-          timestamp: p.timestamp,
-          index: i,
-        });
+        samplePoints.push({ latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp, index: i });
       });
     } else {
-      // 均等間隔でサンプリング
-      const step = pool.length / count;
-      for (let i = 0; i < count; i++) {
-        const idx = Math.min(Math.floor(i * step), pool.length - 1);
-        const p = pool[idx];
-        samplePoints.push({
-          latitude: p.latitude,
-          longitude: p.longitude,
-          timestamp: p.timestamp,
-          index: idx,
-        });
+      // バウンディングボックスを計算
+      const lats = pool.map(p => p.latitude);
+      const lngs = pool.map(p => p.longitude);
+      const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+      const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+
+      // グリッドのセル数を決定（sqrt(count) x sqrt(count)）
+      const gridSize = Math.ceil(Math.sqrt(count));
+      const cellWidth = (maxLng - minLng) / gridSize || 0.001;
+      const cellHeight = (maxLat - minLat) / gridSize || 0.001;
+
+      // 各セルにポイントを分類
+      const cells = new Map<string, typeof pool>();
+      for (const p of pool) {
+        const col = Math.min(Math.floor((p.longitude - minLng) / cellWidth), gridSize - 1);
+        const row = Math.min(Math.floor((p.latitude - minLat) / cellHeight), gridSize - 1);
+        const key = `${row},${col}`;
+        if (!cells.has(key)) cells.set(key, []);
+        cells.get(key)!.push(p);
+      }
+
+      // 各セルからランダムに1つ選択
+      const cellKeys = Array.from(cells.keys());
+      // ポイントが多いセルを優先
+      cellKeys.sort((a, b) => (cells.get(b)?.length || 0) - (cells.get(a)?.length || 0));
+
+      for (const key of cellKeys) {
+        if (samplePoints.length >= count) break;
+        const cellPoints = cells.get(key)!;
+        // セル内のランダムなポイントを選択
+        const randIdx = Math.floor(Math.random() * cellPoints.length);
+        const p = cellPoints[randIdx];
+        // 既存サンプルとの最小距離をチェック（近すぎるポイントを除外）
+        const tooClose = samplePoints.some(sp =>
+          haversineDistance(sp.latitude, sp.longitude, p.latitude, p.longitude) < 30
+        );
+        if (!tooClose) {
+          samplePoints.push({ latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp, index: pool.indexOf(p) });
+        }
+      }
+
+      // まだ足りない場合はランダムに追加
+      if (samplePoints.length < count) {
+        const remaining = pool.filter(p => !samplePoints.some(sp =>
+          haversineDistance(sp.latitude, sp.longitude, p.latitude, p.longitude) < 20
+        ));
+        while (samplePoints.length < count && remaining.length > 0) {
+          const randIdx = Math.floor(Math.random() * remaining.length);
+          const p = remaining.splice(randIdx, 1)[0];
+          samplePoints.push({ latitude: p.latitude, longitude: p.longitude, timestamp: p.timestamp, index: pool.indexOf(p) });
+        }
       }
     }
 
