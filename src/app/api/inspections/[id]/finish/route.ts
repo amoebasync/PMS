@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
+import { pushMessage, isLineConfigured } from '@/lib/line';
 
 // POST /api/inspections/[id]/finish
 // 現地確認を完了（サマリー自動計算）
@@ -79,6 +80,16 @@ export async function POST(
         include: {
           distributor: { select: { id: true, name: true, staffId: true } },
           inspector: { select: { id: true, lastNameJa: true, firstNameJa: true } },
+          schedule: {
+            select: {
+              area: {
+                include: {
+                  prefecture: { select: { name: true } },
+                  city: { select: { name: true } },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -116,6 +127,72 @@ export async function POST(
         },
       };
     });
+
+    // LINE notification (fire-and-forget)
+    try {
+      if (isLineConfigured()) {
+        const groupSetting = await prisma.systemSetting.findUnique({
+          where: { key: 'lineInspectionNotificationGroupId' },
+        });
+        if (groupSetting?.value) {
+          const categoryLabel = result.category === 'CHECK' ? 'チェック' : '指導';
+          const distributorName = result.distributor?.name || '-';
+          const staffId = result.distributor?.staffId || '';
+          const inspectorName = result.inspector
+            ? `${result.inspector.lastNameJa}${result.inspector.firstNameJa}`
+            : '-';
+          const area = (result as any).schedule?.area;
+          const areaName = area
+            ? `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name}`
+            : '-';
+          const jstNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+          const dateStr = `${jstNow.getFullYear()}/${String(jstNow.getMonth() + 1).padStart(2, '0')}/${String(jstNow.getDate()).padStart(2, '0')} ${String(jstNow.getHours()).padStart(2, '0')}:${String(jstNow.getMinutes()).padStart(2, '0')}`;
+
+          let resultsText = '';
+          if (result.category === 'CHECK') {
+            const confRate = confirmationRate != null ? `${(confirmationRate * 100).toFixed(1)}%` : '-';
+            const compRate = complianceRate != null ? `${(complianceRate * 100).toFixed(1)}%` : '-';
+            resultsText = [
+              `確認率: ${confRate}`,
+              `遵守率: ${compRate}`,
+              `チェックポイント: ${confirmedCount}/${totalCheckpoints}件 確認`,
+              notFoundCount > 0 ? `未発見: ${notFoundCount}件` : null,
+              violationCount > 0 ? `禁止物件違反: ${violationCount}/${totalProhibited}件` : null,
+            ].filter(Boolean).join('\n');
+          } else {
+            // GUIDANCE
+            const ratingLabels: [string, string | null | undefined][] = [
+              ['配布速度', result.distributionSpeed],
+              ['シール遵守', result.stickerCompliance],
+              ['禁止物件遵守', result.prohibitedCompliance],
+              ['地図理解', result.mapComprehension],
+              ['勤務態度', result.workAttitude],
+            ];
+            resultsText = ratingLabels
+              .map(([label, val]) => `${label}: ${val || '-'}`)
+              .join('\n');
+          }
+
+          const messageText = [
+            `【巡回完了】${categoryLabel}`,
+            `━━━━━━━━━━━━━━`,
+            `配布員: ${distributorName}${staffId ? ` (${staffId})` : ''}`,
+            `エリア: ${areaName}`,
+            `巡回員: ${inspectorName}`,
+            ``,
+            `■ 結果`,
+            resultsText,
+            result.note ? `\n■ 備考\n${result.note}` : '',
+            `━━━━━━━━━━━━━━`,
+            dateStr,
+          ].filter(s => s !== undefined).join('\n');
+
+          await pushMessage(groupSetting.value, [{ type: 'text', text: messageText }]);
+        }
+      }
+    } catch (lineErr) {
+      console.error('LINE notification error (non-fatal):', lineErr);
+    }
 
     return NextResponse.json(result);
   } catch (err) {

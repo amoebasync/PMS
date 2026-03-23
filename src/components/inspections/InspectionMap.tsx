@@ -323,12 +323,39 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         />
       )}
 
-      {/* Sample points (white/yellow dots — unchecked targets) */}
+      {/* Sample points — pending (yellow numbered) or checked (result colored) */}
       {samplePoints.map((sp, idx) => {
-        const isChecked = checkpoints.some(
+        const matchedCp = checkpoints.find(
           (cp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
         );
-        if (isChecked) return null;
+        if (matchedCp && matchedCp.result) {
+          // Checked sample point — show result marker
+          const fillColor = matchedCp.result === 'CONFIRMED' ? '#22c55e' : matchedCp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8';
+          const labelText = matchedCp.result === 'CONFIRMED' ? '✓' : matchedCp.result === 'NOT_FOUND' ? '✗' : '?';
+          return (
+            <Marker
+              key={`sample-${idx}`}
+              position={{ lat: sp.lat, lng: sp.lng }}
+              icon={{
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 14,
+                fillColor,
+                fillOpacity: 0.95,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
+              }}
+              label={{
+                text: labelText,
+                color: '#ffffff',
+                fontSize: '14px',
+                fontWeight: 'bold',
+              }}
+              zIndex={40}
+              title={`サンプル #${idx + 1} — ${matchedCp.result}`}
+            />
+          );
+        }
+        // Pending sample point — yellow numbered
         return (
           <Marker
             key={`sample-${idx}`}
@@ -392,21 +419,36 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         );
       })}
 
-      {/* Checkpoint markers */}
-      {checkpoints.map((cp) => (
-        <Circle
-          key={`cp-${cp.id}`}
-          center={{ lat: cp.lat, lng: cp.lng }}
-          radius={6}
-          options={{
-            fillColor: checkpointColor(cp.result),
-            fillOpacity: 1,
-            strokeColor: checkpointBorder(cp.result),
-            strokeWeight: 2,
-            zIndex: 60,
-          }}
-        />
-      ))}
+      {/* Checkpoint markers (only those NOT matching a sample point — manual adds) */}
+      {checkpoints.map((cp) => {
+        const matchesSample = samplePoints.some(
+          (sp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
+        );
+        if (matchesSample) return null; // already rendered with sample point markers
+        const fillColor = cp.result === 'CONFIRMED' ? '#22c55e' : cp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8';
+        const labelText = cp.result === 'CONFIRMED' ? '✓' : cp.result === 'NOT_FOUND' ? '✗' : '?';
+        return (
+          <Marker
+            key={`cp-${cp.id}`}
+            position={{ lat: cp.lat, lng: cp.lng }}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 12,
+              fillColor,
+              fillOpacity: 0.95,
+              strokeColor: '#ffffff',
+              strokeWeight: 2,
+            }}
+            label={{
+              text: labelText,
+              color: '#ffffff',
+              fontSize: '14px',
+              fontWeight: 'bold',
+            }}
+            zIndex={40}
+          />
+        );
+      })}
     </GoogleMap>
   );
 }
