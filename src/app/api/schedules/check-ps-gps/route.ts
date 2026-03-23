@@ -101,17 +101,23 @@ export async function POST(request: Request) {
             } catch { /* parse error */ }
           }
 
-          // DB キャッシュ更新 + GPSデータありなら配布中ステータスに変更
-          const updateData: any = { psGpsAvailable: available, psGpsLastTime: lastTime };
-          await prisma.distributionSchedule.updateMany({
-            where: { id: { in: entry.scheduleIds } },
-            data: updateData,
-          });
+          // DB キャッシュ更新 + GPSデータありなら配布中ステータスに同時変更
           if (available) {
-            // UNSTARTED/IN_PROGRESS → DISTRIBUTING に変更（COMPLETEDは触らない）
+            // GPS あり: psGpsAvailable + status を1回で更新（race condition 防止）
             await prisma.distributionSchedule.updateMany({
               where: { id: { in: entry.scheduleIds }, status: { in: ['UNSTARTED', 'IN_PROGRESS'] } },
-              data: { status: 'DISTRIBUTING' },
+              data: { psGpsAvailable: true, psGpsLastTime: lastTime, status: 'DISTRIBUTING' },
+            });
+            // COMPLETED等の場合はpsGpsだけ更新
+            await prisma.distributionSchedule.updateMany({
+              where: { id: { in: entry.scheduleIds }, psGpsAvailable: { not: true } },
+              data: { psGpsAvailable: true, psGpsLastTime: lastTime },
+            });
+          } else {
+            // GPS なし: psGpsAvailable のみ更新
+            await prisma.distributionSchedule.updateMany({
+              where: { id: { in: entry.scheduleIds } },
+              data: { psGpsAvailable: false, psGpsLastTime: null },
             });
           }
 

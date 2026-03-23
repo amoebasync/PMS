@@ -263,10 +263,11 @@ export async function POST(request: Request) {
                   sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
                   remarks: s.remarks || undefined,
                 };
-                // ステータス更新: COMPLETED インポート時は常に更新、配布中(PS Fallback含む)なら維持
+                // ステータス更新: COMPLETED インポート時は常に更新、配布中(PS Fallback/PMS Session)なら維持
+                const isDistributing = matchedExisting.status === 'DISTRIBUTING' || (matchedExisting as any).psGpsAvailable === true;
                 if (importStatus === 'COMPLETED') {
                   updateData.status = 'COMPLETED';
-                } else if (!hasActiveSession && matchedExisting.status !== 'DISTRIBUTING') {
+                } else if (!hasActiveSession && !isDistributing) {
                   updateData.status = importStatus;
                 }
 
@@ -424,13 +425,13 @@ export async function POST(request: Request) {
               date: new Date(dateStr),
               id: { notIn: [...allKeepIds] },
             },
-            select: { id: true, status: true, session: { select: { id: true, finishedAt: true } } },
+            select: { id: true, status: true, psGpsAvailable: true, session: { select: { id: true, finishedAt: true } } },
           });
 
           for (const old of candidates) {
-            // 配布中のスケジュールは絶対に削除しない
+            // 配布中のスケジュールは絶対に削除しない（PS Fallback含む）
             const hasActiveSession = old.session && !old.session.finishedAt;
-            if (old.status === 'DISTRIBUTING' || hasActiveSession) {
+            if (old.status === 'DISTRIBUTING' || hasActiveSession || old.psGpsAvailable === true) {
               continue;
             }
 
