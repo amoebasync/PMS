@@ -2949,6 +2949,7 @@ model FieldInspection {
   // 共通
   note               String?         @db.Text
   followUpRequired   Boolean         @default(false) @map("follow_up_required")
+  samplePointsJson   String?         @map("sample_points_json") @db.Text  // サンプルポイントのJSON配列
 
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")

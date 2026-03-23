@@ -132,6 +132,7 @@ export async function PUT(
     // 共通
     if (body.note !== undefined) updateData.note = body.note || null;
     if (body.followUpRequired !== undefined) updateData.followUpRequired = !!body.followUpRequired;
+    if (body.samplePointsJson !== undefined) updateData.samplePointsJson = body.samplePointsJson || null;
 
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.fieldInspection.update({
