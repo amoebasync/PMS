@@ -69,42 +69,51 @@ export async function POST(request: NextRequest) {
     const dow = DAY_NAMES[jstDate.getDay()];
     const dateLabel = `${mmStr}/${ddStr}（${dow}）`;
 
-    // メッセージ組み立て
-    const lines: string[] = [`【現場確認予定 ${dateLabel}】`];
-
+    // 巡回員ごとにグループ化
+    const grouped = new Map<string, typeof inspections>();
     for (const insp of inspections) {
-      const name = insp.distributor?.name || '-';
-      const staffId = insp.distributor?.staffId || '';
-      const area = insp.schedule?.area;
-      const areaName = area
-        ? `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name}`
-        : '-';
-      const categoryLabel = insp.category === 'CHECK' ? 'チェック' : '指導';
-      const inspector = insp.inspector
+      const inspectorKey = insp.inspector
         ? `${insp.inspector.lastNameJa}${insp.inspector.firstNameJa}`
-        : '-';
-
-      // 配布スケジュールの日付（UTCサーバー対応）
-      let schedDateLabel = '';
-      if (insp.schedule?.date) {
-        const sd = new Date(insp.schedule.date);
-        const sJst = new Date(sd.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
-        const smm = String(sJst.getMonth() + 1).padStart(2, '0');
-        const sdd = String(sJst.getDate()).padStart(2, '0');
-        const sdow = DAY_NAMES[sJst.getDay()];
-        schedDateLabel = `${smm}/${sdd}（${sdow}）`;
-      }
-
-      let line = `・${name}`;
-      if (staffId) line += `（${staffId}）`;
-      if (schedDateLabel) line += `${schedDateLabel}`;
-      line += ` ${areaName}`;
-      line += ` ／${categoryLabel}`;
-      line += ` ／巡回員: ${inspector}`;
-      lines.push(line);
+        : '未割当';
+      if (!grouped.has(inspectorKey)) grouped.set(inspectorKey, []);
+      grouped.get(inspectorKey)!.push(insp);
     }
 
-    const messageText = lines.join('\n');
+    // メッセージ組み立て
+    const lines: string[] = [`📋 現場確認予定 ${dateLabel}`, `合計 ${inspections.length}件`, ''];
+
+    for (const [inspectorName, items] of grouped) {
+      lines.push(`▶ 巡回員: ${inspectorName}`);
+      for (const insp of items) {
+        const name = insp.distributor?.name || '-';
+        const staffId = insp.distributor?.staffId || '';
+        const area = insp.schedule?.area;
+        const areaName = area
+          ? `${area.prefecture.name}${area.city.name}${area.chome_name || area.town_name}`
+          : '-';
+        const categoryLabel = insp.category === 'CHECK' ? 'チェック' : '指導';
+
+        // 配布スケジュールの日付（UTCサーバー対応）
+        let schedDateLabel = '';
+        if (insp.schedule?.date) {
+          const sd = new Date(insp.schedule.date);
+          const sJst = new Date(sd.toLocaleString('en-US', { timeZone: 'Asia/Tokyo' }));
+          const smm = String(sJst.getMonth() + 1).padStart(2, '0');
+          const sdd = String(sJst.getDate()).padStart(2, '0');
+          const sdow = DAY_NAMES[sJst.getDay()];
+          schedDateLabel = `${smm}/${sdd}（${sdow}）`;
+        }
+
+        let line = `  ${name}`;
+        if (staffId) line += `（${staffId}）`;
+        line += `\n    ${categoryLabel}｜配布日 ${schedDateLabel}`;
+        line += `\n    📍 ${areaName}`;
+        lines.push(line);
+      }
+      lines.push('');
+    }
+
+    const messageText = lines.join('\n').trimEnd();
 
     await pushMessage(groupSetting.value, [{ type: 'text', text: messageText }]);
 
