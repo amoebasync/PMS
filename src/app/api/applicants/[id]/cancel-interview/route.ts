@@ -105,12 +105,22 @@ export async function POST(
       const jobCategoryName = isEn
         ? (applicant.jobCategory?.nameEn || applicant.jobCategory?.nameJa || '')
         : (applicant.jobCategory?.nameJa || '');
+      const cancelReasonTranslations: Record<string, string> = {
+        '別の仕事が決まった': 'Found another job',
+        '仕事が合わなそう': 'Job doesn\'t seem like a good fit',
+        '採用枠が埋まった': 'Position has been filled',
+        '募集終了': 'Recruitment closed',
+        'その他': 'Other',
+      };
+      const translatedReason = isEn
+        ? (cancelReasonTranslations[cancelReason] || cancelReason)
+        : cancelReason;
       sendInterviewCancellationEmail(
         applicant.email,
         applicant.name,
         applicant.language || 'ja',
         jobCategoryName,
-        cancelReason,
+        translatedReason,
       ).catch((err) => {
         console.error('Failed to send cancellation email:', err);
       });
