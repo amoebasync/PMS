@@ -193,10 +193,10 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
             <label className="text-xs font-bold text-slate-500 shrink-0">{t('sample_count')}</label>
             <input
               type="number"
-              min={1}
+              min={0}
               max={50}
               value={sampleCount}
-              onChange={(e) => setSampleCount(Math.max(1, Math.min(50, Number(e.target.value))))}
+              onChange={(e) => setSampleCount(Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
               className="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <button
