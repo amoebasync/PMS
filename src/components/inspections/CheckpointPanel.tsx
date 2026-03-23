@@ -87,7 +87,12 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       const res = await fetch(`/api/inspections/${inspectionId}/sample-points?count=${sampleCount}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
-      setSamplePoints(data.points || []);
+      const points = (data.samplePoints || []).map((p: any) => ({
+        lat: p.latitude,
+        lng: p.longitude,
+        index: p.index,
+      }));
+      setSamplePoints(points);
     } catch {
       showToast(t('error_generic'), 'error');
     }
