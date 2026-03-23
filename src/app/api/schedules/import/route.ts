@@ -263,10 +263,10 @@ export async function POST(request: Request) {
                   sizeUnitPrice: s.sizeUnitPrice != null ? Number(s.sizeUnitPrice) : undefined,
                   remarks: s.remarks || undefined,
                 };
-                // ステータス更新: COMPLETED インポート時は常に更新、それ以外は配布中なら維持
+                // ステータス更新: COMPLETED インポート時は常に更新、配布中(PS Fallback含む)なら維持
                 if (importStatus === 'COMPLETED') {
                   updateData.status = 'COMPLETED';
-                } else if (!hasActiveSession) {
+                } else if (!hasActiveSession && matchedExisting.status !== 'DISTRIBUTING') {
                   updateData.status = importStatus;
                 }
 
