@@ -304,7 +304,7 @@ export default function InspectionDetailPage() {
   /* ---- Loading ---- */
   if (loading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white z-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-white z-[200]">
         <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
@@ -312,7 +312,7 @@ export default function InspectionDetailPage() {
 
   if (!inspection) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-50 gap-4">
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-[200] gap-4">
         <p className="text-sm text-slate-500">{t('error_generic')}</p>
         <button onClick={() => router.back()} className="text-emerald-600 text-sm font-bold">{t('btn_back')}</button>
       </div>
@@ -320,9 +320,9 @@ export default function InspectionDetailPage() {
   }
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-slate-50 z-50">
+    <div className="fixed inset-0 flex flex-col bg-slate-50 z-[200]">
       {/* ── Header ── */}
-      <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shrink-0 safe-area-top">
+      <div className="bg-white border-b border-slate-200 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 shrink-0">
         <button
           onClick={() => router.push('/inspections')}
           className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
