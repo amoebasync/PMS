@@ -12,9 +12,12 @@ import { prisma } from '../src/lib/prisma';
 import { analyzeFraudIndicators } from '../src/lib/fraud-analysis';
 
 async function main() {
+  const sinceDate = process.argv[2] || '2026-03-14';
+  console.log(`Backfilling from: ${sinceDate}`);
+
   const sessions = await prisma.distributionSession.findMany({
     where: {
-      finishedAt: { not: null },
+      finishedAt: { not: null, gte: new Date(sinceDate) },
       fraudAnalysis: null,
     },
     orderBy: { finishedAt: 'desc' },

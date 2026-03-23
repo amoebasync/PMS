@@ -713,6 +713,111 @@ export const sendHiringNotificationEmail = async (
 };
 
 // ─────────────────────────────────────────────────────────
+// 5a-2. 面接キャンセル通知メール
+// ─────────────────────────────────────────────────────────
+export const sendInterviewCancellationEmail = async (
+  toEmail: string,
+  applicantName: string,
+  language: string,
+  jobCategoryName: string,
+  cancelReason: string,
+) => {
+  const isEn = language === 'en';
+
+  const contentHtml = isEn
+    ? `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">Dear ${applicantName},</p>
+    <p style="margin:0 0 16px;">
+      Thank you for your interest in our company. We are writing to inform you that your interview has been cancelled.
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">Interview Cancellation</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">Position</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Status</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">Cancelled</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">Reason</td>
+            <td style="padding:6px 0;font-weight:bold;">${cancelReason}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      If you wish to reapply in the future, please do not hesitate to contact us.
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      If you have any questions, please contact us at recruit@tiramis.co.jp.
+    </p>
+  `
+    : `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${applicantName} 様</p>
+    <p style="margin:0 0 16px;">
+      この度は弊社にご応募いただき、誠にありがとうございました。<br>
+      誠に残念ではございますが、面接をキャンセルさせていただくこととなりましたのでご連絡いたします。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 12px;font-size:13px;font-weight:bold;color:#991b1b;">面接キャンセル</p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#64748b;width:160px;">応募職種</td>
+            <td style="padding:6px 0;font-weight:bold;">${jobCategoryName}</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">ステータス</td>
+            <td style="padding:6px 0;">
+              <span style="background:#fee2e2;color:#991b1b;font-size:12px;font-weight:bold;padding:3px 10px;border-radius:20px;">キャンセル</span>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#64748b;">キャンセル理由</td>
+            <td style="padding:6px 0;font-weight:bold;">${cancelReason}</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <p style="margin:0 0 16px;">
+      今後、再度ご応募を希望される場合は、お気軽にお問い合わせください。
+    </p>
+
+    <p style="margin:0;color:#64748b;font-size:13px;">
+      ご不明な点がございましたら、recruit@tiramis.co.jp までお問い合わせください。
+    </p>
+  `;
+
+  const subject = isEn
+    ? '[Tiramis] Interview Cancellation Notice'
+    : '【Tiramis】面接キャンセルのお知らせ';
+
+  const textContent = isEn
+    ? `Dear ${applicantName},\n\nThank you for your interest in our company.\nWe are writing to inform you that your interview has been cancelled.\n\nPosition: ${jobCategoryName}\nStatus: Cancelled\nReason: ${cancelReason}\n\nIf you wish to reapply in the future, please do not hesitate to contact us.\n\nContact: recruit@tiramis.co.jp`
+    : `${applicantName} 様\n\nこの度は弊社にご応募いただき、誠にありがとうございました。\n誠に残念ではございますが、面接をキャンセルさせていただくこととなりましたのでご連絡いたします。\n\n応募職種: ${jobCategoryName}\nステータス: キャンセル\nキャンセル理由: ${cancelReason}\n\n今後、再度ご応募を希望される場合は、お気軽にお問い合わせください。\n\nお問い合わせ: recruit@tiramis.co.jp`;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    cc: 'recruit@tiramis.co.jp',
+    subject,
+    html: htmlWrapper(contentHtml, 'recruit@tiramis.co.jp'),
+    text: textContent,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
 // 5b. 不採用通知メール
 // ─────────────────────────────────────────────────────────
 export const sendRejectionNotificationEmail = async (

@@ -205,6 +205,8 @@
   "cancel_reason_label": "Cancel Reason",
   "cancel_reason_other_job": "Found another job",
   "cancel_reason_not_fit": "Job doesn't seem like a good fit",
+  "cancel_reason_position_filled": "Position has been filled",
+  "cancel_reason_recruitment_closed": "Recruitment closed",
   "cancel_reason_other": "Other",
 
   "eval_no_show_confirm": "Record \"{{name}}\" as no-show for the interview?",

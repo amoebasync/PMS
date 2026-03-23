@@ -1,0 +1,1331 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PMS Pro — System Map</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --bg: #0f1117; --surface: #1a1d27; --surface2: #242836; --border: #2e3348;
+    --text: #e2e4ed; --text2: #8b8fa7; --accent: #6c7cff; --accent2: #4a58d6;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  .header { display: flex; align-items: center; gap: 16px; padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--surface); flex-shrink: 0; }
+  .header h1 { font-size: 16px; font-weight: 700; letter-spacing: -0.3px; }
+  .header h1 span { color: var(--accent); }
+  .header-tabs { display: flex; gap: 4px; margin-left: auto; }
+  .header-tab { padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: var(--text2); border: 1px solid transparent; transition: all 0.2s; }
+  .header-tab:hover { background: var(--surface2); color: var(--text); }
+  .header-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .main { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar { width: 280px; border-right: 1px solid var(--border); background: var(--surface); display: flex; flex-direction: column; overflow-y: auto; flex-shrink: 0; }
+  .sidebar-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+  .sidebar-section h3 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin-bottom: 8px; }
+  .filter-group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .filter-btn { display: flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600; cursor: pointer; background: var(--surface2); color: var(--text2); border: 1px solid var(--border); transition: all 0.15s; }
+  .filter-btn:hover { border-color: var(--text2); }
+  .filter-btn.active { color: #fff; border-color: transparent; }
+  .filter-btn .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  .preset-group { display: flex; flex-wrap: wrap; gap: 4px; }
+  .preset-btn { padding: 5px 10px; border-radius: 5px; font-size: 10px; font-weight: 600; cursor: pointer; background: var(--surface2); color: var(--text2); border: 1px solid var(--border); transition: all 0.15s; }
+  .preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .stat-card { background: var(--surface2); border-radius: 6px; padding: 8px 10px; }
+  .stat-card .val { font-size: 20px; font-weight: 800; color: var(--accent); }
+  .stat-card .label { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+  .legend-item { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 11px; color: var(--text2); }
+  .legend-item .dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  .canvas-wrap { flex: 1; position: relative; overflow: hidden; background: var(--bg); }
+  .canvas-wrap canvas { display: block; }
+  .zoom-controls { position: absolute; bottom: 16px; right: 16px; display: flex; gap: 4px; }
+  .zoom-btn { width: 32px; height: 32px; border-radius: 6px; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .zoom-btn:hover { background: var(--surface2); }
+
+  .tooltip { position: absolute; display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; max-width: 320px; pointer-events: none; z-index: 100; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+  .tooltip h4 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+  .tooltip .tt-path { font-size: 10px; color: var(--text2); font-family: 'SF Mono', 'Fira Code', monospace; margin-bottom: 6px; }
+  .tooltip .tt-desc { font-size: 11px; color: var(--text2); line-height: 1.5; }
+  .tooltip .tt-badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: 700; margin-top: 4px; }
+
+  .detail-panel { width: 320px; border-left: 1px solid var(--border); background: var(--surface); overflow-y: auto; display: none; flex-shrink: 0; }
+  .detail-panel.open { display: block; }
+  .detail-header { padding: 16px; border-bottom: 1px solid var(--border); }
+  .detail-header h3 { font-size: 14px; font-weight: 700; }
+  .detail-header .close-btn { float: right; cursor: pointer; color: var(--text2); font-size: 16px; background: none; border: none; }
+  .detail-body { padding: 16px; }
+  .detail-body h4 { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); margin: 12px 0 6px; }
+  .detail-body h4:first-child { margin-top: 0; }
+  .detail-body ul { list-style: none; }
+  .detail-body li { font-size: 11px; padding: 4px 0; color: var(--text2); border-bottom: 1px solid var(--border); }
+  .detail-body li:last-child { border-bottom: none; }
+  .detail-body .endpoint { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 10px; color: var(--accent); }
+  .detail-body .desc-text { font-size: 12px; line-height: 1.6; color: var(--text2); }
+
+  .prompt-bar { border-top: 1px solid var(--border); background: var(--surface); padding: 10px 20px; display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .prompt-bar .prompt-text { flex: 1; font-size: 11px; color: var(--text2); font-family: 'SF Mono', 'Fira Code', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .copy-btn { padding: 6px 16px; border-radius: 6px; background: var(--accent); color: #fff; border: none; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .copy-btn:hover { background: var(--accent2); }
+  .copy-btn.copied { background: #10b981; }
+
+  .search-box { position: relative; }
+  .search-box input { width: 100%; padding: 7px 10px 7px 28px; border-radius: 6px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 12px; outline: none; }
+  .search-box input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text2); font-size: 13px; pointer-events: none; }
+
+  .lang-toggle { display: flex; gap: 0; margin-left: 12px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; flex-shrink: 0; }
+  .lang-btn { padding: 5px 10px; font-size: 11px; font-weight: 700; cursor: pointer; background: transparent; color: var(--text2); border: none; transition: all 0.15s; }
+  .lang-btn:hover { color: var(--text); }
+  .lang-btn.active { background: var(--accent); color: #fff; }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1><span>PMS</span> Pro System Map</h1>
+  <div class="header-tabs">
+    <div class="header-tab active" data-view="features">機能マップ</div>
+    <div class="header-tab" data-view="flow">業務フロー</div>
+    <div class="header-tab" data-view="data">データモデル</div>
+    <div class="header-tab" data-view="users">ユーザーロール</div>
+  </div>
+  <div class="lang-toggle">
+    <button class="lang-btn active" id="langJa">JA</button>
+    <button class="lang-btn" id="langEn">EN</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="search-box">
+        <span class="search-icon">&#x2315;</span>
+        <input type="text" id="searchInput" placeholder="検索..." />
+      </div>
+    </div>
+    <div class="sidebar-section" id="presetSection" style="display:none">
+      <h3>プリセット</h3>
+      <div class="preset-group" id="presetPanel"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>モジュール フィルター</h3>
+      <div class="filter-group" id="moduleFilters"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>統計</h3>
+      <div class="stats" id="statsPanel"></div>
+    </div>
+    <div class="sidebar-section">
+      <h3>凡例</h3>
+      <div id="legendPanel"></div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="tooltip" id="tooltip"></div>
+    <div class="zoom-controls">
+      <button class="zoom-btn" id="zoomInBtn">+</button>
+      <button class="zoom-btn" id="zoomOutBtn">&minus;</button>
+      <button class="zoom-btn" id="resetZoomBtn" style="font-size:11px">&#x27F2;</button>
+    </div>
+  </div>
+
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-header">
+      <button class="close-btn" id="closeDetailBtn">&#x2715;</button>
+      <h3 id="detailTitle"></h3>
+    </div>
+    <div class="detail-body" id="detailBody"></div>
+  </div>
+</div>
+
+<div class="prompt-bar">
+  <div class="prompt-text" id="promptText">モジュールをクリックして詳細を表示</div>
+  <button class="copy-btn" id="copyBtn">コピー</button>
+</div>
+
+<script>
+// ==================== I18N ====================
+var lang = 'ja';
+
+var UI = {
+  ja: {
+    search: '検索...',
+    presets: 'プリセット',
+    moduleFilter: 'モジュール フィルター',
+    stats: '統計',
+    legend: '凡例',
+    featureNodes: '機能ノード',
+    dataFlows: 'データフロー',
+    apiEndpoints: 'APIエンドポイント',
+    dataModels: 'データモデル',
+    flowSolid: '業務フロー（実線）',
+    flowDashed: 'データ参照（破線）',
+    path: 'パス',
+    apiEndpoint: 'API エンドポイント',
+    dataModel: 'データモデル',
+    inbound: '\u2190 インバウンド',
+    outbound: '\u2192 アウトバウンド',
+    copy: 'コピー',
+    defaultPrompt: 'モジュールをクリックして詳細を表示',
+    tabFeatures: '機能マップ',
+    tabFlow: '業務フロー',
+    tabData: 'データモデル',
+    tabUsers: 'ユーザーロール',
+    promptSelected: function(label, mod, path, apis, db, related) {
+      return 'PMS「' + label + '」(' + mod + ') について。パス: ' + path + '、API: ' + apis + '、DB: ' + db + '。関連: ' + related;
+    },
+    promptFlow: function(names) { return 'PMS の以下の業務フローについて説明してください: ' + names; },
+    promptOverview: function(count, mods) { return 'PMS システム全体像 — ' + count + '機能、' + mods + ' モジュールを表示中'; },
+  },
+  en: {
+    search: 'Search...',
+    presets: 'Presets',
+    moduleFilter: 'Module Filter',
+    stats: 'Statistics',
+    legend: 'Legend',
+    featureNodes: 'Feature Nodes',
+    dataFlows: 'Data Flows',
+    apiEndpoints: 'API Endpoints',
+    dataModels: 'Data Models',
+    flowSolid: 'Business Flow (solid)',
+    flowDashed: 'Data Reference (dashed)',
+    path: 'Path',
+    apiEndpoint: 'API Endpoints',
+    dataModel: 'Data Models',
+    inbound: '\u2190 Inbound',
+    outbound: '\u2192 Outbound',
+    copy: 'Copy',
+    defaultPrompt: 'Click a module to view details',
+    tabFeatures: 'Feature Map',
+    tabFlow: 'Business Flow',
+    tabData: 'Data Models',
+    tabUsers: 'User Roles',
+    promptSelected: function(label, mod, path, apis, db, related) {
+      return 'About PMS "' + label + '" (' + mod + '). Path: ' + path + ', API: ' + apis + ', DB: ' + db + '. Related: ' + related;
+    },
+    promptFlow: function(names) { return 'Please explain the following PMS business flow: ' + names; },
+    promptOverview: function(count, mods) { return 'PMS System Overview — showing ' + count + ' features across ' + mods + ' modules'; },
+  }
+};
+
+function t(key) { return UI[lang][key] || UI['ja'][key] || key; }
+
+// i18n helper: get localized field from object
+function L(obj, field) {
+  if (lang === 'en' && obj[field + 'En']) return obj[field + 'En'];
+  return obj[field];
+}
+
+// ==================== DATA ====================
+const MODULES = {
+  sales:   { label: '営業 (Sales)',       labelEn: 'Sales',              color: '#f59e0b', icon: '\uD83D\uDCBC' },
+  ops:     { label: '配布 (Operations)',   labelEn: 'Operations',         color: '#10b981', icon: '\uD83D\uDE9A' },
+  quality: { label: '品質 (Quality)',      labelEn: 'Quality',            color: '#ef4444', icon: '\uD83D\uDEE1\uFE0F' },
+  hr:      { label: '人事 (HR)',           labelEn: 'Human Resources',    color: '#8b5cf6', icon: '\uD83D\uDC65' },
+  acct:    { label: '経理 (Accounting)',   labelEn: 'Accounting',         color: '#06b6d4', icon: '\uD83D\uDCB0' },
+  system:  { label: 'システム (System)',    labelEn: 'System',             color: '#6b7280', icon: '\u2699\uFE0F' },
+  portal:  { label: 'ECポータル (Portal)', labelEn: 'EC Portal',          color: '#ec4899', icon: '\uD83D\uDED2' },
+  staff:   { label: 'スタッフ (Staff)',     labelEn: 'Staff (Mobile)',     color: '#14b8a6', icon: '\uD83D\uDCF1' },
+  recruit: { label: '採用 (Recruit)',      labelEn: 'Recruitment',        color: '#a3e635', icon: '\uD83D\uDCCB' },
+  cron:    { label: 'CRON (自動処理)',      labelEn: 'CRON (Scheduled)',   color: '#f97316', icon: '\u23F0' },
+};
+
+const NODES = [
+  // SALES
+  { id: 'orders', module: 'sales', label: '受注管理', labelEn: 'Order Mgmt', desc: '受注の作成・承認・進捗管理。見積〜納品まで。', descEn: 'Create, approve, and track orders from quotation to delivery.', path: '/orders', apis: ['GET/POST /api/orders', 'GET/PUT /api/orders/[id]'], db: ['Order', 'OrderApproval', 'OrderDesign', 'OrderDistribution'] },
+  { id: 'customers', module: 'sales', label: '顧客管理', labelEn: 'Customer Mgmt', desc: '法人・個人顧客の基本情報、連絡先、配送先管理。', descEn: 'Manage corporate/individual customers, contacts, and delivery addresses.', path: '/customers', apis: ['GET/POST /api/customers', 'GET/PUT/DELETE /api/customers/[id]'], db: ['Customer', 'CustomerContact', 'CustomerDeliveryAddress'] },
+  { id: 'leads', module: 'sales', label: 'リード管理', labelEn: 'Lead Mgmt', desc: '見込み客の管理。アプローチ→提案→見積→交渉→受注のパイプライン。', descEn: 'Prospect pipeline: approach, proposal, quotation, negotiation, order.', path: '/crm/leads', apis: ['GET/POST /api/leads'], db: ['Lead'] },
+  { id: 'campaigns', module: 'sales', label: 'キャンペーン', labelEn: 'Campaigns', desc: 'マーケティングキャンペーンの作成と管理。', descEn: 'Create and manage marketing campaigns.', path: '/campaigns', apis: ['GET/POST /api/campaigns'], db: ['Campaign'] },
+  { id: 'tasks', module: 'sales', label: 'CRMタスク', labelEn: 'CRM Tasks', desc: '営業・現場・管理タスクの管理。定期タスクテンプレートからの自動生成対応。', descEn: 'Sales/field/admin tasks with recurring template auto-generation.', path: '/crm/tasks', apis: ['GET/POST /api/tasks', 'GET/POST /api/task-templates'], db: ['Task', 'TaskAssignee', 'TaskTemplate'] },
+
+  // OPERATIONS
+  { id: 'dispatch', module: 'ops', label: '配車管理', labelEn: 'Dispatch', desc: '配布案件のアサインと配車指示。', descEn: 'Assign distribution jobs and dispatch instructions.', path: '/dispatch', apis: ['GET /api/schedules'], db: ['DistributionSchedule'] },
+  { id: 'schedules', module: 'ops', label: 'スケジュール', labelEn: 'Schedules', desc: '配布スケジュールの一覧・地図表示。GPS軌跡ビューア。', descEn: 'Distribution schedule list with map view and GPS trajectory viewer.', path: '/schedules', apis: ['GET/POST /api/schedules', 'GET /api/schedules/[id]/trajectory'], db: ['DistributionSchedule', 'DistributionSession', 'GpsPoint'] },
+  { id: 'areas', module: 'ops', label: 'エリア管理', labelEn: 'Area Mgmt', desc: '配布エリア（都道府県→市区町村→丁目）の管理。GeoJSONポリゴン。', descEn: 'Manage distribution areas (prefecture/city/district) with GeoJSON polygons.', path: '/areas', apis: ['GET/POST /api/areas'], db: ['Area', 'Prefecture', 'City', 'AreaRank'] },
+  { id: 'flyers', module: 'ops', label: 'チラシ管理', labelEn: 'Flyer Mgmt', desc: 'チラシマスタの登録・在庫管理。', descEn: 'Flyer master registration and inventory management.', path: '/flyers', apis: ['GET/POST /api/flyers'], db: ['Flyer', 'FlyerSize', 'FoldingType'] },
+  { id: 'inventory', module: 'ops', label: '在庫管理', labelEn: 'Inventory', desc: 'チラシの入出庫・在庫推移。', descEn: 'Flyer stock in/out and inventory tracking.', path: '/transactions', apis: ['GET/POST /api/transactions'], db: ['FlyerTransaction'] },
+  { id: 'picking', module: 'ops', label: 'ピッキング照合', labelEn: 'Picking Check', desc: 'Claude Vision AIによるチラシ照合 + 人的チェックの2段階検証。', descEn: 'Two-stage flyer verification: Claude Vision AI check + human review.', path: '/picking', apis: ['GET /api/picking', 'POST /api/picking/upload', 'PUT /api/picking/[id]/check'], db: ['PickingVerification'] },
+  { id: 'distributors', module: 'ops', label: '配布員管理', labelEn: 'Distributor Mgmt', desc: '配布員（スタッフ）の登録・評価・給与管理。', descEn: 'Distributor registration, evaluation, and payroll management.', path: '/distributors', apis: ['GET/POST /api/distributors'], db: ['FlyerDistributor', 'DistributorEvaluation'] },
+  { id: 'shifts', module: 'ops', label: 'シフト管理', labelEn: 'Shift Mgmt', desc: '配布員のシフトスケジュール管理。', descEn: 'Distributor shift scheduling.', path: '/distributor-shifts', apis: ['GET/POST /api/distributor-shifts'], db: ['DistributorShift'] },
+  { id: 'partners', module: 'ops', label: '協力会社管理', labelEn: 'Partner Mgmt', desc: '外注パートナーの管理・エリア・単価設定。', descEn: 'Outsourcing partner management, coverage areas, and pricing.', path: '/partners', apis: ['GET/POST /api/partners'], db: ['Partner', 'PartnerType', 'PartnerCoverageArea'] },
+  { id: 'relay', module: 'ops', label: '中継管理', labelEn: 'Relay Mgmt', desc: '中継・回収ドライバータスクのルート最適化。Google Directions API連携。', descEn: 'Relay/collection driver route optimization via Google Directions API.', path: '/relay', apis: ['GET/POST /api/relay-tasks', 'POST /api/relay-tasks/optimize-route'], db: [] },
+
+  // QUALITY
+  { id: 'alerts', module: 'quality', label: 'アラート', labelEn: 'Alerts', desc: 'ルールベースの自動アラート。ビザ期限・評価閾値等。', descEn: 'Rule-based automatic alerts for visa expiry, evaluation thresholds, etc.', path: '/alerts', apis: ['GET/POST /api/alerts', 'GET/POST /api/alert-definitions'], db: ['Alert', 'AlertCategory', 'AlertDefinition'] },
+  { id: 'complaints', module: 'quality', label: 'クレーム管理', labelEn: 'Complaints', desc: 'クレームの登録・対応履歴・禁止物件への自動登録。', descEn: 'Complaint registration, response history, auto-register prohibited properties.', path: '/quality/complaints', apis: ['GET/POST /api/complaints', 'POST /api/complaints/[id]/register-prohibited'], db: ['Complaint', 'ComplaintType', 'ComplaintResponse'] },
+  { id: 'prohibited', module: 'quality', label: '配布禁止物件', labelEn: 'Prohibited Addr', desc: '配布禁止アドレスDB。CSVインポート・地図表示。写真はS3。', descEn: 'No-distribution address DB. CSV import, map view, S3 photos.', path: '/quality/prohibited-properties', apis: ['GET/POST /api/prohibited-properties', 'POST /api/prohibited-properties/import'], db: ['ProhibitedProperty', 'ProhibitedReason'] },
+
+  // HR
+  { id: 'employees', module: 'hr', label: '社員管理', labelEn: 'Employee Mgmt', desc: '社員マスタ。役職・部署・支店・給与情報。', descEn: 'Employee master: position, department, branch, salary info.', path: '/employees', apis: ['GET/POST /api/employees'], db: ['Employee', 'Department', 'EmployeeRole', 'EmployeeFinancial'] },
+  { id: 'applicants', module: 'hr', label: '応募者管理', labelEn: 'Applicant Mgmt', desc: '応募者のフロー管理。面接→研修→採用→配布員登録。FullCalendar。', descEn: 'Applicant flow: interview, training, hiring, distributor registration.', path: '/applicants', apis: ['GET/POST /api/applicants', 'POST /api/applicants/[id]/register-as-distributor'], db: ['Applicant', 'InterviewSlot', 'TrainingSlot'] },
+  { id: 'branches', module: 'hr', label: '支店管理', labelEn: 'Branch Mgmt', desc: '支店の住所・地図上での位置管理。', descEn: 'Branch office address and map location management.', path: '/branches', apis: ['GET/POST /api/branches'], db: ['Branch'] },
+  { id: 'attendance', module: 'hr', label: '勤怠管理', labelEn: 'Attendance', desc: '社員の出退勤打刻。', descEn: 'Employee clock-in/clock-out tracking.', path: '/attendance', apis: ['GET/POST /api/attendance'], db: ['Attendance', 'AttendanceType'] },
+  { id: 'approvals', module: 'hr', label: '経費承認', labelEn: 'Expense Approval', desc: '経費申請の承認ワークフロー。', descEn: 'Expense claim approval workflow.', path: '/approvals', apis: ['GET/POST /api/approvals'], db: ['Expense'] },
+
+  // ACCOUNTING
+  { id: 'billing', module: 'acct', label: '請求管理', labelEn: 'Billing', desc: '請求書の作成・PDF出力。顧客別請求一覧。', descEn: 'Invoice creation, PDF export, customer billing list.', path: '/billing', apis: ['GET/POST /api/billing'], db: ['BillingStatement', 'BillingStatementItem'] },
+  { id: 'payroll', module: 'acct', label: '給与管理', labelEn: 'Payroll', desc: '社員給与の計算・明細出力。', descEn: 'Employee salary calculation and pay slip output.', path: '/payroll', apis: ['GET/POST /api/payroll'], db: ['PayrollRecord'] },
+  { id: 'dist-payroll', module: 'acct', label: '配布員給与', labelEn: 'Dist. Payroll', desc: '配布員の報酬計算。単価x実績の自動集計。', descEn: 'Distributor compensation: unit price x actual count auto-calculation.', path: '/distributors/payroll', apis: ['GET/POST /api/distributor-payroll'], db: ['DistributorPayrollRecord', 'DistributorPayrollItem'] },
+
+  // SYSTEM
+  { id: 'settings', module: 'system', label: 'システム設定', labelEn: 'Settings', desc: '各種マスタ・面接/研修スロット・GPS設定・求人媒体等の管理。', descEn: 'Master data, interview/training slots, GPS config, recruiting media.', path: '/settings', apis: ['GET/PUT /api/settings'], db: ['SystemSetting', 'CompanySetting'] },
+  { id: 'audit', module: 'system', label: '監査ログ', labelEn: 'Audit Logs', desc: '全操作の監査証跡。SuperAdminのみ閲覧可。', descEn: 'Full operation audit trail. SuperAdmin only.', path: '/audit-logs', apis: ['GET /api/audit-logs'], db: ['AuditLog'] },
+  { id: 'analytics', module: 'system', label: 'アナリティクス', labelEn: 'Analytics', desc: 'エリア別・配布実績の分析ダッシュボード。', descEn: 'Area-based and distribution performance analytics dashboard.', path: '/analytics', apis: ['GET /api/analytics'], db: [] },
+  { id: 'announcements', module: 'system', label: 'お知らせ', labelEn: 'Announcements', desc: '社内アナウンスの配信・既読管理。', descEn: 'Internal announcements with read tracking.', path: '/announcements', apis: ['GET/POST /api/announcements'], db: ['Announcement', 'AnnouncementRead'] },
+
+  // PORTAL
+  { id: 'portal-orders', module: 'portal', label: 'EC発注', labelEn: 'EC Orders', desc: '顧客がWebから直接発注。エリア選択・見積・カート機能。', descEn: 'Customer web orders with area selection, quotes, and cart.', path: '/portal/orders', apis: ['GET/POST /api/portal/orders'], db: ['Order'] },
+  { id: 'portal-mypage', module: 'portal', label: 'マイページ', labelEn: 'My Page', desc: '顧客のアカウント設定・発注履歴・分析。', descEn: 'Customer account settings, order history, and analytics.', path: '/portal/mypage', apis: ['GET /api/portal/orders'], db: ['Customer'] },
+  { id: 'portal-qr', module: 'portal', label: 'QRコード', labelEn: 'QR Codes', desc: 'チラシ効果測定用QRコード生成・リダイレクト追跡。', descEn: 'QR code generation for flyer effectiveness tracking.', path: '/portal/qrcodes', apis: ['GET/POST /api/qrcodes'], db: [] },
+
+  // STAFF
+  { id: 'staff-shifts', module: 'staff', label: 'シフト確認', labelEn: 'View Shifts', desc: '配布員がモバイルから自分のシフト確認・出勤記録。', descEn: 'Distributors view their shifts and attendance from mobile.', path: '/staff/shifts', apis: ['GET /api/staff/shifts'], db: ['DistributorShift'] },
+  { id: 'staff-distribution', module: 'staff', label: 'GPS配布', labelEn: 'GPS Distribution', desc: 'モバイルからGPS配布開始→座標送信→進捗報告→完了。', descEn: 'Mobile GPS distribution: start, send coords, report progress, finish.', path: '(mobile)', apis: ['POST /api/staff/distribution/start', 'POST /api/staff/distribution/gps', 'POST /api/staff/distribution/finish'], db: ['DistributionSession', 'GpsPoint', 'ProgressEvent'] },
+  { id: 'staff-payroll', module: 'staff', label: '給与確認', labelEn: 'View Payroll', desc: '配布員が自分の報酬・明細を確認。', descEn: 'Distributors view their earnings and pay details.', path: '/staff/payroll', apis: ['GET /api/staff/payroll'], db: ['DistributorPayrollRecord'] },
+  { id: 'staff-eval', module: 'staff', label: '評価確認', labelEn: 'View Evaluation', desc: '配布員が自分の評価スコアを確認。', descEn: 'Distributors view their performance evaluation scores.', path: '/staff/evaluation', apis: ['GET /api/staff/evaluation'], db: ['DistributorEvaluation'] },
+
+  // RECRUIT
+  { id: 'apply', module: 'recruit', label: '応募フォーム', labelEn: 'Application Form', desc: '公開応募フォーム（ja/en）。面接スロット自動予約+Google Meet生成。', descEn: 'Public application form (JA/EN). Auto interview slot booking + Google Meet.', path: '/apply', apis: ['POST /api/apply', 'GET /api/interview-slots/available'], db: ['Applicant', 'InterviewSlot'] },
+  { id: 'training-booking', module: 'recruit', label: '研修予約', labelEn: 'Training Booking', desc: '採用者が自分で研修日時を予約（トークンベース）。', descEn: 'Hired applicants self-book training sessions via token.', path: '/training-booking', apis: ['GET/POST /api/training-booking'], db: ['TrainingSlot'] },
+  { id: 'interview-booking', module: 'recruit', label: '面接予約', labelEn: 'Interview Booking', desc: '応募者が面接日程を変更（トークンベース）。', descEn: 'Applicants reschedule interviews via token.', path: '/interview-booking', apis: ['GET/POST /api/interview-booking'], db: ['InterviewSlot'] },
+
+  // CRON
+  { id: 'cron-slots', module: 'cron', label: '面接スロット生成', labelEn: 'Interview Slots', desc: '毎日01:00にデフォルトマスタから14日分の面接スロットを自動生成。', descEn: 'Daily 01:00: auto-generate 14 days of interview slots from master.', path: 'cron 01:00', apis: ['GET /api/cron/generate-slots'], db: ['InterviewSlot', 'DefaultInterviewSlot'] },
+  { id: 'cron-tasks', module: 'cron', label: '定期タスク生成', labelEn: 'Recurring Tasks', desc: '毎日00:00にテンプレートからCRMタスクを自動生成。', descEn: 'Daily 00:00: auto-generate CRM tasks from templates.', path: 'cron 00:00', apis: ['GET /api/cron/generate-tasks'], db: ['Task', 'TaskTemplate'] },
+  { id: 'cron-training', module: 'cron', label: '研修スロット生成', labelEn: 'Training Slots', desc: '毎日02:00にデフォルトマスタから研修スロットを自動生成。', descEn: 'Daily 02:00: auto-generate training slots from master.', path: 'cron 02:00', apis: ['GET /api/cron/generate-training-slots'], db: ['TrainingSlot', 'DefaultTrainingSlot'] },
+  { id: 'cron-eval', module: 'cron', label: '配布員評価', labelEn: 'Dist. Evaluation', desc: '配布員の実績ベース自動評価。', descEn: 'Performance-based auto-evaluation of distributors.', path: 'cron', apis: ['GET /api/cron/evaluate-distributors'], db: ['DistributorEvaluation'] },
+  { id: 'cron-visa', module: 'cron', label: 'ビザ期限チェック', labelEn: 'Visa Expiry Check', desc: 'ビザ期限が近い配布員のアラートを自動生成。', descEn: 'Auto-generate alerts for distributors with expiring visas.', path: 'cron', apis: ['GET /api/cron/check-visa-expiry'], db: ['Alert'] },
+  { id: 'cron-alerts', module: 'cron', label: 'アラート評価', labelEn: 'Alert Evaluation', desc: 'ルール定義に基づくアラートの自動発火。', descEn: 'Fire alerts based on defined rules.', path: 'cron', apis: ['GET /api/cron/check-alert-definitions'], db: ['Alert', 'AlertDefinition'] },
+  { id: 'cron-reminders', module: 'cron', label: 'リマインダー送信', labelEn: 'Send Reminders', desc: '面接・研修等のリマインダーメール自動送信。', descEn: 'Auto-send reminder emails for interviews and training.', path: 'cron', apis: ['GET /api/cron/send-reminders'], db: [] },
+];
+
+const EDGES = [
+  { from: 'leads', to: 'customers', label: '成約', labelEn: 'Close', type: 'flow' },
+  { from: 'customers', to: 'orders', label: '発注', labelEn: 'Order', type: 'flow' },
+  { from: 'orders', to: 'dispatch', label: '配車指示', labelEn: 'Dispatch', type: 'flow' },
+  { from: 'orders', to: 'billing', label: '請求', labelEn: 'Invoice', type: 'flow' },
+  { from: 'campaigns', to: 'leads', label: 'リード獲得', labelEn: 'Lead gen', type: 'flow' },
+  { from: 'dispatch', to: 'schedules', label: 'スケジュール化', labelEn: 'Schedule', type: 'flow' },
+  { from: 'schedules', to: 'picking', label: 'ピッキング', labelEn: 'Picking', type: 'flow' },
+  { from: 'picking', to: 'staff-distribution', label: '配布開始', labelEn: 'Start dist.', type: 'flow' },
+  { from: 'staff-distribution', to: 'schedules', label: 'GPS軌跡', labelEn: 'GPS track', type: 'data' },
+  { from: 'flyers', to: 'inventory', label: '在庫管理', labelEn: 'Inventory', type: 'data' },
+  { from: 'flyers', to: 'orders', label: 'チラシ紐付け', labelEn: 'Link flyer', type: 'data' },
+  { from: 'areas', to: 'schedules', label: 'エリア指定', labelEn: 'Area assign', type: 'data' },
+  { from: 'areas', to: 'prohibited', label: 'エリア参照', labelEn: 'Area ref', type: 'data' },
+  { from: 'distributors', to: 'schedules', label: '配布員アサイン', labelEn: 'Assign dist.', type: 'data' },
+  { from: 'distributors', to: 'shifts', label: 'シフト登録', labelEn: 'Shift reg.', type: 'data' },
+  { from: 'partners', to: 'dispatch', label: '外注配車', labelEn: 'Outsource', type: 'data' },
+  { from: 'relay', to: 'schedules', label: '中継ルート', labelEn: 'Relay route', type: 'data' },
+  { from: 'complaints', to: 'prohibited', label: '禁止登録', labelEn: 'Ban register', type: 'flow' },
+  { from: 'prohibited', to: 'staff-distribution', label: 'スキップ通知', labelEn: 'Skip notify', type: 'data' },
+  { from: 'cron-alerts', to: 'alerts', label: 'アラート生成', labelEn: 'Generate alert', type: 'data' },
+  { from: 'cron-visa', to: 'alerts', label: 'ビザアラート', labelEn: 'Visa alert', type: 'data' },
+  { from: 'apply', to: 'applicants', label: '応募登録', labelEn: 'Apply', type: 'flow' },
+  { from: 'applicants', to: 'training-booking', label: '研修案内', labelEn: 'Training invite', type: 'flow' },
+  { from: 'applicants', to: 'distributors', label: '配布員登録', labelEn: 'Register dist.', type: 'flow' },
+  { from: 'interview-booking', to: 'applicants', label: '日程変更', labelEn: 'Reschedule', type: 'data' },
+  { from: 'employees', to: 'attendance', label: '出退勤', labelEn: 'Clock in/out', type: 'data' },
+  { from: 'employees', to: 'approvals', label: '経費申請', labelEn: 'Expense claim', type: 'data' },
+  { from: 'schedules', to: 'dist-payroll', label: '実績集計', labelEn: 'Tally results', type: 'data' },
+  { from: 'employees', to: 'payroll', label: '給与計算', labelEn: 'Calc salary', type: 'data' },
+  { from: 'distributors', to: 'dist-payroll', label: '単価参照', labelEn: 'Unit price ref', type: 'data' },
+  { from: 'portal-orders', to: 'orders', label: 'EC発注', labelEn: 'EC order', type: 'flow' },
+  { from: 'customers', to: 'portal-mypage', label: '顧客情報', labelEn: 'Customer info', type: 'data' },
+  { from: 'shifts', to: 'staff-shifts', label: 'シフト参照', labelEn: 'View shifts', type: 'data' },
+  { from: 'dist-payroll', to: 'staff-payroll', label: '報酬参照', labelEn: 'View pay', type: 'data' },
+  { from: 'cron-eval', to: 'staff-eval', label: '評価反映', labelEn: 'Update eval', type: 'data' },
+  { from: 'cron-slots', to: 'applicants', label: 'スロット生成', labelEn: 'Gen slots', type: 'data' },
+  { from: 'cron-tasks', to: 'tasks', label: 'タスク生成', labelEn: 'Gen tasks', type: 'data' },
+  { from: 'cron-training', to: 'training-booking', label: 'スロット生成', labelEn: 'Gen slots', type: 'data' },
+  { from: 'cron-reminders', to: 'applicants', label: 'リマインダー', labelEn: 'Reminder', type: 'data' },
+  { from: 'settings', to: 'cron-slots', label: '設定参照', labelEn: 'Config ref', type: 'data' },
+];
+
+const FLOW_PRESETS = [
+  { id: 'all', label: '全体表示', labelEn: 'All', modules: null, highlight: null },
+  { id: 'posting', label: '配布業務フロー', labelEn: 'Distribution Flow', modules: ['sales', 'ops', 'quality', 'staff'], highlight: ['leads','customers','orders','dispatch','schedules','picking','staff-distribution','flyers','inventory','areas','complaints','prohibited'] },
+  { id: 'recruit', label: '採用フロー', labelEn: 'Recruitment Flow', modules: ['recruit', 'hr', 'ops', 'cron'], highlight: ['apply','applicants','training-booking','interview-booking','distributors','cron-slots','cron-training','cron-reminders'] },
+  { id: 'accounting', label: '請求・給与', labelEn: 'Billing & Payroll', modules: ['acct', 'sales', 'ops', 'hr'], highlight: ['orders','billing','payroll','dist-payroll','schedules','distributors','employees'] },
+  { id: 'ec', label: 'ECポータル', labelEn: 'EC Portal', modules: ['portal', 'sales'], highlight: ['portal-orders','portal-mypage','portal-qr','orders','customers'] },
+  { id: 'mobile', label: 'モバイル（配布員）', labelEn: 'Mobile (Distributor)', modules: ['staff', 'ops', 'acct'], highlight: ['staff-shifts','staff-distribution','staff-payroll','staff-eval','schedules','shifts','dist-payroll'] },
+];
+
+// Business flow diagrams: sequential step chains with swimlanes
+const FLOW_DIAGRAMS = {
+  posting: {
+    title: '配布業務フロー', titleEn: 'Distribution Business Flow',
+    lanes: [
+      { label: '営業', labelEn: 'Sales', color: '#f59e0b', steps: ['campaigns','leads','customers','orders'] },
+      { label: 'オペレーション', labelEn: 'Operations', color: '#10b981', steps: ['flyers','dispatch','schedules','picking'] },
+      { label: '配布', labelEn: 'Distribution', color: '#14b8a6', steps: ['staff-distribution'] },
+      { label: '品質', labelEn: 'Quality', color: '#ef4444', steps: ['complaints','prohibited'] },
+      { label: '経理', labelEn: 'Accounting', color: '#06b6d4', steps: ['billing'] },
+    ],
+    arrows: [
+      { from: 'campaigns', to: 'leads', label: 'リード獲得', labelEn: 'Lead gen' },
+      { from: 'leads', to: 'customers', label: '成約', labelEn: 'Close' },
+      { from: 'customers', to: 'orders', label: '発注', labelEn: 'Order' },
+      { from: 'orders', to: 'dispatch', label: '配車指示', labelEn: 'Dispatch' },
+      { from: 'flyers', to: 'dispatch', label: 'チラシ準備', labelEn: 'Prepare flyers' },
+      { from: 'dispatch', to: 'schedules', label: 'スケジュール化', labelEn: 'Schedule' },
+      { from: 'schedules', to: 'picking', label: 'ピッキング', labelEn: 'Picking' },
+      { from: 'picking', to: 'staff-distribution', label: '配布開始', labelEn: 'Start dist.' },
+      { from: 'staff-distribution', to: 'complaints', label: 'クレーム発生', labelEn: 'Complaint' },
+      { from: 'complaints', to: 'prohibited', label: '禁止登録', labelEn: 'Ban' },
+      { from: 'orders', to: 'billing', label: '請求', labelEn: 'Invoice' },
+    ]
+  },
+  recruit: {
+    title: '採用フロー', titleEn: 'Recruitment Flow',
+    lanes: [
+      { label: '応募者', labelEn: 'Applicant', color: '#a3e635', steps: ['apply','interview-booking','training-booking'] },
+      { label: '人事管理', labelEn: 'HR Admin', color: '#8b5cf6', steps: ['applicants'] },
+      { label: 'オペレーション', labelEn: 'Operations', color: '#10b981', steps: ['distributors'] },
+      { label: '自動処理', labelEn: 'Automation', color: '#f97316', steps: ['cron-slots','cron-training','cron-reminders'] },
+    ],
+    arrows: [
+      { from: 'apply', to: 'applicants', label: '応募', labelEn: 'Apply' },
+      { from: 'cron-slots', to: 'apply', label: 'スロット提供', labelEn: 'Provide slots' },
+      { from: 'applicants', to: 'interview-booking', label: '面接案内', labelEn: 'Interview invite' },
+      { from: 'applicants', to: 'training-booking', label: '研修案内', labelEn: 'Training invite' },
+      { from: 'cron-training', to: 'training-booking', label: 'スロット生成', labelEn: 'Gen slots' },
+      { from: 'cron-reminders', to: 'applicants', label: 'リマインダー', labelEn: 'Reminder' },
+      { from: 'applicants', to: 'distributors', label: '配布員登録', labelEn: 'Register' },
+    ]
+  },
+  accounting: {
+    title: '請求・給与フロー', titleEn: 'Billing & Payroll Flow',
+    lanes: [
+      { label: '営業', labelEn: 'Sales', color: '#f59e0b', steps: ['orders'] },
+      { label: 'オペレーション', labelEn: 'Operations', color: '#10b981', steps: ['schedules','distributors'] },
+      { label: '人事', labelEn: 'HR', color: '#8b5cf6', steps: ['employees'] },
+      { label: '経理', labelEn: 'Accounting', color: '#06b6d4', steps: ['billing','dist-payroll','payroll'] },
+    ],
+    arrows: [
+      { from: 'orders', to: 'billing', label: '請求書作成', labelEn: 'Create invoice' },
+      { from: 'schedules', to: 'dist-payroll', label: '実績集計', labelEn: 'Tally results' },
+      { from: 'distributors', to: 'dist-payroll', label: '単価参照', labelEn: 'Unit price' },
+      { from: 'employees', to: 'payroll', label: '給与計算', labelEn: 'Calc salary' },
+    ]
+  },
+  ec: {
+    title: 'ECポータルフロー', titleEn: 'EC Portal Flow',
+    lanes: [
+      { label: 'EC顧客', labelEn: 'EC Customer', color: '#ec4899', steps: ['portal-mypage','portal-orders','portal-qr'] },
+      { label: '社内管理', labelEn: 'Internal', color: '#f59e0b', steps: ['customers','orders'] },
+    ],
+    arrows: [
+      { from: 'portal-orders', to: 'orders', label: 'EC発注', labelEn: 'EC order' },
+      { from: 'customers', to: 'portal-mypage', label: '顧客情報', labelEn: 'Customer info' },
+    ]
+  },
+  mobile: {
+    title: 'モバイル（配布員）フロー', titleEn: 'Mobile Distributor Flow',
+    lanes: [
+      { label: '管理者', labelEn: 'Admin', color: '#10b981', steps: ['shifts','schedules'] },
+      { label: '配布員アプリ', labelEn: 'Distributor App', color: '#14b8a6', steps: ['staff-shifts','staff-distribution','staff-payroll','staff-eval'] },
+      { label: '経理', labelEn: 'Accounting', color: '#06b6d4', steps: ['dist-payroll'] },
+    ],
+    arrows: [
+      { from: 'shifts', to: 'staff-shifts', label: 'シフト参照', labelEn: 'View shifts' },
+      { from: 'schedules', to: 'staff-distribution', label: '配布実行', labelEn: 'Execute dist.' },
+      { from: 'staff-distribution', to: 'dist-payroll', label: '実績報告', labelEn: 'Report results' },
+      { from: 'dist-payroll', to: 'staff-payroll', label: '報酬参照', labelEn: 'View pay' },
+    ]
+  }
+};
+
+const USER_ROLES = [
+  { id: 'super-admin', label: 'SuperAdmin', desc: '全機能アクセス可。監査ログ閲覧権限あり。', descEn: 'Full access. Can view audit logs.', auth: 'pms_session (7d)', color: '#ef4444' },
+  { id: 'admin', label: 'Admin', desc: '管理画面の全機能（監査ログ除く）。', descEn: 'All admin features except audit logs.', auth: 'pms_session (7d)', color: '#f59e0b' },
+  { id: 'driver', label: 'Driver', desc: '中継管理・勤怠・タスクのみ。', descEn: 'Relay, attendance, and tasks only.', auth: 'pms_session (7d)', color: '#10b981' },
+  { id: 'customer', label: 'EC Customer', desc: 'ECポータルから発注・分析・QR管理。', descEn: 'EC portal: orders, analytics, QR codes.', auth: 'NextAuth JWT (30d)', color: '#ec4899' },
+  { id: 'distributor', label: 'Distributor', desc: 'モバイルからシフト・GPS配布・給与確認。', descEn: 'Mobile: shifts, GPS distribution, payroll.', auth: 'pms_distributor_session (30d)', color: '#14b8a6' },
+  { id: 'applicant', label: 'Applicant', desc: '応募フォーム・面接/研修予約。', descEn: 'Application form, interview/training booking.', auth: 'Token / Public', color: '#a3e635' },
+];
+
+// ==================== STATE ====================
+const state = {
+  view: 'features',
+  activeModules: new Set(Object.keys(MODULES)),
+  search: '',
+  selectedNode: null,
+  highlightNodes: null,
+  activePreset: 'all',
+  zoom: 1, panX: 0, panY: 0,
+  dragging: false, dragStartX: 0, dragStartY: 0, panStartX: 0, panStartY: 0,
+  hoveredNode: null,
+};
+
+// ==================== LAYOUT ====================
+function layoutNodes() {
+  var visible = getVisibleNodes();
+  var moduleGroups = {};
+  visible.forEach(function(n) {
+    if (!moduleGroups[n.module]) moduleGroups[n.module] = [];
+    moduleGroups[n.module].push(n);
+  });
+
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.width / dpr;
+
+  var moduleOrder = ['sales','ops','quality','hr','acct','system','portal','staff','recruit','cron'];
+  var activeOrder = moduleOrder.filter(function(m) { return moduleGroups[m]; });
+  if (activeOrder.length === 0) return;
+
+  var nodeW = 150, nodeH = 44, gap = 8;
+  var marginX = 40, marginY = 50, colGap = 24;
+
+  // Calculate max columns that fit in the canvas width
+  var maxCols = Math.max(2, Math.floor((W - marginX * 2 + colGap) / (nodeW + colGap)));
+  var cols = Math.min(activeOrder.length, maxCols);
+  var colWidth = nodeW + colGap;
+  var totalWidth = cols * colWidth - colGap;
+  var startX = Math.max(marginX, (W - totalWidth) / 2);
+
+  // Track each column's current Y position (masonry-style)
+  var colY = [];
+  for (var c = 0; c < cols; c++) colY.push(marginY);
+
+  activeOrder.forEach(function(mod) {
+    // Pick the shortest column
+    var bestCol = 0;
+    for (var c = 1; c < cols; c++) {
+      if (colY[c] < colY[bestCol]) bestCol = c;
+    }
+
+    var nodes = moduleGroups[mod];
+    var x = startX + bestCol * colWidth;
+    var y = colY[bestCol] + 20; // space for module label
+
+    nodes.forEach(function(n, i) {
+      n._x = x;
+      n._y = y + i * (nodeH + gap);
+      n._w = nodeW;
+      n._h = nodeH;
+    });
+
+    // Advance column Y past this module
+    colY[bestCol] = y + nodes.length * (nodeH + gap) + 24;
+  });
+}
+
+// Flow diagram layout: positions stored in _flow map keyed by node id
+var _flowPositions = {};
+
+function layoutFlowDiagram(diagramKey) {
+  _flowPositions = {};
+  var diagram = FLOW_DIAGRAMS[diagramKey];
+  if (!diagram) return;
+
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.width / dpr;
+  var H = cv.height / dpr;
+
+  var laneH = 70;
+  var nodeW = 140, nodeH = 42, hGap = 40;
+  var marginX = 60, marginY = 80;
+  var laneGap = 12;
+  var laneLabelW = 110;
+
+  diagram.lanes.forEach(function(lane, li) {
+    var y = marginY + li * (laneH + laneGap);
+    lane.steps.forEach(function(stepId, si) {
+      _flowPositions[stepId] = {
+        x: marginX + laneLabelW + si * (nodeW + hGap),
+        y: y + (laneH - nodeH) / 2,
+        w: nodeW, h: nodeH,
+        laneIndex: li
+      };
+    });
+  });
+}
+
+function drawFlowDiagram(diagramKey) {
+  var diagram = FLOW_DIAGRAMS[diagramKey];
+  if (!diagram) return;
+
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.width / dpr;
+  var H = cv.height / dpr;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(state.panX, state.panY);
+  ctx.scale(state.zoom, state.zoom);
+
+  var laneH = 70, laneGap = 12;
+  var nodeW = 140, nodeH = 42;
+  var marginX = 60, marginY = 80;
+  var laneLabelW = 110;
+
+  // Title
+  ctx.fillStyle = '#e2e4ed';
+  ctx.font = 'bold 16px -apple-system, system-ui, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText(L(diagram, 'title'), marginX, marginY - 30);
+
+  // Draw swimlanes
+  var maxSteps = 0;
+  diagram.lanes.forEach(function(lane) { if (lane.steps.length > maxSteps) maxSteps = lane.steps.length; });
+  var totalW = laneLabelW + maxSteps * (nodeW + 40) + 60;
+
+  diagram.lanes.forEach(function(lane, li) {
+    var y = marginY + li * (laneH + laneGap);
+
+    // Lane background
+    ctx.fillStyle = lane.color + '08';
+    ctx.strokeStyle = lane.color + '20';
+    ctx.lineWidth = 1;
+    roundRect(ctx, marginX, y, totalW, laneH, 8);
+
+    // Lane label
+    ctx.fillStyle = lane.color;
+    ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(L(lane, 'label'), marginX + 12, y + laneH / 2 + 4);
+
+    // Separator line
+    ctx.beginPath();
+    ctx.moveTo(marginX + laneLabelW - 10, y + 8);
+    ctx.lineTo(marginX + laneLabelW - 10, y + laneH - 8);
+    ctx.strokeStyle = lane.color + '30';
+    ctx.stroke();
+  });
+
+  // Draw arrows first (behind nodes)
+  diagram.arrows.forEach(function(arrow) {
+    var fp = _flowPositions[arrow.from];
+    var tp = _flowPositions[arrow.to];
+    if (!fp || !tp) return;
+
+    var x1 = fp.x + fp.w / 2;
+    var y1 = fp.y + fp.h / 2;
+    var x2 = tp.x + tp.w / 2;
+    var y2 = tp.y + tp.h / 2;
+
+    // Adjust start/end to edge of nodes
+    var dx = x2 - x1, dy = y2 - y1;
+    var dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist === 0) return;
+
+    // Start from edge
+    var sx = x1 + (dx / dist) * (fp.w / 2);
+    var sy = y1 + (dy / dist) * (fp.h / 2);
+    var ex = x2 - (dx / dist) * (tp.w / 2);
+    var ey = y2 - (dy / dist) * (tp.h / 2);
+
+    var isSelected = state.selectedNode && (state.selectedNode === arrow.from || state.selectedNode === arrow.to);
+
+    ctx.beginPath();
+    // Curved for cross-lane, straight for same-lane
+    if (fp.laneIndex !== tp.laneIndex) {
+      var midX = (sx + ex) / 2;
+      ctx.moveTo(sx, sy);
+      ctx.bezierCurveTo(midX, sy, midX, ey, ex, ey);
+    } else {
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+    }
+
+    ctx.strokeStyle = isSelected ? '#6c7cff' : '#6c7cff80';
+    ctx.lineWidth = isSelected ? 2.5 : 1.5;
+    ctx.setLineDash([]);
+    ctx.stroke();
+
+    // Arrowhead
+    var angle;
+    if (fp.laneIndex !== tp.laneIndex) {
+      angle = Math.atan2(ey - sy, 0.001);
+      // Recalculate for the bezier end direction
+      angle = Math.atan2(ey - (sy + ey) / 2, ex - (sx + ex) / 2);
+    } else {
+      angle = Math.atan2(ey - sy, ex - sx);
+    }
+    var al = 8;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - al * Math.cos(angle - 0.35), ey - al * Math.sin(angle - 0.35));
+    ctx.lineTo(ex - al * Math.cos(angle + 0.35), ey - al * Math.sin(angle + 0.35));
+    ctx.closePath();
+    ctx.fillStyle = isSelected ? '#6c7cff' : '#6c7cff80';
+    ctx.fill();
+
+    // Arrow label
+    if (isSelected || true) {
+      var lx = (sx + ex) / 2;
+      var ly = (sy + ey) / 2 - 8;
+      if (fp.laneIndex !== tp.laneIndex) {
+        ly = (sy + ey) / 2 - 8;
+      }
+      ctx.fillStyle = '#8b8fa7';
+      ctx.font = '9px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(L(arrow, 'label'), lx, ly);
+    }
+  });
+
+  // Draw nodes
+  Object.keys(_flowPositions).forEach(function(nodeId) {
+    var pos = _flowPositions[nodeId];
+    var node = NODES.find(function(n) { return n.id === nodeId; });
+    if (!node) return;
+    var m = MODULES[node.module];
+    var isSelected = state.selectedNode === nodeId;
+    var isHovered = state.hoveredNode === nodeId;
+
+    if (isSelected || isHovered) { ctx.shadowColor = m.color + '50'; ctx.shadowBlur = 14; }
+
+    ctx.fillStyle = isSelected ? m.color + '25' : '#1a1d27';
+    ctx.strokeStyle = isSelected ? m.color : isHovered ? m.color + '90' : m.color + '50';
+    ctx.lineWidth = isSelected ? 2 : 1;
+    roundRect(ctx, pos.x, pos.y, pos.w, pos.h, 8, true);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+    // Left accent
+    ctx.fillStyle = m.color;
+    roundRectLeft(ctx, pos.x, pos.y, 4, pos.h, 8);
+
+    // Step number circle
+    var stepNum = 0;
+    // Find this node's position in the flow
+    diagram.lanes.forEach(function(lane) {
+      var idx = lane.steps.indexOf(nodeId);
+      if (idx >= 0) stepNum = idx + 1;
+    });
+
+    ctx.fillStyle = '#e2e4ed';
+    ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(truncate(L(node, 'label'), 14), pos.x + 12, pos.y + 17);
+
+    ctx.fillStyle = '#8b8fa7';
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.fillText(node.path || '', pos.x + 12, pos.y + 31);
+
+    // Store for hit testing
+    node._x = pos.x; node._y = pos.y; node._w = pos.w; node._h = pos.h;
+  });
+
+  ctx.restore();
+}
+
+function getVisibleNodes() {
+  return NODES.filter(function(n) {
+    if (!state.activeModules.has(n.module)) return false;
+    if (state.search) {
+      var q = state.search.toLowerCase();
+      return n.label.toLowerCase().indexOf(q) >= 0 || (n.labelEn && n.labelEn.toLowerCase().indexOf(q) >= 0) || n.desc.toLowerCase().indexOf(q) >= 0 || (n.descEn && n.descEn.toLowerCase().indexOf(q) >= 0) || n.id.indexOf(q) >= 0 || (n.path && n.path.toLowerCase().indexOf(q) >= 0);
+    }
+    return true;
+  });
+}
+
+// ==================== RENDER ====================
+var cv = document.getElementById('canvas');
+var ctx = cv.getContext('2d');
+var tooltipEl = document.getElementById('tooltip');
+
+function resizeCanvas() {
+  var wrap = cv.parentElement;
+  var dpr = window.devicePixelRatio || 1;
+  cv.width = wrap.clientWidth * dpr;
+  cv.height = wrap.clientHeight * dpr;
+  cv.style.width = wrap.clientWidth + 'px';
+  cv.style.height = wrap.clientHeight + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+function draw() {
+  var dpr = window.devicePixelRatio || 1;
+  var W = cv.width / dpr;
+  var H = cv.height / dpr;
+  ctx.clearRect(0, 0, W, H);
+
+  ctx.save();
+  ctx.translate(state.panX, state.panY);
+  ctx.scale(state.zoom, state.zoom);
+
+  var visible = getVisibleNodes();
+  var visibleIds = new Set(visible.map(function(n) { return n.id; }));
+
+  // Module group backgrounds
+  var groups = {};
+  visible.forEach(function(n) {
+    if (!groups[n.module]) groups[n.module] = [];
+    groups[n.module].push(n);
+  });
+
+  Object.keys(groups).forEach(function(mod) {
+    var nodes = groups[mod];
+    var m = MODULES[mod];
+    var pad = 16;
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    nodes.forEach(function(n) {
+      if (n._x < minX) minX = n._x;
+      if (n._y < minY) minY = n._y;
+      if (n._x + n._w > maxX) maxX = n._x + n._w;
+      if (n._y + n._h > maxY) maxY = n._y + n._h;
+    });
+
+    ctx.fillStyle = m.color + '08';
+    ctx.strokeStyle = m.color + '25';
+    ctx.lineWidth = 1;
+    roundRect(ctx, minX - pad, minY - 28, maxX - minX + pad * 2, maxY - minY + 44 + pad + 20, 10);
+
+    ctx.fillStyle = m.color + '90';
+    ctx.font = 'bold 10px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(m.icon + ' ' + L(m, 'label'), minX - pad + 8, minY - 14);
+  });
+
+  // Edges
+  var visibleEdges = EDGES.filter(function(e) { return visibleIds.has(e.from) && visibleIds.has(e.to); });
+  visibleEdges.forEach(function(e) {
+    var from = visible.find(function(n) { return n.id === e.from; });
+    var to = visible.find(function(n) { return n.id === e.to; });
+    if (!from || !to || !from._x || !to._x) return;
+
+    var x1 = from._x + from._w / 2, y1 = from._y + from._h / 2;
+    var x2 = to._x + to._w / 2, y2 = to._y + to._h / 2;
+
+    var isHighlight = state.highlightNodes && (state.highlightNodes.has(from.id) && state.highlightNodes.has(to.id));
+    var isSelected = state.selectedNode && (state.selectedNode === from.id || state.selectedNode === to.id);
+
+    ctx.beginPath();
+    var ctrlX = (x1 + x2) / 2 + (y2 - y1) * 0.15;
+    var ctrlY = (y1 + y2) / 2 - (x2 - x1) * 0.15;
+    ctx.moveTo(x1, y1);
+    ctx.quadraticCurveTo(ctrlX, ctrlY, x2, y2);
+
+    if (e.type === 'flow') {
+      ctx.strokeStyle = isHighlight || isSelected ? '#6c7cff' : '#6c7cff40';
+      ctx.setLineDash([]);
+      ctx.lineWidth = isHighlight || isSelected ? 2 : 1;
+    } else {
+      ctx.strokeStyle = isHighlight || isSelected ? '#8b8fa770' : '#8b8fa720';
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 1;
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    var angle = Math.atan2(y2 - ctrlY, x2 - ctrlX);
+    var al = 7;
+    ctx.beginPath();
+    ctx.moveTo(x2, y2);
+    ctx.lineTo(x2 - al * Math.cos(angle - 0.4), y2 - al * Math.sin(angle - 0.4));
+    ctx.lineTo(x2 - al * Math.cos(angle + 0.4), y2 - al * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.fill();
+
+    if ((isHighlight || isSelected) && e.label) {
+      ctx.fillStyle = '#e2e4ed90';
+      ctx.font = '9px -apple-system, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(L(e, 'label'), ctrlX, ctrlY - 4);
+    }
+  });
+
+  // Nodes
+  visible.forEach(function(n) {
+    if (!n._x) return;
+    var m = MODULES[n.module];
+    var isSelected = state.selectedNode === n.id;
+    var isHighlight = state.highlightNodes ? state.highlightNodes.has(n.id) : true;
+    var isHovered = state.hoveredNode === n.id;
+    var dim = state.highlightNodes && !isHighlight && !isSelected;
+
+    if (isSelected || isHovered) { ctx.shadowColor = m.color + '40'; ctx.shadowBlur = 12; }
+    ctx.fillStyle = dim ? '#1a1d2780' : (isSelected ? m.color + '30' : '#1a1d27');
+    ctx.strokeStyle = dim ? m.color + '15' : (isSelected ? m.color : isHovered ? m.color + '80' : m.color + '40');
+    ctx.lineWidth = isSelected ? 2 : 1;
+    roundRect(ctx, n._x, n._y, n._w, n._h, 8, true);
+    ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0;
+
+    // Left accent
+    ctx.fillStyle = dim ? m.color + '20' : m.color;
+    roundRectLeft(ctx, n._x, n._y, 4, n._h, 8);
+
+    ctx.fillStyle = dim ? '#e2e4ed40' : '#e2e4ed';
+    ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(truncate(L(n, 'label'), 14), n._x + 12, n._y + 18);
+
+    ctx.fillStyle = dim ? '#8b8fa730' : '#8b8fa7';
+    ctx.font = '9px -apple-system, system-ui, sans-serif';
+    ctx.fillText(n.path || '', n._x + 12, n._y + 32);
+  });
+
+  ctx.restore();
+}
+
+function roundRect(ctx, x, y, w, h, r, fill) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+  if (fill) ctx.fill(); ctx.stroke();
+}
+
+function roundRectLeft(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath(); ctx.fill();
+}
+
+function truncate(s, max) { return s.length > max ? s.slice(0, max) + '\u2026' : s; }
+
+// ==================== INTERACTION ====================
+function getNodeAt(mx, my) {
+  var x = (mx - state.panX) / state.zoom;
+  var y = (my - state.panY) / state.zoom;
+  var visible = getVisibleNodes();
+  for (var i = visible.length - 1; i >= 0; i--) {
+    var n = visible[i];
+    if (n._x && x >= n._x && x <= n._x + n._w && y >= n._y && y <= n._y + n._h) return n;
+  }
+  return null;
+}
+
+cv.addEventListener('mousemove', function(e) {
+  var rect = cv.getBoundingClientRect();
+  var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+
+  if (state.dragging) {
+    state.panX = state.panStartX + (e.clientX - state.dragStartX);
+    state.panY = state.panStartY + (e.clientY - state.dragStartY);
+    draw(); return;
+  }
+
+  var node = getNodeAt(mx, my);
+  if (node !== (state.hoveredNode ? NODES.find(function(n){return n.id===state.hoveredNode}) : null)) {
+    state.hoveredNode = node ? node.id : null;
+    draw();
+  }
+
+  if (node) {
+    cv.style.cursor = 'pointer';
+    var m = MODULES[node.module];
+    // Build tooltip safely using DOM
+    tooltipEl.textContent = '';
+    var h4 = document.createElement('h4');
+    h4.style.color = m.color;
+    h4.textContent = m.icon + ' ' + L(node, 'label');
+    var pathDiv = document.createElement('div');
+    pathDiv.className = 'tt-path';
+    pathDiv.textContent = node.path;
+    var descDiv = document.createElement('div');
+    descDiv.className = 'tt-desc';
+    descDiv.textContent = L(node, 'desc');
+    var badge = document.createElement('div');
+    badge.className = 'tt-badge';
+    badge.style.background = m.color + '20';
+    badge.style.color = m.color;
+    badge.textContent = L(m, 'label');
+    tooltipEl.appendChild(h4);
+    tooltipEl.appendChild(pathDiv);
+    tooltipEl.appendChild(descDiv);
+    tooltipEl.appendChild(badge);
+    tooltipEl.style.display = 'block';
+    tooltipEl.style.left = Math.min(e.clientX - rect.left + 12, rect.width - 340) + 'px';
+    tooltipEl.style.top = (e.clientY - rect.top + 12) + 'px';
+  } else {
+    cv.style.cursor = 'grab';
+    tooltipEl.style.display = 'none';
+  }
+});
+
+cv.addEventListener('mousedown', function(e) {
+  var rect = cv.getBoundingClientRect();
+  var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  var node = getNodeAt(mx, my);
+  if (node) {
+    state.selectedNode = node.id;
+    showDetail(node);
+    draw();
+  } else {
+    state.dragging = true;
+    state.dragStartX = e.clientX; state.dragStartY = e.clientY;
+    state.panStartX = state.panX; state.panStartY = state.panY;
+    cv.style.cursor = 'grabbing';
+  }
+});
+
+cv.addEventListener('mouseup', function() { state.dragging = false; cv.style.cursor = 'grab'; });
+cv.addEventListener('mouseleave', function() { state.dragging = false; tooltipEl.style.display = 'none'; });
+
+cv.addEventListener('wheel', function(e) {
+  e.preventDefault();
+  var delta = e.deltaY > 0 ? 0.9 : 1.1;
+  var rect = cv.getBoundingClientRect();
+  var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+  var newZoom = Math.max(0.3, Math.min(3, state.zoom * delta));
+  state.panX = mx - (mx - state.panX) * (newZoom / state.zoom);
+  state.panY = my - (my - state.panY) * (newZoom / state.zoom);
+  state.zoom = newZoom;
+  draw();
+}, { passive: false });
+
+document.getElementById('zoomInBtn').addEventListener('click', function() { state.zoom = Math.min(3, state.zoom * 1.2); draw(); });
+document.getElementById('zoomOutBtn').addEventListener('click', function() { state.zoom = Math.max(0.3, state.zoom * 0.8); draw(); });
+document.getElementById('resetZoomBtn').addEventListener('click', function() { state.zoom = 1; state.panX = 0; state.panY = 0; draw(); });
+
+// ==================== DETAIL PANEL ====================
+function showDetail(node) {
+  var panel = document.getElementById('detailPanel');
+  var m = MODULES[node.module];
+  var titleEl = document.getElementById('detailTitle');
+  titleEl.textContent = '';
+  var iconSpan = document.createElement('span');
+  iconSpan.style.color = m.color;
+  iconSpan.textContent = m.icon + ' ';
+  titleEl.appendChild(iconSpan);
+  titleEl.appendChild(document.createTextNode(L(node, 'label')));
+
+  var body = document.getElementById('detailBody');
+  body.textContent = '';
+
+  // Description
+  var descP = document.createElement('div');
+  descP.className = 'desc-text';
+  descP.textContent = L(node, 'desc');
+  body.appendChild(descP);
+
+  // Path
+  var h4Path = document.createElement('h4');
+  h4Path.textContent = t('path');
+  body.appendChild(h4Path);
+  var pathEl = document.createElement('div');
+  pathEl.className = 'endpoint';
+  pathEl.textContent = node.path;
+  body.appendChild(pathEl);
+
+  // APIs
+  var h4Api = document.createElement('h4');
+  h4Api.textContent = t('apiEndpoint');
+  body.appendChild(h4Api);
+  var apiUl = document.createElement('ul');
+  node.apis.forEach(function(a) {
+    var li = document.createElement('li');
+    li.className = 'endpoint';
+    li.textContent = a;
+    apiUl.appendChild(li);
+  });
+  body.appendChild(apiUl);
+
+  // DB Models
+  if (node.db.length > 0) {
+    var h4Db = document.createElement('h4');
+    h4Db.textContent = t('dataModel');
+    body.appendChild(h4Db);
+    var dbUl = document.createElement('ul');
+    node.db.forEach(function(d) {
+      var li = document.createElement('li');
+      li.textContent = d;
+      dbUl.appendChild(li);
+    });
+    body.appendChild(dbUl);
+  }
+
+  // Related edges
+  var relatedEdges = EDGES.filter(function(e) { return e.from === node.id || e.to === node.id; });
+  var inbound = relatedEdges.filter(function(e) { return e.to === node.id; });
+  var outbound = relatedEdges.filter(function(e) { return e.from === node.id; });
+
+  if (inbound.length > 0) {
+    var h4In = document.createElement('h4');
+    h4In.textContent = t('inbound');
+    body.appendChild(h4In);
+    var inUl = document.createElement('ul');
+    inbound.forEach(function(e) {
+      var src = NODES.find(function(n) { return n.id === e.from; });
+      var li = document.createElement('li');
+      li.textContent = (src ? L(src, 'label') : e.from) + ' \u2192 ' + (L(e, 'label') || '');
+      inUl.appendChild(li);
+    });
+    body.appendChild(inUl);
+  }
+
+  if (outbound.length > 0) {
+    var h4Out = document.createElement('h4');
+    h4Out.textContent = t('outbound');
+    body.appendChild(h4Out);
+    var outUl = document.createElement('ul');
+    outbound.forEach(function(e) {
+      var tgt = NODES.find(function(n) { return n.id === e.to; });
+      var li = document.createElement('li');
+      li.textContent = (L(e, 'label') || '') + ' \u2192 ' + (tgt ? L(tgt, 'label') : e.to);
+      outUl.appendChild(li);
+    });
+    body.appendChild(outUl);
+  }
+
+  panel.classList.add('open');
+  updatePrompt();
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').classList.remove('open');
+  state.selectedNode = null;
+  draw();
+  updatePrompt();
+}
+document.getElementById('closeDetailBtn').addEventListener('click', closeDetail);
+
+// ==================== SIDEBAR ====================
+function renderSidebar() {
+  var filtersEl = document.getElementById('moduleFilters');
+  filtersEl.textContent = '';
+  Object.keys(MODULES).forEach(function(key) {
+    var m = MODULES[key];
+    var btn = document.createElement('div');
+    var isActive = state.activeModules.has(key);
+    btn.className = 'filter-btn' + (isActive ? ' active' : '');
+    if (isActive) {
+      btn.style.background = m.color + '20';
+      btn.style.borderColor = m.color + '60';
+      btn.style.color = m.color;
+    } else {
+      btn.style.background = '';
+      btn.style.borderColor = '';
+      btn.style.color = '';
+    }
+    var dot = document.createElement('span');
+    dot.className = 'dot';
+    dot.style.background = m.color;
+    btn.appendChild(dot);
+    btn.appendChild(document.createTextNode(L(m, 'label').split(' ')[0]));
+    btn.addEventListener('click', function() {
+      if (state.activeModules.has(key)) state.activeModules.delete(key);
+      else state.activeModules.add(key);
+      state.highlightNodes = null;
+      state.activePreset = null;
+      renderAll();
+    });
+    filtersEl.appendChild(btn);
+  });
+
+  // Presets
+  var presetSection = document.getElementById('presetSection');
+  var presetPanel = document.getElementById('presetPanel');
+  presetPanel.textContent = '';
+  if (state.view === 'flow' || state.view === 'features') {
+    presetSection.style.display = '';
+    FLOW_PRESETS.forEach(function(p) {
+      var btn = document.createElement('div');
+      btn.className = 'preset-btn' + (state.activePreset === p.id ? ' active' : '');
+      btn.textContent = L(p, 'label');
+      btn.addEventListener('click', function() {
+        state.activePreset = p.id;
+        if (p.modules) state.activeModules = new Set(p.modules);
+        else state.activeModules = new Set(Object.keys(MODULES));
+        state.highlightNodes = p.highlight ? new Set(p.highlight) : null;
+        renderAll();
+      });
+      presetPanel.appendChild(btn);
+    });
+  } else {
+    presetSection.style.display = 'none';
+  }
+
+  // Stats
+  var visible = getVisibleNodes();
+  var visIds = new Set(visible.map(function(n) { return n.id; }));
+  var visEdges = EDGES.filter(function(e) { return visIds.has(e.from) && visIds.has(e.to); });
+  var dbModels = new Set();
+  visible.forEach(function(n) { n.db.forEach(function(d) { dbModels.add(d); }); });
+  var apiCount = visible.reduce(function(sum, n) { return sum + n.apis.length; }, 0);
+
+  var statsPanel = document.getElementById('statsPanel');
+  statsPanel.textContent = '';
+  var statsData = [
+    { val: visible.length, label: t('featureNodes') },
+    { val: visEdges.length, label: t('dataFlows') },
+    { val: apiCount, label: t('apiEndpoints') },
+    { val: dbModels.size, label: t('dataModels') },
+  ];
+  statsData.forEach(function(s) {
+    var card = document.createElement('div');
+    card.className = 'stat-card';
+    var valEl = document.createElement('div');
+    valEl.className = 'val';
+    valEl.textContent = s.val;
+    var labelEl = document.createElement('div');
+    labelEl.className = 'label';
+    labelEl.textContent = s.label;
+    card.appendChild(valEl);
+    card.appendChild(labelEl);
+    statsPanel.appendChild(card);
+  });
+
+  // Legend
+  var legendPanel = document.getElementById('legendPanel');
+  legendPanel.textContent = '';
+  var legendData = [
+    { color: '#6c7cff', label: t('flowSolid') },
+    { color: '#8b8fa7', label: t('flowDashed') },
+  ];
+
+  if (state.view === 'users') {
+    legendPanel.textContent = '';
+    USER_ROLES.forEach(function(r) {
+      var item = document.createElement('div');
+      item.className = 'legend-item';
+      var dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.style.background = r.color;
+      item.appendChild(dot);
+      var txt = document.createElement('span');
+      txt.textContent = r.label + ' - ' + r.auth;
+      item.appendChild(txt);
+      legendPanel.appendChild(item);
+    });
+  } else {
+    legendData.forEach(function(l) {
+      var item = document.createElement('div');
+      item.className = 'legend-item';
+      var dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.style.background = l.color;
+      item.appendChild(dot);
+      var txt = document.createElement('span');
+      txt.textContent = l.label;
+      item.appendChild(txt);
+      legendPanel.appendChild(item);
+    });
+  }
+}
+
+// ==================== VIEWS ====================
+function setView(view) {
+  state.view = view;
+  document.querySelectorAll('.header-tab').forEach(function(tab) {
+    tab.classList.toggle('active', tab.dataset.view === view);
+  });
+  state.activeModules = new Set(Object.keys(MODULES));
+  state.highlightNodes = null;
+  state.activePreset = view === 'flow' ? 'all' : null;
+  state.selectedNode = null;
+  closeDetail();
+  renderAll();
+}
+
+document.querySelectorAll('.header-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() { setView(tab.dataset.view); });
+});
+
+// ==================== SEARCH ====================
+document.getElementById('searchInput').addEventListener('input', function(e) {
+  state.search = e.target.value;
+  renderAll();
+});
+
+// ==================== PROMPT ====================
+function updatePrompt() {
+  var el = document.getElementById('promptText');
+  var visible = getVisibleNodes();
+  var activeModNames = [];
+  state.activeModules.forEach(function(m) { if (MODULES[m]) activeModNames.push(L(MODULES[m], 'label')); });
+
+  if (state.selectedNode) {
+    var node = NODES.find(function(n) { return n.id === state.selectedNode; });
+    if (node) {
+      var m = MODULES[node.module];
+      var edges = EDGES.filter(function(e) { return e.from === node.id || e.to === node.id; });
+      var related = edges.map(function(e) {
+        var other = NODES.find(function(n) { return n.id === (e.from === node.id ? e.to : e.from); });
+        return other ? L(other, 'label') : '';
+      }).filter(Boolean);
+      el.textContent = t('promptSelected')(L(node, 'label'), L(m, 'label'), node.path, node.apis.join(', '), node.db.join(', '), related.join(lang === 'ja' ? '\u3001' : ', '));
+    }
+  } else if (state.highlightNodes) {
+    var names = [];
+    state.highlightNodes.forEach(function(id) {
+      var n = NODES.find(function(nn) { return nn.id === id; });
+      if (n) names.push(L(n, 'label'));
+    });
+    el.textContent = t('promptFlow')(names.join(' \u2192 '));
+  } else {
+    el.textContent = t('promptOverview')(visible.length, activeModNames.join(lang === 'ja' ? '\u30FB' : ', '));
+  }
+}
+
+function copyPrompt() {
+  var text = document.getElementById('promptText').textContent;
+  navigator.clipboard.writeText(text).then(function() {
+    var btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(function() { btn.textContent = t('copy'); btn.classList.remove('copied'); }, 1500);
+  });
+}
+document.getElementById('copyBtn').addEventListener('click', copyPrompt);
+
+// ==================== LANGUAGE ====================
+function setLang(newLang) {
+  lang = newLang;
+  document.getElementById('langJa').classList.toggle('active', lang === 'ja');
+  document.getElementById('langEn').classList.toggle('active', lang === 'en');
+  // Update static HTML text
+  document.getElementById('searchInput').placeholder = t('search');
+  document.getElementById('copyBtn').textContent = t('copy');
+  document.getElementById('promptText').textContent = t('defaultPrompt');
+  // Update header tabs
+  var tabMap = { features: 'tabFeatures', flow: 'tabFlow', data: 'tabData', users: 'tabUsers' };
+  document.querySelectorAll('.header-tab').forEach(function(tab) {
+    var key = tabMap[tab.dataset.view];
+    if (key) tab.textContent = t(key);
+  });
+  // Update sidebar section headers
+  var sections = document.querySelectorAll('.sidebar-section h3');
+  var sectionKeys = ['', 'presets', 'moduleFilter', 'stats', 'legend'];
+  sections.forEach(function(h3, i) { if (sectionKeys[i]) h3.textContent = t(sectionKeys[i]); });
+  renderAll();
+}
+document.getElementById('langJa').addEventListener('click', function() { setLang('ja'); });
+document.getElementById('langEn').addEventListener('click', function() { setLang('en'); });
+
+// ==================== RENDER ALL ====================
+function isFlowDiagramActive() {
+  return state.view === 'flow' && state.activePreset && state.activePreset !== 'all' && FLOW_DIAGRAMS[state.activePreset];
+}
+
+function renderAll() {
+  resizeCanvas();
+  if (isFlowDiagramActive()) {
+    layoutFlowDiagram(state.activePreset);
+    renderSidebar();
+    drawFlowDiagram(state.activePreset);
+  } else {
+    layoutNodes();
+    renderSidebar();
+    draw();
+  }
+  updatePrompt();
+}
+
+window.addEventListener('resize', renderAll);
+renderAll();
+</script>
+</body>
+</html>

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/i18n';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -121,6 +122,7 @@ const formatArea = (area: Inspection['schedule'] extends null ? never : NonNulla
 export default function InspectionsPage() {
   const { t } = useTranslation('inspections');
   const router = useRouter();
+  const { showToast } = useNotification();
 
   /* ---- State ---- */
   const [data, setData] = useState<InspectionListResponse | null>(null);
@@ -218,6 +220,18 @@ export default function InspectionsPage() {
 
     return () => clearTimeout(timer);
   }, [scheduleSearch, showAssignModal, assignForm.date]);
+
+  /* ---- Delete handler ---- */
+  const handleDelete = async (id: number) => {
+    if (!window.confirm(t('confirm_cancel'))) return;
+    try {
+      const res = await fetch(`/api/inspections/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error();
+      fetchData();
+    } catch {
+      showToast(t('error_generic'), 'error');
+    }
+  };
 
   /* ---- Assign handler ---- */
   const handleAssign = async () => {
@@ -484,6 +498,7 @@ export default function InspectionsPage() {
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_category')}</th>
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_confirmation_rate')}</th>
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_compliance_rate')}</th>
+              <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -523,6 +538,15 @@ export default function InspectionsPage() {
                 <td className="px-3 py-3">{renderCategoryBadge(inspection.category)}</td>
                 <td className="px-3 py-3 text-right">{renderRate(inspection.confirmationRate)}</td>
                 <td className="px-3 py-3 text-right">{renderRate(inspection.complianceRate)}</td>
+                <td className="px-1 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => handleDelete(inspection.id)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-slate-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    title="削除"
+                  >
+                    <i className="bi bi-trash3 text-sm"></i>
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

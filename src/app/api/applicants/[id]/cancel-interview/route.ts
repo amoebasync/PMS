@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { deleteGoogleCalendarEvent } from '@/lib/google-meet';
 import { unbookSlotForApplicant } from '@/lib/interview-slot-helpers';
+import { sendInterviewCancellationEmail } from '@/lib/mailer';
 
 // POST /api/applicants/[id]/cancel-interview
 // 管理者: 面接をキャンセル（スロット解放）
@@ -34,6 +35,7 @@ export async function POST(
       where: { id: applicantId },
       include: {
         interviewSlot: true,
+        jobCategory: true,
         interviewSlotApplicants: {
           include: { interviewSlot: true },
           take: 1,
@@ -95,6 +97,20 @@ export async function POST(
     // Google Calendar イベントを削除（トランザクション外で非同期実行）
     if (oldCalendarEventId) {
       deleteGoogleCalendarEvent(oldCalendarEventId).catch(() => {});
+    }
+
+    // キャンセル通知メール送信（非同期、失敗してもエラーにしない）
+    if (applicant.email && cancelReason) {
+      const jobCategoryName = applicant.jobCategory?.name || '';
+      sendInterviewCancellationEmail(
+        applicant.email,
+        applicant.name,
+        applicant.language || 'ja',
+        jobCategoryName,
+        cancelReason,
+      ).catch((err) => {
+        console.error('Failed to send cancellation email:', err);
+      });
     }
 
     return NextResponse.json(updated);

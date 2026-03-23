@@ -4520,6 +4520,8 @@ export default function ApplicantsPage() {
                   {[
                     { value: '別の仕事が決まった', labelKey: 'cancel_reason_other_job' },
                     { value: '仕事が合わなそう', labelKey: 'cancel_reason_not_fit' },
+                    { value: '採用枠が埋まった', labelKey: 'cancel_reason_position_filled' },
+                    { value: '募集終了', labelKey: 'cancel_reason_recruitment_closed' },
                     { value: 'その他', labelKey: 'cancel_reason_other' },
                   ].map(opt => (
                     <label key={opt.value} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${

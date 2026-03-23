@@ -205,6 +205,8 @@
   "cancel_reason_label": "キャンセル理由",
   "cancel_reason_other_job": "別の仕事が決まった",
   "cancel_reason_not_fit": "仕事が合わなそう",
+  "cancel_reason_position_filled": "採用枠が埋まった",
+  "cancel_reason_recruitment_closed": "募集終了",
   "cancel_reason_other": "その他",
 
   "eval_no_show_confirm": "「{{name}}」を面接不参加（NO SHOW）として記録しますか？",
