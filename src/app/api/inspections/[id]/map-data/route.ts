@@ -76,25 +76,60 @@ export async function GET(
       return NextResponse.json({ error: '現地確認が見つかりません' }, { status: 404 });
     }
 
-    // 配布員のGPS軌跡（distribution_sessionsから取得）
-    let distributorTrajectory: { latitude: number; longitude: number; accuracy: number | null; timestamp: Date }[] = [];
+    // 配布員のGPS軌跡（PMS session → Posting System fallback）
+    let distributorTrajectory: { latitude: number; longitude: number; accuracy: number | null; timestamp: Date | string }[] = [];
     if (inspection.scheduleId) {
+      // 1. PMS session から取得
       const distributionSession = await prisma.distributionSession.findUnique({
         where: { scheduleId: inspection.scheduleId },
         select: {
           gpsPoints: {
             orderBy: { timestamp: 'asc' },
-            select: {
-              latitude: true,
-              longitude: true,
-              accuracy: true,
-              timestamp: true,
-            },
+            select: { latitude: true, longitude: true, accuracy: true, timestamp: true },
           },
         },
       });
-      if (distributionSession) {
+      if (distributionSession && distributionSession.gpsPoints.length > 0) {
         distributorTrajectory = distributionSession.gpsPoints;
+      } else {
+        // 2. Posting System fallback
+        const schedule = await prisma.distributionSchedule.findUnique({
+          where: { id: inspection.scheduleId },
+          select: { date: true, distributor: { select: { staffId: true } } },
+        });
+        const PS_API_URL = process.env.POSTING_SYSTEM_API_URL;
+        if (schedule?.distributor?.staffId && PS_API_URL && schedule.date) {
+          try {
+            const dateStr = new Date(schedule.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+            const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+            if (process.env.POSTING_SYSTEM_API_KEY) headers['X-API-Key'] = process.env.POSTING_SYSTEM_API_KEY;
+            const psRes = await fetch(`${PS_API_URL}/GetStaffGPS.php`, {
+              method: 'POST', headers,
+              body: new URLSearchParams({ STAFF_ID: schedule.distributor.staffId, TARGET_DATE: dateStr }).toString(),
+              signal: AbortSignal.timeout(10000),
+            });
+            if (psRes.ok) {
+              const rows = JSON.parse((await psRes.text()).trim());
+              if (Array.isArray(rows)) {
+                distributorTrajectory = rows
+                  .filter((r: any) => parseFloat(r.LATITUDE || '0') !== 0 && parseFloat(r.LONGITUDE || '0') !== 0)
+                  .map((r: any) => ({
+                    latitude: parseFloat(r.LATITUDE),
+                    longitude: parseFloat(r.LONGITUDE),
+                    accuracy: null,
+                    timestamp: `${dateStr}T${(r.TERMINAL_TIME || '').trim()}+09:00`,
+                  }));
+                // サンプリング（1000件超）
+                if (distributorTrajectory.length > 1000) {
+                  const step = Math.ceil(distributorTrajectory.length / 1000);
+                  distributorTrajectory = distributorTrajectory.filter((_, i) => i % step === 0 || i === distributorTrajectory.length - 1);
+                }
+              }
+            }
+          } catch (e) {
+            console.error('[Inspection map-data] PS GPS fallback error:', e);
+          }
+        }
       }
     }
 
