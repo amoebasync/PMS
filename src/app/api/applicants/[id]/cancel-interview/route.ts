@@ -101,7 +101,10 @@ export async function POST(
 
     // キャンセル通知メール送信（非同期、失敗してもエラーにしない）
     if (applicant.email && cancelReason) {
-      const jobCategoryName = applicant.jobCategory?.name || '';
+      const isEn = (applicant.language || 'ja') === 'en';
+      const jobCategoryName = isEn
+        ? (applicant.jobCategory?.nameEn || applicant.jobCategory?.nameJa || '')
+        : (applicant.jobCategory?.nameJa || '');
       sendInterviewCancellationEmail(
         applicant.email,
         applicant.name,
