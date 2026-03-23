@@ -127,9 +127,15 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
     setSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('lat', point.lat.toString());
-      formData.append('lng', point.lng.toString());
-      formData.append('result', recordResult);
+      formData.append('targetLat', point.lat.toString());
+      formData.append('targetLng', point.lng.toString());
+      // API側のenum値にマッピング
+      const resultMap: Record<string, string> = { CONFIRMED: 'CONFIRMED', NOT_FOUND: 'NOT_FOUND', UNABLE: 'UNABLE_TO_CHECK' };
+      formData.append('result', resultMap[recordResult] || recordResult);
+      if (currentPosition) {
+        formData.append('actualLat', currentPosition.lat.toString());
+        formData.append('actualLng', currentPosition.lng.toString());
+      }
       if (recordNote) formData.append('note', recordNote);
       if (selectedFile) formData.append('photo', selectedFile);
 

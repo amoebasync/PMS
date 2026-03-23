@@ -118,7 +118,9 @@ export default function ProhibitedCheckPanel({ inspectionId, prohibitedPropertie
     try {
       const formData = new FormData();
       formData.append('prohibitedPropertyId', recordingId.toString());
-      formData.append('result', recordResult);
+      // API側のenum値にマッピング
+      const resultMap: Record<string, string> = { COMPLIANT: 'COMPLIANT', VIOLATION: 'VIOLATION', UNABLE: 'UNABLE_TO_CHECK' };
+      formData.append('result', resultMap[recordResult] || recordResult);
       if (recordNote) formData.append('note', recordNote);
       if (selectedFile) formData.append('photo', selectedFile);
 
