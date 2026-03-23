@@ -37,6 +37,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '日付は必須です' }, { status: 400 });
     }
 
+    const baseUrl = process.env.NEXTAUTH_URL || `https://${request.headers.get('host')}`;
+
     // 送信先グループ取得
     const groupSetting = await prisma.systemSetting.findUnique({
       where: { key: 'lineInspectionNotificationGroupId' },
@@ -59,6 +61,7 @@ export async function POST(request: NextRequest) {
         inspector: { select: { lastNameJa: true, firstNameJa: true } },
         schedule: {
           select: {
+            id: true,
             date: true,
             area: {
               include: {
@@ -117,27 +120,46 @@ export async function POST(request: NextRequest) {
         const categoryLabel = insp.category === 'CHECK' ? 'チェック' : '指導';
         const categoryColor = insp.category === 'CHECK' ? '#2563EB' : '#7C3AED';
         const schedDate = insp.schedule?.date ? formatScheduleDate(new Date(insp.schedule.date)) : '-';
+        const scheduleId = insp.schedule?.id;
+        const mapUrl = scheduleId ? `${baseUrl}/map/${scheduleId}` : null;
+
+        const cardContents: any[] = [
+          {
+            type: 'box', layout: 'baseline', spacing: 'sm',
+            contents: [
+              { type: 'text', text: name, size: 'xs', weight: 'bold', color: '#333333', flex: 1 },
+              { type: 'text', text: categoryLabel, size: 'xxs', color: categoryColor, weight: 'bold', flex: 0 },
+            ],
+          },
+          {
+            type: 'text', text: `${staffId ? staffId + ' | ' : ''}${schedDate} ${areaName}`,
+            size: 'xxs', color: '#888888', margin: 'xs', wrap: true,
+          },
+        ];
+
+        if (mapUrl) {
+          cardContents.push({
+            type: 'box', layout: 'horizontal', margin: 'sm', spacing: 'sm',
+            contents: [
+              {
+                type: 'box', layout: 'vertical', flex: 0,
+                paddingStart: 'md', paddingEnd: 'md', paddingTop: '4px', paddingBottom: '4px',
+                backgroundColor: '#EEF2FF', cornerRadius: 'sm',
+                action: { type: 'uri', label: 'GPS', uri: mapUrl },
+                contents: [
+                  { type: 'text', text: 'GPS軌跡', size: 'xxs', color: '#4F46E5', weight: 'bold', align: 'center' },
+                ],
+              },
+            ],
+          });
+        }
 
         bodyContents.push({
           type: 'box', layout: 'vertical', margin: 'sm',
           paddingStart: 'lg', paddingEnd: 'md', paddingTop: 'sm', paddingBottom: 'sm',
           backgroundColor: '#F8FAFC',
           cornerRadius: 'md',
-          contents: [
-            {
-              type: 'box', layout: 'baseline', spacing: 'sm',
-              contents: [
-                { type: 'text', text: name, size: 'xs', weight: 'bold', color: '#333333', flex: 1 },
-                {
-                  type: 'text', text: categoryLabel, size: 'xxs', color: categoryColor, weight: 'bold', flex: 0,
-                },
-              ],
-            },
-            {
-              type: 'text', text: `${staffId ? staffId + ' | ' : ''}${schedDate} ${areaName}`,
-              size: 'xxs', color: '#888888', margin: 'xs', wrap: true,
-            },
-          ],
+          contents: cardContents,
         });
       }
     }

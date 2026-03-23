@@ -54,7 +54,9 @@ export function middleware(request: NextRequest) {
     path === '/interview-booking' ||
     path === '/api/legal-content' ||
     path === '/api/webhooks/docuseal' ||
-    path === '/api/line/webhook';
+    path === '/api/line/webhook' ||
+    path === '/api/public/trajectory' ||
+    path.startsWith('/map/');
 
   const adminSession = request.cookies.get('pms_session')?.value;
   const portalSession = request.cookies.get('next-auth.session-token')?.value || request.cookies.get('__Secure-next-auth.session-token')?.value;
