@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
         },
       },
       items: { orderBy: { slotIndex: 'asc' }, select: { flyerName: true, plannedCount: true } },
-      photos: { select: { id: true, photoUrl: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
+      photos: { select: { id: true, photoUrl: true, type: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
     },
     orderBy: { id: 'asc' },
   });
@@ -76,6 +76,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const scheduleId = parseInt(formData.get('scheduleId') as string || '');
     const lineUserId = formData.get('lineUserId') as string || '';
+    const photoType = (formData.get('type') as string || 'FLYER'); // FLYER or MAP
     const photo = formData.get('photo') as File | null;
 
     if (!scheduleId || !lineUserId || !photo) {
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest) {
 
     // DB 保存
     const saved = await prisma.schedulePhoto.create({
-      data: { scheduleId, photoUrl, source: 'LINE' },
+      data: { scheduleId, photoUrl, type: photoType, source: 'LINE' },
     });
 
     return NextResponse.json({ success: true, photo: saved });

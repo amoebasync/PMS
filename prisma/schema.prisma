@@ -3437,6 +3437,7 @@ model SchedulePhoto {
   scheduleId  Int                  @map("schedule_id")
   schedule    DistributionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   photoUrl    String               @map("photo_url") @db.Text
+  type        String               @default("FLYER") @db.VarChar(20) // FLYER, MAP
   source      String               @default("LINE") @db.VarChar(20) // LINE, MANUAL
   createdAt   DateTime             @default(now()) @map("created_at")
 
