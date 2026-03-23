@@ -60,8 +60,8 @@ export async function PUT(
       },
     });
 
-    // ── LINE通知: 中継/回収が完了した場合 ──
-    if (body.status === 'COMPLETED' && existing.status !== 'COMPLETED') {
+    // ── LINE通知: 中継/回収が完了した場合（skipLineNotification=true でスキップ）──
+    if (body.status === 'COMPLETED' && existing.status !== 'COMPLETED' && !body.skipLineNotification) {
       sendRelayCompletionNotification(task).catch(e =>
         console.error('[RelayTask] LINE notification error:', e)
       );

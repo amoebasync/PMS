@@ -99,7 +99,7 @@ export default function RelayListPage() {
       const res = await fetch(`/api/relay-tasks/${task.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: newStatus, skipLineNotification: true }),
       });
       if (res.ok) {
         setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t));
