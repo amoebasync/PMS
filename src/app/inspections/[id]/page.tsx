@@ -410,8 +410,8 @@ export default function InspectionDetailPage() {
             <div className="w-10 h-1 bg-slate-300 rounded-full"></div>
           </div>
 
-          {/* Tab bar */}
-          <div className="flex border-b border-slate-100 px-2 shrink-0">
+          {/* Tab bar — icon only on mobile, icon + short label on desktop */}
+          <div className="flex border-b border-slate-100 shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -419,16 +419,13 @@ export default function InspectionDetailPage() {
                   setActiveTab(tab.key);
                   setSheetExpanded(true);
                 }}
-                className={`flex-1 py-2.5 text-[11px] font-bold text-center transition-colors relative ${
-                  activeTab === tab.key
-                    ? 'text-emerald-600'
-                    : 'text-slate-400'
+                className={`flex-1 py-2 text-center transition-colors relative ${
+                  activeTab === tab.key ? 'text-emerald-600' : 'text-slate-400'
                 }`}
               >
-                <i className={`bi ${tab.icon} block text-base mb-0.5`}></i>
-                <span className="truncate block">{tab.label}</span>
+                <i className={`bi ${tab.icon} text-lg`}></i>
                 {activeTab === tab.key && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-emerald-500 rounded-full"></div>
+                  <div className="absolute bottom-0 left-3 right-3 h-0.5 bg-emerald-500 rounded-full"></div>
                 )}
               </button>
             ))}
