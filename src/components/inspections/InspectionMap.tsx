@@ -168,10 +168,8 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
     return stored;
   }, [inspectorGpsPoints, inspectorPosition]);
 
-  /* ---- Map center ---- */
+  /* ---- Map center (エリア中心を優先、自動追従しない) ---- */
   const center = useMemo(() => {
-    // Priority: inspector position > area center > distributor center > default
-    if (inspectorPosition) return inspectorPosition;
     if (areaPolygons.length > 0 && areaPolygons[0].length > 0) {
       const pts = areaPolygons[0];
       const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
@@ -179,8 +177,17 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
       return { lat, lng };
     }
     if (distributorPath.length > 0) return distributorPath[0];
+    if (inspectorPosition) return inspectorPosition;
     return { lat: 35.6812, lng: 139.7671 }; // Tokyo
-  }, [inspectorPosition, areaPolygons, distributorPath]);
+  }, [areaPolygons, distributorPath, inspectorPosition]);
+
+  /* ---- 現在地にフォーカス ---- */
+  const panToMyLocation = useCallback(() => {
+    if (inspectorPosition && mapRef.current) {
+      mapRef.current.panTo(inspectorPosition);
+      mapRef.current.setZoom(17);
+    }
+  }, [inspectorPosition]);
 
   /* ---- Prohibited check status map ---- */
   const prohibitedCheckMap = useMemo(() => {
@@ -253,6 +260,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
   }
 
   return (
+    <div className="relative w-full h-full">
     <GoogleMap
       mapContainerClassName="w-full h-full"
       center={center}
@@ -450,5 +458,16 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         );
       })}
     </GoogleMap>
+    {/* 現在地ボタン */}
+    {inspectorPosition && (
+      <button
+        onClick={panToMyLocation}
+        className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-50 active:bg-slate-100 transition-colors border border-slate-200"
+        title="現在地"
+      >
+        <i className="bi bi-crosshair text-lg text-indigo-600"></i>
+      </button>
+    )}
+    </div>
   );
 }
