@@ -332,44 +332,26 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         />
       )}
 
-      {/* Sample points — pending (yellow numbered) or checked (result colored) */}
+      {/* Sample points — color-coded by check result, always showing number */}
       {samplePoints.map((sp, idx) => {
         const matchedCp = checkpoints.find(
           (cp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
         );
-        if (matchedCp && matchedCp.result) {
-          // Checked sample point — show result marker
-          const fillColor = matchedCp.result === 'CONFIRMED' ? '#22c55e' : matchedCp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8';
-          const labelText = matchedCp.result === 'CONFIRMED' ? '✓' : matchedCp.result === 'NOT_FOUND' ? '✗' : '?';
-          return (
-            <Marker
-              key={`sample-${idx}`}
-              position={{ lat: sp.lat, lng: sp.lng }}
-              icon={{
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 14,
-                fillColor,
-                fillOpacity: 0.95,
-                strokeColor: '#ffffff',
-                strokeWeight: 2,
-              }}
-              label={{
-                text: labelText,
-                color: '#ffffff',
-                fontSize: '14px',
-                fontWeight: 'bold',
-              }}
-              zIndex={40}
-              title={`サンプル #${idx + 1} — ${matchedCp.result}`}
-            />
-          );
-        }
-        // Pending sample point — yellow numbered, draggable
+        const hasResult = matchedCp && matchedCp.result;
+        const fillColor = hasResult
+          ? (matchedCp.result === 'CONFIRMED' ? '#22c55e' : matchedCp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8')
+          : '#fbbf24'; // yellow for pending
+        const strokeColor = hasResult
+          ? (matchedCp.result === 'CONFIRMED' ? '#16a34a' : matchedCp.result === 'NOT_FOUND' ? '#dc2626' : '#6b7280')
+          : '#ffffff';
+        const labelColor = hasResult ? '#ffffff' : '#000000';
+        const isDraggable = !hasResult && !!onSamplePointsChange;
+
         return (
           <Marker
             key={`sample-${idx}`}
             position={{ lat: sp.lat, lng: sp.lng }}
-            draggable={!!onSamplePointsChange}
+            draggable={isDraggable}
             onDragEnd={(e) => {
               if (e.latLng && onSamplePointsChange) {
                 const newPoints = [...samplePoints];
@@ -380,19 +362,19 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
               scale: 14,
-              fillColor: '#fbbf24',
+              fillColor,
               fillOpacity: 0.95,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
+              strokeColor,
+              strokeWeight: 2.5,
             }}
             label={{
               text: String(idx + 1),
-              color: '#000000',
+              color: labelColor,
               fontSize: '11px',
               fontWeight: 'bold',
             }}
-            zIndex={30}
-            title={`サンプル #${idx + 1}`}
+            zIndex={hasResult ? 40 : 30}
+            title={hasResult ? `#${idx + 1} — ${matchedCp.result}` : `#${idx + 1}`}
           />
         );
       })}

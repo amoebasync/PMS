@@ -249,6 +249,23 @@ export async function POST(request: Request) {
                     where: { id: matchedExisting.id },
                     data: { status: 'COMPLETED', jobNumber: s.jobNumber || undefined },
                   });
+                  // 既存アイテムの actualCount を更新（実績枚数の反映）
+                  const existingItems = await tx.distributionItem.findMany({
+                    where: { scheduleId: matchedExisting.id },
+                    select: { id: true, slotIndex: true, flyerCode: true, flyerName: true },
+                  });
+                  for (const item of s.items || []) {
+                    const match = existingItems.find((ei: any) =>
+                      (item.flyerCode && ei.flyerCode === item.flyerCode) ||
+                      (item.flyerName && ei.flyerName === item.flyerName)
+                    );
+                    if (match && item.actualCount != null) {
+                      await tx.distributionItem.update({
+                        where: { id: match.id },
+                        data: { actualCount: item.actualCount },
+                      });
+                    }
+                  }
                 }
                 matchedIds.push(matchedExisting.id);
                 return { type: 'matched' as const, scheduleId: matchedExisting.id, source: s, distributor, baseDate };
@@ -305,8 +322,27 @@ export async function POST(request: Request) {
         for (const r of results) {
           const { source: s, distributor, baseDate, scheduleId } = r;
 
-          // matched（完全一致）の場合はアイテム作成不要（既存のまま）
+          // matched（完全一致）の場合はアイテム作成不要（既存のまま）だが、セッション未作成時は作成
           if (r.type === 'matched') {
+            // 完了インポート時: セッションが未作成なら作成
+            if (importStatus === 'COMPLETED' && s.startTime && distributor) {
+              const existingSession = await tx.distributionSession.findUnique({
+                where: { scheduleId },
+                select: { id: true },
+              });
+              if (!existingSession) {
+                const startedAt = new Date(`${s.date}T${s.startTime}:00+09:00`);
+                const finishedAt = s.endTime ? new Date(`${s.date}T${s.endTime}:00+09:00`) : null;
+                pendingSessions.push({
+                  scheduleId,
+                  distributorId: distributor.id,
+                  startedAt,
+                  finishedAt,
+                  milestones: s.milestones || [],
+                  dateStr: s.date,
+                });
+              }
+            }
             updatedCount++;
             continue;
           }
