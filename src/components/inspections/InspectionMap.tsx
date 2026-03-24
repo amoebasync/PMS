@@ -316,20 +316,34 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         />
       )}
 
-      {/* Inspector current position */}
+      {/* Inspector current position — blue dot with accuracy circle */}
       {inspectorPosition && (
-        <Marker
-          position={inspectorPosition}
-          icon={{
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: '#f97316',
-            fillOpacity: 1,
-            strokeColor: '#ffffff',
-            strokeWeight: 3,
-          }}
-          zIndex={100}
-        />
+        <>
+          <Circle
+            center={inspectorPosition}
+            radius={30}
+            options={{
+              fillColor: '#3b82f6',
+              fillOpacity: 0.1,
+              strokeColor: '#3b82f6',
+              strokeOpacity: 0.3,
+              strokeWeight: 1,
+              zIndex: 90,
+            }}
+          />
+          <Marker
+            position={inspectorPosition}
+            icon={{
+              path: google.maps.SymbolPath.CIRCLE,
+              scale: 10,
+              fillColor: '#3b82f6',
+              fillOpacity: 1,
+              strokeColor: '#ffffff',
+              strokeWeight: 3,
+            }}
+            zIndex={100}
+          />
+        </>
       )}
 
       {/* Sample points — color-coded by check result, always showing number */}
@@ -449,16 +463,30 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         );
       })}
     </GoogleMap>
-    {/* 現在地ボタン */}
-    {inspectorPosition && (
-      <button
-        onClick={panToMyLocation}
-        className="absolute bottom-4 right-4 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-50 active:bg-slate-100 transition-colors border border-slate-200"
-        title="現在地"
-      >
-        <i className="bi bi-crosshair text-lg text-indigo-600"></i>
-      </button>
-    )}
+    {/* 現在地ボタン — 常に表示、位置未取得時は灰色 */}
+    <button
+      onClick={() => {
+        if (inspectorPosition) {
+          panToMyLocation();
+        } else if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+              if (mapRef.current) {
+                mapRef.current.panTo(loc);
+                mapRef.current.setZoom(17);
+              }
+            },
+            () => { /* ignore */ },
+            { enableHighAccuracy: true, timeout: 10000 }
+          );
+        }
+      }}
+      className={`absolute top-3 right-3 z-10 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-slate-50 active:bg-slate-100 transition-colors border border-slate-200`}
+      title="現在地"
+    >
+      <i className={`bi bi-crosshair text-lg ${inspectorPosition ? 'text-indigo-600' : 'text-slate-400'}`}></i>
+    </button>
     </div>
   );
 }
