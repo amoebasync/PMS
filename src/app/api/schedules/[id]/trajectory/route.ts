@@ -101,8 +101,8 @@ export async function GET(
         console.warn('Posting System forbidden buildings fetch failed, falling back to PMS DB:', e);
       }
     }
-    // PMS DB フォールバック
-    if (prohibitedProperties.length === 0 && schedule.areaId) {
+    // PMS DB: ポリゴンデータの補完（PS APIにはポリゴンがないためDBからマージ）
+    if (schedule.areaId) {
       const dbProps = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: schedule.areaId,
@@ -122,11 +122,53 @@ export async function GET(
           prohibitedReason: { select: { name: true } },
         },
       });
-      prohibitedProperties = dbProps.map(p => ({
-        ...p,
-        reasonName: p.prohibitedReason?.name || null,
-        prohibitedReason: undefined,
-      }));
+
+      if (prohibitedProperties.length === 0) {
+        // PS APIが返さなかった場合 → DB全件を使用
+        prohibitedProperties = dbProps.map(p => ({
+          ...p,
+          reasonName: p.prohibitedReason?.name || null,
+          prohibitedReason: undefined,
+        }));
+      } else {
+        // PS APIの結果にDBのポリゴンデータをマージ（座標近接で紐付け）
+        for (const pp of prohibitedProperties) {
+          if (pp.boundaryGeojson) continue; // 既にポリゴンあり
+          const dbMatch = dbProps.find(db =>
+            db.boundaryGeojson &&
+            db.latitude && db.longitude &&
+            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
+            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
+          );
+          if (dbMatch) {
+            pp.boundaryGeojson = dbMatch.boundaryGeojson;
+          }
+        }
+        // DBにのみ存在するポリゴン付き禁止物件を追加
+        const dbPolygonOnly = dbProps.filter(db => {
+          if (!db.boundaryGeojson || !db.latitude || !db.longitude) return false;
+          return !prohibitedProperties.some(pp =>
+            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
+            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
+          );
+        });
+        for (const db of dbPolygonOnly) {
+          prohibitedProperties.push({
+            id: db.id,
+            latitude: db.latitude,
+            longitude: db.longitude,
+            address: db.address,
+            buildingName: db.buildingName,
+            roomNumber: db.roomNumber,
+            residentName: db.residentName,
+            reasonDetail: db.reasonDetail,
+            severity: db.severity,
+            boundaryGeojson: db.boundaryGeojson,
+            reasonName: db.prohibitedReason?.name || null,
+            pinColor: null,
+          });
+        }
+      }
     }
 
     const sess = schedule.session;

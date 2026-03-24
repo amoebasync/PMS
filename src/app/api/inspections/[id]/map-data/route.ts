@@ -188,9 +188,9 @@ export async function GET(
       }
     }
 
-    // PMS DB フォールバック
-    if (prohibitedProperties.length === 0 && inspection.schedule?.areaId) {
-      prohibitedProperties = await prisma.prohibitedProperty.findMany({
+    // PMS DB: ポリゴンデータの補完
+    if (inspection.schedule?.areaId) {
+      const dbProps = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: inspection.schedule.areaId,
           isActive: true,
@@ -207,6 +207,31 @@ export async function GET(
           boundaryGeojson: true,
         },
       });
+
+      if (prohibitedProperties.length === 0) {
+        prohibitedProperties = dbProps;
+      } else {
+        // PS APIの結果にDBのポリゴンデータをマージ
+        for (const pp of prohibitedProperties) {
+          if (pp.boundaryGeojson) continue;
+          const dbMatch = dbProps.find(db =>
+            db.boundaryGeojson &&
+            db.latitude && db.longitude &&
+            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
+            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
+          );
+          if (dbMatch) pp.boundaryGeojson = dbMatch.boundaryGeojson;
+        }
+        // DBにのみ存在するポリゴン付き禁止物件を追加
+        for (const db of dbProps) {
+          if (!db.boundaryGeojson || !db.latitude || !db.longitude) continue;
+          const exists = prohibitedProperties.some(pp =>
+            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
+            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
+          );
+          if (!exists) prohibitedProperties.push(db);
+        }
+      }
     }
 
     return NextResponse.json({
