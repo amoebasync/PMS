@@ -688,9 +688,51 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     }
 
     if (roadFeatures.length > 0) {
+      // 配布対象の道路クラスのみ（駅構内・高速道路・線路を除外）
+      const DISTRIBUTABLE_CLASSES = new Set([
+        'street', 'street_limited', 'pedestrian',
+        'primary', 'primary_link', 'secondary', 'secondary_link',
+        'tertiary', 'tertiary_link', 'trunk', 'trunk_link',
+      ]);
+      const filteredRoadFeatures = roadFeatures.filter((f: any) => {
+        const cls = f.properties?.class || '';
+        return DISTRIBUTABLE_CLASSES.has(cls);
+      });
+
+      // landuse レイヤーから駅・公園等の非配布エリアを取得して除外
+      const EXCLUDE_LANDUSE = new Set(['railway', 'park', 'cemetery', 'industrial', 'pitch', 'airport']);
+      let excludePolygons: any[] = [];
+      try {
+        const landuseLayers = map.getStyle()?.layers
+          ?.filter((l: any) => (l['source-layer'] === 'landuse' || l['source-layer'] === 'landuse_overlay') && (l.type === 'fill' || l.type === 'line'))
+          .map((l: any) => l.id) || [];
+        if (landuseLayers.length > 0) {
+          const luFeatures = map.queryRenderedFeatures(undefined, { layers: landuseLayers });
+          excludePolygons = luFeatures.filter((f: any) => EXCLUDE_LANDUSE.has(f.properties?.class || ''));
+        }
+      } catch { /* ignore */ }
+
+      // 除外ポリゴン内判定（簡易レイキャスト）
+      const isInsideExcludeZone = (lng: number, lat: number): boolean => {
+        for (const f of excludePolygons) {
+          const geom = f.geometry;
+          const rings = geom.type === 'Polygon' ? geom.coordinates : geom.type === 'MultiPolygon' ? geom.coordinates.flat() : [];
+          for (const ring of rings) {
+            let inside = false;
+            for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+              const xi = ring[i][0], yi = ring[i][1];
+              const xj = ring[j][0], yj = ring[j][1];
+              if ((yi > lat) !== (yj > lat) && lng < (xj - xi) * (lat - yi) / (yj - yi) + xi) inside = !inside;
+            }
+            if (inside) return true;
+          }
+        }
+        return false;
+      };
+
       // 道路セグメントから座標ポイントを抽出
       const roadPoints: [number, number][] = [];
-      for (const f of roadFeatures) {
+      for (const f of filteredRoadFeatures) {
         const geom = f.geometry;
         if (geom.type === 'LineString') {
           for (const coord of geom.coordinates) roadPoints.push([coord[0], coord[1]]);
@@ -699,14 +741,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         }
       }
 
-      // 道路ポイントを間引き（重複排除）+ エリアポリゴン内のみフィルタ
+      // 道路ポイントを間引き（重複排除）+ エリアポリゴン内のみ + 駅・公園等除外
       const seen = new Set<string>();
       const uniqueRoadPoints = roadPoints.filter(p => {
         const key = `${(p[0] * 10000).toFixed(0)},${(p[1] * 10000).toFixed(0)}`;
         if (seen.has(key)) return false;
         seen.add(key);
-        // 配布エリアポリゴン内のポイントのみ対象
-        return isInsideArea(p[0], p[1]);
+        // 配布エリアポリゴン内かつ除外ゾーン外
+        return isInsideArea(p[0], p[1]) && !isInsideExcludeZone(p[0], p[1]);
       });
 
       // 各道路ポイントがGPS軌跡でカバーされているか判定
