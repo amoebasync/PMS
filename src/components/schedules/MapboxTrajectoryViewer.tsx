@@ -1238,18 +1238,31 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Popup>
                 )}
 
-                {/* Coverage — uncovered road points shown as red dots */}
+                {/* Coverage — uncovered road points (orange diamonds, distinct from red prohibited circles) */}
                 {showCoverage && coverageGeoJson && (
                   <Source id="coverage-uncovered" type="geojson" data={coverageGeoJson}>
                     <Layer
                       id="coverage-uncovered-circles"
                       type="circle"
                       paint={{
-                        'circle-radius': 4,
-                        'circle-color': '#ef4444',
-                        'circle-opacity': 0.6,
-                        'circle-stroke-width': 1,
-                        'circle-stroke-color': '#dc2626',
+                        'circle-radius': 3.5,
+                        'circle-color': '#f97316',
+                        'circle-opacity': 0.7,
+                        'circle-stroke-width': 1.5,
+                        'circle-stroke-color': '#ea580c',
+                      }}
+                    />
+                    <Layer
+                      id="coverage-uncovered-x"
+                      type="symbol"
+                      layout={{
+                        'text-field': '×',
+                        'text-size': 9,
+                        'text-allow-overlap': true,
+                        'text-ignore-placement': true,
+                      }}
+                      paint={{
+                        'text-color': '#ffffff',
                       }}
                     />
                   </Source>
