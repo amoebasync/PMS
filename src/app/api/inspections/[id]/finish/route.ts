@@ -250,13 +250,83 @@ export async function POST(
             ];
           }
 
-          // Confirmation/compliance rate display
-          const confRateStr = confirmationRate != null ? `${(confirmationRate * 100).toFixed(0)}%` : '-';
-          const compRateStr = complianceRate != null ? `${(complianceRate * 100).toFixed(0)}%` : '-';
-          const unableCount = totalCheckpoints - confirmedCount - notFoundCount;
-
           // Status color
           const headerColor = result.category === 'CHECK' ? '#22c55e' : '#3b82f6';
+
+          // カテゴリ別の評価セクション
+          const SPEED_LABELS: Record<string, string> = { VERY_SLOW: 'とても遅い', SLOW: '遅い', NORMAL: '普通', FAST: '速い', VERY_FAST: 'とても速い' };
+          const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', NORMAL: '普通', GOOD: '良い' };
+          const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' ? '#22c55e' : v === 'NORMAL' ? '#f59e0b' : '#ef4444';
+
+          let evaluationSection: any[] = [];
+          if (result.category === 'GUIDANCE') {
+            // 指導: 評価項目を表示
+            const guidanceItems = [
+              { label: '配布スピード', value: result.distributionSpeed, labels: SPEED_LABELS },
+              { label: 'ステッカー遵守', value: result.stickerCompliance, labels: LEVEL_LABELS },
+              { label: '禁止物件遵守', value: result.prohibitedCompliance, labels: LEVEL_LABELS },
+              { label: '地図理解度', value: result.mapComprehension, labels: LEVEL_LABELS },
+              { label: '勤務態度', value: result.workAttitude, labels: LEVEL_LABELS },
+            ].filter(item => item.value);
+
+            evaluationSection = [
+              { type: 'separator', margin: 'lg' },
+              ...guidanceItems.map(item => ({
+                type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'md',
+                contents: [
+                  { type: 'text', text: item.label, size: 'sm', color: '#888888', flex: 3 },
+                  { type: 'text', text: item.labels[item.value!] || item.value, size: 'sm', color: levelColor(item.value), flex: 2, weight: 'bold' as const, align: 'end' as const },
+                ],
+              })),
+            ];
+          } else {
+            // チェック: 確認率・遵守率・カウントを表示
+            const confRateStr = confirmationRate != null ? `${(confirmationRate * 100).toFixed(0)}%` : '-';
+            const compRateStr = complianceRate != null ? `${(complianceRate * 100).toFixed(0)}%` : '-';
+            const unableCount = totalCheckpoints - confirmedCount - notFoundCount;
+
+            evaluationSection = [
+              { type: 'separator', margin: 'lg' },
+              {
+                type: 'box', layout: 'horizontal', margin: 'lg',
+                contents: [
+                  {
+                    type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                    contents: [
+                      { type: 'text', text: confRateStr, size: 'xxl', weight: 'bold', color: confirmationRate != null && confirmationRate >= 0.8 ? '#22c55e' : confirmationRate != null && confirmationRate >= 0.5 ? '#f59e0b' : '#ef4444' },
+                      { type: 'text', text: '確認率', size: 'xs', color: '#888888' },
+                    ],
+                  },
+                  { type: 'separator' },
+                  {
+                    type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
+                    contents: [
+                      { type: 'text', text: compRateStr, size: 'xxl', weight: 'bold', color: complianceRate != null && complianceRate >= 0.8 ? '#22c55e' : complianceRate != null && complianceRate >= 0.5 ? '#f59e0b' : '#ef4444' },
+                      { type: 'text', text: '遵守率', size: 'xs', color: '#888888' },
+                    ],
+                  },
+                ],
+              },
+              { type: 'separator', margin: 'lg' },
+              {
+                type: 'box', layout: 'horizontal', margin: 'lg', spacing: 'md',
+                contents: [
+                  { type: 'box', layout: 'vertical', flex: 1, alignItems: 'center', contents: [
+                    { type: 'text', text: `${confirmedCount}`, size: 'md', weight: 'bold', color: '#22c55e' },
+                    { type: 'text', text: '確認', size: 'xxs', color: '#888888' },
+                  ]},
+                  { type: 'box', layout: 'vertical', flex: 1, alignItems: 'center', contents: [
+                    { type: 'text', text: `${notFoundCount}`, size: 'md', weight: 'bold', color: '#e74c3c' },
+                    { type: 'text', text: '未発見', size: 'xxs', color: '#888888' },
+                  ]},
+                  { type: 'box', layout: 'vertical', flex: 1, alignItems: 'center', contents: [
+                    { type: 'text', text: `${unableCount}`, size: 'md', weight: 'bold', color: '#95a5a6' },
+                    { type: 'text', text: '確認不可', size: 'xxs', color: '#888888' },
+                  ]},
+                ],
+              },
+            ];
+          }
 
           const flexMessage = {
             type: 'flex',
@@ -270,22 +340,8 @@ export async function POST(
                 backgroundColor: headerColor,
                 paddingAll: 'lg',
                 contents: [
-                  {
-                    type: 'text',
-                    text: `${categoryEmoji} ${categoryLabel}`,
-                    color: '#FFFFFF',
-                    weight: 'bold',
-                    size: 'lg',
-                    flex: 1,
-                  },
-                  {
-                    type: 'text',
-                    text: '完了',
-                    color: '#FFFFFF',
-                    size: 'sm',
-                    align: 'end',
-                    gravity: 'center',
-                  },
+                  { type: 'text', text: `${categoryEmoji} ${categoryLabel}`, color: '#FFFFFF', weight: 'bold', size: 'lg', flex: 1 },
+                  { type: 'text', text: '完了', color: '#FFFFFF', size: 'sm', align: 'end', gravity: 'center' },
                 ],
               },
               ...(mapImageUrl ? {
@@ -303,7 +359,6 @@ export async function POST(
                 spacing: 'md',
                 paddingAll: 'lg',
                 contents: [
-                  // Distributor + StaffId
                   {
                     type: 'box', layout: 'horizontal', spacing: 'sm',
                     contents: [
@@ -311,7 +366,6 @@ export async function POST(
                       { type: 'text', text: `${distributorName}${staffId ? ` (${staffId})` : ''}`, size: 'sm', color: '#333333', flex: 5, weight: 'bold' },
                     ],
                   },
-                  // Area
                   {
                     type: 'box', layout: 'horizontal', spacing: 'sm',
                     contents: [
@@ -319,7 +373,6 @@ export async function POST(
                       { type: 'text', text: areaName, size: 'sm', color: '#333333', flex: 5, wrap: true },
                     ],
                   },
-                  // Inspector
                   {
                     type: 'box', layout: 'horizontal', spacing: 'sm',
                     contents: [
@@ -327,59 +380,9 @@ export async function POST(
                       { type: 'text', text: inspectorName, size: 'sm', color: '#333333', flex: 5 },
                     ],
                   },
-                  // Separator
-                  { type: 'separator', margin: 'lg' },
-                  // Rates
-                  {
-                    type: 'box', layout: 'horizontal', margin: 'lg',
-                    contents: [
-                      {
-                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
-                        contents: [
-                          { type: 'text', text: confRateStr, size: 'xxl', weight: 'bold', color: confirmationRate != null && confirmationRate >= 0.8 ? '#22c55e' : confirmationRate != null && confirmationRate >= 0.5 ? '#f59e0b' : '#ef4444' },
-                          { type: 'text', text: '確認率', size: 'xs', color: '#888888' },
-                        ],
-                      },
-                      { type: 'separator' },
-                      {
-                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
-                        contents: [
-                          { type: 'text', text: compRateStr, size: 'xxl', weight: 'bold', color: complianceRate != null && complianceRate >= 0.8 ? '#22c55e' : complianceRate != null && complianceRate >= 0.5 ? '#f59e0b' : '#ef4444' },
-                          { type: 'text', text: '遵守率', size: 'xs', color: '#888888' },
-                        ],
-                      },
-                    ],
-                  },
-                  // Separator
-                  { type: 'separator', margin: 'lg' },
-                  // Checkpoint counts
-                  {
-                    type: 'box', layout: 'horizontal', margin: 'lg', spacing: 'md',
-                    contents: [
-                      {
-                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
-                        contents: [
-                          { type: 'text', text: `✓ ${confirmedCount}`, size: 'md', weight: 'bold', color: '#22c55e' },
-                          { type: 'text', text: '確認', size: 'xxs', color: '#888888' },
-                        ],
-                      },
-                      {
-                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
-                        contents: [
-                          { type: 'text', text: `✗ ${notFoundCount}`, size: 'md', weight: 'bold', color: '#e74c3c' },
-                          { type: 'text', text: '未発見', size: 'xxs', color: '#888888' },
-                        ],
-                      },
-                      {
-                        type: 'box', layout: 'vertical', flex: 1, alignItems: 'center',
-                        contents: [
-                          { type: 'text', text: `? ${unableCount}`, size: 'md', weight: 'bold', color: '#95a5a6' },
-                          { type: 'text', text: '確認不可', size: 'xxs', color: '#888888' },
-                        ],
-                      },
-                    ],
-                  },
-                  // Note section (conditional)
+                  // カテゴリ別の評価セクション
+                  ...evaluationSection,
+                  // メモ
                   ...noteSection,
                 ],
               },
