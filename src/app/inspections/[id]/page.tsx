@@ -110,7 +110,7 @@ const statusBadge = (status: InspectionStatus, t: (k: string) => string) => {
   };
   const { cls, key } = map[status] || map.PENDING;
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${cls}`}>
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${cls}`}>
       {t(key)}
     </span>
   );
@@ -368,27 +368,27 @@ export default function InspectionDetailPage() {
   return (
     <div className="fixed inset-0 flex flex-col bg-slate-50 z-[200]">
       {/* ── Header ── */}
-      <div className="bg-white border-b border-slate-200 px-3 md:px-4 py-2 md:py-3 flex items-center gap-2 md:gap-3 shrink-0">
+      <div className="bg-white border-b border-slate-200 px-2 md:px-4 py-1.5 md:py-3 flex items-center gap-1.5 md:gap-3 shrink-0">
         <button
           onClick={() => router.push('/inspections')}
-          className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+          className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors shrink-0"
         >
-          <i className="bi bi-arrow-left text-lg text-slate-600"></i>
+          <i className="bi bi-arrow-left text-base md:text-lg text-slate-600"></i>
         </button>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-slate-800 truncate">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs md:text-sm font-bold text-slate-800 truncate">
               {inspection.distributor?.name || inspection.schedule?.distributor?.name || '--'}
             </span>
             {statusBadge(inspection.status, t)}
           </div>
-          <p className="text-[11px] text-slate-400 truncate">{areaName}</p>
+          <p className="text-[10px] md:text-[11px] text-slate-400 truncate">{areaName}</p>
         </div>
         {/* GPS indicator */}
         {gpsActive && (
-          <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-full">
-            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-            <span className="text-[10px] font-bold text-emerald-700">{t('gps_tracking_active')}</span>
+          <div className="flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 rounded-full shrink-0">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span className="text-[9px] md:text-[10px] font-bold text-emerald-700 whitespace-nowrap">{t('gps_tracking_active')}</span>
           </div>
         )}
       </div>
@@ -447,7 +447,7 @@ export default function InspectionDetailPage() {
       {(inspection.status === 'IN_PROGRESS' || inspection.status === 'COMPLETED') && (
         <div
           className={`bg-white border-t md:border-t-0 md:border-l border-slate-200 rounded-t-2xl md:rounded-none shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-none transition-all duration-300 shrink-0 flex flex-col md:w-[400px] md:h-full ${
-            sheetExpanded ? 'max-h-[50vh] md:max-h-none' : 'h-[52px] md:max-h-none'
+            sheetExpanded ? 'max-h-[40vh] md:max-h-none' : 'h-[44px] md:max-h-none'
           }`}
         >
           {/* Drag handle (mobile only) */}
