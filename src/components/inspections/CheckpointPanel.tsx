@@ -53,15 +53,6 @@ const formatDistance = (meters: number) => {
   return `${(meters / 1000).toFixed(1)}km`;
 };
 
-const resultColor = (result: string | null) => {
-  switch (result) {
-    case 'CONFIRMED': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    case 'NOT_FOUND': return 'bg-red-100 text-red-700 border-red-200';
-    case 'UNABLE': return 'bg-slate-100 text-slate-600 border-slate-200';
-    default: return 'bg-white text-slate-400 border-slate-200';
-  }
-};
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -72,7 +63,6 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const [sampleCount, setSampleCount] = useState(10);
   const [sampleMode, setSampleMode] = useState<'trajectory' | 'area'>('trajectory');
   const [generating, setGenerating] = useState(false);
-  const [manualMode, setManualMode] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
   const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND' | 'UNABLE'>('CONFIRMED');
   const [recordNote, setRecordNote] = useState('');
@@ -82,6 +72,13 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  /* ---- Match sample point to checkpoint ---- */
+  const getMatchedCheckpoint = (sp: SamplePoint): Checkpoint | null => {
+    return checkpoints.find(
+      (cp) => Math.abs(cp.targetLat - sp.lat) < 0.0002 && Math.abs(cp.targetLng - sp.lng) < 0.0002
+    ) || null;
+  };
 
   /* ---- Generate samples ---- */
   const handleGenerate = async () => {
@@ -102,7 +99,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
     setGenerating(false);
   };
 
-  /* ---- Open recording UI for a sample point ---- */
+  /* ---- Open recording UI ---- */
   const openRecording = (index: number) => {
     setRecordingIndex(index);
     setRecordResult('CONFIRMED');
@@ -130,7 +127,6 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       const formData = new FormData();
       formData.append('targetLat', point.lat.toString());
       formData.append('targetLng', point.lng.toString());
-      // API側のenum値にマッピング
       const resultMap: Record<string, string> = { CONFIRMED: 'CONFIRMED', NOT_FOUND: 'NOT_FOUND', UNABLE: 'UNABLE_TO_CHECK' };
       formData.append('result', resultMap[recordResult] || recordResult);
       if (currentPosition) {
@@ -147,9 +143,6 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       if (!res.ok) throw new Error();
 
       showToast(t('success_checkpoint'), 'success');
-
-      // Remove submitted sample from list
-      onSamplePointsChange(samplePoints.filter((_, i) => i !== recordingIndex));
       setRecordingIndex(null);
       setSelectedFile(null);
       setPreviewUrl(null);
@@ -160,11 +153,11 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
     setSubmitting(false);
   };
 
-  const checkedCount = checkpoints.filter((c) => c.result !== null).length;
-  const totalCount = checkpoints.length + samplePoints.length;
+  const checkedCount = samplePoints.filter((sp) => getMatchedCheckpoint(sp) !== null).length;
+  const totalCount = samplePoints.length;
 
   return (
-    <div className="p-4 space-y-4">
+    <div className="p-3 md:p-4 space-y-3">
       {/* Stats */}
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-slate-500">{t('section_checkpoints')}</h3>
@@ -173,98 +166,77 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         </span>
       </div>
 
-      {/* Sample generation + manual add */}
+      {/* Sample generation */}
       {isActive && (
-        <div className="bg-slate-50 rounded-xl p-3 space-y-3">
-          {/* Mode toggle */}
+        <div className="bg-slate-50 rounded-xl p-2.5 space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-bold text-slate-400 shrink-0">{t('sample_mode')}</span>
             <div className="inline-flex bg-slate-200 rounded-lg p-0.5 flex-1">
               <button
                 onClick={() => setSampleMode('trajectory')}
-                className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${sampleMode === 'trajectory' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${sampleMode === 'trajectory' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
                 {t('sample_mode_trajectory')}
               </button>
               <button
                 onClick={() => setSampleMode('area')}
-                className={`flex-1 px-2 py-1 text-[11px] font-bold rounded-md transition-colors ${sampleMode === 'area' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 px-2 py-1 text-[10px] font-bold rounded-md transition-colors ${sampleMode === 'area' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}
               >
                 {t('sample_mode_area')}
               </button>
             </div>
           </div>
-
-          {/* Generate + count */}
           <div className="flex items-center gap-2">
-            <label className="text-xs font-bold text-slate-500 shrink-0">{t('sample_count')}</label>
             <input
               type="number"
               min={0}
               max={50}
               value={sampleCount}
               onChange={(e) => setSampleCount(Math.max(0, Math.min(50, Number(e.target.value) || 0)))}
-              className="w-16 border border-slate-300 rounded-lg px-2 py-1.5 text-sm text-center outline-none focus:ring-2 focus:ring-emerald-500"
+              className="w-14 border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-center outline-none focus:ring-2 focus:ring-emerald-500"
             />
             <button
               onClick={handleGenerate}
               disabled={generating}
-              className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="flex-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-1"
             >
               {generating ? (
-                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <i className="bi bi-shuffle"></i>
+                <i className="bi bi-shuffle text-xs"></i>
               )}
               {t('sample_generate')}
             </button>
-          </div>
-
-          {/* Manual add */}
-          <button
-            onClick={() => {
-              if (currentPosition) {
-                const newPoint = { lat: currentPosition.lat, lng: currentPosition.lng, index: Date.now() };
-                onSamplePointsChange([...samplePoints, newPoint]);
-                showToast(t('success_checkpoint'), 'success');
-              } else {
-                // Fallback: add at approximate center of existing sample points, or Tokyo default
-                if (samplePoints.length > 0) {
+            <button
+              onClick={() => {
+                if (currentPosition) {
+                  onSamplePointsChange([...samplePoints, { lat: currentPosition.lat, lng: currentPosition.lng, index: Date.now() }]);
+                } else if (samplePoints.length > 0) {
                   const avgLat = samplePoints.reduce((s, p) => s + p.lat, 0) / samplePoints.length;
                   const avgLng = samplePoints.reduce((s, p) => s + p.lng, 0) / samplePoints.length;
-                  const newPoint = { lat: avgLat, lng: avgLng, index: Date.now() };
-                  onSamplePointsChange([...samplePoints, newPoint]);
-                  showToast('マップ上でマーカーをドラッグして位置を調整してください', 'info');
-                } else {
-                  showToast('GPS位置を取得できません。位置情報の権限を許可してください。', 'error');
+                  onSamplePointsChange([...samplePoints, { lat: avgLat, lng: avgLng, index: Date.now() }]);
                 }
-              }
-            }}
-            className="w-full py-2 border-2 border-dashed border-slate-300 hover:border-emerald-400 text-slate-500 hover:text-emerald-600 text-xs font-bold rounded-lg transition-colors flex items-center justify-center gap-1.5"
-          >
-            <i className="bi bi-plus-circle"></i>
-            {t('add_manual_checkpoint')}
-          </button>
+              }}
+              className="w-8 h-8 border border-dashed border-slate-300 hover:border-emerald-400 text-slate-400 hover:text-emerald-600 rounded-lg flex items-center justify-center transition-colors shrink-0"
+              title={t('add_manual_checkpoint')}
+            >
+              <i className="bi bi-plus text-base"></i>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Recording UI (inline) */}
       {recordingIndex !== null && samplePoints[recordingIndex] && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-emerald-700">
               #{recordingIndex + 1}
             </span>
-            <button
-              onClick={() => setRecordingIndex(null)}
-              className="text-slate-400 hover:text-slate-600"
-            >
+            <button onClick={() => setRecordingIndex(null)} className="text-slate-400 hover:text-slate-600">
               <i className="bi bi-x-lg text-sm"></i>
             </button>
           </div>
-
-          {/* Result selector */}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-1.5">
             {(['CONFIRMED', 'NOT_FOUND', 'UNABLE'] as const).map((r) => {
               const labels: Record<string, string> = {
                 CONFIRMED: t('checkpoint_confirmed'),
@@ -280,10 +252,8 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                 <button
                   key={r}
                   onClick={() => setRecordResult(r)}
-                  className={`py-2.5 text-xs font-bold rounded-lg border transition-all active:scale-95 ${
-                    recordResult === r
-                      ? colors[r]
-                      : 'bg-white text-slate-600 border-slate-300'
+                  className={`py-2 text-[11px] font-bold rounded-lg border transition-all active:scale-95 ${
+                    recordResult === r ? colors[r] : 'bg-white text-slate-600 border-slate-300'
                   }`}
                 >
                   {labels[r]}
@@ -291,26 +261,13 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
               );
             })}
           </div>
-
-          {/* Camera capture */}
           <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              className="hidden"
-              onChange={handleFileChange}
-            />
+            <input ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
             {previewUrl ? (
               <div className="relative">
-                <img src={previewUrl} alt="Preview" className="w-full h-32 object-cover rounded-lg" />
+                <img src={previewUrl} alt="Preview" className="w-full h-28 object-cover rounded-lg" />
                 <button
-                  onClick={() => {
-                    setSelectedFile(null);
-                    setPreviewUrl(null);
-                    if (fileInputRef.current) fileInputRef.current.value = '';
-                  }}
+                  onClick={() => { setSelectedFile(null); setPreviewUrl(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
                   className="absolute top-1 right-1 w-6 h-6 bg-black/50 text-white rounded-full flex items-center justify-center"
                 >
                   <i className="bi bi-x text-sm"></i>
@@ -319,27 +276,23 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full py-3 border-2 border-dashed border-slate-300 rounded-lg text-xs text-slate-400 flex items-center justify-center gap-1.5 hover:border-emerald-400 hover:text-emerald-500 transition-colors"
+                className="w-full py-2.5 border-2 border-dashed border-slate-300 rounded-lg text-xs text-slate-400 flex items-center justify-center gap-1.5 hover:border-emerald-400 hover:text-emerald-500 transition-colors"
               >
                 <i className="bi bi-camera text-base"></i>
                 {t('btn_take_photo')}
               </button>
             )}
           </div>
-
-          {/* Note */}
           <textarea
             value={recordNote}
             onChange={(e) => setRecordNote(e.target.value)}
             placeholder={t('note')}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white h-16 resize-none"
+            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-white h-12 resize-none"
           />
-
-          {/* Submit */}
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             {submitting ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -351,44 +304,86 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         </div>
       )}
 
-      {/* Pending sample points */}
+      {/* Unified sample points list */}
       {samplePoints.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold text-slate-400 uppercase">{t('sample_points')}</p>
+        <div className="space-y-1.5">
           {samplePoints.map((point, i) => {
+            const matched = getMatchedCheckpoint(point);
             const dist = currentPosition
               ? haversineM(currentPosition.lat, currentPosition.lng, point.lat, point.lng)
               : null;
+            const isChecked = matched !== null;
+
             return (
               <div
                 key={`sample-${i}`}
-                className="flex items-center gap-2 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 transition-colors"
+                className={`flex items-center gap-2 rounded-xl border transition-colors ${
+                  isChecked
+                    ? matched.result === 'CONFIRMED'
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : matched.result === 'NOT_FOUND'
+                        ? 'bg-rose-50 border-rose-200'
+                        : 'bg-slate-50 border-slate-200'
+                    : 'bg-white border-slate-200 hover:border-emerald-300'
+                }`}
               >
                 <button
-                  onClick={() => isActive && openRecording(i)}
-                  disabled={!isActive || recordingIndex !== null}
-                  className="flex-1 flex items-center gap-3 p-3 text-left disabled:opacity-50"
+                  onClick={() => isActive && !isChecked && openRecording(i)}
+                  disabled={!isActive || isChecked || recordingIndex !== null}
+                  className="flex-1 flex items-center gap-2.5 p-2.5 text-left disabled:opacity-70"
                 >
-                  <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center shrink-0">
-                    <span className="text-xs font-black text-amber-700">{i + 1}</span>
+                  {/* Number badge */}
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 ${
+                    isChecked
+                      ? matched.result === 'CONFIRMED'
+                        ? 'bg-emerald-500 text-white'
+                        : matched.result === 'NOT_FOUND'
+                          ? 'bg-rose-500 text-white'
+                          : 'bg-slate-400 text-white'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {isChecked
+                      ? <i className={`bi ${matched.result === 'CONFIRMED' ? 'bi-check-lg' : matched.result === 'NOT_FOUND' ? 'bi-x-lg' : 'bi-dash-lg'} text-xs`}></i>
+                      : <span className="text-[10px] font-black">{i + 1}</span>
+                    }
                   </div>
+                  {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs text-slate-600 truncate">
-                      {point.lat.toFixed(6)}, {point.lng.toFixed(6)}
-                    </p>
-                    {dist !== null && (
-                      <p className="text-[10px] text-slate-400">{formatDistance(dist)}</p>
+                    {isChecked ? (
+                      <>
+                        <p className="text-[11px] font-bold truncate">
+                          {matched.result === 'CONFIRMED' ? t('checkpoint_confirmed') : matched.result === 'NOT_FOUND' ? t('checkpoint_not_found') : t('checkpoint_unable')}
+                        </p>
+                        {matched.note && <p className="text-[10px] text-slate-500 truncate">{matched.note}</p>}
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[11px] text-slate-500">#{i + 1}</p>
+                        {dist !== null && (
+                          <p className="text-[10px] text-slate-400">{formatDistance(dist)}</p>
+                        )}
+                      </>
                     )}
                   </div>
-                  <i className="bi bi-chevron-right text-slate-300"></i>
+                  {/* Photo thumbnail or chevron */}
+                  {isChecked && matched.photoUrl ? (
+                    <img
+                      src={matched.photoUrl}
+                      alt=""
+                      className="w-9 h-9 object-cover rounded-lg shrink-0 cursor-pointer hover:opacity-80"
+                      onClick={(e) => { e.stopPropagation(); e.preventDefault(); setEnlargedPhoto(matched.photoUrl); }}
+                    />
+                  ) : !isChecked ? (
+                    <i className="bi bi-chevron-right text-slate-300 text-xs"></i>
+                  ) : null}
                 </button>
-                {isActive && (
+                {/* Delete button (only for unchecked, active) */}
+                {isActive && !isChecked && (
                   <button
                     onClick={(e) => { e.stopPropagation(); onSamplePointsChange(samplePoints.filter((_, j) => j !== i)); }}
-                    className="px-2 py-3 text-slate-300 hover:text-red-500 transition-colors shrink-0"
-                    title="削除"
+                    className="px-2 py-2.5 text-slate-300 hover:text-red-500 transition-colors shrink-0"
                   >
-                    <i className="bi bi-trash3 text-sm"></i>
+                    <i className="bi bi-trash3 text-xs"></i>
                   </button>
                 )}
               </div>
@@ -397,48 +392,14 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         </div>
       )}
 
-      {/* Completed checkpoints */}
-      {checkpoints.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-bold text-slate-400 uppercase">
-            {t('section_checkpoints')} ({checkedCount})
-          </p>
-          {checkpoints.map((cp) => (
-            <div
-              key={cp.id}
-              className={`flex items-center gap-3 p-3 border rounded-xl ${resultColor(cp.result)}`}
-            >
-              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white/50">
-                {cp.result === 'CONFIRMED' && <i className="bi bi-check-lg text-emerald-600"></i>}
-                {cp.result === 'NOT_FOUND' && <i className="bi bi-x-lg text-red-600"></i>}
-                {cp.result === 'UNABLE' && <i className="bi bi-dash-lg text-slate-500"></i>}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold truncate">
-                  {cp.result === 'CONFIRMED' ? t('checkpoint_confirmed') : cp.result === 'NOT_FOUND' ? t('checkpoint_not_found') : t('checkpoint_unable')}
-                </p>
-                {cp.note && <p className="text-[10px] truncate opacity-70">{cp.note}</p>}
-              </div>
-              {cp.photoUrl && (
-                <img
-                  src={cp.photoUrl}
-                  alt=""
-                  className="w-10 h-10 object-cover rounded-lg shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={(e) => { e.stopPropagation(); setEnlargedPhoto(cp.photoUrl); }}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Empty state */}
-      {checkpoints.length === 0 && samplePoints.length === 0 && (
-        <div className="py-8 text-center">
-          <i className="bi bi-check-circle text-3xl text-slate-200 block mb-2"></i>
+      {samplePoints.length === 0 && checkpoints.length === 0 && (
+        <div className="py-6 text-center">
+          <i className="bi bi-check-circle text-2xl text-slate-200 block mb-2"></i>
           <p className="text-xs text-slate-400">{t('empty_checkpoints')}</p>
         </div>
       )}
+
       {/* Photo enlargement modal */}
       {enlargedPhoto && (
         <div
