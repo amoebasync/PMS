@@ -48,6 +48,11 @@ interface ProhibitedProperty {
   longitude: number | null;
   address: string | null;
   buildingName: string | null;
+  roomNumber?: string | null;
+  residentName?: string | null;
+  reasonDetail?: string | null;
+  reasonName?: string | null;
+  severity?: number | null;
   pinColor?: string | null;
 }
 
@@ -243,6 +248,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   const [gpsComment, setGpsComment] = useState('');
   const [gpsSaving, setGpsSaving] = useState(false);
   const [showGpsCommentInput, setShowGpsCommentInput] = useState(false);
+  const [ppPopup, setPpPopup] = useState<{ lng: number; lat: number; props: any } | null>(null);
 
   // View mode: trajectory (default), dwell, heatmap
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
@@ -526,6 +532,13 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         properties: {
           id: pp.id ?? idx,
           name: pp.buildingName || pp.address || '禁止物件',
+          address: pp.address || '',
+          buildingName: pp.buildingName || '',
+          roomNumber: pp.roomNumber || '',
+          residentName: pp.residentName || '',
+          reasonDetail: pp.reasonDetail || '',
+          reasonName: pp.reasonName || '',
+          severity: pp.severity ?? 0,
           color: pp.pinColor && pp.pinColor !== '#000000'
             ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
             : '#ef4444',
@@ -979,6 +992,17 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 map.setPaintProperty('building', 'fill-outline-color', '#94a3b8');
               }
             }}
+            interactiveLayerIds={['prohibited-circles']}
+            onClick={(e) => {
+              const feature = e.features?.[0];
+              if (feature && feature.layer?.id === 'prohibited-circles' && feature.geometry.type === 'Point') {
+                const [lng, lat] = feature.geometry.coordinates;
+                setPpPopup({ lng, lat, props: feature.properties });
+              } else {
+                setPpPopup(null);
+              }
+            }}
+            cursor={ppPopup ? 'default' : undefined}
           >
             <NavigationControl position="top-right" />
 
@@ -1085,6 +1109,41 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       }}
                     />
                   </Source>
+                )}
+                {/* Prohibited property Popup */}
+                {ppPopup && (
+                  <Popup
+                    longitude={ppPopup.lng}
+                    latitude={ppPopup.lat}
+                    anchor="bottom"
+                    onClose={() => setPpPopup(null)}
+                    closeOnClick={false}
+                    maxWidth="280px"
+                  >
+                    <div className="text-xs space-y-1 p-1">
+                      {ppPopup.props.buildingName && (
+                        <div className="font-bold text-slate-800 text-sm">{ppPopup.props.buildingName}</div>
+                      )}
+                      {ppPopup.props.address && (
+                        <div className="text-slate-600"><i className="bi bi-geo-alt text-rose-500 mr-1"></i>{ppPopup.props.address}</div>
+                      )}
+                      {ppPopup.props.roomNumber && (
+                        <div className="text-slate-500">部屋: {ppPopup.props.roomNumber}</div>
+                      )}
+                      {ppPopup.props.residentName && (
+                        <div className="text-slate-500">居住者: {ppPopup.props.residentName}</div>
+                      )}
+                      {(ppPopup.props.reasonName || ppPopup.props.reasonDetail) && (
+                        <div className="border-t border-slate-100 pt-1 mt-1">
+                          {ppPopup.props.reasonName && <span className="inline-block bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-bold mr-1">{ppPopup.props.reasonName}</span>}
+                          {ppPopup.props.reasonDetail && <div className="text-slate-500 mt-0.5">{ppPopup.props.reasonDetail}</div>}
+                        </div>
+                      )}
+                      {ppPopup.props.severity > 0 && (
+                        <div className="text-[10px] text-slate-400">重要度: {'★'.repeat(ppPopup.props.severity)}{'☆'.repeat(5 - ppPopup.props.severity)}</div>
+                      )}
+                    </div>
+                  </Popup>
                 )}
 
                 {/* Coverage — uncovered road points shown as red dots */}

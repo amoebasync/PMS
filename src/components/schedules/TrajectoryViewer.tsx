@@ -46,6 +46,11 @@ interface ProhibitedProperty {
   longitude: number | null;
   address: string | null;
   buildingName: string | null;
+  roomNumber?: string | null;
+  residentName?: string | null;
+  reasonDetail?: string | null;
+  reasonName?: string | null;
+  severity?: number | null;
   pinColor?: string | null;
 }
 
@@ -264,6 +269,7 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
   const [gpsComment, setGpsComment] = useState('');
   const [gpsSaving, setGpsSaving] = useState(false);
   const [showGpsCommentInput, setShowGpsCommentInput] = useState(false);
+  const [selectedPP, setSelectedPP] = useState<ProhibitedProperty | null>(null);
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
@@ -858,10 +864,41 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
                           strokeColor: '#ffffff',
                           strokeWeight: 2,
                         }}
-                        title={pp.buildingName || pp.address || '禁止物件'}
+                        onClick={() => setSelectedPP(pp)}
                       />
                     );
                   })}
+                  {/* Prohibited property InfoWindow */}
+                  {selectedPP && selectedPP.latitude && selectedPP.longitude && (
+                    <InfoWindow
+                      position={{ lat: selectedPP.latitude, lng: selectedPP.longitude }}
+                      onCloseClick={() => setSelectedPP(null)}
+                    >
+                      <div className="text-xs max-w-[250px] space-y-1">
+                        {selectedPP.buildingName && (
+                          <div className="font-bold text-slate-800 text-sm">{selectedPP.buildingName}</div>
+                        )}
+                        {selectedPP.address && (
+                          <div className="text-slate-600"><i className="bi bi-geo-alt text-rose-500 mr-1"></i>{selectedPP.address}</div>
+                        )}
+                        {selectedPP.roomNumber && (
+                          <div className="text-slate-500">部屋: {selectedPP.roomNumber}</div>
+                        )}
+                        {selectedPP.residentName && (
+                          <div className="text-slate-500">居住者: {selectedPP.residentName}</div>
+                        )}
+                        {(selectedPP.reasonName || selectedPP.reasonDetail) && (
+                          <div className="border-t border-slate-100 pt-1 mt-1">
+                            {selectedPP.reasonName && <span className="inline-block bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded text-[10px] font-bold mr-1">{selectedPP.reasonName}</span>}
+                            {selectedPP.reasonDetail && <div className="text-slate-500 mt-0.5">{selectedPP.reasonDetail}</div>}
+                          </div>
+                        )}
+                        {selectedPP.severity != null && (
+                          <div className="text-[10px] text-slate-400">重要度: {'★'.repeat(selectedPP.severity)}{'☆'.repeat(5 - selectedPP.severity)}</div>
+                        )}
+                      </div>
+                    </InfoWindow>
+                  )}
                 </>
               )}
 

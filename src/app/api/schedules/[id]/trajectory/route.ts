@@ -89,6 +89,10 @@ export async function GET(
               longitude: parseFloat(r.lng || '0'),
               address: r.address || null,
               buildingName: r.buildingName || null,
+              roomNumber: r.roomNumber || null,
+              residentName: r.residentName || null,
+              reasonDetail: r.reasonDetail || r.remarks || null,
+              severity: r.severity ? parseInt(r.severity) : null,
               pinColor: r.pinColor || null,
             }));
         }
@@ -98,7 +102,7 @@ export async function GET(
     }
     // PMS DB フォールバック
     if (prohibitedProperties.length === 0 && schedule.areaId) {
-      prohibitedProperties = await prisma.prohibitedProperty.findMany({
+      const dbProps = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: schedule.areaId,
           isActive: true,
@@ -109,8 +113,18 @@ export async function GET(
           longitude: true,
           address: true,
           buildingName: true,
+          roomNumber: true,
+          residentName: true,
+          reasonDetail: true,
+          severity: true,
+          prohibitedReason: { select: { name: true } },
         },
       });
+      prohibitedProperties = dbProps.map(p => ({
+        ...p,
+        reasonName: p.prohibitedReason?.name || null,
+        prohibitedReason: undefined,
+      }));
     }
 
     const sess = schedule.session;
