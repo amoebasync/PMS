@@ -435,7 +435,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
       {/* Checkpoint markers (only those NOT matching a sample point — manual adds) */}
       {checkpoints.map((cp) => {
         const matchesSample = samplePoints.some(
-          (sp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
+          (sp) => Math.abs(cp.targetLat - sp.lat) < 0.0002 && Math.abs(cp.targetLng - sp.lng) < 0.0002
         );
         if (matchesSample) return null; // already rendered with sample point markers
         const fillColor = cp.result === 'CONFIRMED' ? '#22c55e' : cp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8';
