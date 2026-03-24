@@ -579,6 +579,37 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     }));
   };
 
+  // レートプラン取得
+  const [availableRatePlans, setAvailableRatePlans] = useState<{ name: string; rates: number[] }[]>([]);
+  useEffect(() => {
+    fetch('/api/settings/system').then(r => r.ok ? r.json() : {}).then((data: any) => {
+      if (data.ratePlans) {
+        try { setAvailableRatePlans(JSON.parse(data.ratePlans)); } catch { /* ignore */ }
+      }
+    }).catch(() => {});
+  }, []);
+
+  const handleRatePlanChange = (planName: string) => {
+    setFormData(prev => {
+      const updated = { ...prev, ratePlan: planName };
+      if (planName === 'Custom') {
+        updated.rateMode = 'manual';
+      } else {
+        const plan = availableRatePlans.find(p => p.name === planName);
+        if (plan) {
+          updated.rateMode = 'manual';
+          updated.rate1Type = String(plan.rates[0] || '');
+          updated.rate2Type = String(plan.rates[1] || '');
+          updated.rate3Type = String(plan.rates[2] || '');
+          updated.rate4Type = String(plan.rates[3] || '');
+          updated.rate5Type = String(plan.rates[4] || '');
+          updated.rate6Type = String(plan.rates[5] || '');
+        }
+      }
+      return updated;
+    });
+  };
+
   const handleRankChange = (newRank: string) => {
     setFormData(prev => ({ ...prev, rank: newRank }));
     if (formData.rateMode === 'auto' && newRank) {
@@ -1808,7 +1839,16 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                           <option value="D">D</option>
                         </select>
                       </div>
-                      <div><Label>レートプラン</Label><input name="ratePlan" value={formData.ratePlan} onChange={handleInputChange} className={inputCls} placeholder="例: Basic" /></div>
+                      <div>
+                        <Label>レートプラン</Label>
+                        <select value={formData.ratePlan} onChange={e => handleRatePlanChange(e.target.value)} className={selectCls}>
+                          <option value="">— 未選択 —</option>
+                          {availableRatePlans.map(p => (
+                            <option key={p.name} value={p.name}>{p.name}</option>
+                          ))}
+                          <option value="Custom">Custom（手動設定）</option>
+                        </select>
+                      </div>
                       <div><Label>出勤回数</Label><input type="number" name="attendanceCount" value={formData.attendanceCount} onChange={handleInputChange} className={inputCls} min={0} /></div>
                     </div>
 
@@ -1816,38 +1856,27 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-bold text-slate-500">配布単価（円/枚）</p>
-                        <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
-                          <button type="button"
-                            onClick={() => handleRateModeChange('auto')}
-                            className={`px-3 py-1 text-xs font-bold transition-colors ${formData.rateMode === 'auto' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-                          >
-                            <i className="bi bi-lightning-fill mr-1"></i>自動
-                          </button>
-                          <button type="button"
-                            onClick={() => handleRateModeChange('manual')}
-                            className={`px-3 py-1 text-xs font-bold transition-colors ${formData.rateMode === 'manual' ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:bg-slate-50'}`}
-                          >
-                            <i className="bi bi-pencil-fill mr-1"></i>手動
-                          </button>
-                        </div>
+                        {formData.ratePlan && formData.ratePlan !== 'Custom' && (
+                          <span className="text-[10px] text-indigo-600 flex items-center gap-1">
+                            <i className="bi bi-info-circle-fill"></i>
+                            {formData.ratePlan} プランの単価が適用されています
+                          </span>
+                        )}
                       </div>
-                      {formData.rateMode === 'auto' && (
-                        <p className="text-[10px] text-indigo-600 flex items-center gap-1">
-                          <i className="bi bi-info-circle-fill"></i>
-                          ランクを変更すると、システム設定のランク別単価が自動反映されます
-                        </p>
-                      )}
                       <div className="grid grid-cols-3 gap-3">
-                        {(['rate1Type', 'rate2Type', 'rate3Type', 'rate4Type', 'rate5Type', 'rate6Type'] as const).map((f, i) => (
-                          <div key={f}>
-                            <Label>{i + 1} Type Rate</Label>
-                            <input type="number" step="0.01" name={f} value={(formData as any)[f]} onChange={handleInputChange}
-                              className={inputCls + (formData.rateMode === 'auto' ? ' bg-indigo-50 border-indigo-200' : '')}
-                              placeholder="0.00"
-                              readOnly={formData.rateMode === 'auto'}
-                            />
-                          </div>
-                        ))}
+                        {(['rate1Type', 'rate2Type', 'rate3Type', 'rate4Type', 'rate5Type', 'rate6Type'] as const).map((f, i) => {
+                          const isReadOnly = formData.ratePlan !== '' && formData.ratePlan !== 'Custom' && formData.rateMode !== 'auto';
+                          return (
+                            <div key={f}>
+                              <Label>{i + 1}種</Label>
+                              <input type="number" step="0.01" name={f} value={(formData as any)[f]} onChange={handleInputChange}
+                                className={inputCls + (isReadOnly ? ' bg-indigo-50 border-indigo-200' : '')}
+                                placeholder="0.00"
+                                readOnly={isReadOnly}
+                              />
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
 
