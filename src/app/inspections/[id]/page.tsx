@@ -62,8 +62,8 @@ interface InspectionDetail {
 
 interface Checkpoint {
   id: number;
-  lat: number;
-  lng: number;
+  targetLat: number;
+  targetLng: number;
   result: 'CONFIRMED' | 'NOT_FOUND' | 'UNABLE' | null;
   note: string | null;
   photoUrl: string | null;

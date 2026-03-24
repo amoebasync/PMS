@@ -24,8 +24,8 @@ interface ProhibitedProperty {
 
 interface Checkpoint {
   id: number;
-  lat: number;
-  lng: number;
+  targetLat: number;
+  targetLng: number;
   result: 'CONFIRMED' | 'NOT_FOUND' | 'UNABLE' | null;
   note: string | null;
   photoUrl: string | null;
@@ -335,7 +335,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
       {/* Sample points — color-coded by check result, always showing number */}
       {samplePoints.map((sp, idx) => {
         const matchedCp = checkpoints.find(
-          (cp) => Math.abs(cp.lat - sp.lat) < 0.0002 && Math.abs(cp.lng - sp.lng) < 0.0002
+          (cp) => Math.abs(cp.targetLat - sp.lat) < 0.0002 && Math.abs(cp.targetLng - sp.lng) < 0.0002
         );
         const hasResult = matchedCp && matchedCp.result;
         const fillColor = hasResult
@@ -429,7 +429,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         return (
           <Marker
             key={`cp-${cp.id}`}
-            position={{ lat: cp.lat, lng: cp.lng }}
+            position={{ lat: cp.targetLat, lng: cp.targetLng }}
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
               scale: 12,
