@@ -258,6 +258,9 @@ export default function DispatchPage() {
     } catch (e) { showToast(t('error_update_failed'), 'error'); }
   };
 
+  // ローカル編集用（入力中はAPIを叩かない、onBlurで保存）
+  const [editingCounts, setEditingCounts] = useState<Record<number, string>>({});
+
   const updateItemPlannedCount = async (itemId: number, newCount: string) => {
     try {
       const res = await fetch('/api/schedules/items', {
@@ -266,6 +269,7 @@ export default function DispatchPage() {
       });
       if (res.ok) fetchData();
     } catch (e) { showToast(t('error_count_update_failed'), 'error'); }
+    setEditingCounts(prev => { const next = { ...prev }; delete next[itemId]; return next; });
   };
 
   const handleAdjustCount = async (itemId: number, currentCount: number, excess: number) => {
@@ -698,11 +702,11 @@ export default function DispatchPage() {
                                 <div className="mt-1 pt-1 border-t border-slate-100/50 flex items-center justify-between">
                                   <span className="text-[9px] text-slate-500">{t('flyer_planned_count')}</span>
                                   <div className="flex items-center">
-                                    <input 
-                                      type="number" 
-                                      value={item.plannedCount || ''} 
-                                      onChange={(e) => updateItemPlannedCount(item.id, e.target.value)}
-                                      onBlur={fetchData} 
+                                    <input
+                                      type="number"
+                                      value={editingCounts[item.id] ?? item.plannedCount ?? ''}
+                                      onChange={(e) => setEditingCounts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      onBlur={(e) => { if (editingCounts[item.id] != null) updateItemPlannedCount(item.id, e.target.value); }}
                                       className={`w-14 text-right border rounded px-1 py-0.5 focus:outline-none focus:ring-1 ${item.isOverCount ? 'border-rose-300 bg-white text-rose-600 font-bold' : 'border-slate-200 bg-slate-50 text-indigo-600 font-bold'}`}
                                     />
                                     <span className="ml-0.5 text-[9px] text-slate-500">{t('unassigned_sheets')}</span>
