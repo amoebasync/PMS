@@ -16,6 +16,11 @@ const DEFAULTS: Record<string, string> = {
   evalRankC: '60',            // Cランク閾値（以上）、これ未満はDランク
   evalCycleDay: '0',          // 評価サイクル開始曜日（0=日,1=月...）
   rankRates: JSON.stringify({ S: [0,0,0,0,0,0], A: [0,0,0,0,0,0], B: [0,0,0,0,0,0], C: [0,0,0,0,0,0], D: [0,0,0,0,0,0] }),
+  ratePlans: JSON.stringify([
+    { name: 'Regular', rates: [2, 3, 3.5, 4.75, 6, 7.25] },
+    { name: 'Advanced', rates: [2, 3.25, 3.75, 5, 6.25, 7.5] },
+    { name: 'Pro', rates: [2.25, 3.5, 4, 5.25, 6.5, 7.75] },
+  ]),
   headerLinks: JSON.stringify([]),  // ヘッダーリンク集
 };
 

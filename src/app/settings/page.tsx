@@ -48,7 +48,7 @@ export default function SettingsPage() {
 
   const WEEK_DAY_OPTIONS = useMemo(() => WEEK_DAY_KEYS.map(k => ({ value: k.value, label: t(k.labelKey) })), [t]);
 
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'headerLinks' | 'legal'>('general');
+  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'ratePlans' | 'headerLinks' | 'legal'>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -590,11 +590,12 @@ export default function SettingsPage() {
     { key: 'alertDefinition' as const,    label: t('tab_alertDefinition'),     icon: 'bi-bell-fill' },
     { key: 'evaluation' as const,          label: t('tab_evaluation'),    icon: 'bi-speedometer2' },
     { key: 'rankRates' as const,            label: t('tab_rankRates'), icon: 'bi-currency-yen' },
+    { key: 'ratePlans' as const,            label: t('tab_ratePlans') || 'レートプラン', icon: 'bi-tags' },
     { key: 'headerLinks' as const,          label: t('tab_headerLinks'),     icon: 'bi-link-45deg' },
     { key: 'legal' as const,                label: t('tab_legal'),         icon: 'bi-file-earmark-text' },
   ], [t]);
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'alertDefinition' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'headerLinks' && tab !== 'legal';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'alertDefinition' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'ratePlans' && tab !== 'headerLinks' && tab !== 'legal';
 
   // 法務コンテンツ
   const [legalContents, setLegalContents] = useState<Record<string, string>>({
@@ -684,6 +685,53 @@ export default function SettingsPage() {
       ...prev,
       [rank]: prev[rank].map((v, i) => i === index ? (parseFloat(value) || 0) : v),
     }));
+  };
+
+  // レートプラン設定
+  type RatePlan = { name: string; rates: number[] };
+  const [ratePlans, setRatePlans] = useState<RatePlan[]>([]);
+  const [ratePlansSaving, setRatePlansSaving] = useState(false);
+
+  const fetchRatePlans = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings/system');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ratePlans) setRatePlans(JSON.parse(data.ratePlans));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const saveRatePlans = async () => {
+    setRatePlansSaving(true);
+    try {
+      await fetch('/api/settings/system', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ratePlans: JSON.stringify(ratePlans) }),
+      });
+      showToast(t('toast_save_success') || '保存しました', 'success');
+    } catch {
+      showToast(t('toast_save_error'), 'error');
+    }
+    setRatePlansSaving(false);
+  };
+
+  const updateRatePlan = (idx: number, rateIdx: number, value: string) => {
+    setRatePlans(prev => prev.map((p, i) => i === idx ? { ...p, rates: p.rates.map((r, ri) => ri === rateIdx ? (parseFloat(value) || 0) : r) } : p));
+  };
+
+  const updateRatePlanName = (idx: number, name: string) => {
+    setRatePlans(prev => prev.map((p, i) => i === idx ? { ...p, name } : p));
+  };
+
+  const addRatePlan = () => {
+    setRatePlans(prev => [...prev, { name: 'New Plan', rates: [0, 0, 0, 0, 0, 0] }]);
+  };
+
+  const removeRatePlan = async (idx: number) => {
+    if (!await showConfirm(t('confirm_delete') || '削除しますか？')) return;
+    setRatePlans(prev => prev.filter((_, i) => i !== idx));
   };
 
   // リンク集設定
@@ -790,6 +838,12 @@ export default function SettingsPage() {
     }
     setEvalSaving(false);
   };
+
+  // タブ切替時にデータ読み込み
+  useEffect(() => {
+    if (tab === 'rankRates') fetchRankRates();
+    if (tab === 'ratePlans') fetchRatePlans();
+  }, [tab, fetchRankRates, fetchRatePlans]);
 
   return (
     <div className="font-sans">
@@ -2326,6 +2380,84 @@ export default function SettingsPage() {
                     <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> {t('saving_ellipsis')}</>
                   ) : (
                     <><i className="bi bi-check2"></i> {t('rank_rates_save_btn')}</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ レートプランタブ ═══ */}
+        {tab === 'ratePlans' && (
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-slate-700"><i className="bi bi-tags mr-2"></i>{t('tab_ratePlans') || 'レートプラン'}</h2>
+                <p className="text-xs text-slate-400 mt-1">配布員に割り当てるレートプランを管理します。Customプランは配布員ごとに手動設定。</p>
+              </div>
+              <button onClick={addRatePlan} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1.5">
+                <i className="bi bi-plus-lg"></i> 追加
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {ratePlans.length === 0 && (
+                <div className="text-center py-8 text-slate-400">
+                  <i className="bi bi-tags text-3xl"></i>
+                  <p className="mt-2 text-sm">レートプランがありません</p>
+                </div>
+              )}
+              {ratePlans.map((plan, idx) => (
+                <div key={idx} className="border border-slate-200 rounded-xl overflow-hidden">
+                  <div className="px-4 py-3 bg-slate-50 flex items-center justify-between">
+                    <input
+                      type="text"
+                      value={plan.name}
+                      onChange={e => updateRatePlanName(idx, e.target.value)}
+                      className="font-bold text-sm text-slate-700 bg-transparent border-none outline-none focus:ring-0 w-48"
+                    />
+                    <button onClick={() => removeRatePlan(idx)} className="text-slate-400 hover:text-red-500 text-sm">
+                      <i className="bi bi-trash3"></i>
+                    </button>
+                  </div>
+                  <div className="px-4 py-3">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-slate-500">
+                          {[1,2,3,4,5,6].map(n => (
+                            <th key={n} className="text-center px-2 py-1 font-bold">{n}種</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          {[0,1,2,3,4,5].map(i => (
+                            <td key={i} className="px-2 py-1">
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={plan.rates[i] || 0}
+                                onChange={e => updateRatePlan(idx, i, e.target.value)}
+                                className="w-full text-center px-2 py-1.5 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-end pt-4 mt-4 border-t border-slate-100">
+                <button
+                  onClick={saveRatePlans}
+                  disabled={ratePlansSaving}
+                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {ratePlansSaving ? (
+                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span> {t('saving_ellipsis') || '保存中...'}</>
+                  ) : (
+                    <><i className="bi bi-check2"></i> {t('btn_save') || '保存'}</>
                   )}
                 </button>
               </div>
