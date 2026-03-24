@@ -133,13 +133,29 @@ export async function GET(
       }
     }
 
-    // エリア内の禁止物件（PMS DBのみ）
+    // エリア内の禁止物件（PMS DBのみ、顧客コードでフィルタ）
     let prohibitedProperties: any[] = [];
-    if (inspection.schedule?.areaId) {
+    if (inspection.schedule?.areaId && inspection.scheduleId) {
+      // スケジュールのチラシに紐づく外部顧客コードを収集
+      const scheduleItems = await prisma.distributionItem.findMany({
+        where: { scheduleId: inspection.scheduleId },
+        select: { externalCustomerCode: true },
+      });
+      const itemCustomerCodes = [...new Set(
+        scheduleItems
+          .map(i => i.externalCustomerCode)
+          .filter((c): c is string => !!c && c.trim() !== '')
+      )];
+
       prohibitedProperties = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: inspection.schedule.areaId,
           isActive: true,
+          OR: [
+            { externalCustomerCode: null },
+            { externalCustomerCode: '' },
+            ...(itemCustomerCodes.length > 0 ? [{ externalCustomerCode: { in: itemCustomerCodes } }] : []),
+          ],
         },
         select: {
           id: true,

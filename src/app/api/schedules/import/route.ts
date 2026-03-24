@@ -376,6 +376,7 @@ export async function POST(request: Request) {
               flyerName: item.flyerName,
               flyerCode: item.flyerCode,
               customerId: customer?.id || null,
+              externalCustomerCode: item.customerCode ? String(item.customerCode).trim() : null,
               orderId: createdOrder?.id || null,
               startDate: baseDate ? parseDayString(s.date, item.startDateStr) : null,
               endDate: baseDate ? parseDayString(s.date, item.endDateStr) : null,

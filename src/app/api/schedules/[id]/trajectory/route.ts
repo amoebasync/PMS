@@ -53,13 +53,26 @@ export async function GET(
       return NextResponse.json({ error: '配布セッションがまだ開始されていません' }, { status: 404 });
     }
 
-    // エリア内の禁止物件（PMS DBのみ）
+    // エリア内の禁止物件（PMS DBのみ、顧客コードでフィルタ）
     let prohibitedProperties: any[] = [];
     if (schedule.areaId) {
+      // スケジュールのチラシに紐づく外部顧客コードを収集
+      const itemCustomerCodes = [...new Set(
+        schedule.items
+          .map(i => i.externalCustomerCode)
+          .filter((c): c is string => !!c && c.trim() !== '')
+      )];
+
       const dbProps = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: schedule.areaId,
           isActive: true,
+          // 全顧客禁止（externalCustomerCode = null/空）OR このスケジュールの顧客に該当
+          OR: [
+            { externalCustomerCode: null },
+            { externalCustomerCode: '' },
+            ...(itemCustomerCodes.length > 0 ? [{ externalCustomerCode: { in: itemCustomerCodes } }] : []),
+          ],
         },
         select: {
           id: true,

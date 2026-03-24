@@ -955,6 +955,9 @@ model DistributionItem {
 
   billingUnitPrice Float? @map("billing_unit_price")
 
+  // Posting System由来の顧客コード（禁止物件フィルタリング用）
+  externalCustomerCode String? @map("external_customer_code") @db.VarChar(20)
+
   @@index([scheduleId])
   @@index([customerId])
   @@map("distribution_items")
