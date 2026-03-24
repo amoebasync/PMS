@@ -94,6 +94,7 @@ export async function GET(
               reasonDetail: r.reasonDetail || r.remarks || null,
               severity: r.severity ? parseInt(r.severity) : null,
               pinColor: r.pinColor || null,
+              boundaryGeojson: r.boundaryGeojson || r.polygon || null,
             }));
         }
       } catch (e) {
@@ -117,6 +118,7 @@ export async function GET(
           residentName: true,
           reasonDetail: true,
           severity: true,
+          boundaryGeojson: true,
           prohibitedReason: { select: { name: true } },
         },
       });

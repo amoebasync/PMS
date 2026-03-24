@@ -52,6 +52,7 @@ interface ProhibitedProperty {
   reasonName?: string | null;
   severity?: number | null;
   pinColor?: string | null;
+  boundaryGeojson?: string | null;
 }
 
 interface TrajectoryData {
@@ -852,20 +853,38 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
                     const color = pp.pinColor && pp.pinColor !== '#000000'
                       ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
                       : '#ef4444';
+                    const ppPolygons = pp.boundaryGeojson ? extractPaths(pp.boundaryGeojson) : [];
                     return (
-                      <Marker
-                        key={`pp-${pp.id ?? idx}-${pp.latitude}-${pp.longitude}`}
-                        position={{ lat: pp.latitude, lng: pp.longitude }}
-                        icon={{
-                          path: google.maps.SymbolPath.CIRCLE,
-                          scale: 7,
-                          fillColor: color,
-                          fillOpacity: 0.7,
-                          strokeColor: '#ffffff',
-                          strokeWeight: 2,
-                        }}
-                        onClick={() => setSelectedPP(pp)}
-                      />
+                      <React.Fragment key={`pp-${pp.id ?? idx}-${pp.latitude}-${pp.longitude}`}>
+                        {ppPolygons.map((path, pi) => (
+                          <Polygon
+                            key={`pp-poly-${pp.id ?? idx}-${pi}`}
+                            paths={path}
+                            options={{
+                              fillColor: color,
+                              fillOpacity: 0.25,
+                              strokeColor: color,
+                              strokeOpacity: 0.8,
+                              strokeWeight: 2,
+                              zIndex: 45,
+                              clickable: true,
+                            }}
+                            onClick={() => setSelectedPP(pp)}
+                          />
+                        ))}
+                        <Marker
+                          position={{ lat: pp.latitude, lng: pp.longitude }}
+                          icon={{
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: ppPolygons.length > 0 ? 5 : 7,
+                            fillColor: color,
+                            fillOpacity: 0.7,
+                            strokeColor: '#ffffff',
+                            strokeWeight: 2,
+                          }}
+                          onClick={() => setSelectedPP(pp)}
+                        />
+                      </React.Fragment>
                     );
                   })}
                   {/* Prohibited property InfoWindow */}

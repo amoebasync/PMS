@@ -54,6 +54,7 @@ interface ProhibitedProperty {
   reasonName?: string | null;
   severity?: number | null;
   pinColor?: string | null;
+  boundaryGeojson?: string | null;
 }
 
 interface TrajectoryData {
@@ -545,6 +546,32 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         },
         geometry: { type: 'Point' as const, coordinates: [pp.longitude!, pp.latitude!] },
       }));
+    return { type: 'FeatureCollection' as const, features };
+  }, [data]);
+
+  // Prohibited properties polygon GeoJSON
+  const prohibitedPolygonGeoJson = useMemo(() => {
+    if (!data) return null;
+    const features: any[] = [];
+    data.prohibitedProperties.forEach((pp, idx) => {
+      if (!pp.boundaryGeojson) return;
+      try {
+        const parsed = JSON.parse(pp.boundaryGeojson.trim());
+        const color = pp.pinColor && pp.pinColor !== '#000000'
+          ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
+          : '#ef4444';
+        const addFeature = (geom: any) => {
+          if (!geom) return;
+          if (geom.type === 'FeatureCollection') { geom.features?.forEach((f: any) => addFeature(f.geometry || f)); return; }
+          if (geom.type === 'Feature') { addFeature(geom.geometry); return; }
+          if (geom.type === 'Polygon' || geom.type === 'MultiPolygon') {
+            features.push({ type: 'Feature', properties: { id: pp.id ?? idx, color }, geometry: geom });
+          }
+        };
+        addFeature(parsed);
+      } catch { /* ignore */ }
+    });
+    if (features.length === 0) return null;
     return { type: 'FeatureCollection' as const, features };
   }, [data]);
 
@@ -1110,6 +1137,29 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     />
                   </Source>
                 )}
+                {/* Prohibited property polygons */}
+                {showProhibited && prohibitedPolygonGeoJson && (
+                  <Source id="prohibited-polygons" type="geojson" data={prohibitedPolygonGeoJson}>
+                    <Layer
+                      id="prohibited-polygon-fill"
+                      type="fill"
+                      paint={{
+                        'fill-color': ['get', 'color'],
+                        'fill-opacity': 0.2,
+                      }}
+                    />
+                    <Layer
+                      id="prohibited-polygon-line"
+                      type="line"
+                      paint={{
+                        'line-color': ['get', 'color'],
+                        'line-opacity': 0.8,
+                        'line-width': 2,
+                      }}
+                    />
+                  </Source>
+                )}
+
                 {/* Prohibited property Popup */}
                 {ppPopup && (
                   <Popup
