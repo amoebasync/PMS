@@ -26,10 +26,11 @@ export async function GET(request: Request) {
     if (scheduleId) {
       where.scheduleId = parseInt(scheduleId);
     } else if (date) {
-      // date フィールドがセットされたタスク OR dateがnullでschedule.dateが一致するタスク
+      // date フィールドがセットされたタスク OR dateがnullでschedule.dateが一致するタスク OR スケジュール無し+date一致
       where.OR = [
         { date: new Date(date) },
         { date: null, schedule: { date: new Date(date) } },
+        { scheduleId: null, date: new Date(date) },
       ];
     }
 
@@ -67,14 +68,14 @@ export async function POST(request: Request) {
     if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { scheduleId, type, driverId, driverName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note, force } = body;
+    const { scheduleId, type, driverId, driverName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note, force, date } = body;
 
-    if (!scheduleId || !type) {
-      return NextResponse.json({ error: 'scheduleId and type are required' }, { status: 400 });
+    if (!type) {
+      return NextResponse.json({ error: 'type is required' }, { status: 400 });
     }
 
-    // 重複チェック: 同スケジュール・同タイプのタスクが既に存在するか
-    if (!force) {
+    // 重複チェック: スケジュール紐付きの場合のみ
+    if (scheduleId && !force) {
       const existing = await prisma.relayTask.findMany({
         where: {
           scheduleId: parseInt(scheduleId),
@@ -100,15 +101,14 @@ export async function POST(request: Request) {
       }
     }
 
-    // 同スケジュールの最大sortOrderを取得
-    const maxSort = await prisma.relayTask.aggregate({
-      where: { scheduleId: parseInt(scheduleId) },
-      _max: { sortOrder: true },
-    });
+    // sortOrder計算
+    const maxSort = scheduleId
+      ? await prisma.relayTask.aggregate({ where: { scheduleId: parseInt(scheduleId) }, _max: { sortOrder: true } })
+      : await prisma.relayTask.aggregate({ where: { scheduleId: null }, _max: { sortOrder: true } });
 
     const task = await prisma.relayTask.create({
       data: {
-        scheduleId: parseInt(scheduleId),
+        scheduleId: scheduleId ? parseInt(scheduleId) : null,
         type,
         driverId: driverId ? parseInt(driverId) : null,
         driverName: driverName || null,
@@ -118,6 +118,7 @@ export async function POST(request: Request) {
         timeSlotStart: timeSlotStart || null,
         timeSlotEnd: timeSlotEnd || null,
         note: note || null,
+        date: date ? new Date(date) : null,
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
       },
       include: {

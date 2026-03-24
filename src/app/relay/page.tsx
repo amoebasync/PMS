@@ -404,13 +404,19 @@ export default function RelayListPage() {
   });
 
   const submitAdd = async () => {
-    if (!addForm.scheduleId || !addForm.type) return;
+    if (!addForm.type) return;
     setAddSubmitting(true);
+    const payload: any = { type: addForm.type };
+    if (addForm.scheduleId) {
+      payload.scheduleId = addForm.scheduleId;
+    } else {
+      payload.date = filterDate;
+    }
     try {
       const res = await fetch('/api/relay-tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scheduleId: addForm.scheduleId, type: addForm.type }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         showToast(t('add_success'), 'success');
@@ -424,7 +430,7 @@ export default function RelayListPage() {
             const res2 = await fetch('/api/relay-tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ scheduleId: addForm.scheduleId, type: addForm.type, force: true }),
+              body: JSON.stringify({ ...payload, force: true }),
             });
             if (res2.ok) {
               showToast(t('add_success'), 'success');
@@ -967,7 +973,7 @@ export default function RelayListPage() {
 
       {/* Add Task Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[80] flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in-95">
             <div className="px-5 py-4 border-b flex items-center justify-between">
               <h3 className="font-bold text-slate-800 flex items-center gap-2">
@@ -992,10 +998,19 @@ export default function RelayListPage() {
               {/* Schedule search & select */}
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1 block">{t('add_select_schedule')}</label>
+                {/* スケジュールなしオプション */}
+                <button onClick={() => setAddForm(f => ({ ...f, scheduleId: '' }))}
+                  className={`w-full text-left px-3 py-2.5 mb-2 rounded-lg text-xs border transition-colors flex items-center justify-between ${!addForm.scheduleId ? 'border-emerald-400 bg-emerald-50 text-emerald-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                  <div className="flex items-center gap-2">
+                    <i className="bi bi-dash-circle"></i>
+                    <span className="font-bold">{t('add_no_schedule')}</span>
+                  </div>
+                  {!addForm.scheduleId && <i className="bi bi-check-circle-fill text-emerald-600"></i>}
+                </button>
                 <input type="text" value={addScheduleSearch} onChange={e => setAddScheduleSearch(e.target.value)}
                   placeholder={t('add_schedule_search_placeholder')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 mb-2" />
-                <div className="max-h-[240px] overflow-y-auto border border-slate-200 rounded-lg">
+                <div className="max-h-[200px] overflow-y-auto border border-slate-200 rounded-lg">
                   {filteredAddSchedules.length === 0 && (
                     <div className="p-4 text-center text-xs text-slate-400">{t('add_no_schedules')}</div>
                   )}
@@ -1016,7 +1031,7 @@ export default function RelayListPage() {
             </div>
             <div className="px-5 py-4 border-t flex justify-end gap-2">
               <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">{t('btn_cancel')}</button>
-              <button onClick={submitAdd} disabled={!addForm.scheduleId || addSubmitting}
+              <button onClick={submitAdd} disabled={!addForm.type || addSubmitting}
                 className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
                 {addSubmitting ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-plus-lg"></i>}
                 {t('btn_add')}

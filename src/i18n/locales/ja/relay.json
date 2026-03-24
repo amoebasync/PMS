@@ -109,6 +109,7 @@
   "add_select_schedule": "スケジュールを選択",
   "add_schedule_search_placeholder": "エリア・配布員で検索...",
   "add_no_schedules": "対象日のスケジュールがありません",
+  "add_no_schedule": "スケジュールなしで追加",
   "add_no_distributor": "配布員未割当",
   "add_success": "タスクを追加しました",
   "add_duplicate_confirm": "同じスケジュール・種別のタスクが既に存在します。追加しますか？",

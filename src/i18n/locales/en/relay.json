@@ -109,6 +109,7 @@
   "add_select_schedule": "Select Schedule",
   "add_schedule_search_placeholder": "Search by area or distributor...",
   "add_no_schedules": "No schedules for this date",
+  "add_no_schedule": "Add without schedule",
   "add_no_distributor": "Unassigned",
   "add_success": "Task added",
   "add_duplicate_confirm": "A task with the same schedule and type already exists. Add anyway?",
