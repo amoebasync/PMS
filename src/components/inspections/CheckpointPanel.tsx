@@ -61,7 +61,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const { t } = useTranslation('inspections');
   const { showToast } = useNotification();
   const [sampleCount, setSampleCount] = useState(10);
-  const [sampleMode, setSampleMode] = useState<'trajectory' | 'area'>('trajectory');
+  const [sampleMode, setSampleMode] = useState<'trajectory' | 'area'>('area');
   const [generating, setGenerating] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
   const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND' | 'UNABLE'>('CONFIRMED');
