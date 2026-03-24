@@ -256,29 +256,44 @@ export async function POST(
           // カテゴリ別の評価セクション
           const SPEED_LABELS: Record<string, string> = { VERY_SLOW: 'とても遅い', SLOW: '遅い', NORMAL: '普通', FAST: '速い', VERY_FAST: 'とても速い' };
           const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', NORMAL: '普通', GOOD: '良い' };
+          const SPEED_MAP: Record<string, number> = { VERY_SLOW: 1, SLOW: 2, NORMAL: 3, FAST: 4, VERY_FAST: 5 };
+          const LEVEL_MAP: Record<string, number> = { BAD: 1, NORMAL: 2, GOOD: 3 };
           const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' ? '#22c55e' : v === 'NORMAL' ? '#f59e0b' : '#ef4444';
+
+          const rateBar = (filled: number, total: number, color: string) => {
+            const contents: any[] = [];
+            for (let i = 0; i < total; i++) {
+              contents.push({ type: 'box', layout: 'vertical', flex: 1, height: '6px', backgroundColor: i < filled ? color : '#E5E7EB', cornerRadius: '3px', contents: [{ type: 'filler' }] });
+            }
+            return { type: 'box', layout: 'horizontal', spacing: 'xs', contents };
+          };
 
           let evaluationSection: any[] = [];
           if (result.category === 'GUIDANCE') {
-            // 指導: 評価項目を表示
+            // 指導: 評価項目 + レートバー
             const guidanceItems = [
-              { label: '配布スピード', value: result.distributionSpeed, labels: SPEED_LABELS },
-              { label: 'ステッカー遵守', value: result.stickerCompliance, labels: LEVEL_LABELS },
-              { label: '禁止物件遵守', value: result.prohibitedCompliance, labels: LEVEL_LABELS },
-              { label: '地図理解度', value: result.mapComprehension, labels: LEVEL_LABELS },
-              { label: '勤務態度', value: result.workAttitude, labels: LEVEL_LABELS },
+              { label: '配布スピード', value: result.distributionSpeed, labels: SPEED_LABELS, map: SPEED_MAP, total: 5 },
+              { label: 'ステッカー遵守', value: result.stickerCompliance, labels: LEVEL_LABELS, map: LEVEL_MAP, total: 3 },
+              { label: '禁止物件遵守', value: result.prohibitedCompliance, labels: LEVEL_LABELS, map: LEVEL_MAP, total: 3 },
+              { label: '地図理解度', value: result.mapComprehension, labels: LEVEL_LABELS, map: LEVEL_MAP, total: 3 },
+              { label: '勤務態度', value: result.workAttitude, labels: LEVEL_LABELS, map: LEVEL_MAP, total: 3 },
             ].filter(item => item.value);
 
-            evaluationSection = [
-              { type: 'separator', margin: 'lg' },
-              ...guidanceItems.map(item => ({
-                type: 'box', layout: 'horizontal', spacing: 'sm', margin: 'md',
+            evaluationSection = [{ type: 'separator', margin: 'lg' }];
+            for (const item of guidanceItems) {
+              const filled = item.map[item.value!] || 0;
+              const color = levelColor(item.value);
+              evaluationSection.push({
+                type: 'box', layout: 'vertical', margin: 'md', spacing: 'xs',
                 contents: [
-                  { type: 'text', text: item.label, size: 'sm', color: '#888888', flex: 3 },
-                  { type: 'text', text: item.labels[item.value!] || item.value, size: 'sm', color: levelColor(item.value), flex: 2, weight: 'bold' as const, align: 'end' as const },
+                  { type: 'box', layout: 'horizontal', contents: [
+                    { type: 'text', text: item.label, size: 'xs', color: '#666666', flex: 3 },
+                    { type: 'text', text: item.labels[item.value!] || item.value, size: 'xs', color, weight: 'bold' as const, flex: 2, align: 'end' as const },
+                  ]},
+                  rateBar(filled, item.total, color),
                 ],
-              })),
-            ];
+              });
+            }
           } else {
             // チェック: 確認率・遵守率・カウントを表示
             const confRateStr = confirmationRate != null ? `${(confirmationRate * 100).toFixed(0)}%` : '-';
@@ -363,7 +378,10 @@ export async function POST(
                     type: 'box', layout: 'horizontal', spacing: 'sm',
                     contents: [
                       { type: 'text', text: '配布員', size: 'sm', color: '#888888', flex: 2 },
-                      { type: 'text', text: `${distributorName}${staffId ? ` (${staffId})` : ''}`, size: 'sm', color: '#333333', flex: 5, weight: 'bold' },
+                      { type: 'box', layout: 'vertical', flex: 5, contents: [
+                        { type: 'text', text: distributorName, size: 'sm', color: '#333333', weight: 'bold' },
+                        ...(staffId ? [{ type: 'text' as const, text: staffId, size: 'xxs' as const, color: '#999999' }] : []),
+                      ]},
                     ],
                   },
                   {
