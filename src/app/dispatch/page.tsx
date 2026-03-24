@@ -110,7 +110,7 @@ export default function DispatchPage() {
       setAreaSearching(true);
       try {
         const res = await fetch(`/api/areas?search=${encodeURIComponent(query)}&limit=20`);
-        if (res.ok) setAreaSearchResults(await res.json().then(d => d.areas || d));
+        if (res.ok) { const json = await res.json(); setAreaSearchResults(json.data || json.areas || []); }
       } catch {}
       setAreaSearching(false);
     }, 300);
