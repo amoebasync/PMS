@@ -255,10 +255,10 @@ export async function POST(
 
           // カテゴリ別の評価セクション
           const SPEED_LABELS: Record<string, string> = { VERY_SLOW: 'とても遅い', SLOW: '遅い', NORMAL: '普通', FAST: '速い', VERY_FAST: 'とても速い' };
-          const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', NORMAL: '普通', GOOD: '良い', NO_MISTAKES: 'ミスなし' };
+          const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', SOME: '一部あり', NORMAL: '普通', GOOD: '良い', NO_MISTAKES: 'ミスなし' };
           const SPEED_MAP: Record<string, number> = { VERY_SLOW: 1, SLOW: 2, NORMAL: 3, FAST: 4, VERY_FAST: 5 };
-          const LEVEL_MAP: Record<string, number> = { BAD: 1, NORMAL: 2, GOOD: 3, NO_MISTAKES: 3 };
-          const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' || v === 'NO_MISTAKES' ? '#22c55e' : v === 'NORMAL' ? '#f59e0b' : '#ef4444';
+          const LEVEL_MAP: Record<string, number> = { BAD: 1, SOME: 2, NORMAL: 2, GOOD: 3, NO_MISTAKES: 3 };
+          const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' || v === 'NO_MISTAKES' ? '#22c55e' : v === 'NORMAL' || v === 'SOME' ? '#f59e0b' : '#ef4444';
 
           const rateBar = (filled: number, total: number, color: string) => {
             const contents: any[] = [];
