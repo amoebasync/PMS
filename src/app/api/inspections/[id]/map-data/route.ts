@@ -180,6 +180,7 @@ export async function GET(
               residentName: r.residentName || null,
               reasonDetail: r.reasonDetail || r.remarks || null,
               pinColor: r.pinColor || null,
+              boundaryGeojson: r.boundaryGeojson || r.polygon || null,
             }));
         }
       } catch (e) {
@@ -203,6 +204,7 @@ export async function GET(
           roomNumber: true,
           residentName: true,
           reasonDetail: true,
+          boundaryGeojson: true,
         },
       });
     }

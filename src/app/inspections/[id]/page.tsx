@@ -226,6 +226,7 @@ export default function InspectionDetailPage() {
           address: p.address, buildingName: p.buildingName,
           roomNumber: p.roomNumber || null, residentName: p.residentName || null,
           reasonDetail: p.reasonDetail || null, pinColor: p.pinColor || null,
+          boundaryGeojson: p.boundaryGeojson || null,
           severity: null,
         })),
         checkpoints: raw.checkpoints || [],

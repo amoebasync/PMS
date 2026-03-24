@@ -23,6 +23,7 @@ interface ProhibitedProperty {
   residentName?: string | null;
   reasonDetail?: string | null;
   pinColor?: string | null;
+  boundaryGeojson?: string | null;
   severity: string | null;
 }
 
@@ -398,21 +399,40 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         );
       })}
 
-      {/* Prohibited properties (red markers) */}
+      {/* Prohibited properties (markers + polygons) */}
       {mapData?.prohibitedProperties?.filter(pp => pp.lat && pp.lng).map((pp, idx) => {
         const check = prohibitedCheckMap.get(pp.id);
         const overlayColor = check ? prohibitedCheckColor(check.result) : null;
         const color = pp.pinColor && pp.pinColor !== '#000000'
           ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
           : '#ef4444';
+        const ppPolygons = pp.boundaryGeojson ? extractPaths(pp.boundaryGeojson) : [];
 
         return (
           <React.Fragment key={`pp-${pp.id ?? idx}-${pp.lat}-${pp.lng}`}>
+            {/* Polygon if available */}
+            {ppPolygons.map((path, pi) => (
+              <Polygon
+                key={`pp-poly-${pp.id ?? idx}-${pi}`}
+                paths={path}
+                options={{
+                  fillColor: color,
+                  fillOpacity: 0.25,
+                  strokeColor: color,
+                  strokeOpacity: 0.8,
+                  strokeWeight: 2,
+                  zIndex: 45,
+                  clickable: true,
+                }}
+                onClick={() => setSelectedPP(pp)}
+              />
+            ))}
+            {/* Point marker */}
             <Marker
               position={{ lat: pp.lat, lng: pp.lng }}
               icon={{
                 path: google.maps.SymbolPath.CIRCLE,
-                scale: 7,
+                scale: ppPolygons.length > 0 ? 5 : 7,
                 fillColor: color,
                 fillOpacity: 0.7,
                 strokeColor: '#ffffff',
