@@ -223,7 +223,10 @@ export default function InspectionDetailPage() {
         })),
         prohibitedProperties: (raw.prohibitedProperties || []).map((p: any) => ({
           id: p.id, lat: p.latitude, lng: p.longitude,
-          address: p.address, buildingName: p.buildingName, severity: null,
+          address: p.address, buildingName: p.buildingName,
+          roomNumber: p.roomNumber || null, residentName: p.residentName || null,
+          reasonDetail: p.reasonDetail || null, pinColor: p.pinColor || null,
+          severity: null,
         })),
         checkpoints: raw.checkpoints || [],
         prohibitedChecks: (raw.prohibitedChecks || []).map((pc: any) => ({

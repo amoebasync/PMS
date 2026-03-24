@@ -139,20 +139,18 @@ export default function InspectionSummary({ inspection, checkpoints, prohibitedC
     return { compliant, violation, unable, total };
   }, [prohibitedChecks]);
 
-  /* ---- Rates ---- */
+  /* ---- Rates (常にcheckpoints/prohibitedChecksから再計算) ---- */
   const confirmationRate = useMemo(() => {
-    if (inspection.confirmationRate !== null) return inspection.confirmationRate;
-    const checkable = cpBreakdown.confirmed + cpBreakdown.notFound;
-    if (checkable === 0) return 0;
-    return Math.round((cpBreakdown.confirmed / checkable) * 100);
-  }, [inspection.confirmationRate, cpBreakdown]);
+    const total = cpBreakdown.confirmed + cpBreakdown.notFound + cpBreakdown.unable;
+    if (total === 0) return 0;
+    return Math.round((cpBreakdown.confirmed / total) * 100);
+  }, [cpBreakdown]);
 
   const complianceRate = useMemo(() => {
-    if (inspection.complianceRate !== null) return inspection.complianceRate;
-    const checkable = ppBreakdown.compliant + ppBreakdown.violation;
-    if (checkable === 0) return 0;
-    return Math.round((ppBreakdown.compliant / checkable) * 100);
-  }, [inspection.complianceRate, ppBreakdown]);
+    const total = ppBreakdown.compliant + ppBreakdown.violation + ppBreakdown.unable;
+    if (total === 0) return 0;
+    return Math.round((ppBreakdown.compliant / total) * 100);
+  }, [ppBreakdown]);
 
   /* ---- Timeline: merge checkpoints and prohibited checks, sort by time ---- */
   const timeline = useMemo(() => {

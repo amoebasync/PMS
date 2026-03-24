@@ -30,6 +30,7 @@ export async function GET(
             area: {
               select: {
                 id: true,
+                address_code: true,
                 boundary_geojson: true,
                 prefecture: { select: { name: true } },
                 city: { select: { name: true } },
@@ -133,9 +134,61 @@ export async function GET(
       }
     }
 
-    // エリア内の禁止物件
-    let prohibitedProperties: { id: number; address: string; buildingName: string | null; latitude: number | null; longitude: number | null }[] = [];
-    if (inspection.schedule?.areaId) {
+    // エリア内の禁止物件（Posting System API → PMS DB フォールバック）
+    let prohibitedProperties: any[] = [];
+    const addressCode = inspection.schedule?.area?.address_code || null;
+
+    if (addressCode) {
+      // Posting System API から禁止物件を取得
+      try {
+        // 顧客コードを取得（スケジュールのチラシに紐づく顧客）
+        const schedule = await prisma.distributionSchedule.findUnique({
+          where: { id: inspection.scheduleId! },
+          select: { items: { select: { customerId: true } } },
+        });
+        const customerIds = [...new Set((schedule?.items || []).map(i => i.customerId).filter(Boolean))];
+        let clientCodes = '';
+        if (customerIds.length > 0) {
+          const customers = await prisma.customer.findMany({
+            where: { id: { in: customerIds as number[] } },
+            select: { customerCode: true },
+          });
+          clientCodes = customers.map(c => c.customerCode).join(',');
+        }
+        const psUrl = `https://postingsystem.net/postingmanage/GetForbiddenBuildingsExec.php?areaCode=${encodeURIComponent(addressCode)}&clientCodes=${encodeURIComponent(clientCodes)}`;
+        const psRes = await fetch(psUrl, { signal: AbortSignal.timeout(5000) });
+        if (psRes.ok) {
+          const psBody = await psRes.text();
+          let rows: any[] = [];
+          try {
+            const parsed = JSON.parse(psBody);
+            rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
+          } catch { /* ignore */ }
+          prohibitedProperties = rows
+            .filter((r: any) => {
+              const lat = parseFloat(r.lat || '0');
+              const lng = parseFloat(r.lng || '0');
+              return lat !== 0 || lng !== 0;
+            })
+            .map((r: any) => ({
+              id: null,
+              latitude: parseFloat(r.lat || '0'),
+              longitude: parseFloat(r.lng || '0'),
+              address: r.address || null,
+              buildingName: r.buildingName || null,
+              roomNumber: r.roomNumber || null,
+              residentName: r.residentName || null,
+              reasonDetail: r.reasonDetail || r.remarks || null,
+              pinColor: r.pinColor || null,
+            }));
+        }
+      } catch (e) {
+        console.warn('[Inspection map-data] PS forbidden buildings fetch failed:', e);
+      }
+    }
+
+    // PMS DB フォールバック
+    if (prohibitedProperties.length === 0 && inspection.schedule?.areaId) {
       prohibitedProperties = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: inspection.schedule.areaId,
@@ -147,6 +200,9 @@ export async function GET(
           buildingName: true,
           latitude: true,
           longitude: true,
+          roomNumber: true,
+          residentName: true,
+          reasonDetail: true,
         },
       });
     }

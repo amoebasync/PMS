@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, Circle } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Polygon, Polyline, Marker, Circle, InfoWindow } from '@react-google-maps/api';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -19,6 +19,10 @@ interface ProhibitedProperty {
   lng: number;
   address: string;
   buildingName: string | null;
+  roomNumber?: string | null;
+  residentName?: string | null;
+  reasonDetail?: string | null;
+  pinColor?: string | null;
   severity: string | null;
 }
 
@@ -147,6 +151,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
   const mapRef = useRef<google.maps.Map | null>(null);
   const heatmapRef = useRef<google.maps.visualization.HeatmapLayer | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [selectedPP, setSelectedPP] = useState<ProhibitedProperty | null>(null);
 
   /* ---- Area polygons ---- */
   const areaPolygons = useMemo(() => {
@@ -394,24 +399,26 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
       })}
 
       {/* Prohibited properties (red markers) */}
-      {mapData?.prohibitedProperties?.filter(pp => pp.lat && pp.lng).map((pp) => {
+      {mapData?.prohibitedProperties?.filter(pp => pp.lat && pp.lng).map((pp, idx) => {
         const check = prohibitedCheckMap.get(pp.id);
         const overlayColor = check ? prohibitedCheckColor(check.result) : null;
+        const color = pp.pinColor && pp.pinColor !== '#000000'
+          ? (pp.pinColor.startsWith('#') ? pp.pinColor : `#${pp.pinColor}`)
+          : '#ef4444';
 
         return (
-          <React.Fragment key={`pp-${pp.id}`}>
+          <React.Fragment key={`pp-${pp.id ?? idx}-${pp.lat}-${pp.lng}`}>
             <Marker
               position={{ lat: pp.lat, lng: pp.lng }}
               icon={{
-                path: 'M10 20S3 10.87 3 7a7 7 0 0 1 14 0c0 3.87-7 13-7 13zm0-11a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
-                fillColor: '#ef4444',
-                fillOpacity: 1,
-                strokeColor: '#991b1b',
-                strokeWeight: 1,
-                scale: 1.2,
-                anchor: new google.maps.Point(10, 20),
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 7,
+                fillColor: color,
+                fillOpacity: 0.7,
+                strokeColor: '#ffffff',
+                strokeWeight: 2,
               }}
-              title={pp.address}
+              onClick={() => setSelectedPP(pp)}
               zIndex={50}
             />
             {/* Check status overlay circle */}
@@ -431,6 +438,22 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
           </React.Fragment>
         );
       })}
+
+      {/* Prohibited property InfoWindow */}
+      {selectedPP && selectedPP.lat && selectedPP.lng && (
+        <InfoWindow
+          position={{ lat: selectedPP.lat, lng: selectedPP.lng }}
+          onCloseClick={() => setSelectedPP(null)}
+        >
+          <div className="text-xs max-w-[220px] space-y-1">
+            {selectedPP.buildingName && <div className="font-bold text-slate-800 text-sm">{selectedPP.buildingName}</div>}
+            {selectedPP.address && <div className="text-slate-600"><i className="bi bi-geo-alt text-rose-500 mr-1"></i>{selectedPP.address}</div>}
+            {selectedPP.roomNumber && <div className="text-slate-500">部屋: {selectedPP.roomNumber}</div>}
+            {selectedPP.residentName && <div className="text-slate-500">居住者: {selectedPP.residentName}</div>}
+            {selectedPP.reasonDetail && <div className="border-t border-slate-100 pt-1 mt-1 text-slate-500">{selectedPP.reasonDetail}</div>}
+          </div>
+        </InfoWindow>
+      )}
 
       {/* Checkpoint markers (only those NOT matching a sample point — manual adds) */}
       {checkpoints.map((cp) => {
