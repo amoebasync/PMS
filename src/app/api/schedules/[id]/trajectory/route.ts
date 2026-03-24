@@ -53,55 +53,8 @@ export async function GET(
       return NextResponse.json({ error: '配布セッションがまだ開始されていません' }, { status: 404 });
     }
 
-    // エリア内の禁止物件を取得（Posting System API → PMS DB フォールバック）
+    // エリア内の禁止物件（PMS DBのみ）
     let prohibitedProperties: any[] = [];
-    const addressCode = schedule.area?.address_code;
-    if (addressCode) {
-      // Posting System API から禁止物件を取得
-      try {
-        const customerIds = [...new Set(schedule.items.map(i => i.customerId).filter(Boolean))];
-        let clientCodes = '';
-        if (customerIds.length > 0) {
-          const customers = await prisma.customer.findMany({
-            where: { id: { in: customerIds as number[] } },
-            select: { customerCode: true },
-          });
-          clientCodes = customers.map(c => c.customerCode).join(',');
-        }
-        const psUrl = `https://postingsystem.net/postingmanage/GetForbiddenBuildingsExec.php?areaCode=${encodeURIComponent(addressCode)}&clientCodes=${encodeURIComponent(clientCodes)}`;
-        const psRes = await fetch(psUrl, { signal: AbortSignal.timeout(5000) });
-        if (psRes.ok) {
-          const psBody = await psRes.text();
-          let rows: any[] = [];
-          try {
-            const parsed = JSON.parse(psBody);
-            rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
-          } catch { /* ignore parse error */ }
-          prohibitedProperties = rows
-            .filter((r: any) => {
-              const lat = parseFloat(r.lat || '0');
-              const lng = parseFloat(r.lng || '0');
-              return lat !== 0 || lng !== 0;
-            })
-            .map((r: any) => ({
-              id: null,
-              latitude: parseFloat(r.lat || '0'),
-              longitude: parseFloat(r.lng || '0'),
-              address: r.address || null,
-              buildingName: r.buildingName || null,
-              roomNumber: r.roomNumber || null,
-              residentName: r.residentName || null,
-              reasonDetail: r.reasonDetail || r.remarks || null,
-              severity: r.severity ? parseInt(r.severity) : null,
-              pinColor: r.pinColor || null,
-              boundaryGeojson: r.boundaryGeojson || r.polygon || null,
-            }));
-        }
-      } catch (e) {
-        console.warn('Posting System forbidden buildings fetch failed, falling back to PMS DB:', e);
-      }
-    }
-    // PMS DB: ポリゴンデータの補完（PS APIにはポリゴンがないためDBからマージ）
     if (schedule.areaId) {
       const dbProps = await prisma.prohibitedProperty.findMany({
         where: {
@@ -122,53 +75,11 @@ export async function GET(
           prohibitedReason: { select: { name: true } },
         },
       });
-
-      if (prohibitedProperties.length === 0) {
-        // PS APIが返さなかった場合 → DB全件を使用
-        prohibitedProperties = dbProps.map(p => ({
-          ...p,
-          reasonName: p.prohibitedReason?.name || null,
-          prohibitedReason: undefined,
-        }));
-      } else {
-        // PS APIの結果にDBのポリゴンデータをマージ（座標近接で紐付け）
-        for (const pp of prohibitedProperties) {
-          if (pp.boundaryGeojson) continue; // 既にポリゴンあり
-          const dbMatch = dbProps.find(db =>
-            db.boundaryGeojson &&
-            db.latitude && db.longitude &&
-            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
-            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
-          );
-          if (dbMatch) {
-            pp.boundaryGeojson = dbMatch.boundaryGeojson;
-          }
-        }
-        // DBにのみ存在するポリゴン付き禁止物件を追加
-        const dbPolygonOnly = dbProps.filter(db => {
-          if (!db.boundaryGeojson || !db.latitude || !db.longitude) return false;
-          return !prohibitedProperties.some(pp =>
-            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
-            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
-          );
-        });
-        for (const db of dbPolygonOnly) {
-          prohibitedProperties.push({
-            id: db.id,
-            latitude: db.latitude,
-            longitude: db.longitude,
-            address: db.address,
-            buildingName: db.buildingName,
-            roomNumber: db.roomNumber,
-            residentName: db.residentName,
-            reasonDetail: db.reasonDetail,
-            severity: db.severity,
-            boundaryGeojson: db.boundaryGeojson,
-            reasonName: db.prohibitedReason?.name || null,
-            pinColor: null,
-          });
-        }
-      }
+      prohibitedProperties = dbProps.map(p => ({
+        ...p,
+        reasonName: p.prohibitedReason?.name || null,
+        prohibitedReason: undefined,
+      }));
     }
 
     const sess = schedule.session;

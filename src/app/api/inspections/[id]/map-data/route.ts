@@ -30,7 +30,6 @@ export async function GET(
             area: {
               select: {
                 id: true,
-                address_code: true,
                 boundary_geojson: true,
                 prefecture: { select: { name: true } },
                 city: { select: { name: true } },
@@ -134,63 +133,10 @@ export async function GET(
       }
     }
 
-    // エリア内の禁止物件（Posting System API → PMS DB フォールバック）
+    // エリア内の禁止物件（PMS DBのみ）
     let prohibitedProperties: any[] = [];
-    const addressCode = inspection.schedule?.area?.address_code || null;
-
-    if (addressCode) {
-      // Posting System API から禁止物件を取得
-      try {
-        // 顧客コードを取得（スケジュールのチラシに紐づく顧客）
-        const schedule = await prisma.distributionSchedule.findUnique({
-          where: { id: inspection.scheduleId! },
-          select: { items: { select: { customerId: true } } },
-        });
-        const customerIds = [...new Set((schedule?.items || []).map(i => i.customerId).filter(Boolean))];
-        let clientCodes = '';
-        if (customerIds.length > 0) {
-          const customers = await prisma.customer.findMany({
-            where: { id: { in: customerIds as number[] } },
-            select: { customerCode: true },
-          });
-          clientCodes = customers.map(c => c.customerCode).join(',');
-        }
-        const psUrl = `https://postingsystem.net/postingmanage/GetForbiddenBuildingsExec.php?areaCode=${encodeURIComponent(addressCode)}&clientCodes=${encodeURIComponent(clientCodes)}`;
-        const psRes = await fetch(psUrl, { signal: AbortSignal.timeout(5000) });
-        if (psRes.ok) {
-          const psBody = await psRes.text();
-          let rows: any[] = [];
-          try {
-            const parsed = JSON.parse(psBody);
-            rows = Array.isArray(parsed) ? parsed : (parsed.data || []);
-          } catch { /* ignore */ }
-          prohibitedProperties = rows
-            .filter((r: any) => {
-              const lat = parseFloat(r.lat || '0');
-              const lng = parseFloat(r.lng || '0');
-              return lat !== 0 || lng !== 0;
-            })
-            .map((r: any) => ({
-              id: null,
-              latitude: parseFloat(r.lat || '0'),
-              longitude: parseFloat(r.lng || '0'),
-              address: r.address || null,
-              buildingName: r.buildingName || null,
-              roomNumber: r.roomNumber || null,
-              residentName: r.residentName || null,
-              reasonDetail: r.reasonDetail || r.remarks || null,
-              pinColor: r.pinColor || null,
-              boundaryGeojson: r.boundaryGeojson || r.polygon || null,
-            }));
-        }
-      } catch (e) {
-        console.warn('[Inspection map-data] PS forbidden buildings fetch failed:', e);
-      }
-    }
-
-    // PMS DB: ポリゴンデータの補完
     if (inspection.schedule?.areaId) {
-      const dbProps = await prisma.prohibitedProperty.findMany({
+      prohibitedProperties = await prisma.prohibitedProperty.findMany({
         where: {
           areaId: inspection.schedule.areaId,
           isActive: true,
@@ -207,31 +153,6 @@ export async function GET(
           boundaryGeojson: true,
         },
       });
-
-      if (prohibitedProperties.length === 0) {
-        prohibitedProperties = dbProps;
-      } else {
-        // PS APIの結果にDBのポリゴンデータをマージ
-        for (const pp of prohibitedProperties) {
-          if (pp.boundaryGeojson) continue;
-          const dbMatch = dbProps.find(db =>
-            db.boundaryGeojson &&
-            db.latitude && db.longitude &&
-            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
-            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
-          );
-          if (dbMatch) pp.boundaryGeojson = dbMatch.boundaryGeojson;
-        }
-        // DBにのみ存在するポリゴン付き禁止物件を追加
-        for (const db of dbProps) {
-          if (!db.boundaryGeojson || !db.latitude || !db.longitude) continue;
-          const exists = prohibitedProperties.some(pp =>
-            Math.abs((db.latitude || 0) - pp.latitude) < 0.0005 &&
-            Math.abs((db.longitude || 0) - pp.longitude) < 0.0005
-          );
-          if (!exists) prohibitedProperties.push(db);
-        }
-      }
     }
 
     return NextResponse.json({
