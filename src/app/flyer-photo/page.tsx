@@ -12,7 +12,7 @@ interface Schedule {
   photos: Photo[];
 }
 
-const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_ID || '';
+const LIFF_ID = process.env.NEXT_PUBLIC_LIFF_PHOTO_ID || process.env.NEXT_PUBLIC_LIFF_ID || '';
 
 export default function FlyerPhotoPage() {
   const [lineUserId, setLineUserId] = useState<string | null>(null);
