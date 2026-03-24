@@ -174,12 +174,17 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
             <textarea
               value={gpsComment}
               onChange={(e) => setGpsComment(e.target.value)}
-              onBlur={saveGpsComment}
               placeholder={t('compliance_gps_comment_placeholder') || 'NGの理由を入力...'}
               className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 resize-none focus:ring-1 focus:ring-rose-400 focus:border-rose-400 placeholder:text-slate-300"
               rows={2}
             />
-            {saving === 'gpsComment' && <div className="text-[10px] text-slate-400">保存中...</div>}
+            <button
+              onClick={saveGpsComment}
+              disabled={saving === 'gpsComment' || gpsComment === (schedule.checkGpsComment || '')}
+              className="w-full py-1 rounded-lg text-[10px] font-bold bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-40 transition-colors"
+            >
+              {saving === 'gpsComment' ? '保存中...' : '保存'}
+            </button>
           </div>
         )}
       </div>
@@ -764,7 +769,7 @@ export default function ScheduleListPage() {
   const handleComplianceUpdate = useCallback((updated: any) => {
     setSchedules(prev => prev.map(s =>
       s.id === updated.id
-        ? { ...s, checkFlyerPhoto: updated.checkFlyerPhoto, checkAppOperation: updated.checkAppOperation, checkGps: updated.checkGps, checkMapPhoto: updated.checkMapPhoto, checkedBy: updated.checkedBy, checkedAt: updated.checkedAt, checkedById: updated.checkedById }
+        ? { ...s, checkFlyerPhoto: updated.checkFlyerPhoto, checkAppOperation: updated.checkAppOperation, checkGps: updated.checkGps, checkGpsResult: updated.checkGpsResult, checkGpsComment: updated.checkGpsComment, checkMapPhoto: updated.checkMapPhoto, checkedBy: updated.checkedBy, checkedAt: updated.checkedAt, checkedById: updated.checkedById }
         : s
     ));
   }, []);
@@ -1507,14 +1512,13 @@ export default function ScheduleListPage() {
         let style: React.CSSProperties;
         if (rect) {
           const popW = 288; // w-72 = 18rem = 288px
-          // ボタン中央揃え、画面右端からはみ出さないように調整
-          let left = rect.left + rect.width / 2 - popW / 2;
-          if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+          // ボタンの右端に揃え、画面左端からはみ出さないように調整
+          let left = rect.right - popW;
           if (left < 8) left = 8;
           // 下に余裕がなければ上に表示
           const spaceBelow = window.innerHeight - rect.bottom;
-          const top = spaceBelow > 300 ? rect.bottom + 4 : rect.top - 4;
-          const transform = spaceBelow > 300 ? undefined : 'translateY(-100%)';
+          const top = spaceBelow > 350 ? rect.bottom + 4 : rect.top - 4;
+          const transform = spaceBelow > 350 ? undefined : 'translateY(-100%)';
           style = { position: 'fixed', top, left, zIndex: 100, transform };
         } else {
           style = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100 };

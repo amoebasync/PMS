@@ -651,12 +651,17 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
             type="text"
             value={gpsComment}
             onChange={(e) => setGpsComment(e.target.value)}
-            onBlur={saveGpsComment}
             onKeyDown={(e) => { if (e.key === 'Enter') saveGpsComment(); }}
             placeholder="NGの理由を入力..."
             className="flex-1 text-xs border border-rose-200 rounded px-2 py-1 focus:ring-1 focus:ring-rose-400 focus:border-rose-400 placeholder:text-rose-300 bg-white"
           />
-          {gpsSaving && <div className="w-3 h-3 border-2 border-rose-300 border-t-rose-600 rounded-full animate-spin shrink-0"></div>}
+          <button
+            onClick={saveGpsComment}
+            disabled={gpsSaving || gpsComment === (data?.schedule?.checkGpsComment || '')}
+            className="px-3 py-1 rounded text-xs font-bold bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-40 transition-colors shrink-0"
+          >
+            {gpsSaving ? '...' : '保存'}
+          </button>
         </div>
       )}
 
