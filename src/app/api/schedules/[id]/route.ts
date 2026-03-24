@@ -28,6 +28,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         hasCheckChange = true;
       }
     }
+    // GPS確認のOK/NG結果とコメント
+    if (body.checkGpsResult !== undefined) {
+      data.checkGpsResult = body.checkGpsResult; // 'OK' | 'NG' | null
+      hasCheckChange = true;
+    }
+    if (body.checkGpsComment !== undefined) {
+      data.checkGpsComment = body.checkGpsComment || null;
+      hasCheckChange = true;
+    }
 
     // チェック変更があれば確認者と日時を自動設定
     if (hasCheckChange) {

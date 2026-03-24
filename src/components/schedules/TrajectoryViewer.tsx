@@ -77,6 +77,9 @@ interface TrajectoryData {
     distributorName: string;
     distributorStaffId: string;
     items: { id: number; flyerName: string; plannedCount: number; actualCount: number | null }[];
+    checkGps?: boolean;
+    checkGpsResult?: string | null;
+    checkGpsComment?: string | null;
   };
 }
 
@@ -258,6 +261,9 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [dataSource, setDataSource] = useState<'pms' | 'posting-system'>('pms');
+  const [gpsComment, setGpsComment] = useState('');
+  const [gpsSaving, setGpsSaving] = useState(false);
+  const [showGpsCommentInput, setShowGpsCommentInput] = useState(false);
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
@@ -357,6 +363,45 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // GPS comment初期化
+  useEffect(() => {
+    if (data?.schedule?.checkGpsComment) setGpsComment(data.schedule.checkGpsComment);
+    if (data?.schedule?.checkGpsResult === 'NG') setShowGpsCommentInput(true);
+  }, [data?.schedule?.checkGpsComment, data?.schedule?.checkGpsResult]);
+
+  const setGpsResult = useCallback(async (result: 'OK' | 'NG' | null) => {
+    setGpsSaving(true);
+    try {
+      const payload: any = { checkGps: result !== null, checkGpsResult: result };
+      if (result !== 'NG') { payload.checkGpsComment = null; setShowGpsCommentInput(false); setGpsComment(''); }
+      else { setShowGpsCommentInput(true); }
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok && data) {
+        setData({ ...data, schedule: { ...data.schedule, checkGps: result !== null, checkGpsResult: result, checkGpsComment: result !== 'NG' ? null : data.schedule.checkGpsComment } });
+      }
+    } catch { /* silent */ }
+    setGpsSaving(false);
+  }, [scheduleId, data]);
+
+  const saveGpsComment = useCallback(async () => {
+    setGpsSaving(true);
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkGpsComment: gpsComment }),
+      });
+      if (res.ok && data) {
+        setData({ ...data, schedule: { ...data.schedule, checkGpsComment: gpsComment } });
+      }
+    } catch { /* silent */ }
+    setGpsSaving(false);
+  }, [scheduleId, data, gpsComment]);
 
   // Live polling for active sessions (PMS: 15秒, Posting System: 20秒)
   useEffect(() => {
@@ -564,6 +609,30 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
               </div>
             </div>
           )}
+          {/* GPS OK/NG */}
+          <div className="flex items-center gap-1 border-l border-slate-200 pl-2 ml-1">
+            <i className="bi bi-geo-alt text-slate-400 text-xs hidden md:inline"></i>
+            <span className="text-[10px] text-slate-500 font-bold hidden md:inline mr-0.5">GPS</span>
+            <button
+              onClick={() => setGpsResult(data?.schedule?.checkGpsResult === 'OK' ? null : 'OK')}
+              disabled={gpsSaving}
+              className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                data?.schedule?.checkGpsResult === 'OK'
+                  ? 'bg-emerald-500 text-white border-emerald-500'
+                  : 'bg-white text-slate-400 border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
+              }`}
+            >OK</button>
+            <button
+              onClick={() => setGpsResult(data?.schedule?.checkGpsResult === 'NG' ? null : 'NG')}
+              disabled={gpsSaving}
+              className={`px-2 py-1 rounded text-[10px] font-bold border transition-all ${
+                data?.schedule?.checkGpsResult === 'NG'
+                  ? 'bg-rose-500 text-white border-rose-500'
+                  : 'bg-white text-slate-400 border-slate-200 hover:border-rose-300 hover:text-rose-600'
+              }`}
+            >NG</button>
+            {gpsSaving && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
+          </div>
           <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
             <i className="bi bi-arrow-clockwise"></i>
           </button>
@@ -572,6 +641,24 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
           </button>
         </div>
       </div>
+
+      {/* GPS NG comment bar */}
+      {showGpsCommentInput && data?.schedule?.checkGpsResult === 'NG' && (
+        <div className="bg-rose-50 border-b border-rose-200 px-3 md:px-4 py-2 flex items-center gap-2 shrink-0">
+          <i className="bi bi-exclamation-triangle-fill text-rose-500 text-xs"></i>
+          <span className="text-xs font-bold text-rose-600 shrink-0">NG理由:</span>
+          <input
+            type="text"
+            value={gpsComment}
+            onChange={(e) => setGpsComment(e.target.value)}
+            onBlur={saveGpsComment}
+            onKeyDown={(e) => { if (e.key === 'Enter') saveGpsComment(); }}
+            placeholder="NGの理由を入力..."
+            className="flex-1 text-xs border border-rose-200 rounded px-2 py-1 focus:ring-1 focus:ring-rose-400 focus:border-rose-400 placeholder:text-rose-300 bg-white"
+          />
+          {gpsSaving && <div className="w-3 h-3 border-2 border-rose-300 border-t-rose-600 rounded-full animate-spin shrink-0"></div>}
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden relative">

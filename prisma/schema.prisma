@@ -874,6 +874,8 @@ model DistributionSchedule {
   checkFlyerPhoto   Boolean   @default(false) @map("check_flyer_photo")
   checkAppOperation Boolean   @default(false) @map("check_app_operation")
   checkGps          Boolean   @default(false) @map("check_gps")
+  checkGpsResult    String?   @map("check_gps_result") @db.VarChar(10) // OK | NG
+  checkGpsComment   String?   @map("check_gps_comment") @db.Text
   checkMapPhoto     Boolean   @default(false) @map("check_map_photo")
   checkedById       Int?      @map("checked_by_id")
   checkedAt         DateTime? @map("checked_at")

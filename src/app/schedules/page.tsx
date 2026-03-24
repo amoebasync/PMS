@@ -64,11 +64,11 @@ const STATUS_DOT: Record<string, string> = {
 function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate: (updated: any) => void; t: (key: string) => string }) {
   const popoverRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [gpsComment, setGpsComment] = useState<string>(schedule.checkGpsComment || '');
 
-  const checks = [
+  const simpleChecks = [
     { key: 'checkFlyerPhoto', icon: 'bi-camera', label: t('compliance_flyer_photo') },
     { key: 'checkAppOperation', icon: 'bi-phone', label: t('compliance_app_operation') },
-    { key: 'checkGps', icon: 'bi-geo-alt', label: t('compliance_gps') },
     { key: 'checkMapPhoto', icon: 'bi-map', label: t('compliance_map_photo') },
   ];
 
@@ -89,9 +89,46 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
     setSaving(null);
   }, [schedule, onUpdate]);
 
+  const setGpsResult = useCallback(async (result: 'OK' | 'NG' | null) => {
+    setSaving('checkGps');
+    try {
+      const payload: any = { checkGps: result !== null, checkGpsResult: result };
+      if (result !== 'NG') payload.checkGpsComment = null;
+      const res = await fetch(`/api/schedules/${schedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onUpdate(data);
+        if (result !== 'NG') setGpsComment('');
+      }
+    } catch { /* silent */ }
+    setSaving(null);
+  }, [schedule, onUpdate]);
+
+  const saveGpsComment = useCallback(async () => {
+    setSaving('gpsComment');
+    try {
+      const res = await fetch(`/api/schedules/${schedule.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkGpsComment: gpsComment }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onUpdate(data);
+      }
+    } catch { /* silent */ }
+    setSaving(null);
+  }, [schedule, onUpdate, gpsComment]);
+
+  const gpsResult = schedule.checkGpsResult as string | null;
+
   return (
-    <div ref={popoverRef} className="w-64 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
-      {checks.map(({ key, icon, label }) => (
+    <div ref={popoverRef} className="w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
+      {simpleChecks.map(({ key, icon, label }) => (
         <label key={key} className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
           <input type="checkbox" checked={!!schedule[key]} onChange={() => toggleCheck(key)} disabled={saving === key}
             className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600" />
@@ -100,6 +137,53 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
           {saving === key && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
         </label>
       ))}
+
+      {/* GPS確認 — OK/NG選択 */}
+      <div className="border-t border-slate-100 pt-2 mt-1">
+        <div className="flex items-center gap-2.5 px-2 py-1">
+          <i className="bi bi-geo-alt text-slate-500 text-sm"></i>
+          <span className="text-xs text-slate-700 flex-1">{t('compliance_gps')}</span>
+          {saving === 'checkGps' && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
+        </div>
+        <div className="flex gap-2 px-2 mt-1">
+          <button
+            onClick={() => setGpsResult(gpsResult === 'OK' ? null : 'OK')}
+            disabled={saving === 'checkGps'}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+              gpsResult === 'OK'
+                ? 'bg-emerald-500 text-white border-emerald-500'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-emerald-300 hover:text-emerald-600'
+            }`}
+          >
+            <i className="bi bi-check-circle mr-1"></i>OK
+          </button>
+          <button
+            onClick={() => setGpsResult(gpsResult === 'NG' ? null : 'NG')}
+            disabled={saving === 'checkGps'}
+            className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+              gpsResult === 'NG'
+                ? 'bg-rose-500 text-white border-rose-500'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-rose-300 hover:text-rose-600'
+            }`}
+          >
+            <i className="bi bi-x-circle mr-1"></i>NG
+          </button>
+        </div>
+        {gpsResult === 'NG' && (
+          <div className="px-2 mt-2 space-y-1.5">
+            <textarea
+              value={gpsComment}
+              onChange={(e) => setGpsComment(e.target.value)}
+              onBlur={saveGpsComment}
+              placeholder={t('compliance_gps_comment_placeholder') || 'NGの理由を入力...'}
+              className="w-full text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 resize-none focus:ring-1 focus:ring-rose-400 focus:border-rose-400 placeholder:text-slate-300"
+              rows={2}
+            />
+            {saving === 'gpsComment' && <div className="text-[10px] text-slate-400">保存中...</div>}
+          </div>
+        )}
+      </div>
+
       {schedule.checkedBy && (
         <div className="border-t border-slate-100 pt-2 mt-1 px-2 space-y-0.5">
           <div className="text-[10px] text-slate-400">
@@ -1420,9 +1504,21 @@ export default function ScheduleListPage() {
         const s = schedules.find(x => x.id === compliancePopoverId);
         if (!s) return null;
         const rect = complianceBtnRef.current?.getBoundingClientRect();
-        const style: React.CSSProperties = rect
-          ? { position: 'fixed', top: rect.bottom + 4, right: window.innerWidth - rect.right, zIndex: 100 }
-          : { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100 };
+        let style: React.CSSProperties;
+        if (rect) {
+          const popW = 288; // w-72 = 18rem = 288px
+          // ボタン中央揃え、画面右端からはみ出さないように調整
+          let left = rect.left + rect.width / 2 - popW / 2;
+          if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
+          if (left < 8) left = 8;
+          // 下に余裕がなければ上に表示
+          const spaceBelow = window.innerHeight - rect.bottom;
+          const top = spaceBelow > 300 ? rect.bottom + 4 : rect.top - 4;
+          const transform = spaceBelow > 300 ? undefined : 'translateY(-100%)';
+          style = { position: 'fixed', top, left, zIndex: 100, transform };
+        } else {
+          style = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100 };
+        }
         return (
           <div ref={popoverContainerRef} style={style}>
             <CompliancePopover schedule={s} onUpdate={handleComplianceUpdate} t={t} />
@@ -1565,7 +1661,6 @@ export default function ScheduleListPage() {
                   {[
                     { key: 'checkFlyerPhoto', icon: 'bi-camera', label: t('compliance_flyer_photo') },
                     { key: 'checkAppOperation', icon: 'bi-phone', label: t('compliance_app_operation') },
-                    { key: 'checkGps', icon: 'bi-geo-alt', label: t('compliance_gps') },
                     { key: 'checkMapPhoto', icon: 'bi-map', label: t('compliance_map_photo') },
                   ].map(({ key, icon, label }) => (
                     <label key={key} className="flex items-center gap-1.5 cursor-pointer">
@@ -1585,6 +1680,41 @@ export default function ScheduleListPage() {
                       <span className="text-[10px] text-slate-600">{label}</span>
                     </label>
                   ))}
+                  {/* GPS — OK/NG buttons (mobile) */}
+                  <div className="flex items-center gap-1.5 col-span-2">
+                    <i className="bi bi-geo-alt text-slate-400 text-[10px]"></i>
+                    <span className="text-[10px] text-slate-600 mr-1">{t('compliance_gps')}</span>
+                    <button
+                      onClick={async () => {
+                        const next = s.checkGpsResult === 'OK' ? null : 'OK';
+                        try {
+                          const res = await fetch(`/api/schedules/${s.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ checkGps: next !== null, checkGpsResult: next, ...(next !== 'NG' ? { checkGpsComment: null } : {}) }),
+                          });
+                          if (res.ok) handleComplianceUpdate(await res.json());
+                        } catch {}
+                      }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        s.checkGpsResult === 'OK' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-slate-400 border-slate-200'
+                      }`}
+                    >OK</button>
+                    <button
+                      onClick={async () => {
+                        const next = s.checkGpsResult === 'NG' ? null : 'NG';
+                        try {
+                          const res = await fetch(`/api/schedules/${s.id}`, {
+                            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ checkGps: next !== null, checkGpsResult: next }),
+                          });
+                          if (res.ok) handleComplianceUpdate(await res.json());
+                        } catch {}
+                      }}
+                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-all ${
+                        s.checkGpsResult === 'NG' ? 'bg-rose-500 text-white border-rose-500' : 'bg-white text-slate-400 border-slate-200'
+                      }`}
+                    >NG</button>
+                  </div>
                 </div>
               </div>
             );

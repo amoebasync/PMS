@@ -176,6 +176,9 @@ export async function GET(
           plannedCount: item.plannedCount,
           actualCount: item.actualCount,
         })),
+        checkGps: schedule.checkGps,
+        checkGpsResult: schedule.checkGpsResult,
+        checkGpsComment: schedule.checkGpsComment,
       },
     });
   } catch (error) {

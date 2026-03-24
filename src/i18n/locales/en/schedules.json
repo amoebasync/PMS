@@ -105,6 +105,7 @@
   "compliance_flyer_photo": "Flyer Photo Sent",
   "compliance_app_operation": "App Operation",
   "compliance_gps": "GPS Confirmed",
+  "compliance_gps_comment_placeholder": "Enter reason for NG...",
   "compliance_map_photo": "Map Photo Sent",
   "compliance_checked_by": "Checked by",
   "compliance_checked_at": "Checked at",
