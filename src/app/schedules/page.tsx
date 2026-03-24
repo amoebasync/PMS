@@ -1690,7 +1690,7 @@ export default function ScheduleListPage() {
                         try {
                           const res = await fetch(`/api/schedules/${s.id}`, {
                             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ checkGps: next !== null, checkGpsResult: next, ...(next !== 'NG' ? { checkGpsComment: null } : {}) }),
+                            body: JSON.stringify({ checkGps: next !== null, checkGpsResult: next, checkGpsComment: null }),
                           });
                           if (res.ok) handleComplianceUpdate(await res.json());
                         } catch {}
