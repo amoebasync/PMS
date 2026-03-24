@@ -282,6 +282,26 @@ export default function RelayListPage() {
     }
   }, []);
 
+  const handleGoogleMapsLink = (url: string) => {
+    if (!url) return;
+    let lat: number | null = null;
+    let lng: number | null = null;
+    const atMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) { lat = parseFloat(atMatch[1]); lng = parseFloat(atMatch[2]); }
+    if (!lat) {
+      const qMatch = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+      if (qMatch) { lat = parseFloat(qMatch[1]); lng = parseFloat(qMatch[2]); }
+    }
+    if (!lat) {
+      const plainMatch = url.trim().match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+      if (plainMatch) { lat = parseFloat(plainMatch[1]); lng = parseFloat(plainMatch[2]); }
+    }
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      setEditForm((f: any) => ({ ...f, latitude: lat, longitude: lng }));
+      setShowMap(true);
+    }
+  };
+
   const handleEvidenceUpload = async (files: FileList) => {
     if (!editTask || files.length === 0) return;
     setEvidenceUploading(true);
@@ -756,6 +776,10 @@ export default function RelayListPage() {
                 <input type="text" value={editForm.locationName} onChange={e => setEditForm({ ...editForm, locationName: e.target.value })}
                   placeholder={t('field_location_placeholder')}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
+                <input type="text" placeholder={t('field_google_maps_link') || 'Google Mapsリンクを貼り付け'}
+                  className="w-full mt-2 px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400"
+                  onPaste={e => { setTimeout(() => handleGoogleMapsLink(e.currentTarget.value), 0); }}
+                  onChange={e => handleGoogleMapsLink(e.target.value)} />
                 <div className="flex gap-2 mt-2">
                   <button onClick={handleShowMap} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
                     <i className="bi bi-map"></i>{t('btn_set_location')}
