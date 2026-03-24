@@ -13,6 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
     const data: any = {};
     if (body.remarks !== undefined) data.remarks = body.remarks;
+    if (body.areaId !== undefined) data.areaId = body.areaId ? parseInt(body.areaId) : null;
     if (body.branchId !== undefined) data.branchId = body.branchId ? parseInt(body.branchId) : null;
     if (body.distributorId !== undefined) data.distributorId = body.distributorId ? parseInt(body.distributorId) : null;
     if (body.status !== undefined) data.status = body.status;

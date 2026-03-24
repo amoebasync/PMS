@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNotification } from '@/components/ui/NotificationProvider';
 import { useTranslation } from '@/i18n';
 
@@ -56,8 +56,23 @@ export default function DispatchPage() {
   const [showOnlyAlerts, setShowOnlyAlerts] = useState(false); 
   const [sortConfig, setSortConfig] = useState({ key: 'areaCode', direction: 'asc' });
 
-  const [movingItem, setMovingItem] = useState<any>(null); 
+  const [movingItem, setMovingItem] = useState<any>(null);
   const [targetMoveScheduleId, setTargetMoveScheduleId] = useState('');
+
+  // エリア検索
+  const [editingAreaScheduleId, setEditingAreaScheduleId] = useState<number | null>(null);
+  const [areaSearchQuery, setAreaSearchQuery] = useState('');
+  const [areaSearchResults, setAreaSearchResults] = useState<any[]>([]);
+  const [areaSearching, setAreaSearching] = useState(false);
+  const areaSearchTimer = useRef<NodeJS.Timeout | null>(null);
+  const areaDropdownRef = useRef<HTMLDivElement>(null);
+
+  // チラシ追加
+  const [addingFlyerSlot, setAddingFlyerSlot] = useState<{ scheduleId: number; slotIndex: number } | null>(null);
+  const [flyerSearchQuery, setFlyerSearchQuery] = useState('');
+  const [flyerSearchResults, setFlyerSearchResults] = useState<any[]>([]);
+  const [allFlyers, setAllFlyers] = useState<any[]>([]);
+  const flyerDropdownRef = useRef<HTMLDivElement>(null);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -80,6 +95,82 @@ export default function DispatchPage() {
   };
 
   useEffect(() => { fetchData(); }, [dateFrom, dateTo]);
+
+  // チラシ一覧を初回取得
+  useEffect(() => {
+    fetch('/api/flyers').then(r => r.ok ? r.json() : []).then(setAllFlyers).catch(() => {});
+  }, []);
+
+  // エリア検索
+  const searchAreas = (query: string) => {
+    setAreaSearchQuery(query);
+    if (areaSearchTimer.current) clearTimeout(areaSearchTimer.current);
+    if (!query || query.length < 2) { setAreaSearchResults([]); return; }
+    areaSearchTimer.current = setTimeout(async () => {
+      setAreaSearching(true);
+      try {
+        const res = await fetch(`/api/areas?search=${encodeURIComponent(query)}&limit=20`);
+        if (res.ok) setAreaSearchResults(await res.json().then(d => d.areas || d));
+      } catch {}
+      setAreaSearching(false);
+    }, 300);
+  };
+
+  const handleAreaSelect = async (scheduleId: number, area: any) => {
+    try {
+      const res = await fetch(`/api/schedules/${scheduleId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ areaId: area.id })
+      });
+      if (res.ok) fetchData();
+    } catch { showToast(t('error_update_failed'), 'error'); }
+    setEditingAreaScheduleId(null);
+    setAreaSearchQuery('');
+    setAreaSearchResults([]);
+  };
+
+  // チラシ検索フィルタ
+  const filteredFlyers = useMemo(() => {
+    if (!flyerSearchQuery) return allFlyers.slice(0, 20);
+    const q = flyerSearchQuery.toLowerCase();
+    return allFlyers.filter(f =>
+      (f.name || '').toLowerCase().includes(q) ||
+      (f.flyerCode || '').toLowerCase().includes(q) ||
+      (f.customer?.name || '').toLowerCase().includes(q)
+    ).slice(0, 20);
+  }, [allFlyers, flyerSearchQuery]);
+
+  const handleAddFlyer = async (scheduleId: number, slotIndex: number, flyer: any) => {
+    try {
+      const schedule = schedules.find(s => s.id === scheduleId);
+      const area = schedule?.area;
+      const plannedCount = area
+        ? (area.door_to_door_count || 0)
+        : 0;
+
+      const res = await fetch('/api/schedules/items', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId, slotIndex, flyerId: flyer.id, plannedCount })
+      });
+      if (res.ok) fetchData();
+    } catch { showToast(t('error_process_failed'), 'error'); }
+    setAddingFlyerSlot(null);
+    setFlyerSearchQuery('');
+  };
+
+  // クリック外でドロップダウンを閉じる
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (areaDropdownRef.current && !areaDropdownRef.current.contains(e.target as Node)) {
+        setEditingAreaScheduleId(null); setAreaSearchQuery(''); setAreaSearchResults([]);
+      }
+      if (flyerDropdownRef.current && !flyerDropdownRef.current.contains(e.target as Node)) {
+        setAddingFlyerSlot(null); setFlyerSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // ★ 追加: From日付変更時に、ToがFromより前になれば自動的に揃えるロジック
   const handleDateFromChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -488,11 +579,45 @@ export default function DispatchPage() {
                           className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-[90px] text-[10px]"
                         />
                       </td>
-                      <td className={`min-w-[160px] w-[160px] ${tdBaseClass}`} style={getStickyStyle(100, false)}>
-                        <div className="font-bold text-indigo-700 truncate" title={formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}>
-                          {formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}
-                        </div>
-                        <div className="text-[9px] text-slate-400">{schedule.area?.prefecture?.name} {schedule.city?.name}</div>
+                      <td className={`min-w-[160px] w-[160px] ${tdBaseClass} relative`} style={getStickyStyle(100, false)}>
+                        {editingAreaScheduleId === schedule.id ? (
+                          <div ref={areaDropdownRef} className="relative">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={areaSearchQuery}
+                              onChange={e => searchAreas(e.target.value)}
+                              placeholder={t('area_search_placeholder') || 'エリアを検索...'}
+                              className="w-full border border-indigo-300 rounded px-2 py-1 text-[10px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                            />
+                            {(areaSearchResults.length > 0 || areaSearching) && (
+                              <div className="absolute top-full left-0 w-[280px] max-h-[200px] overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-[100] mt-1">
+                                {areaSearching && <div className="p-2 text-center text-[10px] text-slate-400">検索中...</div>}
+                                {areaSearchResults.map((area: any) => (
+                                  <button
+                                    key={area.id}
+                                    onClick={() => handleAreaSelect(schedule.id, area)}
+                                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-[10px] border-b border-slate-50 transition-colors"
+                                  >
+                                    <div className="font-bold text-indigo-700">{formatAreaName(area.town_name, area.chome_name)}</div>
+                                    <div className="text-[9px] text-slate-400">{area.prefecture?.name} {area.city?.name}</div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => { setEditingAreaScheduleId(schedule.id); setAreaSearchQuery(''); setAreaSearchResults([]); }}
+                            className="cursor-pointer hover:bg-indigo-50 rounded p-1 -m-1 transition-colors"
+                            title={t('area_click_to_change') || 'クリックしてエリアを変更'}
+                          >
+                            <div className="font-bold text-indigo-700 truncate" title={formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}>
+                              {formatAreaName(schedule.area?.town_name, schedule.area?.chome_name)}
+                            </div>
+                            <div className="text-[9px] text-slate-400">{schedule.area?.prefecture?.name} {schedule.city?.name}</div>
+                          </div>
+                        )}
                       </td>
                       <td className={`min-w-[100px] w-[100px] ${tdBaseClass}`} style={getStickyStyle(260, false)}>
                         <select value={schedule.branchId || ''} onChange={(e) => updateScheduleProp(schedule.id, 'branchId', e.target.value)} className="border-0 bg-transparent font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 rounded p-1 w-full text-[10px] truncate cursor-pointer">
@@ -599,9 +724,47 @@ export default function DispatchPage() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="h-full min-h-[70px] border-2 border-dashed border-slate-200 rounded flex items-center justify-center text-slate-300 hover:bg-slate-50 hover:border-indigo-300 transition-colors">
-                                <span className="text-[9px]">Drop Here</span>
-                              </div>
+                              addingFlyerSlot?.scheduleId === schedule.id && addingFlyerSlot?.slotIndex === slotIndex ? (
+                                <div ref={flyerDropdownRef} className="h-full min-h-[70px] relative">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={flyerSearchQuery}
+                                    onChange={e => setFlyerSearchQuery(e.target.value)}
+                                    placeholder={t('flyer_search_placeholder') || 'チラシ名・コードで検索...'}
+                                    className="w-full border border-indigo-300 rounded px-2 py-1 text-[10px] focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                  />
+                                  <div className="absolute top-full left-0 w-[260px] max-h-[200px] overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-xl z-[100] mt-1">
+                                    {filteredFlyers.length === 0 && (
+                                      <div className="p-2 text-center text-[10px] text-slate-400">{t('no_results') || '該当なし'}</div>
+                                    )}
+                                    {filteredFlyers.map((flyer: any) => (
+                                      <button
+                                        key={flyer.id}
+                                        onClick={() => handleAddFlyer(schedule.id, slotIndex, flyer)}
+                                        className="w-full text-left px-3 py-2 hover:bg-indigo-50 text-[10px] border-b border-slate-50 transition-colors"
+                                      >
+                                        <div className="font-bold text-slate-800 truncate">{flyer.name}</div>
+                                        <div className="text-[9px] text-slate-400 flex gap-2">
+                                          <span>{flyer.flyerCode || '-'}</span>
+                                          <span>{flyer.customer?.name || ''}</span>
+                                          <span>{flyer.size?.name || ''}</span>
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div
+                                  className="h-full min-h-[70px] border-2 border-dashed border-slate-200 rounded flex flex-col items-center justify-center text-slate-300 hover:bg-slate-50 hover:border-indigo-300 transition-colors cursor-pointer group/empty"
+                                  onDragOver={handleDragOver}
+                                  onDrop={(e) => handleDrop(e, schedule.id, slotIndex, schedule.areaId)}
+                                  onClick={() => { setAddingFlyerSlot({ scheduleId: schedule.id, slotIndex }); setFlyerSearchQuery(''); }}
+                                >
+                                  <i className="bi bi-plus-circle text-sm text-slate-300 group-hover/empty:text-indigo-400 transition-colors"></i>
+                                  <span className="text-[9px] mt-0.5">Drop / Click</span>
+                                </div>
+                              )
                             )}
                           </td>
                         );

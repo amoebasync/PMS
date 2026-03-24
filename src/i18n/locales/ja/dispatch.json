@@ -66,5 +66,9 @@
   "confirm_adjust_count": "配布予定枚数を {{excess}} 枚オーバーしています。この枠の枚数を {{current}}枚 から 【{{new}}枚】 に自動調整しますか？",
   "confirm_adjust_btn": "調整する",
   "confirm_remove_btn": "削除する",
-  "toast_schedule_created": "チラシの完了期限日（{{date}}）に合わせてスケジュールを作成しました。表示期間を自動調整します。"
+  "toast_schedule_created": "チラシの完了期限日（{{date}}）に合わせてスケジュールを作成しました。表示期間を自動調整します。",
+  "area_search_placeholder": "エリアを検索...",
+  "area_click_to_change": "クリックしてエリアを変更",
+  "flyer_search_placeholder": "チラシ名・コードで検索...",
+  "no_results": "該当なし"
 }

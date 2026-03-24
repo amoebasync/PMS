@@ -7,8 +7,31 @@ export async function POST(request: Request) {
   const { error } = await requireAdminSession();
   if (error) return error;
   try {
-    const { scheduleId, slotIndex, odaId } = await request.json();
+    const body = await request.json();
+    const { scheduleId, slotIndex, odaId, flyerId } = body;
 
+    // ── 直接チラシ追加（flyerId指定） ──
+    if (flyerId && !odaId) {
+      const flyer = await prisma.flyer.findUnique({
+        where: { id: parseInt(flyerId) },
+        include: { customer: true, size: true },
+      });
+      if (!flyer) return NextResponse.json({ error: 'Flyer not found' }, { status: 404 });
+
+      const newItem = await prisma.distributionItem.create({
+        data: {
+          scheduleId: parseInt(scheduleId), slotIndex: parseInt(slotIndex),
+          flyerId: flyer.id, flyerName: flyer.name, flyerCode: flyer.flyerCode,
+          customerId: flyer.customerId,
+          method: body.method || '軒並',
+          plannedCount: parseInt(body.plannedCount) || 0,
+          startDate: flyer.startDate, endDate: flyer.endDate,
+        },
+      });
+      return NextResponse.json(newItem);
+    }
+
+    // ── 未手配依頼から追加（odaId指定）──
     const oda = await prisma.orderDistributionArea.findUnique({
       where: { id: parseInt(odaId) },
       include: { orderDistribution: { include: { order: true, flyer: true } }, area: true }

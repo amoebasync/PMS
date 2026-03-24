@@ -66,5 +66,9 @@
   "confirm_adjust_count": "Planned count exceeded by {{excess}} sheets. Auto-adjust this slot from {{current}} sheets to {{new}} sheets?",
   "confirm_adjust_btn": "Adjust",
   "confirm_remove_btn": "Delete",
-  "toast_schedule_created": "Schedule created for the flyer deadline ({{date}}). Display period adjusted automatically."
+  "toast_schedule_created": "Schedule created for the flyer deadline ({{date}}). Display period adjusted automatically.",
+  "area_search_placeholder": "Search area...",
+  "area_click_to_change": "Click to change area",
+  "flyer_search_placeholder": "Search by flyer name or code...",
+  "no_results": "No results"
 }
