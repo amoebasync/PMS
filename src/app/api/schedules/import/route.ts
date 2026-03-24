@@ -254,12 +254,20 @@ export async function POST(request: Request) {
                     where: { scheduleId: matchedExisting.id },
                     select: { id: true, slotIndex: true, flyerCode: true, flyerName: true },
                   });
+                  const matchedItemIds = new Set<number>();
                   for (const item of s.items || []) {
-                    const match = existingItems.find((ei: any) =>
-                      (item.flyerCode && ei.flyerCode === item.flyerCode) ||
-                      (item.flyerName && ei.flyerName === item.flyerName)
-                    );
+                    // slotIndex優先 → flyerCode → flyerName の順でマッチ（重複回避）
+                    let match = existingItems.find((ei: any) => ei.slotIndex === item.slotIndex && !matchedItemIds.has(ei.id));
+                    if (!match) {
+                      match = existingItems.find((ei: any) =>
+                        !matchedItemIds.has(ei.id) && (
+                          (item.flyerCode && ei.flyerCode === item.flyerCode) ||
+                          (item.flyerName && ei.flyerName === item.flyerName)
+                        )
+                      );
+                    }
                     if (match && item.actualCount != null) {
+                      matchedItemIds.add(match.id);
                       await tx.distributionItem.update({
                         where: { id: match.id },
                         data: { actualCount: item.actualCount },
