@@ -127,7 +127,7 @@ export default function InspectionsPage() {
   /* ---- State ---- */
   const [data, setData] = useState<InspectionListResponse | null>(null);
   const [loading, setLoading] = useState(false);
-  const [filterDate, setFilterDate] = useState('');
+  const [filterDate, setFilterDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [filterStatus, setFilterStatus] = useState<'ALL' | InspectionStatus>('ALL');
   const [filterCategory, setFilterCategory] = useState<'ALL' | InspectionCategory>('ALL');
   const [page, setPage] = useState(1);
