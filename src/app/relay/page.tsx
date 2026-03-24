@@ -66,6 +66,11 @@ export default function RelayListPage() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
   const [showRouteOpt, setShowRouteOpt] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({ scheduleId: '', type: 'RELAY' as string });
+  const [addSchedules, setAddSchedules] = useState<any[]>([]);
+  const [addScheduleSearch, setAddScheduleSearch] = useState('');
+  const [addSubmitting, setAddSubmitting] = useState(false);
   const dragItem = useRef<number | null>(null);
   const dragOver = useRef<number | null>(null);
 
@@ -380,6 +385,61 @@ export default function RelayListPage() {
     } catch { showToast(t('save_error'), 'error'); }
   };
 
+  const openAddModal = async () => {
+    setAddForm({ scheduleId: '', type: 'RELAY' });
+    setAddScheduleSearch('');
+    try {
+      const res = await fetch(`/api/schedules?from=${filterDate}&to=${filterDate}`);
+      if (res.ok) setAddSchedules(await res.json());
+    } catch {}
+    setShowAddModal(true);
+  };
+
+  const filteredAddSchedules = addSchedules.filter(s => {
+    if (!addScheduleSearch) return true;
+    const q = addScheduleSearch.toLowerCase();
+    const area = formatAreaName(s.area);
+    const dist = s.distributor?.name || '';
+    return area.toLowerCase().includes(q) || dist.toLowerCase().includes(q) || String(s.id).includes(q);
+  });
+
+  const submitAdd = async () => {
+    if (!addForm.scheduleId || !addForm.type) return;
+    setAddSubmitting(true);
+    try {
+      const res = await fetch('/api/relay-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scheduleId: addForm.scheduleId, type: addForm.type }),
+      });
+      if (res.ok) {
+        showToast(t('add_success'), 'success');
+        setShowAddModal(false);
+        fetchTasks();
+      } else if (res.status === 409) {
+        const data = await res.json();
+        if (data.duplicate) {
+          const ok = await showConfirm(t('add_duplicate_confirm'), { variant: 'warning', confirmLabel: t('add_force') });
+          if (ok) {
+            const res2 = await fetch('/api/relay-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ scheduleId: addForm.scheduleId, type: addForm.type, force: true }),
+            });
+            if (res2.ok) {
+              showToast(t('add_success'), 'success');
+              setShowAddModal(false);
+              fetchTasks();
+            }
+          }
+        }
+      } else {
+        showToast(t('save_error'), 'error');
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+    setAddSubmitting(false);
+  };
+
   const selectedDriverInfo = uniqueDrivers.find(([id]) => String(id) === filterDriver);
   const selectedDriverName = selectedDriverInfo
     ? `${selectedDriverInfo[1]?.lastNameJa || ''} ${selectedDriverInfo[1]?.firstNameJa || ''}`
@@ -426,6 +486,11 @@ export default function RelayListPage() {
               ))}
             </select>
           </div>
+          <button onClick={openAddModal}
+            className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 flex items-center gap-1.5 transition-colors">
+            <i className="bi bi-plus-lg"></i>
+            <span className="hidden sm:inline">{t('btn_add_task')}</span>
+          </button>
           <button onClick={() => setShowRouteOpt(true)}
             className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 flex items-center gap-1.5 transition-colors">
             <i className="bi bi-signpost-2"></i>
@@ -894,6 +959,67 @@ export default function RelayListPage() {
               <button onClick={saveEdit} disabled={editSaving}
                 className="px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-lg hover:bg-indigo-700 disabled:opacity-50">
                 {editSaving ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-check-lg mr-1"></i>{t('btn_save')}</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Task Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-in fade-in zoom-in-95">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <i className="bi bi-plus-circle text-emerald-600"></i> {t('add_task_title')}
+              </h3>
+              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg"></i></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Type select */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('filter_type')}</label>
+                <div className="flex gap-2">
+                  {(['RELAY', 'COLLECTION', 'FULL_RELAY'] as const).map(tp => (
+                    <button key={tp} onClick={() => setAddForm(f => ({ ...f, type: tp }))}
+                      className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 border transition-colors ${addForm.type === tp ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}>
+                      <i className={`bi ${TYPE_ICON[tp]}`}></i>
+                      {t(`type_${tp.toLowerCase()}`)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {/* Schedule search & select */}
+              <div>
+                <label className="text-xs font-bold text-slate-600 mb-1 block">{t('add_select_schedule')}</label>
+                <input type="text" value={addScheduleSearch} onChange={e => setAddScheduleSearch(e.target.value)}
+                  placeholder={t('add_schedule_search_placeholder')}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 mb-2" />
+                <div className="max-h-[240px] overflow-y-auto border border-slate-200 rounded-lg">
+                  {filteredAddSchedules.length === 0 && (
+                    <div className="p-4 text-center text-xs text-slate-400">{t('add_no_schedules')}</div>
+                  )}
+                  {filteredAddSchedules.map(s => (
+                    <button key={s.id} onClick={() => setAddForm(f => ({ ...f, scheduleId: String(s.id) }))}
+                      className={`w-full text-left px-3 py-2.5 border-b border-slate-50 text-xs transition-colors flex items-center justify-between ${String(s.id) === addForm.scheduleId ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : 'hover:bg-slate-50'}`}>
+                      <div>
+                        <div className="font-bold text-slate-800">{formatAreaName(s.area)}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">
+                          {s.distributor?.name || t('add_no_distributor')} · {s.branch?.nameJa || '-'}
+                        </div>
+                      </div>
+                      {String(s.id) === addForm.scheduleId && <i className="bi bi-check-circle-fill text-indigo-600"></i>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t flex justify-end gap-2">
+              <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">{t('btn_cancel')}</button>
+              <button onClick={submitAdd} disabled={!addForm.scheduleId || addSubmitting}
+                className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+                {addSubmitting ? <i className="bi bi-arrow-repeat animate-spin"></i> : <i className="bi bi-plus-lg"></i>}
+                {t('btn_add')}
               </button>
             </div>
           </div>

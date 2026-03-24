@@ -101,5 +101,16 @@
   "field_equipment": "Equipment",
   "equipment_bag": "Flyer Bag",
   "equipment_trolley": "Trolley",
-  "equipment_other": "Other"
+  "equipment_other": "Other",
+  "btn_add_task": "Add",
+  "btn_add": "Add",
+  "btn_cancel": "Cancel",
+  "add_task_title": "Add Relay/Collection Task",
+  "add_select_schedule": "Select Schedule",
+  "add_schedule_search_placeholder": "Search by area or distributor...",
+  "add_no_schedules": "No schedules for this date",
+  "add_no_distributor": "Unassigned",
+  "add_success": "Task added",
+  "add_duplicate_confirm": "A task with the same schedule and type already exists. Add anyway?",
+  "add_force": "Add"
 }

@@ -101,5 +101,16 @@
   "field_equipment": "備品数量",
   "equipment_bag": "バッグ",
   "equipment_trolley": "台車",
-  "equipment_other": "その他"
+  "equipment_other": "その他",
+  "btn_add_task": "追加",
+  "btn_add": "追加",
+  "btn_cancel": "キャンセル",
+  "add_task_title": "中継/回収タスクを追加",
+  "add_select_schedule": "スケジュールを選択",
+  "add_schedule_search_placeholder": "エリア・配布員で検索...",
+  "add_no_schedules": "対象日のスケジュールがありません",
+  "add_no_distributor": "配布員未割当",
+  "add_success": "タスクを追加しました",
+  "add_duplicate_confirm": "同じスケジュール・種別のタスクが既に存在します。追加しますか？",
+  "add_force": "追加する"
 }
