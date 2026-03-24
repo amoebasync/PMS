@@ -355,6 +355,40 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
     });
   };
 
+  const handleGoogleMapsLink = (url: string) => {
+    if (!url) return;
+    // Google Maps URL patterns:
+    // https://maps.google.com/?q=35.123,139.456
+    // https://www.google.com/maps?q=35.123,139.456
+    // https://www.google.com/maps/@35.123,139.456,15z
+    // https://www.google.com/maps/place/.../@35.123,139.456,15z
+    // https://goo.gl/maps/xxx (short link - can't parse directly)
+    // https://maps.app.goo.gl/xxx (short link)
+    let lat: number | null = null;
+    let lng: number | null = null;
+
+    // Pattern: @lat,lng or q=lat,lng
+    const atMatch = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    if (atMatch) { lat = parseFloat(atMatch[1]); lng = parseFloat(atMatch[2]); }
+
+    if (!lat) {
+      const qMatch = url.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+      if (qMatch) { lat = parseFloat(qMatch[1]); lng = parseFloat(qMatch[2]); }
+    }
+
+    // Pattern: plain "lat,lng" (not a URL)
+    if (!lat) {
+      const plainMatch = url.trim().match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+      if (plainMatch) { lat = parseFloat(plainMatch[1]); lng = parseFloat(plainMatch[2]); }
+    }
+
+    if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
+      setLatitude(lat);
+      setLongitude(lng);
+      setShowMap(true);
+    }
+  };
+
   const handleMapClick = useCallback((e: google.maps.MapMouseEvent) => {
     if (e.latLng) {
       setLatitude(e.latLng.lat());
@@ -441,6 +475,12 @@ function RelayAddModal({ schedule, type, saving, onSave, onClose, t }: {
             <input type="text" value={locationName} onChange={e => setLocationName(e.target.value)}
               placeholder={t('field_location_placeholder') || '場所を入力 or 地図で指定'}
               className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400" />
+            <div className="mt-2">
+              <input type="text" placeholder={t('field_google_maps_link') || 'Google Mapsリンクを貼り付け'}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400 focus:border-indigo-400"
+                onPaste={e => { setTimeout(() => handleGoogleMapsLink(e.currentTarget.value), 0); }}
+                onChange={e => handleGoogleMapsLink(e.target.value)} />
+            </div>
             <div className="flex gap-2 mt-2">
               <button onClick={handleShowMap} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
                 <i className="bi bi-map"></i>{t('btn_set_location') || '地図で指定'}
