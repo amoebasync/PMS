@@ -463,12 +463,16 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         );
       })}
     </GoogleMap>
-    {/* 現在地ボタン — 常に表示、位置未取得時は灰色 */}
+    {/* 現在地ボタン — 常に表示、押すとGPS取得してpanTo */}
     <button
       onClick={() => {
-        if (inspectorPosition) {
-          panToMyLocation();
-        } else if (navigator.geolocation) {
+        // inspectorPositionがあればまずそこにpan
+        if (inspectorPosition && mapRef.current) {
+          mapRef.current.panTo(inspectorPosition);
+          mapRef.current.setZoom(17);
+        }
+        // 常にGPSで最新位置を取得してpan（位置情報の権限プロンプトも兼ねる）
+        if (navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
               const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -477,8 +481,15 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
                 mapRef.current.setZoom(17);
               }
             },
-            () => { /* ignore */ },
-            { enableHighAccuracy: true, timeout: 10000 }
+            (err) => {
+              console.warn('Geolocation error:', err.message);
+              // 位置取得失敗でもinspectorPositionがあればそこにいく
+              if (inspectorPosition && mapRef.current) {
+                mapRef.current.panTo(inspectorPosition);
+                mapRef.current.setZoom(17);
+              }
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
           );
         }
       }}
