@@ -39,6 +39,10 @@ interface InspectionDetail {
   fraudTrace: string | null;
   schedule: {
     id: number;
+    status: string;
+    checkGps: boolean;
+    checkGpsResult: string | null;
+    checkGpsComment: string | null;
     distributor: {
       id: number;
       name: string;
@@ -50,6 +54,15 @@ interface InspectionDetail {
       prefecture: { name: string };
       city: { name: string };
     } | null;
+    items: {
+      id: number;
+      slotIndex: number;
+      flyerName: string | null;
+      plannedCount: number | null;
+      actualCount: number | null;
+      customer: { id: number; name: string } | null;
+      flyer: { id: number; name: string; flyerCode: string | null } | null;
+    }[];
   } | null;
   inspector: {
     id: number;
@@ -392,6 +405,46 @@ export default function InspectionDetailPage() {
           </div>
         )}
       </div>
+
+      {/* ── Schedule info bar (GPS result + flyers) ── */}
+      {inspection.schedule && (
+        <div className="bg-slate-50 border-b border-slate-200 px-2 md:px-4 py-1 shrink-0 overflow-x-auto">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0">
+            {/* GPS check result */}
+            {inspection.schedule.checkGpsResult ? (
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full shrink-0 text-[10px] font-bold ${
+                inspection.schedule.checkGpsResult === 'OK'
+                  ? 'bg-emerald-100 text-emerald-700'
+                  : 'bg-rose-100 text-rose-700'
+              }`}>
+                <i className={`bi ${inspection.schedule.checkGpsResult === 'OK' ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`}></i>
+                GPS {inspection.schedule.checkGpsResult}
+              </div>
+            ) : (
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-200 text-slate-500 text-[10px] font-bold shrink-0">
+                <i className="bi bi-geo-alt"></i>GPS --
+              </div>
+            )}
+            {inspection.schedule.checkGpsResult === 'NG' && inspection.schedule.checkGpsComment && (
+              <span className="text-[10px] text-rose-600 truncate max-w-[120px] md:max-w-[200px]" title={inspection.schedule.checkGpsComment}>
+                {inspection.schedule.checkGpsComment}
+              </span>
+            )}
+            {/* Flyer items — compact horizontal scroll */}
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-x-auto">
+              {(inspection.schedule.items || []).filter(i => i.flyerName).map((item, idx) => (
+                <div key={item.id} className="flex items-center gap-1 px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[9px] md:text-[10px] whitespace-nowrap shrink-0">
+                  <span className="w-3.5 h-3.5 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[8px] font-bold shrink-0">{idx + 1}</span>
+                  <span className="text-slate-600 truncate max-w-[80px] md:max-w-[120px]" title={item.flyerName || ''}>{item.flyerName}</span>
+                  <span className="text-slate-400 tabular-nums">
+                    {item.actualCount != null ? item.actualCount.toLocaleString() : '-'}/{item.plannedCount?.toLocaleString() || '-'}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Main content: Map + Panel ── */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">

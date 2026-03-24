@@ -33,6 +33,11 @@ export async function GET(
             id: true,
             jobNumber: true,
             date: true,
+            status: true,
+            checkGps: true,
+            checkGpsResult: true,
+            checkGpsComment: true,
+            distributor: { select: { id: true, name: true, staffId: true } },
             area: {
               include: {
                 prefecture: { select: { name: true } },
