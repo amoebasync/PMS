@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Noto_Sans_JP } from "next/font/google";
 import "./globals.css";
 // Sidebarの直接インポートは不要になり、LayoutWrapperをインポートします
@@ -11,6 +11,10 @@ const notojp = Noto_Sans_JP({
   subsets: ["latin"],
   variable: "--font-notojp",
 });
+
+export const viewport: Viewport = {
+  viewportFit: 'cover',
+};
 
 export const metadata: Metadata = {
   title: "PMS Pro System",

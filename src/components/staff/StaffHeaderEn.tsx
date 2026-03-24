@@ -98,7 +98,7 @@ export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon, co
       )}
 
       {/* Bottom navigation bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up pb-[env(safe-area-inset-bottom)]">
         <div className="max-w-lg mx-auto grid grid-cols-6">
           {navItems.map((item) => {
             const isActive = item.href === '/staff/en'
