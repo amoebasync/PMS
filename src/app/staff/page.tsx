@@ -14,7 +14,7 @@ type Shift = {
 
 type PayrollRecord = {
   grossPay: number;
-  status: 'DRAFT' | 'CONFIRMED' | 'PAID';
+  status: 'DRAFT' | 'CONFIRMED' | 'PAID' | 'ESTIMATED';
   paymentDate: string;
 } | null;
 
@@ -136,7 +136,24 @@ export default function DistributorDashboard() {
       const payrollRes = await fetch(`/api/staff/payroll?year=${today.getFullYear()}&month=${today.getMonth() + 1}`);
       if (payrollRes.ok) {
         const payrollData = await payrollRes.json();
-        setPayroll(payrollData.upcomingRecord || null);
+        if (payrollData.upcomingRecord) {
+          setPayroll(payrollData.upcomingRecord);
+        } else {
+          try {
+            const earningsRes = await fetch(`/api/staff/distribution/earnings?mode=weekly&date=${formatDate(today)}`);
+            if (earningsRes.ok) {
+              const earningsData = await earningsRes.json();
+              if (earningsData.totalEarnings > 0) {
+                const friday = getUpcomingFriday(today);
+                setPayroll({
+                  grossPay: earningsData.totalEarnings,
+                  status: 'ESTIMATED',
+                  paymentDate: formatDate(friday),
+                });
+              }
+            }
+          } catch { /* ignore */ }
+        }
       }
 
       setLoading(false);
@@ -222,16 +239,17 @@ export default function DistributorDashboard() {
             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
               payroll.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' :
               payroll.status === 'CONFIRMED' ? 'bg-amber-100 text-amber-700' :
+              payroll.status === 'ESTIMATED' ? 'bg-blue-100 text-blue-600' :
               'bg-slate-100 text-slate-500'
             }`}>
-              {payroll.status === 'PAID' ? '支払済' : payroll.status === 'CONFIRMED' ? '確定済' : '計算中'}
+              {payroll.status === 'PAID' ? '支払済' : payroll.status === 'CONFIRMED' ? '確定済' : payroll.status === 'ESTIMATED' ? '予想' : '計算中'}
             </span>
           )}
         </div>
         {payroll ? (
           <>
-            <p className="text-3xl font-black text-indigo-600">¥{payroll.grossPay.toLocaleString()}</p>
-            <p className="text-xs text-slate-400 mt-1">タップして明細を確認</p>
+            <p className={`text-3xl font-black ${payroll.status === 'ESTIMATED' ? 'text-blue-500' : 'text-indigo-600'}`}>¥{payroll.grossPay.toLocaleString()}</p>
+            <p className="text-xs text-slate-400 mt-1">{payroll.status === 'ESTIMATED' ? '完了したスケジュールから計算' : 'タップして明細を確認'}</p>
           </>
         ) : (
           <>
