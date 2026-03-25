@@ -44,5 +44,8 @@
   "toast_deleted": "シフトを削除しました",
   "confirm_delete": "{{name}} の {{date}} のシフトを削除しますか？",
   "confirm_delete_btn": "削除",
-  "has_schedule": "スケジュール有"
+  "has_schedule": "スケジュール有",
+  "filter_all_schedule": "全て",
+  "filter_scheduled": "スケジュール有",
+  "filter_unscheduled": "スケジュール無"
 }

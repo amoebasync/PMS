@@ -100,6 +100,7 @@ export default function DistributorShiftsPage() {
   const [weekDistributors, setWeekDistributors] = useState<WeeklyDistributor[]>([]);
   const [weekLoading, setWeekLoading] = useState(false);
   const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null);
+  const [scheduleFilter, setScheduleFilter] = useState<'all' | 'scheduled' | 'unscheduled'>('all');
 
   // 一覧
   const [listShifts, setListShifts] = useState<Shift[]>([]);
@@ -317,13 +318,17 @@ export default function DistributorShiftsPage() {
   };
 
   // ────── 週間ナビ ──────
-  const goToday = () => { setWeekStartDate(getTodayStr()); setSelectedDateFilter(null); };
-  const goPrev = () => { setWeekStartDate(prev => addDays(prev, -7)); setSelectedDateFilter(null); };
-  const goNext = () => { setWeekStartDate(prev => addDays(prev, 7)); setSelectedDateFilter(null); };
+  const clearFilters = () => { setSelectedDateFilter(null); setScheduleFilter('all'); };
+  const goToday = () => { setWeekStartDate(getTodayStr()); clearFilters(); };
+  const goPrev = () => { setWeekStartDate(prev => addDays(prev, -7)); clearFilters(); };
+  const goNext = () => { setWeekStartDate(prev => addDays(prev, 7)); clearFilters(); };
 
   // 日付ヘッダークリック → フィルタ切替
   const toggleDateFilter = (dateStr: string) => {
-    setSelectedDateFilter(prev => prev === dateStr ? null : dateStr);
+    setSelectedDateFilter(prev => {
+      if (prev === dateStr) { setScheduleFilter('all'); return null; }
+      return dateStr;
+    });
   };
 
   // 日付ごとの出勤人数集計
@@ -335,11 +340,21 @@ export default function DistributorShiftsPage() {
     return counts;
   }, [weekDates, weekDistributors]);
 
-  // フィルタ適用: 選択日にシフトがある配布員のみ表示
+  // フィルタ適用: 選択日 + スケジュール有無
   const filteredDistributors = React.useMemo(() => {
-    if (!selectedDateFilter) return weekDistributors;
-    return weekDistributors.filter(dist => dist.shifts[selectedDateFilter] !== null);
-  }, [weekDistributors, selectedDateFilter]);
+    let result = weekDistributors;
+    if (selectedDateFilter) {
+      result = result.filter(dist => dist.shifts[selectedDateFilter] !== null);
+    }
+    if (scheduleFilter !== 'all' && selectedDateFilter) {
+      result = result.filter(dist => {
+        const cell = dist.shifts[selectedDateFilter];
+        if (!cell) return false;
+        return scheduleFilter === 'scheduled' ? cell.hasSchedule : !cell.hasSchedule;
+      });
+    }
+    return result;
+  }, [weekDistributors, selectedDateFilter, scheduleFilter]);
 
   // ──────────────────────────────────────────
   // レンダリング
@@ -434,18 +449,39 @@ export default function DistributorShiftsPage() {
               <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full ml-2" />
             )}
             {selectedDateFilter && (
-              <button
-                onClick={() => setSelectedDateFilter(null)}
-                className="ml-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
-              >
-                <i className="bi bi-funnel-fill text-[10px]"></i>
-                {(() => {
-                  const d = new Date(selectedDateFilter + 'T00:00:00');
-                  return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
-                })()}
-                — {filteredDistributors.length}{t('people_suffix')}
-                <i className="bi bi-x-lg text-[9px] ml-1"></i>
-              </button>
+              <div className="ml-2 flex items-center gap-1.5">
+                <button
+                  onClick={() => { setSelectedDateFilter(null); setScheduleFilter('all'); }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
+                >
+                  <i className="bi bi-funnel-fill text-[10px]"></i>
+                  {(() => {
+                    const d = new Date(selectedDateFilter + 'T00:00:00');
+                    return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
+                  })()}
+                  — {filteredDistributors.length}{t('people_suffix')}
+                  <i className="bi bi-x-lg text-[9px] ml-1"></i>
+                </button>
+                <div className="flex rounded-lg border border-slate-200 overflow-hidden">
+                  {([
+                    { value: 'all', label: t('filter_all_schedule') },
+                    { value: 'scheduled', label: t('filter_scheduled') },
+                    { value: 'unscheduled', label: t('filter_unscheduled') },
+                  ] as const).map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setScheduleFilter(opt.value)}
+                      className={`px-2 py-1 text-[11px] font-medium transition-colors ${
+                        scheduleFilter === opt.value
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
 

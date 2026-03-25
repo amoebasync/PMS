@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { ScheduleStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { ensureShiftExists } from '@/lib/autoShift';
 
 
 // "16日(月)" や "2026-02-18" などを適切に処理して Date型を作る
@@ -533,6 +534,24 @@ export async function POST(request: Request) {
 
       return { importedCount, updatedCount, matchedIds, createdIds, cleanedCount, createdOrder };
     }, { timeout: 120000 });
+
+    // インポートで作成/更新されたスケジュールのシフトを自動作成
+    try {
+      const allIds = [...result.matchedIds, ...result.createdIds];
+      if (allIds.length > 0) {
+        const importedSchedules = await prisma.distributionSchedule.findMany({
+          where: { id: { in: allIds }, distributorId: { not: null } },
+          select: { distributorId: true, date: true },
+        });
+        for (const s of importedSchedules) {
+          if (s.distributorId && s.date) {
+            await ensureShiftExists(s.distributorId, s.date);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Auto-shift creation after import failed:', e);
+    }
 
     return NextResponse.json({
       success: true,

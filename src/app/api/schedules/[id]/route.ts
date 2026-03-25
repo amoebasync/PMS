@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { ensureShiftExists } from '@/lib/autoShift';
 
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +81,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         items: { orderBy: { slotIndex: 'asc' } },
       }
     });
+
+    // 配布員アサイン時にシフトを自動作成
+    if (body.distributorId && updatedSchedule.date) {
+      try {
+        await ensureShiftExists(parseInt(body.distributorId), updatedSchedule.date);
+      } catch (e) {
+        console.error('Auto-shift creation failed:', e);
+      }
+    }
 
     // 監査ログ記録（チェック変更時のみ）
     if (hasCheckChange && beforeData) {

@@ -44,5 +44,8 @@
   "toast_deleted": "Shift deleted",
   "confirm_delete": "Delete the shift for {{name}} on {{date}}?",
   "confirm_delete_btn": "Delete",
-  "has_schedule": "Scheduled"
+  "has_schedule": "Scheduled",
+  "filter_all_schedule": "All",
+  "filter_scheduled": "Scheduled",
+  "filter_unscheduled": "Unscheduled"
 }
