@@ -3,26 +3,20 @@ import { requireAdminSession } from '@/lib/adminAuth';
 import { prisma } from '@/lib/prisma';
 
 // GET /api/distributors/prefixes
-// PMS管理対象の配布員スタッフIDプレフィックス一覧を返す
+// PMS管理対象の支店プレフィックス一覧を返す（Branch.prefixから取得）
 export async function GET() {
   const { error } = await requireAdminSession();
   if (error) return error;
 
-  const distributors = await prisma.flyerDistributor.findMany({
-    where: { staffId: { not: '' } },
-    select: { staffId: true },
+  const branches = await prisma.branch.findMany({
+    where: { prefix: { not: null } },
+    select: { prefix: true },
   });
 
-  // 除外プレフィックス（PMS対象外）
-  const EXCLUDED_PREFIXES = ['NAI', 'Test', 'B01-'];
+  const prefixes = branches
+    .map(b => b.prefix!)
+    .filter(p => p.trim() !== '')
+    .sort();
 
-  const prefixes = new Set<string>();
-  for (const d of distributors) {
-    if (d.staffId) {
-      const prefix = d.staffId.replace(/[0-9]+$/, '');
-      if (prefix && !EXCLUDED_PREFIXES.includes(prefix)) prefixes.add(prefix);
-    }
-  }
-
-  return NextResponse.json([...prefixes].sort());
+  return NextResponse.json(prefixes);
 }
