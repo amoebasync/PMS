@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { getSubFlyerCustomerCodes, isSubFlyer } from '@/lib/sub-flyer';
 
 
 export async function GET(request: Request) {
@@ -75,9 +76,14 @@ export async function GET(request: Request) {
       console.error('Attendance count error:', e);
     }
 
+    const subCodes = await getSubFlyerCustomerCodes();
     const result = schedules.map(s => ({
       ...s,
       attendanceCount: s.distributorId ? (attendanceCounts[s.distributorId] || 0) : 0,
+      items: s.items.map(item => ({
+        ...item,
+        isSubFlyer: isSubFlyer(item.externalCustomerCode, subCodes),
+      })),
     }));
 
     return NextResponse.json(result);

@@ -22,6 +22,7 @@ const DEFAULTS: Record<string, string> = {
     { name: 'Pro', rates: [2.25, 3.5, 4, 5.25, 6.5, 7.75] },
   ]),
   headerLinks: JSON.stringify([]),  // ヘッダーリンク集
+  subFlyerCustomerCodes: JSON.stringify([]),  // サブチラシ顧客コード一覧
 };
 
 async function checkAdminAuth() {

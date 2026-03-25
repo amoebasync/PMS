@@ -671,8 +671,9 @@ export default function DispatchPage() {
                                 className={`border rounded p-1.5 cursor-move transition-colors relative group/card h-full flex flex-col justify-between ${cardClass}`}
                               >
                                 <div>
-                                  <div className="font-bold text-slate-800 truncate mb-1 pr-6" title={item.flyerName}>
-                                    {item.flyerName}
+                                  <div className="font-bold text-slate-800 truncate mb-1 pr-6 flex items-center gap-1" title={item.flyerName}>
+                                    {item.isSubFlyer && <span className="shrink-0 text-[7px] font-bold bg-slate-200 text-slate-500 px-1 py-0 rounded">SUB</span>}
+                                    <span className="truncate">{item.flyerName}</span>
                                   </div>
 
                                   <div className="text-[9px] text-slate-500">

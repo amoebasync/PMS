@@ -1129,8 +1129,8 @@ export default function ScheduleListPage() {
               <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
                 <i className="bi bi-file-earmark text-amber-500"></i>
                 {t('summary_main_count')}: {filteredSchedules.reduce((sum, s) => {
-                  const slot1 = (s.items || []).find((item: any) => item.slotIndex === 1);
-                  return sum + (slot1?.plannedCount || 0);
+                  const mainItems = (s.items || []).filter((item: any) => item.flyerName && !item.isSubFlyer);
+                  return sum + mainItems.reduce((s2: number, item: any) => s2 + (item.plannedCount || 0), 0);
                 }, 0).toLocaleString()}
               </span>
               {(() => {
@@ -1303,7 +1303,8 @@ export default function ScheduleListPage() {
                         <div className="space-y-0.5">
                           {activeFlyers.map((f: any, i: number) => (
                             <div key={i} className="flex items-center gap-1.5 text-[11px]">
-                              <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white bg-slate-400`}>{i + 1}</span>
+                              <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${f.isSubFlyer ? 'bg-amber-400' : 'bg-slate-400'}`}>{i + 1}</span>
+                              {f.isSubFlyer && <span className="shrink-0 text-[7px] font-bold bg-amber-100 text-amber-600 px-1 rounded">SUB</span>}
                               <span className="truncate max-w-[200px] text-slate-700" title={f.flyerName}>{f.flyerName}</span>
                               <span className="shrink-0 text-slate-400 text-[10px]">{f.plannedCount?.toLocaleString() || 0}</span>
                               {f.actualCount != null && (
@@ -1646,8 +1647,9 @@ export default function ScheduleListPage() {
                       <div key={idx} className="flex items-center justify-between text-xs">
                         <div className="flex items-center gap-1.5 min-w-0 mr-2">
                           <span className={`shrink-0 w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold text-white ${
-                            'bg-slate-400'
+                            flyer.isSubFlyer ? 'bg-amber-400' : 'bg-slate-400'
                           }`}>{idx + 1}</span>
+                          {flyer.isSubFlyer && <span className="shrink-0 text-[7px] font-bold bg-amber-100 text-amber-600 px-1 rounded">SUB</span>}
                           <span className="text-slate-700 truncate">{flyer.flyerName}</span>
                         </div>
                         <div className="flex items-center gap-2 shrink-0 text-slate-500">

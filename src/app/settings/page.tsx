@@ -993,6 +993,70 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+            {/* サブチラシ顧客コード設定 */}
+            <div className="p-5 border-t border-slate-200">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <i className="bi bi-tag-fill text-amber-500"></i>
+                {t('sub_flyer_codes') || 'サブチラシ顧客コード'}
+              </h3>
+              <p className="text-xs text-slate-500 mt-1">{t('sub_flyer_codes_desc') || 'サブ（自社練習用）チラシの顧客コードを登録します。該当コードのチラシはサブとして区別されます。'}</p>
+              <div className="mt-3 space-y-2">
+                <div className="flex flex-wrap gap-1.5">
+                  {(() => {
+                    let codes: string[] = [];
+                    try { codes = JSON.parse(systemSettings.subFlyerCustomerCodes || '[]'); } catch {}
+                    return codes.map((code: string) => (
+                      <span key={code} className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg text-xs font-bold">
+                        {code}
+                        <button
+                          onClick={async () => {
+                            const updated = codes.filter(c => c !== code);
+                            const val = JSON.stringify(updated);
+                            setSystemSettings(prev => ({ ...prev, subFlyerCustomerCodes: val }));
+                            await handleSaveSystemSetting('subFlyerCustomerCodes', val);
+                          }}
+                          className="text-amber-400 hover:text-red-500 transition-colors ml-0.5"
+                        >
+                          <i className="bi bi-x text-sm"></i>
+                        </button>
+                      </span>
+                    ));
+                  })()}
+                </div>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const input = (e.target as HTMLFormElement).elements.namedItem('newSubCode') as HTMLInputElement;
+                    const val = input.value.trim();
+                    if (!val) return;
+                    let codes: string[] = [];
+                    try { codes = JSON.parse(systemSettings.subFlyerCustomerCodes || '[]'); } catch {}
+                    if (codes.includes(val)) { input.value = ''; return; }
+                    const updated = [...codes, val];
+                    const json = JSON.stringify(updated);
+                    setSystemSettings(prev => ({ ...prev, subFlyerCustomerCodes: json }));
+                    await handleSaveSystemSetting('subFlyerCustomerCodes', json);
+                    input.value = '';
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <input
+                    name="newSubCode"
+                    type="text"
+                    placeholder={t('sub_flyer_code_placeholder') || '顧客コードを入力（例: 01kp0001）'}
+                    className="flex-1 border border-slate-300 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-bold rounded-xl flex items-center gap-1.5"
+                  >
+                    <i className="bi bi-plus-circle"></i>
+                    {t('btn_add') || '追加'}
+                  </button>
+                </form>
+              </div>
+            </div>
+
             {/* 在留カードAI検証設定 */}
             <div className="p-5 border-t border-slate-200">
               <h3 className="font-bold text-slate-700 flex items-center gap-2">
