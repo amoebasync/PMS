@@ -138,17 +138,23 @@ export async function POST(request: Request) {
     }
 
     let expensePay = 0;
-    for (const expense of expenses) {
-      if (isFull) {
+    if (isFull) {
+      for (const expense of expenses) {
         expensePay += expense.amount;
-      } else {
+      }
+    } else {
+      // 日別に合算してからキャップを適用
+      const dailyExpenses: Record<string, number> = {};
+      for (const expense of expenses) {
         const dateKey = expense.date.toISOString().split('T')[0];
+        dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + expense.amount;
+      }
+      for (const [dateKey, totalAmount] of Object.entries(dailyExpenses)) {
         const flyerCount = scheduleFlyerCounts[dateKey] || 0;
-        // 1種配布: 個人設定 or デフォルト500、複数種: 個人設定 or デフォルト1000
         const dailyCap = flyerCount === 1
           ? Math.min(personalCap, personal1TypeCap)
           : personalCap;
-        expensePay += Math.min(expense.amount, dailyCap);
+        expensePay += Math.min(totalAmount, dailyCap);
       }
     }
 

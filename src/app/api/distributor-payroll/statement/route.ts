@@ -113,11 +113,24 @@ export async function GET(request: Request) {
       orderBy: { date: 'asc' },
     });
 
-    // 経費を日別マップに
+    // 配布員の交通費キャップ設定を取得
+    const distSettings = await prisma.flyerDistributor.findUnique({
+      where: { id: distributorId },
+      select: { transportationFee: true, transportationFee1Type: true },
+    });
+    const feeSetting = distSettings?.transportationFee || '1000';
+    const isFull = feeSetting === 'FULL';
+    const personalCap = isFull ? Infinity : parseInt(feeSetting) || 1000;
+
+    // 経費を日別マップに（キャップ適用）
     const expenseByDate = new Map<string, number>();
+    const rawExpenseByDate = new Map<string, number>();
     for (const exp of expenses) {
       const key = exp.date.toISOString().slice(0, 10);
-      expenseByDate.set(key, (expenseByDate.get(key) || 0) + exp.amount);
+      rawExpenseByDate.set(key, (rawExpenseByDate.get(key) || 0) + exp.amount);
+    }
+    for (const [key, total] of rawExpenseByDate) {
+      expenseByDate.set(key, isFull ? total : Math.min(total, personalCap));
     }
 
     let rows: PayrollStatementRow[];
