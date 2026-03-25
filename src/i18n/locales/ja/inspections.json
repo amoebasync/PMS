@@ -111,6 +111,13 @@
   "add_manual_checkpoint": "手動で追加",
   "manual_checkpoint_instruction": "地図上でチェックしたい場所をタップしてください",
 
+  "btn_revert": "巡回中に戻す",
+  "confirm_revert": "巡回中に戻しますか？",
+  "success_reverted": "巡回中に戻しました",
+  "confirm_finish_title": "巡回を完了しますか？",
+  "confirm_finish_desc": "GPS記録が停止し、チェック結果が確定されます。",
+  "btn_finish": "完了",
+
   "line_share": "LINE共有",
   "line_share_confirm": "現場確認予定をLINEグループに送信しますか？",
   "line_share_success": "LINE送信完了（{count}件）",

@@ -111,6 +111,13 @@
   "add_manual_checkpoint": "Add Manually",
   "manual_checkpoint_instruction": "Tap a location on the map to add a checkpoint",
 
+  "btn_revert": "Revert to In Progress",
+  "confirm_revert": "Revert this inspection to In Progress?",
+  "success_reverted": "Reverted to In Progress",
+  "confirm_finish_title": "Complete this inspection?",
+  "confirm_finish_desc": "GPS tracking will stop and checkpoint results will be finalized.",
+  "btn_finish": "Complete",
+
   "line_share": "LINE Share",
   "line_share_confirm": "Send inspection schedule to LINE group?",
   "line_share_success": "Sent to LINE ({count} inspections)",
