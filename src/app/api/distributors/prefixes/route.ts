@@ -13,11 +13,14 @@ export async function GET() {
     select: { staffId: true },
   });
 
+  // 除外プレフィックス（PMS対象外）
+  const EXCLUDED_PREFIXES = ['NAI', 'Test', 'B01-'];
+
   const prefixes = new Set<string>();
   for (const d of distributors) {
     if (d.staffId) {
       const prefix = d.staffId.replace(/[0-9]+$/, '');
-      if (prefix) prefixes.add(prefix);
+      if (prefix && !EXCLUDED_PREFIXES.includes(prefix)) prefixes.add(prefix);
     }
   }
 
