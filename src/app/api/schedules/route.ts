@@ -49,6 +49,7 @@ export async function GET(request: Request) {
         checkedBy: { select: { id: true, lastNameJa: true, firstNameJa: true } },
         relayTasks: { select: { id: true, type: true, status: true }, orderBy: { sortOrder: 'asc' } },
         fieldInspections: { select: { id: true, category: true, status: true, confirmationRate: true, complianceRate: true, inspector: { select: { lastNameJa: true, firstNameJa: true } } } },
+        photos: { select: { id: true, photoUrl: true, type: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
       },
       orderBy: { createdAt: 'desc' }
     });

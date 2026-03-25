@@ -126,16 +126,35 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
 
   const gpsResult = schedule.checkGpsResult as string | null;
 
+  const flyerPhotos = (schedule.photos || []).filter((p: any) => p.type === 'FLYER');
+  const mapPhotos = (schedule.photos || []).filter((p: any) => p.type === 'MAP');
+  const photosByCheck: Record<string, any[]> = {
+    checkFlyerPhoto: flyerPhotos,
+    checkMapPhoto: mapPhotos,
+  };
+
   return (
     <div ref={popoverRef} className="w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
       {simpleChecks.map(({ key, icon, label }) => (
-        <label key={key} className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
-          <input type="checkbox" checked={!!schedule[key]} onChange={() => toggleCheck(key)} disabled={saving === key}
-            className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600" />
-          <i className={`bi ${icon} text-slate-500 text-sm`}></i>
-          <span className="text-xs text-slate-700 flex-1">{label}</span>
-          {saving === key && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
-        </label>
+        <div key={key}>
+          <label className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
+            <input type="checkbox" checked={!!schedule[key]} onChange={() => toggleCheck(key)} disabled={saving === key}
+              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600" />
+            <i className={`bi ${icon} text-slate-500 text-sm`}></i>
+            <span className="text-xs text-slate-700 flex-1">{label}</span>
+            {photosByCheck[key]?.length > 0 && <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1 rounded font-bold">{photosByCheck[key].length}</span>}
+            {saving === key && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
+          </label>
+          {photosByCheck[key]?.length > 0 && (
+            <div className="flex gap-1.5 px-2 py-1 overflow-x-auto">
+              {photosByCheck[key].map((p: any) => (
+                <a key={p.id} href={p.photoUrl} target="_blank" rel="noopener noreferrer">
+                  <img src={p.photoUrl} alt="" className="w-10 h-10 rounded object-cover border border-slate-200 shrink-0 hover:opacity-80" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
       ))}
 
       {/* GPS確認 — OK/NG選択 */}

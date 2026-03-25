@@ -115,10 +115,19 @@ export async function POST(request: NextRequest) {
 
     const photoUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION || 'ap-northeast-1'}.amazonaws.com/${key}`;
 
-    // DB 保存
+    // DB 保存 + コンプライアンスチェック自動更新
     const saved = await prisma.schedulePhoto.create({
       data: { scheduleId, photoUrl, type: photoType, source: 'LINE' },
     });
+
+    // チラシ写真 → checkFlyerPhoto、地図写真 → checkMapPhoto を自動ON
+    const checkField = photoType === 'FLYER' ? 'checkFlyerPhoto' : photoType === 'MAP' ? 'checkMapPhoto' : null;
+    if (checkField) {
+      await prisma.distributionSchedule.update({
+        where: { id: scheduleId },
+        data: { [checkField]: true },
+      });
+    }
 
     return NextResponse.json({ success: true, photo: saved });
   } catch (err) {
