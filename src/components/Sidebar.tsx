@@ -98,6 +98,7 @@ const MENU_GROUPS: MenuGroup[] = [
     items: [
       { nameKey: 'area_analytics', href: '/analytics/areas', icon: 'bi-bar-chart-line-fill' },
       { nameKey: 'distribution_analytics', href: '/analytics/distribution', icon: 'bi-graph-up' },
+      { nameKey: 'beginner_analytics', href: '/analytics/beginners', icon: 'bi-person-plus-fill' },
     ],
   },
   {

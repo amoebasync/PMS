@@ -36,6 +36,7 @@
   "company_settings": "自社情報設定",
   "area_analytics": "エリア分析",
   "distribution_analytics": "配布分析",
+  "beginner_analytics": "新人分析",
   "profile_edit": "プロフィール編集",
   "page_titles": {
     "dashboard": "ダッシュボード",
@@ -74,6 +75,7 @@
     "pricing": "価格設定",
     "area_analytics": "エリア別配布分析",
     "distribution_analytics": "配布分析",
+    "beginner_analytics": "新人分析",
     "company_settings": "自社情報設定",
     "picking_verification": "ピッキング照合",
     "line_integration": "LINE連携管理"

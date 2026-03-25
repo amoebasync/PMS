@@ -36,6 +36,7 @@
   "company_settings": "Company Settings",
   "area_analytics": "Area Analytics",
   "distribution_analytics": "Dist. Analytics",
+  "beginner_analytics": "Beginner Analysis",
   "profile_edit": "Edit Profile",
   "page_titles": {
     "dashboard": "Dashboard",
@@ -74,6 +75,7 @@
     "pricing": "Pricing",
     "area_analytics": "Area Distribution Analytics",
     "distribution_analytics": "Distribution Analytics",
+    "beginner_analytics": "Beginner Analysis",
     "company_settings": "Company Settings",
     "picking_verification": "Picking Verification",
     "line_integration": "LINE Integration"
