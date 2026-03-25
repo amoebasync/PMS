@@ -175,18 +175,19 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
     return stored;
   }, [inspectorGpsPoints, inspectorPosition]);
 
-  /* ---- Map center (エリア中心を優先、自動追従しない) ---- */
-  const center = useMemo(() => {
-    if (areaPolygons.length > 0 && areaPolygons[0].length > 0) {
-      const pts = areaPolygons[0];
-      const lat = pts.reduce((s, p) => s + p.lat, 0) / pts.length;
-      const lng = pts.reduce((s, p) => s + p.lng, 0) / pts.length;
-      return { lat, lng };
+  /* ---- Map center (初回のみ。以降ユーザー操作を尊重) ---- */
+  const initialCenterRef = useRef<{ lat: number; lng: number }>({ lat: 35.6812, lng: 139.7671 });
+  const hasFittedBoundsRef = useRef(false);
+
+  // エリアポリゴンが読み込まれたら一度だけ fitBounds
+  useEffect(() => {
+    if (mapRef.current && areaPolygons.length > 0 && !hasFittedBoundsRef.current) {
+      hasFittedBoundsRef.current = true;
+      const bounds = new google.maps.LatLngBounds();
+      areaPolygons[0].forEach(p => bounds.extend(p));
+      mapRef.current.fitBounds(bounds, 40);
     }
-    if (distributorPath.length > 0) return distributorPath[0];
-    if (inspectorPosition) return inspectorPosition;
-    return { lat: 35.6812, lng: 139.7671 }; // Tokyo
-  }, [areaPolygons, distributorPath, inspectorPosition]);
+  }, [areaPolygons, mapReady]);
 
   /* ---- 現在地にフォーカス ---- */
   const panToMyLocation = useCallback(() => {
@@ -270,7 +271,7 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
     <div className="relative w-full h-full">
     <GoogleMap
       mapContainerClassName="w-full h-full"
-      center={center}
+      center={initialCenterRef.current}
       zoom={16}
       onLoad={onMapLoad}
       options={{

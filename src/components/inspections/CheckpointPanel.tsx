@@ -72,6 +72,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
@@ -109,6 +110,9 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
     setEditingCheckpointId(existingCheckpoint?.id || null);
     setSelectedFile(null);
     setPreviewUrl(null);
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   };
 
   /* ---- Handle file selection ---- */
@@ -173,7 +177,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const totalCount = samplePoints.length;
 
   return (
-    <div className="p-3 md:p-4 space-y-3">
+    <div ref={panelRef} className="p-3 md:p-4 space-y-3">
       {/* Stats */}
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-bold text-slate-500">{t('section_checkpoints')}</h3>
@@ -241,18 +245,18 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
         </div>
       )}
 
-      {/* Recording UI (inline) */}
+      {/* Recording UI (sticky at top) */}
       {recordingIndex !== null && samplePoints[recordingIndex] && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2.5">
+        <div className="sticky top-0 z-10 bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2.5 shadow-md">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-700">
-              #{recordingIndex + 1}
+            <span className="text-sm font-bold text-emerald-700">
+              <i className="bi bi-pencil-square mr-1"></i>#{recordingIndex + 1}
             </span>
-            <button onClick={() => setRecordingIndex(null)} className="text-slate-400 hover:text-slate-600">
+            <button onClick={() => setRecordingIndex(null)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white text-slate-400 hover:text-slate-600 shadow-sm">
               <i className="bi bi-x-lg text-sm"></i>
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             {(['CONFIRMED', 'NOT_FOUND'] as const).map((r) => {
               const labels: Record<string, string> = {
                 CONFIRMED: t('checkpoint_confirmed'),
@@ -262,14 +266,19 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                 CONFIRMED: 'bg-emerald-600 text-white border-emerald-600',
                 NOT_FOUND: 'bg-red-500 text-white border-red-500',
               };
+              const icons: Record<string, string> = {
+                CONFIRMED: 'bi-check-circle-fill',
+                NOT_FOUND: 'bi-x-circle-fill',
+              };
               return (
                 <button
                   key={r}
                   onClick={() => setRecordResult(r)}
-                  className={`py-2 text-[11px] font-bold rounded-lg border transition-all active:scale-95 ${
-                    recordResult === r ? colors[r] : 'bg-white text-slate-600 border-slate-300'
+                  className={`py-3 text-sm font-bold rounded-xl border-2 transition-all active:scale-95 flex items-center justify-center gap-1.5 ${
+                    recordResult === r ? colors[r] : 'bg-white text-slate-500 border-slate-200'
                   }`}
                 >
+                  <i className={`bi ${icons[r]}`}></i>
                   {labels[r]}
                 </button>
               );
