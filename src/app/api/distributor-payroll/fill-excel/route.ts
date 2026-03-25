@@ -94,7 +94,81 @@ export async function POST(request: Request) {
         };
       });
 
-    const payrollData = { weekStart, distributors };
+    // ── 社員の週払い給与も取得 ──
+    const empRecords = await prisma.payrollRecord.findMany({
+      where: {
+        periodStart,
+        paymentCycle: 'WEEKLY',
+      },
+      include: {
+        employee: { select: { id: true, staffId: true, lastNameJa: true, firstNameJa: true } },
+      },
+    });
+
+    const empIds = empRecords.map(r => r.employee.id);
+    const empAttendances = empIds.length > 0 ? await prisma.attendance.findMany({
+      where: {
+        employeeId: { in: empIds },
+        date: { gte: periodStart, lte: periodEnd },
+        status: 'APPROVED',
+      },
+      include: { attendanceType: { select: { isWorking: true, isPaid: true } } },
+    }) : [];
+
+    const empExpenses = empIds.length > 0 ? await prisma.expense.findMany({
+      where: {
+        employeeId: { in: empIds },
+        date: { gte: periodStart, lte: periodEnd },
+        status: 'APPROVED',
+      },
+      select: { employeeId: true, date: true, amount: true },
+    }) : [];
+
+    const empFinancials = empIds.length > 0 ? await prisma.employeeFinancial.findMany({
+      where: { employeeId: { in: empIds } },
+      select: { employeeId: true, salaryType: true, hourlyRate: true, dailyRate: true },
+    }) : [];
+    const finMap = new Map(empFinancials.map(f => [f.employeeId, f]));
+
+    const employees = empRecords
+      .filter(r => r.grossPay > 0)
+      .sort((a, b) => (a.employee.staffId || '').localeCompare(b.employee.staffId || ''))
+      .map(r => {
+        const fin = finMap.get(r.employee.id);
+        const atts = empAttendances.filter(a => a.employeeId === r.employee.id);
+
+        const dailyEarnings: Record<string, number> = {};
+        for (const day of weekDays) {
+          const dayAtts = atts.filter(a => a.date.toISOString().split('T')[0] === day && (a.attendanceType?.isWorking || a.attendanceType?.isPaid));
+          let dayWage = 0;
+          for (const att of dayAtts) {
+            dayWage += (att as any).calculatedWage ??
+              (fin?.salaryType === 'DAILY'
+                ? (fin.dailyRate || 0)
+                : Math.floor((fin?.hourlyRate || 0) * (att.workHours || 0)));
+          }
+          dailyEarnings[day] = dayWage;
+        }
+
+        const dailyExpenses: Record<string, number> = {};
+        const exps = empExpenses.filter(e => e.employeeId === r.employee.id);
+        for (const e of exps) {
+          const dateKey = e.date.toISOString().split('T')[0];
+          dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + e.amount;
+        }
+
+        return {
+          staffId: r.employee.staffId || `EMP${r.employee.id}`,
+          name: `${r.employee.lastNameJa || ''}${r.employee.firstNameJa || ''}`,
+          dailyEarnings,
+          dailyExpenses,
+          schedulePay: r.grossPay - r.expenseTotal,
+          expensePay: r.expenseTotal,
+          grossPay: r.grossPay,
+        };
+      });
+
+    const payrollData = { weekStart, distributors: [...distributors, ...employees] };
 
     // Write temp files
     await mkdir(tmpDir, { recursive: true });
