@@ -266,12 +266,17 @@ export async function POST(request: Request) {
                         )
                       );
                     }
-                    if (match && item.actualCount != null) {
+                    if (match) {
                       matchedItemIds.add(match.id);
-                      await tx.distributionItem.update({
-                        where: { id: match.id },
-                        data: { actualCount: item.actualCount },
-                      });
+                      const updateData: any = {};
+                      if (item.actualCount != null) updateData.actualCount = item.actualCount;
+                      if (item.customerCode) updateData.externalCustomerCode = String(item.customerCode).trim();
+                      if (Object.keys(updateData).length > 0) {
+                        await tx.distributionItem.update({
+                          where: { id: match.id },
+                          data: updateData,
+                        });
+                      }
                     }
                   }
                 }
