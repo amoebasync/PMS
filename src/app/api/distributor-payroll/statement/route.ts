@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdminSession } from '@/lib/adminAuth';
+import { getDistributorFromCookie } from '@/lib/distributorAuth';
 import { renderToStream } from '@react-pdf/renderer';
 import React from 'react';
 import { PayrollStatementPDF } from '@/lib/pdf/payroll-statement-template';
@@ -11,14 +12,28 @@ import { getPresignedUrl, getS3Url } from '@/lib/s3';
 export const runtime = 'nodejs';
 
 // GET /api/distributor-payroll/statement?distributorId=X&year=YYYY&month=MM
-// month が指定されなければ年間、指定されれば月間
+// distributorId=me の場合は配布員セッションから取得
 export async function GET(request: Request) {
-  const { error } = await requireAdminSession();
-  if (error) return error;
+  const { searchParams } = new URL(request.url);
+  const rawDistId = searchParams.get('distributorId') || '0';
+
+  let distributorId: number;
+
+  if (rawDistId === 'me') {
+    // 配布員自身からのアクセス
+    const distributor = await getDistributorFromCookie();
+    if (!distributor) {
+      return NextResponse.json({ error: '認証エラー' }, { status: 401 });
+    }
+    distributorId = distributor.id;
+  } else {
+    // 管理者からのアクセス
+    const { error } = await requireAdminSession();
+    if (error) return error;
+    distributorId = parseInt(rawDistId);
+  }
 
   try {
-    const { searchParams } = new URL(request.url);
-    const distributorId = parseInt(searchParams.get('distributorId') || '0');
     const year = parseInt(searchParams.get('year') || '0');
     const month = searchParams.get('month') ? parseInt(searchParams.get('month')!) : null;
 

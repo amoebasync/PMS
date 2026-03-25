@@ -63,13 +63,39 @@ export default function StaffPayrollPageEn() {
     else setMonth(m => m + 1);
   };
 
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownloadStatement = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(`/api/distributor-payroll/statement?distributorId=me&year=${year}&month=${month}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `payslip_${year}_${String(month).padStart(2, '0')}.pdf`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch { /* silent */ }
+    setDownloading(false);
+  };
+
   const monthLabel = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-black text-slate-800">Pay History</h1>
-        <p className="text-xs text-slate-500 mt-1">Weekly delivery pay and transportation expense history</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-slate-800">Payment History</h1>
+          <p className="text-xs text-slate-500 mt-1">Weekly pay and transportation expense history</p>
+        </div>
+        <button onClick={handleDownloadStatement} disabled={downloading || records.length === 0}
+          className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-colors">
+          {downloading ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <i className="bi bi-file-earmark-pdf"></i>}
+          Pay Slip
+        </button>
       </div>
 
       {/* Month navigation */}

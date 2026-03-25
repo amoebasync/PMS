@@ -83,8 +83,8 @@ export default function StaffHistoryPageEn() {
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-black text-slate-800">Delivery History</h1>
-        <p className="text-xs text-slate-500 mt-1">View your monthly delivery records</p>
+        <h1 className="text-2xl font-black text-slate-800">Distribution History</h1>
+        <p className="text-xs text-slate-500 mt-1">View your monthly distribution records</p>
       </div>
 
       {/* Month navigation */}

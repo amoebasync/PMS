@@ -15,6 +15,7 @@ export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon, co
     { name: 'Shifts',   href: '/staff/en/shifts',        icon: 'bi-calendar3' },
     { name: 'Expenses', href: '/staff/en/expenses',      icon: 'bi-train-front-fill' },
     { name: 'History',   href: '/staff/en/report',        icon: 'bi-clock-history' },
+    { name: 'Pay',      href: '/staff/en/payroll',       icon: 'bi-wallet2' },
     { name: 'Rating',   href: '/staff/en/evaluation',    icon: 'bi-award-fill' },
     { name: 'Profile',  href: '/staff/en/profile',       icon: 'bi-person-fill' },
   ];
@@ -99,7 +100,7 @@ export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon, co
 
       {/* Bottom navigation bar */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-up pb-[env(safe-area-inset-bottom)]">
-        <div className="max-w-lg mx-auto grid grid-cols-6">
+        <div className="max-w-lg mx-auto grid grid-cols-7">
           {navItems.map((item) => {
             const isActive = item.href === '/staff/en'
               ? pathname === '/staff/en'
