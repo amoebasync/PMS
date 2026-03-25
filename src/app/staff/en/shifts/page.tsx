@@ -139,35 +139,30 @@ export default function ShiftsPageEn() {
     setSubmitting(true);
     setMessage(null);
 
-    const errors: string[] = [];
+    const weekEndDate = addDays(weekStart, 6);
+    const res = await fetch('/api/staff/shifts/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        addDates: [...pendingAdd],
+        removeDateIds: [...pendingRemove],
+        notes,
+        weekStart: formatDate(weekStart),
+        weekEnd: formatDate(weekEndDate),
+      }),
+    });
 
-    for (const dateStr of pendingAdd) {
-      const res = await fetch('/api/staff/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, note: notes[dateStr] || null }),
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        errors.push(data.error || `Failed to register ${dateStr}`);
-      }
-    }
-
-    for (const id of pendingRemove) {
-      const res = await fetch(`/api/staff/shifts/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
-        errors.push(data.error || `Failed to cancel shift`);
-      }
-    }
+    const data = await res.json();
 
     setPendingAdd(new Set());
     setPendingRemove(new Set());
     setNotes({});
     await fetchShifts();
 
-    if (errors.length > 0) {
-      setMessage({ type: 'error', text: errors.join(' / ') });
+    if (!res.ok) {
+      setMessage({ type: 'error', text: data.error || 'An error occurred' });
+    } else if (data.errors && data.errors.length > 0) {
+      setMessage({ type: 'error', text: data.errors.join(' / ') });
     } else {
       setMessage({ type: 'success', text: 'Shifts updated successfully.' });
     }
