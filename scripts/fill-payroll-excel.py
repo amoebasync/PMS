@@ -11,7 +11,6 @@ import io
 import msoffcrypto
 import openpyxl
 from openpyxl.styles import PatternFill, Font
-from openpyxl.utils import get_column_letter
 from datetime import datetime, timedelta
 from copy import copy
 
@@ -19,8 +18,8 @@ ALERT_THRESHOLD_RATE = 0.2
 ALERT_THRESHOLD_ABS = 2000
 ALERT_FILL = PatternFill(start_color="FFFECACA", end_color="FFFECACA", fill_type="solid")
 NEW_STAFF_FILL = PatternFill(start_color="FFE0F2FE", end_color="FFE0F2FE", fill_type="solid")
-ZERO_FILL = PatternFill(start_color="FFFF99CC", end_color="FFFF99CC", fill_type="solid")      # pink - 7日間0円
-HAS_DATA_FILL = PatternFill(start_color="FF99CCFF", end_color="FF99CCFF", fill_type="solid")  # blue - 金額あり
+ZERO_FILL = PatternFill(start_color="FFFF99CC", end_color="FFFF99CC", fill_type="solid")
+HAS_DATA_FILL = PatternFill(start_color="FF99CCFF", end_color="FF99CCFF", fill_type="solid")
 HEADER_FONT = Font(bold=True, size=9)
 
 
@@ -68,46 +67,17 @@ def find_week_block(ws, week_start_date):
 
 def find_staff_columns(ws, staff_code_row=20):
     staff_map = {}
+    max_used_col = 1
     for c in range(2, ws.max_column + 1):
         val = ws.cell(staff_code_row, c).value
         if val and str(val).strip():
             staff_map[str(val).strip()] = c
-    return staff_map
+            max_used_col = c
+    return staff_map, max_used_col
 
 
-def find_insert_position(staff_cols, new_staff_id):
-    """スタッフコード順でソートされた位置に挿入する列を返す"""
-    # 既存のMBF/MSF/MYFスタッフコードのみ対象
-    existing = sorted(
-        [(sid, col) for sid, col in staff_cols.items()],
-        key=lambda x: x[1]  # 列番号順
-    )
-
-    # 新しいスタッフIDが入るべき位置を探す
-    # スタッフコードの大小比較で、直後に来るべき列を見つける
-    insert_after_col = None
-    for sid, col in existing:
-        if sid < new_staff_id:
-            insert_after_col = col
-        else:
-            break
-
-    if insert_after_col is not None:
-        return insert_after_col + 1
-    # 全員より前に来る場合は最初のスタッフ列
-    if existing:
-        return existing[0][1]
-    return 2
-
-
-def insert_column(ws, col_idx):
-    """指定位置に空列を挿入する（openpyxlのinsert_cols）"""
-    ws.insert_cols(col_idx)
-
-
-def copy_column_style(ws, source_col, target_col, max_row):
-    """ソース列のスタイルをターゲット列にコピー"""
-    for r in range(1, max_row + 1):
+def copy_column_style(ws, source_col, target_col, rows):
+    for r in rows:
         src = ws.cell(r, source_col)
         tgt = ws.cell(r, target_col)
         if src.has_style:
@@ -115,7 +85,6 @@ def copy_column_style(ws, source_col, target_col, max_row):
             tgt.border = copy(src.border)
             tgt.number_format = src.number_format
             tgt.alignment = copy(src.alignment)
-            # fill はコピーしない（後で独自に設定する）
 
 
 def main():
@@ -145,11 +114,12 @@ def main():
         print(json.dumps({"error": f"週ブロックが見つかりません: {data['weekStart']}"}))
         sys.exit(0)
 
-    subtotal_row = block_start + 7
-    expense_row = block_start + 11
-    total_row = block_start + 22
+    # 小計・交通費・合計の行位置
+    expense_row = block_start + 11       # 交通費（経費）
+    total_row = block_start + 22         # 合計
+    # ※ 小計行 (block_start + 7, +8) は SUM関数が入っているので触らない
 
-    staff_cols = find_staff_columns(ws)
+    staff_cols, max_used_col = find_staff_columns(ws)
 
     alerts = []
     new_staff = []
@@ -157,54 +127,40 @@ def main():
 
     week_dates = [(week_start + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(7)]
 
-    # --- Phase 1: 新規スタッフの列を挿入（先にやらないと列がずれる） ---
+    # --- Phase 1: 新規スタッフを最後の列に追加 ---
     new_staff_ids = [d["staffId"] for d in distributors if d["staffId"] not in staff_cols]
-    # スタッフコード順にソートして挿入
     new_staff_ids.sort()
 
+    next_col = max_used_col + 1
     for new_id in new_staff_ids:
-        # 挿入位置を決定（現在のstaff_colsに基づく）
-        insert_col = find_insert_position(staff_cols, new_id)
-
-        # 列を挿入
-        insert_column(ws, insert_col)
-
-        # 挿入によって既存の列番号がずれるので更新
-        updated_staff_cols = {}
-        for sid, col in staff_cols.items():
-            if col >= insert_col:
-                updated_staff_cols[sid] = col + 1
-            else:
-                updated_staff_cols[sid] = col
-        updated_staff_cols[new_id] = insert_col
-        staff_cols = updated_staff_cols
-
-        # 前の列のスタイルをコピー（見た目を揃える）
-        style_src = insert_col - 1 if insert_col > 1 else insert_col + 1
-        copy_column_style(ws, style_src, insert_col, ws.max_row)
+        col = next_col
+        staff_cols[new_id] = col
+        new_staff.append(new_id)
 
         # ヘッダー書き込み
         dist_data = next((d for d in distributors if d["staffId"] == new_id), None)
-        ws.cell(20, insert_col).value = new_id
-        ws.cell(20, insert_col).font = HEADER_FONT
-        ws.cell(20, insert_col).fill = NEW_STAFF_FILL
+        ws.cell(20, col).value = new_id
+        ws.cell(20, col).font = HEADER_FONT
+        ws.cell(20, col).fill = NEW_STAFF_FILL
         if dist_data:
-            ws.cell(21, insert_col).value = dist_data["name"]
-            ws.cell(21, insert_col).font = HEADER_FONT
-            ws.cell(21, insert_col).fill = NEW_STAFF_FILL
+            ws.cell(21, col).value = dist_data["name"]
+            ws.cell(21, col).font = HEADER_FONT
+            ws.cell(21, col).fill = NEW_STAFF_FILL
 
-        new_staff.append(new_id)
+        # 前の列のスタイルをコピー
+        all_rows = list(range(block_start, block_start + 23))
+        copy_column_style(ws, max_used_col, col, all_rows)
+
+        next_col += 1
 
     # --- Phase 2: データ差し込み + セル色設定 ---
     for dist in distributors:
         staff_id = dist["staffId"]
         col = staff_cols.get(staff_id)
         if col is None:
-            continue  # should not happen after Phase 1
+            continue
 
         daily_earnings = dist.get("dailyEarnings", {})
-        daily_expenses = dist.get("dailyExpenses", {})
-        schedule_pay = dist.get("schedulePay", 0)
         expense_pay = dist.get("expensePay", 0)
         gross_pay = dist.get("grossPay", 0)
 
@@ -225,13 +181,13 @@ def main():
                 except (ValueError, TypeError):
                     old_num = 0
 
-            # セル色設定（金額の有無に関わらず）
+            # セル色設定
             if is_zero_week:
                 ws.cell(r, col).fill = ZERO_FILL       # ピンク: 7日間0円
             else:
                 ws.cell(r, col).fill = HAS_DATA_FILL    # 水色: 金額あり
 
-            # 金額差異アラート
+            # 金額差異アラート（アラート色が優先）
             if old_num > 0 and new_val > 0:
                 diff = abs(new_val - old_num)
                 rate = diff / old_num if old_num != 0 else 0
@@ -244,42 +200,18 @@ def main():
                         "new": int(new_val),
                         "diff": int(new_val - old_num),
                     })
-                    ws.cell(r, col).fill = ALERT_FILL   # 赤: アラートが優先
+                    ws.cell(r, col).fill = ALERT_FILL
 
-            # 値の書き込み（0でも書き込む）
+            # 値の書き込み
             ws.cell(r, col).value = new_val
-
-        # 小計
-        if schedule_pay >= 0:
-            old_sub = ws.cell(subtotal_row, col).value
-            old_sub_num = 0
-            if old_sub is not None:
-                try:
-                    old_sub_num = float(old_sub)
-                except (ValueError, TypeError):
-                    old_sub_num = 0
-
-            if old_sub_num > 0 and schedule_pay > 0:
-                diff = abs(schedule_pay - old_sub_num)
-                rate = diff / old_sub_num if old_sub_num != 0 else 0
-                if diff >= ALERT_THRESHOLD_ABS or rate >= ALERT_THRESHOLD_RATE:
-                    alerts.append({
-                        "staffId": staff_id,
-                        "name": dist["name"],
-                        "date": "小計",
-                        "old": int(old_sub_num),
-                        "new": int(schedule_pay),
-                        "diff": int(schedule_pay - old_sub_num),
-                    })
-                    ws.cell(subtotal_row, col).fill = ALERT_FILL
-
-            ws.cell(subtotal_row, col).value = schedule_pay
 
         # 交通費
         ws.cell(expense_row, col).value = expense_pay
 
         # 合計
         ws.cell(total_row, col).value = gross_pay
+
+        # ※ 小計行は SUM関数のまま触らない
 
         updated_count += 1
 
