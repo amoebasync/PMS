@@ -11,6 +11,7 @@ type Distributor = {
 };
 
 type DailyExpense = {
+  id: number;
   date: string;
   amount: number;
   description: string;
@@ -29,6 +30,25 @@ type PayrollItem = {
   actualCount: number;
   earnedAmount: number;
 };
+
+type PayrollAdjustment = {
+  id: number;
+  type: string;
+  amount: number;
+  description: string | null;
+  createdAt: string;
+  createdBy?: { lastNameJa: string; firstNameJa: string } | null;
+};
+
+const ADJUSTMENT_TYPES = [
+  { value: 'BONUS', label: 'ボーナス', icon: 'bi-gift', color: 'text-emerald-600' },
+  { value: 'ADVANCE', label: '前借', icon: 'bi-cash-stack', color: 'text-amber-600' },
+  { value: 'PENALTY', label: '罰金', icon: 'bi-exclamation-triangle', color: 'text-red-600' },
+  { value: 'EQUIPMENT', label: '備品代', icon: 'bi-box', color: 'text-slate-600' },
+  { value: 'TRANSFER_FEE', label: '振込手数料', icon: 'bi-bank', color: 'text-slate-500' },
+  { value: 'HOUSING', label: '寮費', icon: 'bi-house', color: 'text-slate-600' },
+  { value: 'ADJUSTMENT', label: '調整金', icon: 'bi-sliders', color: 'text-indigo-600' },
+];
 
 type PayrollRecord = {
   id: number;
@@ -151,6 +171,19 @@ export default function DistributorPayrollPage() {
 
   useEffect(() => { fetchRecords(); }, [fetchRecords]);
 
+  const handleDeleteExpense = async (expenseId: number, record: PayrollRecord) => {
+    if (!confirm('この交通費を削除しますか？')) return;
+    try {
+      const res = await fetch(`/api/admin/expenses?id=${expenseId}`, { method: 'DELETE' });
+      if (res.ok) {
+        // ローカルstateから削除
+        setRecords(prev => prev.map(r =>
+          r.id === record.id ? { ...r, expenses: r.expenses.filter(e => e.id !== expenseId) } : r
+        ));
+      }
+    } catch { /* silent */ }
+  };
+
   // 配布員個別の年間データ取得
   const fetchDistributorYear = useCallback(async (distId: number, year: number) => {
     setSearchLoading(true);
@@ -257,11 +290,10 @@ export default function DistributorPayrollPage() {
         .filter((item) => item.date.startsWith(dayStr))
         .reduce((s, item) => s + item.earnedAmount, 0);
       const scheduleItems = record.items.filter((item) => item.date.startsWith(dayStr));
-      const expenseAmount = record.expenses
-        .filter((e) => e.date.startsWith(dayStr))
-        .reduce((s, e) => s + e.amount, 0);
+      const dayExpenses = record.expenses.filter((e) => e.date.startsWith(dayStr));
+      const expenseAmount = dayExpenses.reduce((s, e) => s + e.amount, 0);
       const total = scheduleEarned + expenseAmount;
-      return { day, dayStr, scheduleEarned, scheduleItems, expenseAmount, total };
+      return { day, dayStr, scheduleEarned, scheduleItems, expenseAmount, dayExpenses, total };
     });
   }
 
@@ -273,6 +305,50 @@ export default function DistributorPayrollPage() {
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [excelUploading, setExcelUploading] = useState(false);
   const [excelResult, setExcelResult] = useState<FillExcelResult | null>(null);
+
+  // 調整
+  const [adjustments, setAdjustments] = useState<Record<number, PayrollAdjustment[]>>({});
+  const [adjFormOpen, setAdjFormOpen] = useState<number | null>(null);
+  const [adjType, setAdjType] = useState('BONUS');
+  const [adjAmount, setAdjAmount] = useState('');
+  const [adjDesc, setAdjDesc] = useState('');
+  const [adjSaving, setAdjSaving] = useState(false);
+
+  const fetchAdjustments = useCallback(async (distributorId: number) => {
+    const res = await fetch(`/api/payroll-adjustments?distributorId=${distributorId}&periodStart=${isoDate(weekStart)}`);
+    if (res.ok) {
+      const data = await res.json();
+      setAdjustments(prev => ({ ...prev, [distributorId]: data }));
+    }
+  }, [weekStart]);
+
+  const handleAddAdjustment = async (distributorId: number) => {
+    if (!adjAmount) return;
+    setAdjSaving(true);
+    const res = await fetch('/api/payroll-adjustments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        distributorId,
+        periodStart: isoDate(weekStart),
+        type: adjType,
+        amount: adjAmount,
+        description: adjDesc,
+      }),
+    });
+    if (res.ok) {
+      await fetchAdjustments(distributorId);
+      setAdjFormOpen(null);
+      setAdjAmount('');
+      setAdjDesc('');
+    }
+    setAdjSaving(false);
+  };
+
+  const handleDeleteAdjustment = async (id: number, distributorId: number) => {
+    await fetch(`/api/payroll-adjustments?id=${id}`, { method: 'DELETE' });
+    await fetchAdjustments(distributorId);
+  };
 
   const handleFillExcel = async (file: File) => {
     setExcelUploading(true);
@@ -598,7 +674,22 @@ export default function DistributorPayrollPage() {
                                       {scheduleEarned > 0 ? `¥${scheduleEarned.toLocaleString()}` : '—'}
                                     </td>
                                     <td className="py-1.5 px-3 text-right font-medium text-emerald-600">
-                                      {expenseAmount > 0 ? `¥${expenseAmount.toLocaleString()}` : '—'}
+                                      {dayExpenses.length > 0 ? (
+                                        <div className="space-y-0.5">
+                                          {dayExpenses.map((exp) => (
+                                            <div key={exp.id} className="flex items-center justify-end gap-1 group">
+                                              <span>¥{exp.amount.toLocaleString()}</span>
+                                              <button
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteExpense(exp.id, record); }}
+                                                className="opacity-0 group-hover:opacity-100 w-4 h-4 rounded-full text-red-400 hover:text-red-600 hover:bg-red-50 flex items-center justify-center transition-all text-[9px]"
+                                                title="削除"
+                                              >
+                                                <i className="bi bi-x"></i>
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : '—'}
                                     </td>
                                     <td className="py-1.5 pl-3 text-right font-bold text-slate-700">
                                       {total > 0 ? `¥${total.toLocaleString()}` : '—'}

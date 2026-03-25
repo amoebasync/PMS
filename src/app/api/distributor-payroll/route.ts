@@ -50,7 +50,7 @@ export async function GET(request: Request) {
             date: { gte: record.periodStart, lte: record.periodEnd },
             status: { in: ['APPROVED', 'PENDING'] },
           },
-          select: { date: true, amount: true, description: true, status: true },
+          select: { id: true, date: true, amount: true, description: true, status: true },
           orderBy: { date: 'asc' },
         });
 
