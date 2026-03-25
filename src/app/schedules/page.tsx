@@ -132,9 +132,21 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
     checkFlyerPhoto: flyerPhotos,
     checkMapPhoto: mapPhotos,
   };
+  const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
+
+  const handleDeletePhoto = useCallback(async (photoId: number) => {
+    setDeletingPhotoId(photoId);
+    try {
+      const res = await fetch(`/api/public/schedule-photos?photoId=${photoId}`, { method: 'DELETE' });
+      if (res.ok) onUpdate({ ...schedule, photos: schedule.photos.filter((p: any) => p.id !== photoId) });
+    } catch { /* silent */ }
+    setDeletingPhotoId(null);
+  }, [schedule, onUpdate]);
 
   return (
-    <div ref={popoverRef} className="w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
+    <>
+    <div ref={popoverRef} className="w-80 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
       {simpleChecks.map(({ key, icon, label }) => (
         <div key={key}>
           <label className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
@@ -148,9 +160,14 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
           {photosByCheck[key]?.length > 0 && (
             <div className="flex gap-1.5 px-2 py-1 overflow-x-auto">
               {photosByCheck[key].map((p: any) => (
-                <a key={p.id} href={p.photoUrl} target="_blank" rel="noopener noreferrer">
-                  <img src={p.photoUrl} alt="" className="w-10 h-10 rounded object-cover border border-slate-200 shrink-0 hover:opacity-80" />
-                </a>
+                <div key={p.id} className="relative group shrink-0">
+                  <img src={p.photoUrl} alt="" className="w-10 h-10 rounded object-cover border border-slate-200 cursor-pointer hover:opacity-80"
+                    onClick={() => setEnlargedPhoto(p.photoUrl)} />
+                  <button onClick={() => handleDeletePhoto(p.id)} disabled={deletingPhotoId === p.id}
+                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px]">
+                    {deletingPhotoId === p.id ? <span className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></span> : <i className="bi bi-x"></i>}
+                  </button>
+                </div>
               ))}
             </div>
           )}
@@ -221,6 +238,15 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
         </div>
       )}
     </div>
+    {enlargedPhoto && (
+      <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4" onClick={() => setEnlargedPhoto(null)}>
+        <button onClick={() => setEnlargedPhoto(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/20 text-white rounded-full flex items-center justify-center text-xl hover:bg-white/30 z-10">
+          <i className="bi bi-x-lg"></i>
+        </button>
+        <img src={enlargedPhoto} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={e => e.stopPropagation()} />
+      </div>
+    )}
+    </>
   );
 }
 
@@ -1530,14 +1556,15 @@ export default function ScheduleListPage() {
         const rect = complianceBtnRef.current?.getBoundingClientRect();
         let style: React.CSSProperties;
         if (rect) {
-          const popW = 288; // w-72 = 18rem = 288px
-          // ボタンの右端に揃え、画面左端からはみ出さないように調整
-          let left = rect.right - popW;
+          const popW = 320; // w-80 = 20rem = 320px
+          // ボタンの中央に揃え、画面端からはみ出さないように調整
+          let left = rect.left + rect.width / 2 - popW / 2;
           if (left < 8) left = 8;
+          if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8;
           // 下に余裕がなければ上に表示
           const spaceBelow = window.innerHeight - rect.bottom;
-          const top = spaceBelow > 350 ? rect.bottom + 4 : rect.top - 4;
-          const transform = spaceBelow > 350 ? undefined : 'translateY(-100%)';
+          const top = spaceBelow > 400 ? rect.bottom + 4 : rect.top - 4;
+          const transform = spaceBelow > 400 ? undefined : 'translateY(-100%)';
           style = { position: 'fixed', top, left, zIndex: 100, transform };
         } else {
           style = { position: 'fixed', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', zIndex: 100 };

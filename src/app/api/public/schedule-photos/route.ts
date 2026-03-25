@@ -135,3 +135,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/public/schedule-photos?photoId=xxx
+ * 写真を削除
+ */
+export async function DELETE(request: NextRequest) {
+  const photoId = parseInt(request.nextUrl.searchParams.get('photoId') || '');
+  if (isNaN(photoId)) {
+    return NextResponse.json({ error: 'photoId is required' }, { status: 400 });
+  }
+
+  try {
+    await prisma.schedulePhoto.delete({ where: { id: photoId } });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/public/schedule-photos error:', err);
+    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  }
+}
