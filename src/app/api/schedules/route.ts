@@ -83,7 +83,7 @@ export async function GET(request: Request) {
       attendanceCount: s.distributorId ? (attendanceCounts[s.distributorId] || 0) : 0,
       items: s.items.map(item => ({
         ...item,
-        isSubFlyer: isSubFlyer(item.externalCustomerCode, subCodes),
+        isSubFlyer: isSubFlyer(item.externalCustomerCode, subCodes, item.flyerName),
       })),
     }));
 

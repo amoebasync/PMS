@@ -24,9 +24,31 @@ export async function getSubFlyerCustomerCodes(): Promise<string[]> {
 }
 
 /**
- * 顧客コードがサブチラシかどうかを判定
+ * 顧客コード+チラシ名条件でサブチラシかどうかを判定
+ *
+ * 例外: 01kp0001 はサブ顧客コードだが、チラシ名に「KP」または「求人」が
+ * 含まれていない場合はメイン（クライアント案件の買取等）として扱う
  */
-export function isSubFlyer(externalCustomerCode: string | null | undefined, subCodes: string[]): boolean {
+// 顧客コード → チラシ名に必須キーワード（いずれか含む場合のみサブ）
+const SUB_CODE_NAME_FILTERS: Record<string, string[]> = {
+  '01kp0001': ['KP', '求人'],
+};
+
+export function isSubFlyer(
+  externalCustomerCode: string | null | undefined,
+  subCodes: string[],
+  flyerName?: string | null,
+): boolean {
   if (!externalCustomerCode || subCodes.length === 0) return false;
-  return subCodes.includes(externalCustomerCode.trim());
+  const code = externalCustomerCode.trim();
+  if (!subCodes.includes(code)) return false;
+
+  // チラシ名条件がある顧客コードの場合、キーワードチェック
+  const nameFilters = SUB_CODE_NAME_FILTERS[code];
+  if (nameFilters && flyerName) {
+    const upper = flyerName.toUpperCase();
+    return nameFilters.some(kw => upper.includes(kw.toUpperCase()));
+  }
+  // チラシ名条件がない顧客コード、またはチラシ名が不明 → サブとして扱う
+  return true;
 }

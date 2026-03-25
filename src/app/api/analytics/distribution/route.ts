@@ -93,8 +93,9 @@ export async function GET(request: NextRequest) {
     const subCodes = await getSubFlyerCustomerCodes();
     const subIn = buildSubCodesCondition(subCodes);
     // メインフィルタ: externalCustomerCode が NULL/空 OR サブリストに含まれない
+    // サブ判定SQL: 顧客コードがサブリスト + チラシ名条件（01kp0001はKP/求人含む場合のみ）
     const IS_SUB = subCodes.length > 0
-      ? `(di.external_customer_code IS NOT NULL AND di.external_customer_code != '' AND di.external_customer_code IN (${subIn}))`
+      ? `(di.external_customer_code IS NOT NULL AND di.external_customer_code != '' AND di.external_customer_code IN (${subIn}) AND NOT (di.external_customer_code = '01kp0001' AND di.flyer_name NOT LIKE '%KP%' AND di.flyer_name NOT LIKE '%求人%'))`
       : '0';
 
     // Build WHERE clause fragments
