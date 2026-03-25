@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     paymentDate.setDate(paymentDate.getDate() + 6); // 土曜の6日後 = 翌週金曜
     paymentDate.setHours(0, 0, 0, 0);
 
-    // 配布員情報取得（レート）
+    // 配布員情報取得（レート + 交通費設定）
     const distributor = await prisma.flyerDistributor.findUnique({
       where: { id: parseInt(distributorId) },
       select: {
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
         rate4Type: true,
         rate5Type: true,
         rate6Type: true,
+        transportationFee: true,
       },
     });
 
@@ -110,15 +111,41 @@ export async function POST(request: Request) {
       });
     }
 
-    // 期間内の承認済み交通費合計
+    // 期間内の承認済み交通費を日別に集計（キャップ適用）
     const expenses = await prisma.distributorExpense.findMany({
       where: {
         distributorId: distributor.id,
         date: { gte: periodStart, lte: periodEnd },
-        status: { in: ['APPROVED', 'PENDING'] }, // 申請中も含める
+        status: { in: ['APPROVED', 'PENDING'] },
       },
     });
-    const expensePay = expenses.reduce((sum, e) => sum + e.amount, 0);
+
+    // 交通費キャップ計算
+    const feeSetting = distributor.transportationFee || '1000';
+    const isFull = feeSetting === 'FULL';
+    const personalCap = isFull ? Infinity : parseInt(feeSetting) || 1000;
+
+    // 日別のスケジュール種別数を取得（1種=500円, 2種以上=1000円）
+    const scheduleFlyerCounts: Record<string, number> = {};
+    for (const schedule of schedules) {
+      const dateKey = schedule.date!.toISOString().split('T')[0];
+      const itemCount = schedule.items.filter(i => i.actualCount !== null && i.actualCount > 0).length;
+      // 同日に複数スケジュールがある場合は最大種別数を採用
+      scheduleFlyerCounts[dateKey] = Math.max(scheduleFlyerCounts[dateKey] || 0, itemCount);
+    }
+
+    let expensePay = 0;
+    for (const expense of expenses) {
+      if (isFull) {
+        expensePay += expense.amount;
+      } else {
+        const dateKey = expense.date.toISOString().split('T')[0];
+        const flyerCount = scheduleFlyerCounts[dateKey] || 0;
+        const defaultCap = flyerCount === 1 ? 500 : 1000; // 1種=500, その他=1000
+        const dailyCap = Math.min(personalCap, defaultCap);
+        expensePay += Math.min(expense.amount, dailyCap);
+      }
+    }
 
     const schedulePay = payrollItems.reduce((sum, item) => sum + item.earnedAmount, 0);
     const grossPay = schedulePay + expensePay;

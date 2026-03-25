@@ -47,6 +47,7 @@ const PAGE_ICONS: Record<string, string> = {
   '/pricing':                       'bi-tags-fill',
   '/settings/company':              'bi-building',
   '/inspections':                   'bi-clipboard-check',
+  '/inspections/monitoring':        'bi-shield-check',
   '/quality/fraud-detection':       'bi-shield-exclamation',
 };
 
@@ -72,6 +73,7 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
   '/employees':                     'page_titles.employee_management',
   '/distributors':                  'page_titles.distributor_management',
   '/distributor-shifts':            'page_titles.shift_management',
+  '/distributor-expenses':          'page_titles.expense_management',
   '/distributors/payroll':          'page_titles.distributor_payroll',
   '/applicants':                    'page_titles.applicant_management',
   '/branches':                      'page_titles.branch_management',
@@ -85,6 +87,7 @@ const PAGE_TITLE_KEYS: Record<string, string> = {
   '/pricing':                       'page_titles.pricing',
   '/settings/company':              'page_titles.company_settings',
   '/inspections':                   'page_titles.field_inspections',
+  '/inspections/monitoring':        'page_titles.inspection_monitoring',
   '/quality/fraud-detection':       'page_titles.fraud_detection',
 };
 
