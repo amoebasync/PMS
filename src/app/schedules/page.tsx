@@ -1382,13 +1382,12 @@ export default function ScheduleListPage() {
 
                     {/* Field Inspection */}
                     <td className="px-2 py-2.5 text-center">
-                      {s.fieldInspections && s.fieldInspections.length > 0 ? (
+                      {s.fieldInspections && s.fieldInspections.filter((fi: any) => fi.status !== 'CANCELLED').length > 0 ? (
                         <div className="flex flex-col items-center gap-0.5">
-                          {s.fieldInspections.map((fi: any) => (
+                          {s.fieldInspections.filter((fi: any) => fi.status !== 'CANCELLED').map((fi: any) => (
                             <span key={fi.id} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold ${
                               fi.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700' :
                               fi.status === 'IN_PROGRESS' ? 'bg-amber-50 text-amber-700' :
-                              fi.status === 'CANCELLED' ? 'bg-slate-100 text-slate-400 line-through' :
                               'bg-slate-50 text-slate-500'
                             }`}>
                               <i className={`bi ${fi.category === 'CHECK' ? 'bi-clipboard-check' : 'bi-person-raised-hand'} text-[9px]`}></i>

@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       where.status = status as Prisma.EnumFieldInspectionStatusFilter;
+    } else {
+      // デフォルトでキャンセル済みを除外
+      where.status = { not: 'CANCELLED' };
     }
 
     if (category) {
