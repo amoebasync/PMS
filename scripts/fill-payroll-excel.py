@@ -223,13 +223,11 @@ def main():
 
         updated_count += 1
 
-    # --- Phase 3: 全スタッフ列の日付セル色を設定（PMS対象外の列も含む） ---
-    # PMS対象スタッフ（Phase 2で処理済み）はスキップ
+    # --- Phase 3: PMS対象外で0円のスタッフの日付セルをピンクに ---
     pms_staff_ids = set(d["staffId"] for d in distributors)
     for sid, col in staff_cols.items():
         if sid in pms_staff_ids:
-            continue  # Phase 2で色設定済み
-        # スタッフコードっぽくない値はスキップ
+            continue  # Phase 2で処理済み（水色）
         if not any(sid.startswith(p) for p in ("MBF", "MSF", "MYF", "NAI", "MNA", "MKI", "TOD", "B0")):
             continue
         # エクセル上の7日間の値を確認
@@ -242,14 +240,14 @@ def main():
                     week_total += float(val)
                 except (ValueError, TypeError):
                     pass
-        # 0円ならピンク、金額ありなら水色
-        fill = ZERO_FILL if week_total == 0 else HAS_DATA_FILL
-        for day_idx in range(7):
-            r = block_start + day_idx
-            try:
-                ws.cell(r, col).fill = fill
-            except (ValueError, TypeError):
-                pass  # スタイル設定できないセルはスキップ
+        # 0円の場合のみピンクに（金額ありは触らない）
+        if week_total == 0:
+            for day_idx in range(7):
+                r = block_start + day_idx
+                try:
+                    ws.cell(r, col).fill = ZERO_FILL
+                except (ValueError, TypeError):
+                    pass
 
     wb.save(output_path)
 
