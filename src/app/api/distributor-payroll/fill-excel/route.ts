@@ -118,11 +118,11 @@ export async function POST(request: Request) {
         paymentCycle: 'WEEKLY',
       },
       include: {
-        employee: { select: { id: true, staffId: true, lastNameJa: true, firstNameJa: true } },
+        employee: { select: { id: true, employeeCode: true, lastNameJa: true, firstNameJa: true } },
       },
     });
 
-    const empIds = empRecords.map(r => r.employee.id);
+    const empIds = empRecords.map(r => r.employee?.id).filter(Boolean) as number[];
     const empAttendances = empIds.length > 0 ? await prisma.attendance.findMany({
       where: {
         employeeId: { in: empIds },
@@ -149,10 +149,10 @@ export async function POST(request: Request) {
 
     const employees = empRecords
       .filter(r => r.grossPay > 0)
-      .sort((a, b) => (a.employee.staffId || '').localeCompare(b.employee.staffId || ''))
+      .sort((a, b) => (a.employee?.employeeCode || '').localeCompare(b.employee?.employeeCode || ''))
       .map(r => {
-        const fin = finMap.get(r.employee.id);
-        const atts = empAttendances.filter(a => a.employeeId === r.employee.id);
+        const fin = finMap.get(r.employee!.id);
+        const atts = empAttendances.filter(a => a.employeeId === r.employee!.id);
 
         const dailyEarnings: Record<string, number> = {};
         for (const day of weekDays) {
@@ -168,15 +168,15 @@ export async function POST(request: Request) {
         }
 
         const dailyExpenses: Record<string, number> = {};
-        const exps = empExpenses.filter(e => e.employeeId === r.employee.id);
+        const exps = empExpenses.filter(e => e.employeeId === r.employee!.id);
         for (const e of exps) {
           const dateKey = e.date.toISOString().split('T')[0];
           dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + e.amount;
         }
 
         return {
-          staffId: r.employee.staffId || `EMP${r.employee.id}`,
-          name: `${r.employee.lastNameJa || ''}${r.employee.firstNameJa || ''}`,
+          staffId: r.employee?.employeeCode || `EMP${r.employee!.id}`,
+          name: `${r.employee?.lastNameJa || ''}${r.employee?.firstNameJa || ''}`,
           dailyEarnings,
           dailyExpenses,
           schedulePay: r.grossPay - r.expenseTotal,
