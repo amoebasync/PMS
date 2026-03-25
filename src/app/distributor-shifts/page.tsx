@@ -444,6 +444,7 @@ export default function DistributorShiftsPage() {
                     const isToday = dateStr === todayStr;
                     const isSun = d.getDay() === 0;
                     const isSat = d.getDay() === 6;
+                    const count = dailyCounts[dateStr] || 0;
                     return (
                       <th
                         key={dateStr}
@@ -466,6 +467,11 @@ export default function DistributorShiftsPage() {
                         }`}>
                           {d.getMonth() + 1}月
                         </div>
+                        {weekDistributors.length > 0 && (
+                          <div className={`text-[10px] font-bold mt-0.5 ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                            {count}{t('people_suffix')}
+                          </div>
+                        )}
                       </th>
                     );
                   })}
@@ -534,30 +540,6 @@ export default function DistributorShiftsPage() {
                   ))
                 )}
               </tbody>
-              {/* フッター: 日付ごとの合計 */}
-              {weekDistributors.length > 0 && (
-                <tfoot className="sticky bottom-0 z-20">
-                  <tr className="bg-slate-50 border-t border-slate-200">
-                    <td className="px-3 py-1.5 border-r border-slate-200 sticky left-0 bg-slate-50 z-30">
-                      <span className="text-xs font-bold text-slate-500">{t('total')}</span>
-                    </td>
-                    {weekDates.map(dateStr => {
-                      const count = dailyCounts[dateStr] || 0;
-                      const isToday = dateStr === todayStr;
-                      return (
-                        <td
-                          key={dateStr}
-                          className={`text-center py-1.5 border-r border-slate-200 ${isToday ? 'bg-indigo-50/60' : 'bg-slate-50'}`}
-                        >
-                          <span className={`text-xs font-bold ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
-                            {count}{t('people_suffix')}
-                          </span>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                </tfoot>
-              )}
             </table>
           </div>
         </div>
