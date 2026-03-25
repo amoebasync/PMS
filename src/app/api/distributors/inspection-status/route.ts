@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     });
     const defaultInterval = parseInt(defaultIntervalSetting?.value || '30');
 
-    const where: any = {};
+    const where: any = { leaveDate: null };
     if (branchId) where.branchId = branchId;
 
     const distributors = await prisma.flyerDistributor.findMany({
