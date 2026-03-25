@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
       ContentType: photo.type || 'image/jpeg',
     }));
 
-    const photoUrl = `https://${BUCKET}.s3.${process.env.AWS_REGION || 'ap-northeast-1'}.amazonaws.com/${key}`;
+    const photoUrl = `/api/s3-proxy?key=${encodeURIComponent(key)}`;
 
     // DB 保存 + コンプライアンスチェック自動更新
     const saved = await prisma.schedulePhoto.create({
