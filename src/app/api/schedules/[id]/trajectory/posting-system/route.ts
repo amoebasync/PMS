@@ -136,7 +136,37 @@ export async function GET(
             chomeName: schedule.area.chome_name,
           }
         : null,
-      prohibitedProperties: [],
+      prohibitedProperties: await (async () => {
+        if (!schedule.areaId) return [];
+        const itemCustomerCodes = [...new Set(
+          schedule.items
+            .map(i => i.externalCustomerCode)
+            .filter((c): c is string => !!c && c.trim() !== '')
+        )];
+        const dbProps = await prisma.prohibitedProperty.findMany({
+          where: {
+            areaId: schedule.areaId,
+            isActive: true,
+            OR: [
+              { externalCustomerCode: null },
+              { externalCustomerCode: '' },
+              ...(itemCustomerCodes.length > 0 ? [{ externalCustomerCode: { in: itemCustomerCodes } }] : []),
+            ],
+          },
+          select: {
+            id: true, latitude: true, longitude: true,
+            address: true, buildingName: true, roomNumber: true,
+            residentName: true, reasonDetail: true, severity: true,
+            boundaryGeojson: true,
+            prohibitedReason: { select: { name: true } },
+          },
+        });
+        return dbProps.map(p => ({
+          ...p,
+          reasonName: p.prohibitedReason?.name || null,
+          prohibitedReason: undefined,
+        }));
+      })(),
       schedule: {
         id: schedule.id,
         date: schedule.date,
