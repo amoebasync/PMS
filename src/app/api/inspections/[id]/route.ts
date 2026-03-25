@@ -51,6 +51,10 @@ export async function GET(
               },
               orderBy: { slotIndex: 'asc' },
             },
+            photos: {
+              select: { id: true, photoUrl: true, type: true, createdAt: true },
+              orderBy: { createdAt: 'desc' },
+            },
           },
         },
         checkpoints: {

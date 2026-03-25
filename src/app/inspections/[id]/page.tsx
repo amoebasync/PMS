@@ -145,8 +145,10 @@ export default function InspectionDetailPage() {
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('checkpoints');
-  const [sheetExpanded, setSheetExpanded] = useState(true);
+  type SheetPosition = 'collapsed' | 'half' | 'full';
+  const [sheetPosition, setSheetPosition] = useState<SheetPosition>('half');
   const [actionLoading, setActionLoading] = useState(false);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
 
   // GPS tracking refs
   const gpsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -373,11 +375,11 @@ export default function InspectionDetailPage() {
   };
 
   /* ---- Tab definitions ---- */
-  const tabs: { key: TabKey; label: string; icon: string }[] = [
-    { key: 'checkpoints', label: t('section_checkpoints'), icon: 'bi-check-circle' },
-    { key: 'prohibited', label: t('section_prohibited'), icon: 'bi-house-x' },
-    { key: 'guidance', label: t('section_guidance'), icon: 'bi-person-workspace' },
-    { key: 'summary', label: t('section_summary'), icon: 'bi-bar-chart' },
+  const tabs: { key: TabKey; label: string; shortLabel: string; icon: string }[] = [
+    { key: 'checkpoints', label: t('section_checkpoints'), shortLabel: t('tab_checkpoints'), icon: 'bi-check-circle' },
+    { key: 'prohibited', label: t('section_prohibited'), shortLabel: t('tab_prohibited'), icon: 'bi-house-x' },
+    { key: 'guidance', label: t('section_guidance'), shortLabel: t('tab_guidance'), icon: 'bi-person-workspace' },
+    { key: 'summary', label: t('section_summary'), shortLabel: t('tab_summary'), icon: 'bi-bar-chart' },
   ];
 
   /* ---- Area display name ---- */
@@ -471,6 +473,36 @@ export default function InspectionDetailPage() {
         </div>
       )}
 
+      {/* ── Flyer/Map Photos from distributor ── */}
+      {inspection.schedule && (inspection.schedule as any).photos?.length > 0 && (
+        <div className="bg-white border-b border-slate-200 px-3 py-2 flex items-center gap-3 overflow-x-auto shrink-0">
+          <span className="text-[10px] font-bold text-slate-500 shrink-0"><i className="bi bi-camera mr-1"></i>配布員写真</span>
+          {((inspection.schedule as any).photos || []).map((p: any) => (
+            <div key={p.id} className="relative shrink-0 group">
+              <img
+                src={p.photoUrl}
+                alt=""
+                className="w-12 h-12 rounded-lg object-cover border border-slate-200 cursor-pointer hover:opacity-80"
+                onClick={() => setPhotoPreview(p.photoUrl)}
+              />
+              <span className={`absolute -top-1 -right-1 text-[7px] font-bold px-1 rounded ${p.type === 'FLYER' ? 'bg-indigo-500 text-white' : 'bg-amber-500 text-white'}`}>
+                {p.type === 'FLYER' ? 'F' : 'M'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Photo preview modal */}
+      {photoPreview && (
+        <div className="fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-4" onClick={() => setPhotoPreview(null)}>
+          <button onClick={() => setPhotoPreview(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/20 text-white rounded-full flex items-center justify-center text-xl hover:bg-white/30 z-10">
+            <i className="bi bi-x-lg"></i>
+          </button>
+          <img src={photoPreview} alt="" className="max-w-full max-h-full object-contain rounded-lg" onClick={e => e.stopPropagation()} />
+        </div>
+      )}
+
       {/* ── Main content: Map + Panel ── */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
       {/* ── Map area ── */}
@@ -503,7 +535,7 @@ export default function InspectionDetailPage() {
           </div>
         )}
 
-        {inspection.status === 'IN_PROGRESS' && !sheetExpanded && (
+        {inspection.status === 'IN_PROGRESS' && sheetPosition === 'collapsed' && (
           <div className="absolute bottom-16 left-4 right-4 z-10">
             <button
               onClick={() => setShowFinishConfirm(true)}
@@ -525,31 +557,35 @@ export default function InspectionDetailPage() {
       {(inspection.status === 'IN_PROGRESS' || inspection.status === 'COMPLETED') && (
         <div
           className={`bg-white border-t md:border-t-0 md:border-l border-slate-200 rounded-t-2xl md:rounded-none shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-none transition-all duration-300 shrink-0 flex flex-col md:w-[400px] md:h-full ${
-            sheetExpanded ? 'max-h-[40vh] md:max-h-none' : 'h-[44px] md:max-h-none'
+            sheetPosition === 'full' ? 'max-h-[85vh] md:max-h-none' :
+            sheetPosition === 'half' ? 'max-h-[40vh] md:max-h-none' :
+            'h-[88px] md:max-h-none'
           }`}
         >
           {/* Drag handle (mobile only) */}
           <div
             className="md:hidden flex flex-col items-center pt-2 pb-1 cursor-pointer"
-            onClick={() => setSheetExpanded(!sheetExpanded)}
+            onClick={() => setSheetPosition(prev => prev === 'collapsed' ? 'half' : prev === 'half' ? 'full' : 'collapsed')}
           >
             <div className="w-10 h-1 bg-slate-300 rounded-full"></div>
+            <i className={`bi ${sheetPosition === 'full' ? 'bi-chevron-down' : 'bi-chevron-up'} text-[10px] text-slate-400 mt-0.5`}></i>
           </div>
 
-          {/* Tab bar — icon only on mobile, icon + short label on desktop */}
+          {/* Tab bar — icon + short label */}
           <div className="flex border-b border-slate-100 shrink-0">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => {
                   setActiveTab(tab.key);
-                  setSheetExpanded(true);
+                  if (sheetPosition === 'collapsed') setSheetPosition('half');
                 }}
-                className={`flex-1 py-2 text-center transition-colors relative ${
+                className={`flex-1 py-1.5 flex flex-col items-center gap-0.5 transition-colors relative ${
                   activeTab === tab.key ? 'text-emerald-600' : 'text-slate-400'
                 }`}
               >
-                <i className={`bi ${tab.icon} text-lg`}></i>
+                <i className={`bi ${tab.icon} text-base`}></i>
+                <span className="text-[9px] font-bold leading-tight truncate max-w-full px-0.5">{tab.shortLabel}</span>
                 {activeTab === tab.key && (
                   <div className="absolute bottom-0 left-3 right-3 h-0.5 bg-emerald-500 rounded-full"></div>
                 )}
@@ -558,7 +594,7 @@ export default function InspectionDetailPage() {
           </div>
 
           {/* Tab content */}
-          <div className={`flex-1 overflow-y-auto overscroll-contain ${!sheetExpanded ? 'hidden md:block' : ''}`}>
+          <div className={`flex-1 overflow-y-auto overscroll-contain ${sheetPosition === 'collapsed' ? 'hidden md:block' : ''}`}>
               {activeTab === 'checkpoints' && (
                 <CheckpointPanel
                   inspectionId={inspectionId}
@@ -599,7 +635,7 @@ export default function InspectionDetailPage() {
 
           {/* Finish button in sheet */}
           {inspection.status === 'IN_PROGRESS' && (
-            <div className={`px-4 py-3 border-t border-slate-100 shrink-0 safe-area-bottom ${!sheetExpanded ? 'hidden md:block' : ''}`}>
+            <div className={`px-4 py-3 border-t border-slate-100 shrink-0 safe-area-bottom ${sheetPosition === 'collapsed' ? 'hidden md:block' : ''}`}>
               <button
                 onClick={() => setShowFinishConfirm(true)}
                 disabled={actionLoading}
