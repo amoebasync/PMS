@@ -12,6 +12,8 @@ import {
 interface Kpi {
   totalPlanned: number;
   totalActual: number;
+  subPlanned: number;
+  subActual: number;
   distributionRate: number;
   complaintCount: number;
   fraudCount: number;
@@ -328,6 +330,15 @@ export default function DistributionAnalyticsPage() {
           <KpiCard icon="bi-exclamation-triangle" label={t('kpi.complaint_count')} value={fmt(kpi.complaintCount)} color="bg-amber-50 text-amber-600" />
           <KpiCard icon="bi-shield-x" label={t('kpi.fraud_count')} value={fmt(kpi.fraudCount)} color="bg-red-50 text-red-600" />
           <KpiCard icon="bi-people" label={t('kpi.schedules_count')} value={fmt(kpi.schedulesCount)} color="bg-slate-100 text-slate-600" />
+        </div>
+      )}
+      {/* Sub flyer stats */}
+      {kpi && (kpi.subPlanned > 0 || kpi.subActual > 0) && (
+        <div className="flex items-center gap-3 text-xs text-slate-500 bg-amber-50 border border-amber-100 rounded-xl px-4 py-2">
+          <i className="bi bi-tag text-amber-500"></i>
+          <span className="font-bold text-amber-700">SUB</span>
+          <span>{t('kpi.total_planned') || '予定'}: {fmt(kpi.subPlanned)}</span>
+          <span>{t('kpi.total_actual') || '実績'}: {fmt(kpi.subActual)}</span>
         </div>
       )}
 
