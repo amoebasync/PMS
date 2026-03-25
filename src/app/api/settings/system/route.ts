@@ -23,6 +23,7 @@ const DEFAULTS: Record<string, string> = {
   ]),
   headerLinks: JSON.stringify([]),  // ヘッダーリンク集
   subFlyerCustomerCodes: JSON.stringify([]),  // サブチラシ顧客コード一覧
+  inspectionIntervalDays: '30',  // デフォルトチェック周期（日）
 };
 
 async function checkAdminAuth() {

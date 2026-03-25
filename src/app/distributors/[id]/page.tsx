@@ -233,7 +233,8 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     ratePlan: '', rateMode: 'manual',
     rate1Type: '', rate2Type: '', rate3Type: '',
     rate4Type: '', rate5Type: '', rate6Type: '',
-    transportationFee: '', trainingAllowance: '',
+    transportationFee: '', transportationFee1Type: '', trainingAllowance: '',
+    inspectionInterval: '',
     rank: '', attendanceCount: '0',
     minTypes: '', maxTypes: '', minSheets: '', maxSheets: '',
     targetAmount: '', note: '',
@@ -545,6 +546,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       leaveReason: distributor.leaveReason || '',
       transportationFee: distributor.transportationFee || '',
       trainingAllowance: distributor.trainingAllowance || '',
+      inspectionInterval: distributor.inspectionInterval != null ? String(distributor.inspectionInterval) : '',
       paymentMethod: distributor.paymentMethod || '現金',
       bankBranchCode: distributor.bankBranchCode || '',
       bankAccountType: distributor.bankAccountType || '普通',
@@ -1898,6 +1900,27 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                         ))}
                       </div>
                       <div><Label>目標金額</Label><input name="targetAmount" value={formData.targetAmount} onChange={handleInputChange} className={inputCls} /></div>
+                    </div>
+                    <div className="bg-slate-50 rounded-xl p-4 space-y-3">
+                      <p className="text-xs font-bold text-slate-500">チェック周期</p>
+                      <select
+                        name="inspectionInterval"
+                        value={formData.inspectionInterval ?? ''}
+                        onChange={handleInputChange}
+                        className={inputCls}
+                      >
+                        <option value="">デフォルト（システム設定）</option>
+                        <option value="1">毎日</option>
+                        <option value="3">3日</option>
+                        <option value="7">1週間</option>
+                        <option value="14">2週間</option>
+                        <option value="30">1ヶ月</option>
+                        <option value="60">2ヶ月</option>
+                        <option value="90">3ヶ月</option>
+                        <option value="180">半年</option>
+                        <option value="365">1年</option>
+                        <option value="-1">不要</option>
+                      </select>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
                       <p className="text-xs font-bold text-slate-500">稼働・貸与品</p>

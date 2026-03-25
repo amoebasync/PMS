@@ -689,8 +689,15 @@ model FlyerDistributor {
   rate4Type         Float?  @map("rate_4_type") // 4type
   rate5Type         Float?  @map("rate_5_type") // 5type
   rate6Type         Float?  @map("rate_6_type") // 6type
-  transportationFee String? @map("transportation_fee") @db.VarChar(50) // Transporation fee (FULL, 1000など)
-  trainingAllowance String? @map("training_allowance") @db.VarChar(50) // 研修手当
+  transportationFee      String? @map("transportation_fee") @db.VarChar(50) // 交通費上限 (FULL, 1000, 500など)
+  transportationFee1Type String? @map("transportation_fee_1_type") @db.VarChar(50) // 1種配布時の交通費上限 (デフォルト500)
+  trainingAllowance      String? @map("training_allowance") @db.VarChar(50) // 研修手当
+
+  // チェック・指導追跡
+  lastInspectedAt     DateTime? @map("last_inspected_at")
+  lastInspectionType  String?   @map("last_inspection_type") @db.VarChar(20) // CHECK or GUIDANCE
+  nextInspectionDue   DateTime? @map("next_inspection_due") @db.Date
+  inspectionInterval  Int?      @map("inspection_interval") // 個別チェック周期（日）、nullならシステム設定
 
   // 目標・実績（KPI）
   rank            String? @db.VarChar(10) // ランク (A, Cなど)

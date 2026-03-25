@@ -128,6 +128,31 @@ export async function POST(
       };
     });
 
+    // 配布員のチェック追跡フィールドを更新
+    try {
+      if (result.distributor?.id) {
+        const intervalSetting = await prisma.systemSetting.findUnique({ where: { key: 'inspectionIntervalDays' } });
+        const dist = await prisma.flyerDistributor.findUnique({
+          where: { id: result.distributor.id },
+          select: { inspectionInterval: true },
+        });
+        const intervalDays = dist?.inspectionInterval || parseInt(intervalSetting?.value || '30');
+        const nextDue = intervalDays < 0 ? null : new Date(); // -1 = 不要
+        if (nextDue && intervalDays > 0) nextDue.setDate(nextDue.getDate() + intervalDays);
+
+        await prisma.flyerDistributor.update({
+          where: { id: result.distributor.id },
+          data: {
+            lastInspectedAt: new Date(),
+            lastInspectionType: result.category,
+            nextInspectionDue: nextDue,
+          },
+        });
+      }
+    } catch (e) {
+      console.error('Inspection tracking update error:', e);
+    }
+
     // LINE Flex Message notification (fire-and-forget)
     try {
       if (isLineConfigured()) {

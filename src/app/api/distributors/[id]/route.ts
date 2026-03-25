@@ -178,6 +178,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         rate6Type: parseFloatSafe(body.rate6Type),
         transportationFee: body.transportationFee,
         trainingAllowance: body.trainingAllowance,
+        inspectionInterval: body.inspectionInterval !== undefined && body.inspectionInterval !== ''
+          ? parseInt(body.inspectionInterval)
+          : null,
         rank: body.rank,
         attendanceCount: parseIntSafe(body.attendanceCount) || 0,
         minTypes: parseIntSafe(body.minTypes),
