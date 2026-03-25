@@ -139,6 +139,18 @@ export async function PUT(
     if (body.followUpRequired !== undefined) updateData.followUpRequired = !!body.followUpRequired;
     if (body.samplePointsJson !== undefined) updateData.samplePointsJson = body.samplePointsJson || null;
 
+    // ステータス変更（完了→巡回中に戻す）
+    if (body.status !== undefined) {
+      const allowedTransitions: Record<string, string[]> = {
+        'COMPLETED': ['IN_PROGRESS'],
+        'IN_PROGRESS': ['COMPLETED'],
+      };
+      const current = beforeData.status;
+      if (allowedTransitions[current]?.includes(body.status)) {
+        updateData.status = body.status;
+      }
+    }
+
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.fieldInspection.update({
         where: { id: inspectionId },

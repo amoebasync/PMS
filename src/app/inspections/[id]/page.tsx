@@ -336,8 +336,10 @@ export default function InspectionDetailPage() {
     setActionLoading(false);
   };
 
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+
   const handleFinish = async () => {
-    if (!window.confirm(t('confirm_finish'))) return;
+    setShowFinishConfirm(false);
     setActionLoading(true);
     try {
       stopGpsTracking();
@@ -345,6 +347,25 @@ export default function InspectionDetailPage() {
       if (!res.ok) throw new Error();
       showToast(t('success_finished'), 'success');
       await fetchInspection();
+    } catch {
+      showToast(t('error_generic'), 'error');
+    }
+    setActionLoading(false);
+  };
+
+  const handleRevertToInProgress = async () => {
+    if (!window.confirm(t('confirm_revert') || '巡回中に戻しますか？')) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'IN_PROGRESS' }),
+      });
+      if (!res.ok) throw new Error();
+      showToast(t('success_reverted') || '巡回中に戻しました', 'success');
+      await fetchInspection();
+      startGpsTracking();
     } catch {
       showToast(t('error_generic'), 'error');
     }
@@ -485,7 +506,7 @@ export default function InspectionDetailPage() {
         {inspection.status === 'IN_PROGRESS' && !sheetExpanded && (
           <div className="absolute bottom-16 left-4 right-4 z-10">
             <button
-              onClick={handleFinish}
+              onClick={() => setShowFinishConfirm(true)}
               disabled={actionLoading}
               className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-base font-bold rounded-2xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             >
@@ -580,7 +601,7 @@ export default function InspectionDetailPage() {
           {inspection.status === 'IN_PROGRESS' && (
             <div className={`px-4 py-3 border-t border-slate-100 shrink-0 safe-area-bottom ${!sheetExpanded ? 'hidden md:block' : ''}`}>
               <button
-                onClick={handleFinish}
+                onClick={() => setShowFinishConfirm(true)}
                 disabled={actionLoading}
                 className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
@@ -596,6 +617,55 @@ export default function InspectionDetailPage() {
         </div>
       )}
       </div>{/* end flex-1 flex-col md:flex-row */}
+
+      {/* Revert button for COMPLETED inspections */}
+      {inspection.status === 'COMPLETED' && (
+        <div className="absolute top-1.5 right-2 md:top-3 md:right-4 z-10">
+          <button
+            onClick={handleRevertToInProgress}
+            disabled={actionLoading}
+            className="px-2 py-1 md:px-3 md:py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] md:text-xs font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1"
+          >
+            <i className="bi bi-arrow-counterclockwise"></i>
+            {t('btn_revert') || '巡回中に戻す'}
+          </button>
+        </div>
+      )}
+
+      {/* Finish confirmation modal */}
+      {showFinishConfirm && (
+        <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+            <div className="text-center">
+              <div className="w-14 h-14 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-3">
+                <i className="bi bi-stop-fill text-2xl text-blue-600"></i>
+              </div>
+              <h3 className="text-lg font-bold text-slate-800">{t('confirm_finish_title') || '巡回を完了しますか？'}</h3>
+              <p className="text-sm text-slate-500 mt-1">{t('confirm_finish_desc') || 'GPS記録が停止し、チェック結果が確定されます。'}</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowFinishConfirm(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors"
+              >
+                {t('btn_cancel') || 'キャンセル'}
+              </button>
+              <button
+                onClick={handleFinish}
+                disabled={actionLoading}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+              >
+                {actionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <i className="bi bi-check2"></i>
+                )}
+                {t('btn_finish') || '完了'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
