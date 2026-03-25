@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useNotification } from '@/components/ui/NotificationProvider';
 
@@ -76,6 +76,24 @@ const statusConfig: Record<string, { label: string; color: string; icon: string 
   CONFIRMED: { label: '確定済', color: 'bg-amber-100 text-amber-700',      icon: 'bi-check-circle' },
   PAID:      { label: '支払済', color: 'bg-emerald-100 text-emerald-700',  icon: 'bi-check-circle-fill' },
 };
+
+interface FillExcelAlert {
+  staffId: string;
+  name: string;
+  date: string;
+  old: number;
+  new: number;
+  diff: number;
+}
+
+interface FillExcelResult {
+  success: boolean;
+  sheet: string;
+  weekBlock: string;
+  updated: number;
+  newStaff: string[];
+  alerts: FillExcelAlert[];
+}
 
 export default function DistributorPayrollPage() {
   const { showConfirm } = useNotification();
@@ -249,6 +267,56 @@ export default function DistributorPayrollPage() {
 
   const [copied, setCopied] = useState(false);
 
+  // Excel差し込み
+  const excelFileRef = useRef<HTMLInputElement>(null);
+  const [excelPassword, setExcelPassword] = useState('4566');
+  const [showExcelModal, setShowExcelModal] = useState(false);
+  const [excelUploading, setExcelUploading] = useState(false);
+  const [excelResult, setExcelResult] = useState<FillExcelResult | null>(null);
+
+  const handleFillExcel = async (file: File) => {
+    setExcelUploading(true);
+    setExcelResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('password', excelPassword);
+      formData.append('weekStart', isoDate(weekStart));
+
+      const res = await fetch('/api/distributor-payroll/fill-excel', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'エラー' }));
+        alert(err.error || 'エラーが発生しました');
+        setExcelUploading(false);
+        return;
+      }
+
+      // Parse result from header
+      const resultHeader = res.headers.get('X-Payroll-Result');
+      let result: FillExcelResult | null = null;
+      if (resultHeader) {
+        try { result = JSON.parse(decodeURIComponent(resultHeader)); } catch { /* ignore */ }
+      }
+      setExcelResult(result);
+
+      // Download the file
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `給与入力済_${isoDate(weekStart)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      alert(e.message || 'エラーが発生しました');
+    }
+    setExcelUploading(false);
+  };
+
   /* ---- Excel貼り付け用TSVコピー ---- */
   const handleCopyForExcel = () => {
     // データありの配布員をスタッフコード順に
@@ -357,6 +425,14 @@ export default function DistributorPayrollPage() {
             >
               <i className="bi bi-file-earmark-arrow-down text-emerald-600"></i>Excel出力
             </a>
+          )}
+          {viewMode === 'week' && (
+            <button
+              onClick={() => setShowExcelModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors"
+            >
+              <i className="bi bi-file-earmark-excel text-emerald-600"></i>Excel差し込み
+            </button>
           )}
           {viewMode === 'week' && (
             <button onClick={handleGenerateAll} disabled={generatingAll || loading}
@@ -752,6 +828,122 @@ export default function DistributorPayrollPage() {
             </div>
           )}
         </>
+      )}
+      {/* ====== Excel差し込みモーダル ====== */}
+      {showExcelModal && (
+        <div className="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4" onClick={() => !excelUploading && setShowExcelModal(false)}>
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <i className="bi bi-file-earmark-excel text-emerald-600"></i>
+                Excel差し込み
+              </h3>
+              <button onClick={() => !excelUploading && setShowExcelModal(false)} className="text-slate-400 hover:text-slate-600">
+                <i className="bi bi-x-lg"></i>
+              </button>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <p className="text-xs text-slate-500">
+                給与管理Excelをアップロードすると、PMSの計算結果を該当週に差し込んで返します。
+                金額が大きく変わった箇所は赤くハイライトされます。
+              </p>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">対象週</label>
+                <div className="text-sm font-bold text-slate-800">
+                  {`${formatDateJa(isoDate(weekStart))}（${DAY_LABELS[weekStart.getDay()]}）〜 ${formatDateJa(isoDate(new Date(weekStart.getTime() + 6 * 86400000)))}（${DAY_LABELS[new Date(weekStart.getTime() + 6 * 86400000).getDay()]}）`}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Excelパスワード</label>
+                <input
+                  type="password"
+                  value={excelPassword}
+                  onChange={e => setExcelPassword(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="パスワード"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-slate-600 block mb-1">Excelファイル</label>
+                <input
+                  ref={excelFileRef}
+                  type="file"
+                  accept=".xlsx,.xls"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm file:mr-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:text-xs file:font-bold file:bg-indigo-50 file:text-indigo-600 hover:file:bg-indigo-100"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  const file = excelFileRef.current?.files?.[0];
+                  if (!file) { alert('ファイルを選択してください'); return; }
+                  if (!excelPassword) { alert('パスワードを入力してください'); return; }
+                  handleFillExcel(file);
+                }}
+                disabled={excelUploading}
+                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {excelUploading ? (
+                  <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>処理中...</>
+                ) : (
+                  <><i className="bi bi-play-fill"></i>差し込み実行</>
+                )}
+              </button>
+
+              {/* Result */}
+              {excelResult && (
+                <div className="space-y-3">
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3">
+                    <p className="text-sm font-bold text-emerald-700">
+                      <i className="bi bi-check-circle-fill mr-1.5"></i>
+                      {excelResult.updated}名のデータを差し込みました
+                    </p>
+                    <p className="text-xs text-emerald-600 mt-1">シート: {excelResult.sheet} / {excelResult.weekBlock}</p>
+                  </div>
+
+                  {excelResult.newStaff.length > 0 && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
+                      <p className="text-xs font-bold text-blue-700 mb-1">
+                        <i className="bi bi-person-plus-fill mr-1"></i>
+                        新規追加（{excelResult.newStaff.length}名）
+                      </p>
+                      <p className="text-xs text-blue-600">{excelResult.newStaff.join(', ')}</p>
+                    </div>
+                  )}
+
+                  {excelResult.alerts.length > 0 && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+                      <p className="text-xs font-bold text-red-700 mb-2">
+                        <i className="bi bi-exclamation-triangle-fill mr-1"></i>
+                        金額差異アラート（{excelResult.alerts.length}件）
+                      </p>
+                      <div className="max-h-40 overflow-y-auto space-y-1">
+                        {excelResult.alerts.map((a, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-red-600 bg-white rounded px-2 py-1">
+                            <span className="font-bold shrink-0">{a.staffId}</span>
+                            <span className="truncate">{a.name}</span>
+                            <span className="text-red-400 shrink-0">{a.date}</span>
+                            <span className="ml-auto font-mono shrink-0">
+                              ¥{a.old.toLocaleString()} → ¥{a.new.toLocaleString()}
+                              <span className={a.diff > 0 ? 'text-emerald-600' : 'text-red-600'}>
+                                ({a.diff > 0 ? '+' : ''}{a.diff.toLocaleString()})
+                              </span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {excelResult.alerts.length === 0 && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg px-4 py-2 text-xs text-slate-500">
+                      <i className="bi bi-check2 mr-1"></i>金額差異なし
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
