@@ -125,6 +125,7 @@ export default function ExpensesPageEn() {
             <p className="text-sm font-bold text-sky-800">Expense Rules</p>
             <ul className="text-xs text-sky-700 space-y-1 leading-relaxed">
               <li>- Daily limit: <span className="font-bold">¥1,000</span></li>
+              <li>- 1-type distribution (training): <span className="font-bold">¥500 max</span></li>
               <li>- Deadline: <span className="font-bold">Next Monday 15:00</span></li>
               <li>- If you miss the deadline, the company will calculate the amount based on your registered address</li>
             </ul>

@@ -125,6 +125,7 @@ export default function ExpensesPage() {
             <p className="text-sm font-bold text-sky-800">交通費のルール</p>
             <ul className="text-xs text-sky-700 space-y-1 leading-relaxed">
               <li>・1日の上限: <span className="font-bold">¥1,000</span></li>
+              <li>・1種類配布（トレーニング中）: <span className="font-bold">最大¥500</span></li>
               <li>・提出期限: <span className="font-bold">翌週月曜日 15:00</span>まで</li>
               <li>・期限を過ぎた場合は、ご登録の住所を元に会社が計算して支払います</li>
             </ul>
