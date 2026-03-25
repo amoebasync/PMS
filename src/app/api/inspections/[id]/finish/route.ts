@@ -213,13 +213,32 @@ export async function POST(
               } catch {}
             }
 
+            // ポリゴンに合わせたズームレベルを計算
+            let zoom = 15.5;
+            if (area?.boundary_geojson) {
+              try {
+                const geojson = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
+                const allCoords: number[][] = geojson.type === 'Polygon' ? geojson.coordinates[0]
+                  : geojson.type === 'MultiPolygon' ? geojson.coordinates[0][0] : [];
+                if (allCoords.length > 0) {
+                  const lngs = allCoords.map((c: number[]) => c[0]);
+                  const lats = allCoords.map((c: number[]) => c[1]);
+                  const dLng = Math.max(...lngs) - Math.min(...lngs);
+                  const dLat = Math.max(...lats) - Math.min(...lats);
+                  const maxSpan = Math.max(dLng, dLat);
+                  // 経験的なズーム計算: span→zoom の近似
+                  if (maxSpan > 0) zoom = Math.min(17, Math.max(13, Math.log2(0.015 / maxSpan) + 15.5));
+                }
+              } catch {}
+            }
+
             const overlayParts = [polygonOverlay, ...(pins.length > 0 ? [pins.join(',')] : [])].filter(Boolean);
             const overlay = overlayParts.length > 0 ? overlayParts.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
-            const candidateUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
+            const candidateUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},${zoom.toFixed(1)},0/600x400@2x?access_token=${mapboxToken}`;
             // URL が長すぎる場合はポリゴンなしで再構築
             if (candidateUrl.length > 8000) {
               const fallbackOverlay = pins.length > 0 ? pins.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
-              mapImageUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${fallbackOverlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
+              mapImageUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${fallbackOverlay}/${centerLng},${centerLat},${zoom.toFixed(1)},0/600x400@2x?access_token=${mapboxToken}`;
             } else {
               mapImageUrl = candidateUrl;
             }
