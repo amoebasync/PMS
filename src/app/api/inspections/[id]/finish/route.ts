@@ -194,8 +194,35 @@ export async function POST(
                 }
               });
 
-            const overlay = pins.length > 0 ? pins.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
-            mapImageUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
+            // ポリゴンをGeoJSON overlayとして追加
+            let polygonOverlay = '';
+            if (area?.boundary_geojson) {
+              try {
+                const geojson = typeof area.boundary_geojson === 'string' ? JSON.parse(area.boundary_geojson) : area.boundary_geojson;
+                let coords: number[][] = geojson.type === 'Polygon' ? geojson.coordinates[0]
+                  : geojson.type === 'MultiPolygon' ? geojson.coordinates[0][0] : [];
+                // 座標数が多い場合は間引き（URL長制限対策）
+                if (coords.length > 30) {
+                  const step = Math.ceil(coords.length / 30);
+                  coords = coords.filter((_: any, i: number) => i % step === 0 || i === coords.length - 1);
+                }
+                if (coords.length >= 3) {
+                  const polyGeoJson = { type: 'Feature', properties: { 'stroke': '#6366f1', 'stroke-width': 2, 'stroke-opacity': 0.7, 'fill': '#6366f1', 'fill-opacity': 0.1 }, geometry: { type: 'Polygon', coordinates: [coords] } };
+                  polygonOverlay = `geojson(${encodeURIComponent(JSON.stringify(polyGeoJson))})`;
+                }
+              } catch {}
+            }
+
+            const overlayParts = [polygonOverlay, ...(pins.length > 0 ? [pins.join(',')] : [])].filter(Boolean);
+            const overlay = overlayParts.length > 0 ? overlayParts.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
+            const candidateUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
+            // URL が長すぎる場合はポリゴンなしで再構築
+            if (candidateUrl.length > 8000) {
+              const fallbackOverlay = pins.length > 0 ? pins.join(',') : `pin-s+999999(${centerLng},${centerLat})`;
+              mapImageUrl = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${fallbackOverlay}/${centerLng},${centerLat},14.5,0/600x400@2x?access_token=${mapboxToken}`;
+            } else {
+              mapImageUrl = candidateUrl;
+            }
           }
 
           // Translate note if mostly English
@@ -255,10 +282,10 @@ export async function POST(
 
           // カテゴリ別の評価セクション
           const SPEED_LABELS: Record<string, string> = { VERY_SLOW: 'とても遅い', SLOW: '遅い', NORMAL: '普通', FAST: '速い', VERY_FAST: 'とても速い' };
-          const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', SOME: '一部あり', NORMAL: '普通', GOOD: '良い', NO_MISTAKES: 'ミスなし' };
+          const LEVEL_LABELS: Record<string, string> = { BAD: '悪い', MANY: '多い', SOME: '一部あり', NORMAL: '普通', GOOD: '良い', NONE: 'なし', NO_MISTAKES: 'ミスなし' };
           const SPEED_MAP: Record<string, number> = { VERY_SLOW: 1, SLOW: 2, NORMAL: 3, FAST: 4, VERY_FAST: 5 };
-          const LEVEL_MAP: Record<string, number> = { BAD: 1, SOME: 2, NORMAL: 2, GOOD: 3, NO_MISTAKES: 3 };
-          const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' || v === 'NO_MISTAKES' ? '#22c55e' : v === 'NORMAL' || v === 'SOME' ? '#f59e0b' : '#ef4444';
+          const LEVEL_MAP: Record<string, number> = { BAD: 1, MANY: 1, SOME: 2, NORMAL: 2, GOOD: 3, NONE: 3, NO_MISTAKES: 3 };
+          const levelColor = (v: string | null) => v === 'GOOD' || v === 'FAST' || v === 'VERY_FAST' || v === 'NO_MISTAKES' || v === 'NONE' ? '#22c55e' : v === 'NORMAL' || v === 'SOME' ? '#f59e0b' : '#ef4444';
 
           const rateBar = (filled: number, total: number, color: string) => {
             const contents: any[] = [];
