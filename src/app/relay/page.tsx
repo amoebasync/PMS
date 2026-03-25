@@ -372,6 +372,29 @@ export default function RelayListPage() {
     } catch { showToast(t('save_error'), 'error'); }
   };
 
+  const handleAddCollection = async (task: any) => {
+    try {
+      const res = await fetch('/api/relay-tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scheduleId: task.scheduleId,
+          type: 'COLLECTION',
+          locationName: task.locationName || null,
+          latitude: task.latitude || null,
+          longitude: task.longitude || null,
+          force: true,
+        }),
+      });
+      if (res.ok) {
+        showToast(t('add_collection_success') || '回収を追加しました', 'success');
+        fetchTasks();
+      } else {
+        showToast(t('save_error'), 'error');
+      }
+    } catch { showToast(t('save_error'), 'error'); }
+  };
+
   const handleApplyRouteOrder = async (orderedIds: number[]) => {
     try {
       await fetch('/api/relay-tasks/reorder', {
@@ -614,6 +637,12 @@ export default function RelayListPage() {
                   </td>
                   <td className="px-3 py-3 text-center">
                     <div className="flex items-center justify-center gap-1">
+                      {(task.type === 'RELAY' || task.type === 'FULL_RELAY') && (
+                        <button onClick={() => handleAddCollection(task)} title="回収追加"
+                          className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-purple-600 hover:bg-purple-50 transition-colors">
+                          <i className="bi bi-box-arrow-in-left text-xs"></i>
+                        </button>
+                      )}
                       <button onClick={() => handleCarryOver(task)} title={t('btn_carryover')}
                         className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-500 hover:text-amber-600 hover:bg-amber-50 transition-colors">
                         <i className="bi bi-arrow-right-circle text-xs"></i>
@@ -662,6 +691,12 @@ export default function RelayListPage() {
                     <option value="COMPLETED">{t('status_completed')}</option>
                     <option value="CANCELLED">{t('status_cancelled')}</option>
                   </select>
+                  {(task.type === 'RELAY' || task.type === 'FULL_RELAY') && (
+                    <button onClick={e => { e.stopPropagation(); handleAddCollection(task); }}
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-purple-600 hover:bg-purple-50">
+                      <i className="bi bi-box-arrow-in-left text-xs"></i>
+                    </button>
+                  )}
                   <button onClick={e => { e.stopPropagation(); handleCarryOver(task); }}
                     className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-400 hover:text-amber-600 hover:bg-amber-50">
                     <i className="bi bi-arrow-right-circle text-xs"></i>
