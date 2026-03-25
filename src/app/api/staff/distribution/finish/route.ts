@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         schedule: {
           include: {
             items: true,
-            area: true,
+            area: { include: { prefecture: { select: { name: true } }, city: { select: { name: true } } } },
           },
         },
       },
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
     // 通知作成（トランザクション外）
     const areaName = session.schedule?.area
-      ? `${session.schedule.area.town_name || ''}${session.schedule.area.chome_name || ''}`
+      ? `${session.schedule.area.prefecture?.name || ''}${session.schedule.area.city?.name || ''}${session.schedule.area.chome_name || session.schedule.area.town_name || ''}`
       : '';
 
     // 実績枚数サマリ

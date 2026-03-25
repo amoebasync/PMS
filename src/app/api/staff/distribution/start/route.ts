@@ -22,7 +22,11 @@ export async function POST(request: Request) {
     if (scheduleId) {
       const schedule = await prisma.distributionSchedule.findUnique({
         where: { id: scheduleId },
-        include: { items: true, area: true, distributor: true },
+        include: {
+          items: true,
+          area: { include: { prefecture: { select: { name: true } }, city: { select: { name: true } } } },
+          distributor: true,
+        },
       });
 
       if (!schedule) {
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
 
       // 通知作成
       const areaName = schedule.area
-        ? `${schedule.area.town_name || ''}${schedule.area.chome_name || ''}`
+        ? `${schedule.area.prefecture?.name || ''}${schedule.area.city?.name || ''}${schedule.area.chome_name || schedule.area.town_name || ''}`
         : '';
       const flyerCount = schedule.items.length;
 
