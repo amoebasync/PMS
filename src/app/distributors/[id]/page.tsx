@@ -1186,7 +1186,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               </h2>
               <InfoRow label="ランク" value={d.rank} />
               <InfoRow label="レートプラン" value={d.ratePlan} />
-              <InfoRow label="出勤回数" value={d.attendanceCount} />
+              <InfoRow label="出勤回数" value={d.totalWorkDays ?? d.attendanceCount} />
               <InfoRow label="単価モード" value={d.rateMode === 'auto' ? '自動（ランク連動）' : '手動'} />
               <InfoRow label="1 Type Rate" value={d.rate1Type != null ? Number(d.rate1Type).toFixed(2) : null} />
               <InfoRow label="2 Type Rate" value={d.rate2Type != null ? Number(d.rate2Type).toFixed(2) : null} />
