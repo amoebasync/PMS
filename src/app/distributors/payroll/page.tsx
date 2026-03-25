@@ -350,6 +350,15 @@ export default function DistributorPayrollPage() {
             </button>
           )}
           {viewMode === 'week' && (
+            <a
+              href={`/api/distributor-payroll/export?weekStart=${isoDate(weekStart)}`}
+              download
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors"
+            >
+              <i className="bi bi-file-earmark-arrow-down text-emerald-600"></i>Excel出力
+            </a>
+          )}
+          {viewMode === 'week' && (
             <button onClick={handleGenerateAll} disabled={generatingAll || loading}
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-60">
               {generatingAll ? <><i className="bi bi-arrow-repeat animate-spin"></i>計算中...</> : <><i className="bi bi-calculator-fill"></i>全員一斉計算</>}
