@@ -146,7 +146,9 @@ export async function GET(request: Request) {
           const dateStr = item.date.toISOString().slice(0, 10);
           const entry = dayMap.get(dateStr) || { schedulePay: 0, expensePay: 0, descriptions: [] };
           entry.schedulePay += item.earnedAmount;
-          entry.descriptions.push(`${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount}投`);
+          entry.descriptions.push(
+            item.flyerTypeCount === 0 ? '研修手当' : `${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount}投`
+          );
           dayMap.set(dateStr, entry);
         }
       }

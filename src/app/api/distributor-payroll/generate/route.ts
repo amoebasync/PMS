@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     paymentDate.setDate(paymentDate.getDate() + 6); // 土曜の6日後 = 翌週金曜
     paymentDate.setHours(0, 0, 0, 0);
 
-    // 配布員情報取得（レート + 交通費設定）
+    // 配布員情報取得（レート + 交通費設定 + 研修日）
     const distributor = await prisma.flyerDistributor.findUnique({
       where: { id: parseInt(distributorId) },
       select: {
@@ -40,6 +40,8 @@ export async function POST(request: Request) {
         rate6Type: true,
         transportationFee: true,
         transportationFee1Type: true,
+        trainingAllowance: true,
+        joinDate: true,
       },
     });
 
@@ -110,6 +112,32 @@ export async function POST(request: Request) {
         actualCount,
         earnedAmount,
       });
+    }
+
+    // 研修手当（初日研修がこの期間に含まれる場合）
+    let trainingPay = 0;
+    const trainingAmount = parseInt(distributor.trainingAllowance || '1000') || 1000;
+    if (distributor.joinDate) {
+      const joinDateStr = new Date(distributor.joinDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      const periodStartStr = periodStart.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      const periodEndStr = periodEnd.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      if (joinDateStr >= periodStartStr && joinDateStr <= periodEndStr) {
+        trainingPay = trainingAmount;
+        // 研修日もpayrollItemsに追加（表示用）
+        payrollItems.push({
+          date: new Date(distributor.joinDate),
+          scheduleId: 0,
+          flyerTypeCount: 0,
+          baseRate: 0,
+          areaUnitPrice: 0,
+          sizeUnitPrice: 0,
+          unitPrice: 0,
+          actualCount: 0,
+          earnedAmount: trainingPay,
+        });
+        // 日付順に再ソート
+        payrollItems.sort((a, b) => a.date.getTime() - b.date.getTime());
+      }
     }
 
     // 期間内の承認済み交通費を日別に集計（キャップ適用）
