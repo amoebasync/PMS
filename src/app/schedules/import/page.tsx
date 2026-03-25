@@ -252,8 +252,32 @@ export default function DataImportPage() {
 
     if (rawSchedules.length === 0) { setMessage(`エラー: ${ts('error_no_data')}`); return; }
 
+    // PMS対象プレフィックスでフィルタリング
+    let filteredSchedules = rawSchedules;
+    let skippedByPrefix = 0;
+    try {
+      const prefixRes = await fetch('/api/distributors/prefixes');
+      if (prefixRes.ok) {
+        const pmsPrefixes: string[] = await prefixRes.json();
+        if (pmsPrefixes.length > 0) {
+          const beforeCount = filteredSchedules.length;
+          filteredSchedules = filteredSchedules.filter(s => {
+            if (!s?.distributorStaffId) return false;
+            const staffPrefix = s.distributorStaffId.replace(/[0-9]+$/, '');
+            return pmsPrefixes.includes(staffPrefix);
+          });
+          skippedByPrefix = beforeCount - filteredSchedules.length;
+        }
+      }
+    } catch { /* prefixフェッチ失敗時はフィルタリングしない */ }
+
+    if (filteredSchedules.length === 0) {
+      setMessage(`エラー: ${ts('error_no_data')}${skippedByPrefix > 0 ? ` (${skippedByPrefix}件はPMS対象外のスタッフのためスキップ)` : ''}`);
+      return;
+    }
+
     // Area lookup (batch by 500 to avoid CloudFront/WAF body size limit)
-    const uniqueAreaCodes = Array.from(new Set(rawSchedules.map(s => s?.areaCode).filter(Boolean)));
+    const uniqueAreaCodes = Array.from(new Set(filteredSchedules.map(s => s?.areaCode).filter(Boolean)));
     let areaMap: Record<string, any> = {};
     const BATCH_SIZE = 500;
     try {
@@ -268,7 +292,7 @@ export default function DataImportPage() {
     } catch { setMessage(`エラー: ${ts('error_master_api')}`); return; }
 
     const missingAreas: string[] = [];
-    const schedules = rawSchedules.map(s => {
+    const schedules = filteredSchedules.map(s => {
       if (!s) return null;
       const dbArea = s.areaCode ? areaMap[s.areaCode] : null;
       if (!dbArea) { missingAreas.push(`${s.excelRowNumber}${ts('row_suffix')} (${ts('area_code_label')}: ${s.areaCode})`); return null; }
@@ -277,7 +301,7 @@ export default function DataImportPage() {
 
     if (missingAreas.length > 0) { setMessage(`エラー: ${ts('error_missing_areas')}\n\n${missingAreas.join('\n')}`); setParsedData([]); return; }
     setParsedData(schedules.filter(Boolean));
-    setMessage('');
+    setMessage(skippedByPrefix > 0 ? `${skippedByPrefix}件のPMS対象外スタッフをスキップしました` : '');
   };
 
   /* ────── 支店 パース ────── */
