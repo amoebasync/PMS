@@ -177,6 +177,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         rate5Type: parseFloatSafe(body.rate5Type),
         rate6Type: parseFloatSafe(body.rate6Type),
         transportationFee: body.transportationFee,
+        transportationFee1Type: body.transportationFee1Type,
         trainingAllowance: body.trainingAllowance,
         inspectionInterval: body.inspectionInterval !== undefined && body.inspectionInterval !== ''
           ? parseInt(body.inspectionInterval)

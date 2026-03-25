@@ -545,6 +545,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       note: distributor.note || '',
       leaveReason: distributor.leaveReason || '',
       transportationFee: distributor.transportationFee || '',
+      transportationFee1Type: distributor.transportationFee1Type || '',
       trainingAllowance: distributor.trainingAllowance || '',
       inspectionInterval: distributor.inspectionInterval != null ? String(distributor.inspectionInterval) : '',
       paymentMethod: distributor.paymentMethod || '現金',
@@ -1194,6 +1195,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <InfoRow label="5 Type Rate" value={d.rate5Type != null ? Number(d.rate5Type).toFixed(2) : null} />
               <InfoRow label="6 Type Rate" value={d.rate6Type != null ? Number(d.rate6Type).toFixed(2) : null} />
               <InfoRow label="交通費" value={d.transportationFee} />
+              <InfoRow label="交通費(1種)" value={d.transportationFee1Type} />
               <InfoRow label="研修手当" value={d.trainingAllowance} />
             </div>
 
@@ -1882,8 +1884,9 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-4">
                       <div><Label>交通費</Label><input name="transportationFee" value={formData.transportationFee} onChange={handleInputChange} className={inputCls} placeholder="例: FULL, 1000" /></div>
+                      <div><Label>交通費(1種)</Label><input name="transportationFee1Type" value={formData.transportationFee1Type} onChange={handleInputChange} className={inputCls} placeholder="例: 500" /></div>
                       <div><Label>研修手当</Label><input name="trainingAllowance" value={formData.trainingAllowance} onChange={handleInputChange} className={inputCls} /></div>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">

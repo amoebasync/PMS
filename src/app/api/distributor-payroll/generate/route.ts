@@ -39,6 +39,7 @@ export async function POST(request: Request) {
         rate5Type: true,
         rate6Type: true,
         transportationFee: true,
+        transportationFee1Type: true,
       },
     });
 
@@ -122,10 +123,12 @@ export async function POST(request: Request) {
 
     // 交通費キャップ計算
     const feeSetting = distributor.transportationFee || '1000';
+    const fee1TypeSetting = distributor.transportationFee1Type || '500';
     const isFull = feeSetting === 'FULL';
     const personalCap = isFull ? Infinity : parseInt(feeSetting) || 1000;
+    const personal1TypeCap = fee1TypeSetting === 'FULL' ? Infinity : parseInt(fee1TypeSetting) || 500;
 
-    // 日別のスケジュール種別数を取得（1種=500円, 2種以上=1000円）
+    // 日別のスケジュール種別数を取得（1種 vs 複数種）
     const scheduleFlyerCounts: Record<string, number> = {};
     for (const schedule of schedules) {
       const dateKey = schedule.date!.toISOString().split('T')[0];
@@ -141,8 +144,10 @@ export async function POST(request: Request) {
       } else {
         const dateKey = expense.date.toISOString().split('T')[0];
         const flyerCount = scheduleFlyerCounts[dateKey] || 0;
-        const defaultCap = flyerCount === 1 ? 500 : 1000; // 1種=500, その他=1000
-        const dailyCap = Math.min(personalCap, defaultCap);
+        // 1種配布: 個人設定 or デフォルト500、複数種: 個人設定 or デフォルト1000
+        const dailyCap = flyerCount === 1
+          ? Math.min(personalCap, personal1TypeCap)
+          : personalCap;
         expensePay += Math.min(expense.amount, dailyCap);
       }
     }
