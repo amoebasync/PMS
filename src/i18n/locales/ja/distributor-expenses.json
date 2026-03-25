@@ -1,6 +1,8 @@
 {
-  "filter_start_date": "開始日",
-  "filter_end_date": "終了日",
+  "filter_week": "対象週",
+  "week_prev": "前の週",
+  "week_next": "次の週",
+  "week_today": "今週",
   "filter_branch": "支店",
   "filter_all_branches": "全支店",
   "filter_search": "検索",

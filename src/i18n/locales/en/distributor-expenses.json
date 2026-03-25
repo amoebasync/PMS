@@ -1,6 +1,8 @@
 {
-  "filter_start_date": "Start Date",
-  "filter_end_date": "End Date",
+  "filter_week": "Week",
+  "week_prev": "Previous week",
+  "week_next": "Next week",
+  "week_today": "This week",
   "filter_branch": "Branch",
   "filter_all_branches": "All Branches",
   "filter_search": "Search",

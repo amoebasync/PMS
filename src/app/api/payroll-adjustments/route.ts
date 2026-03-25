@@ -54,7 +54,7 @@ export async function POST(request: Request) {
         type,
         amount: parseInt(amount),
         description: description || null,
-        createdById: actorId ? parseInt(actorId) : null,
+        createdById: actorId ?? null,
       },
     });
 

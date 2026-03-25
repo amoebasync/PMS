@@ -661,7 +661,7 @@ export default function DistributorPayrollPage() {
                               </tr>
                             </thead>
                             <tbody>
-                              {dailyRows.map(({ day, dayStr, scheduleEarned, scheduleItems, expenseAmount, total }) => {
+                              {dailyRows.map(({ day, dayStr, scheduleEarned, scheduleItems, expenseAmount, dayExpenses, total }) => {
                                 const dayLabel = DAY_LABELS[day.getDay()];
                                 const hasData = total > 0;
                                 return (

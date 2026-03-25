@@ -39,6 +39,35 @@ type ParsedBreakdown = {
 const LIMIT = 50;
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
+/** 指定日を含む週の日曜日を返す (YYYY-MM-DD) */
+function getSunday(date: Date): string {
+  const d = new Date(date);
+  d.setDate(d.getDate() - d.getDay()); // 日曜日に戻す
+  return d.toISOString().split('T')[0];
+}
+
+/** YYYY-MM-DD から 6日後（土曜日）を返す */
+function getSaturday(sundayStr: string): string {
+  const d = new Date(sundayStr + 'T00:00:00');
+  d.setDate(d.getDate() + 6);
+  return d.toISOString().split('T')[0];
+}
+
+/** 週ラベル: "2026/03/22 (日) 〜 2026/03/28 (土)" */
+function formatWeekLabel(sundayStr: string): string {
+  const sun = new Date(sundayStr + 'T00:00:00');
+  const sat = new Date(sundayStr + 'T00:00:00');
+  sat.setDate(sat.getDate() + 6);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const wd = WEEKDAYS[d.getDay()];
+    return `${y}/${m}/${day} (${wd})`;
+  };
+  return `${fmt(sun)} 〜 ${fmt(sat)}`;
+}
+
 /** description文字列を "事務所: ¥510 / 現場: ¥178 / 帰宅: ¥566" からパース */
 function parseDescription(desc: string): ParsedBreakdown {
   const result: ParsedBreakdown = { office: 0, field: 0, home: 0 };
@@ -75,9 +104,24 @@ export default function DistributorExpensesPage() {
   // 支店データ
   const [branches, setBranches] = useState<Branch[]>([]);
 
+  // 週フィルタ（デフォルト: 今週の日曜）
+  const [weekSunday, setWeekSunday] = useState(() => getSunday(new Date()));
+  const filterDateFrom = weekSunday;
+  const filterDateTo = getSaturday(weekSunday);
+
+  const goToPrevWeek = () => {
+    const d = new Date(weekSunday + 'T00:00:00');
+    d.setDate(d.getDate() - 7);
+    setWeekSunday(d.toISOString().split('T')[0]);
+  };
+  const goToNextWeek = () => {
+    const d = new Date(weekSunday + 'T00:00:00');
+    d.setDate(d.getDate() + 7);
+    setWeekSunday(d.toISOString().split('T')[0]);
+  };
+  const goToThisWeek = () => setWeekSunday(getSunday(new Date()));
+
   // フィルタ
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
   const [filterBranchId, setFilterBranchId] = useState('');
   const [filterSearch, setFilterSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
@@ -136,7 +180,7 @@ export default function DistributorExpensesPage() {
   useEffect(() => {
     fetchExpenses(1);
     setPage(1);
-  }, [filterDateFrom, filterDateTo, filterBranchId, filterSearch, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [weekSunday, filterBranchId, filterSearch, filterStatus]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ────── 操作ハンドラ ──────
 
@@ -197,26 +241,43 @@ export default function DistributorExpensesPage() {
 
   return (
     <div className="space-y-3">
-      {/* フィルタバー */}
+      {/* 週ナビゲーション + フィルタバー */}
       <div className="flex flex-wrap items-end gap-3 bg-white rounded-xl border border-slate-200 p-3 shadow-sm">
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_start_date')}</label>
-          <input
-            type="date"
-            value={filterDateFrom}
-            onChange={e => setFilterDateFrom(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
+        {/* 週切替 */}
+        <div className="flex items-end gap-1">
+          <div>
+            <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_week')}</label>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={goToPrevWeek}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                title={t('week_prev')}
+              >
+                <i className="bi bi-chevron-left text-sm"></i>
+              </button>
+              <span className="text-sm font-medium text-slate-700 px-2 min-w-[280px] text-center whitespace-nowrap">
+                {formatWeekLabel(weekSunday)}
+              </span>
+              <button
+                onClick={goToNextWeek}
+                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-500 hover:text-slate-700 transition-colors"
+                title={t('week_next')}
+              >
+                <i className="bi bi-chevron-right text-sm"></i>
+              </button>
+            </div>
+          </div>
+          {weekSunday !== getSunday(new Date()) && (
+            <button
+              onClick={goToThisWeek}
+              className="ml-1 px-2.5 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors"
+            >
+              {t('week_today')}
+            </button>
+          )}
         </div>
-        <div>
-          <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_end_date')}</label>
-          <input
-            type="date"
-            value={filterDateTo}
-            onChange={e => setFilterDateTo(e.target.value)}
-            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
+
+        {/* 支店 */}
         <div>
           <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_branch')}</label>
           <select
@@ -230,6 +291,8 @@ export default function DistributorExpensesPage() {
             ))}
           </select>
         </div>
+
+        {/* ステータス */}
         <div>
           <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_status')}</label>
           <select
@@ -242,6 +305,8 @@ export default function DistributorExpensesPage() {
             <option value="APPROVED">{t('status_approved')}</option>
           </select>
         </div>
+
+        {/* 検索 */}
         <div className="flex-1 min-w-[180px]">
           <label className="block text-[11px] font-medium text-slate-400 mb-1">{t('filter_search')}</label>
           <div className="relative">
