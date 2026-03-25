@@ -524,7 +524,7 @@ export default function DistributorPayrollPage() {
                                     </td>
                                     <td className="py-1.5 px-3 text-right text-slate-400 text-[10px]">
                                       {scheduleItems.length > 0
-                                        ? scheduleItems.map((item) => `${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount.toLocaleString()}投`).join(' / ')
+                                        ? scheduleItems.map((item) => `${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount.toLocaleString()}枚`).join(' / ')
                                         : '—'}
                                     </td>
                                     <td className="py-1.5 px-3 text-right font-medium text-indigo-600">

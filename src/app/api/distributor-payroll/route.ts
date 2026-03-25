@@ -35,13 +35,13 @@ export async function GET(request: Request) {
     const records = await prisma.distributorPayrollRecord.findMany({
       where,
       include: {
-        distributor: { select: { id: true, staffId: true, name: true } },
+        distributor: { select: { id: true, staffId: true, name: true, transportationFee: true, transportationFee1Type: true } },
         items: { orderBy: { date: 'asc' } },
       },
       orderBy: [{ periodStart: 'desc' }, { distributorId: 'asc' }],
     });
 
-    // 各レコードの期間内の経費を日別に取得して付加
+    // 各レコードの期間内の経費を日別に取得して付加（キャップ適用）
     const recordsWithExpenses = await Promise.all(
       records.map(async (record) => {
         const expenses = await prisma.distributorExpense.findMany({
@@ -53,7 +53,41 @@ export async function GET(request: Request) {
           select: { date: true, amount: true, description: true, status: true },
           orderBy: { date: 'asc' },
         });
-        return { ...record, expenses };
+
+        // 交通費キャップ計算
+        const feeSetting = record.distributor.transportationFee || '1000';
+        const fee1TypeSetting = record.distributor.transportationFee1Type || '500';
+        const isFull = feeSetting === 'FULL';
+        const personalCap = isFull ? Infinity : parseInt(feeSetting) || 1000;
+        const personal1TypeCap = fee1TypeSetting === 'FULL' ? Infinity : parseInt(fee1TypeSetting) || 500;
+
+        // 期間内のスケジュールから日別の種別数を取得
+        const schedules = await prisma.distributionSchedule.findMany({
+          where: {
+            distributorId: record.distributorId,
+            date: { gte: record.periodStart, lte: record.periodEnd },
+          },
+          include: { items: { select: { actualCount: true } } },
+        });
+        const scheduleFlyerCounts: Record<string, number> = {};
+        for (const schedule of schedules) {
+          const dateKey = schedule.date!.toISOString().split('T')[0];
+          const itemCount = schedule.items.filter(i => i.actualCount !== null && i.actualCount > 0).length;
+          scheduleFlyerCounts[dateKey] = Math.max(scheduleFlyerCounts[dateKey] || 0, itemCount);
+        }
+
+        // 日別にキャップ適用した金額を返す
+        const cappedExpenses = expenses.map(e => {
+          const dateKey = e.date.toISOString().split('T')[0];
+          if (isFull) return e;
+          const flyerCount = scheduleFlyerCounts[dateKey] || 0;
+          const dailyCap = flyerCount === 1
+            ? Math.min(personalCap, personal1TypeCap)
+            : personalCap;
+          return { ...e, amount: Math.min(e.amount, dailyCap) };
+        });
+
+        return { ...record, expenses: cappedExpenses };
       })
     );
 
