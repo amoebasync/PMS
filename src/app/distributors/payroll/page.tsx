@@ -409,24 +409,6 @@ export default function DistributorPayrollPage() {
             <i className="bi bi-upload text-slate-400"></i>取込
           </Link>
           {viewMode === 'week' && (
-            <button onClick={handleCopyForExcel}
-              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-bold rounded-lg transition-colors ${
-                copied ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
-              }`}>
-              <i className={`bi ${copied ? 'bi-check-lg' : 'bi-clipboard'} ${copied ? 'text-emerald-600' : 'text-slate-400'}`}></i>
-              {copied ? 'コピー済' : 'Excel用コピー'}
-            </button>
-          )}
-          {viewMode === 'week' && (
-            <a
-              href={`/api/distributor-payroll/export?weekStart=${isoDate(weekStart)}`}
-              download
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors"
-            >
-              <i className="bi bi-file-earmark-arrow-down text-emerald-600"></i>Excel出力
-            </a>
-          )}
-          {viewMode === 'week' && (
             <button
               onClick={() => setShowExcelModal(true)}
               className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors"
