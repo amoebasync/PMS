@@ -21,7 +21,7 @@ export async function GET() {
     const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
     const [scheduleDates, expenseDates] = await Promise.all([
       prisma.distributionSchedule.findMany({
-        where: { distributorId: distributor.id, date: { gte: twoMonthsAgo }, status: { not: 'CANCELLED' } },
+        where: { distributorId: distributor.id, date: { gte: twoMonthsAgo } },
         select: { date: true },
       }),
       prisma.distributorExpense.findMany({

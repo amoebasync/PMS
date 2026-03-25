@@ -30,6 +30,9 @@ export default function ExpensesPage() {
   const [form, setForm] = useState({ date: '', amount: '', description: '' });
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [scheduleDates, setScheduleDates] = useState<Set<string>>(new Set());
+  const [expenseMap, setExpenseMap] = useState<Record<string, string>>({});
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
 
   const fetchExpenses = async () => {
     setLoading(true);
@@ -37,6 +40,10 @@ export default function ExpensesPage() {
     if (res.ok) {
       const data = await res.json();
       setExpenses(data.expenses || []);
+      if (data.calendarData) {
+        setScheduleDates(new Set(data.calendarData.scheduleDates || []));
+        setExpenseMap(data.calendarData.expenseMap || {});
+      }
     }
     setLoading(false);
   };
@@ -151,24 +158,59 @@ export default function ExpensesPage() {
           <h2 className="font-bold text-slate-800">新規交通費申請</h2>
 
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-bold text-slate-600 ml-1">日付</label>
-              <button
-                type="button"
-                onClick={() => setForm((f) => ({ ...f, date: today }))}
-                className="text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors"
-              >
-                今日
-              </button>
+            <label className="block text-xs font-bold text-slate-600 mb-1.5 ml-1">日付</label>
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+              <div className="flex items-center justify-between mb-2">
+                <button type="button" onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1))}
+                  className="w-7 h-7 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500"><i className="bi bi-chevron-left text-xs"></i></button>
+                <span className="text-sm font-bold text-slate-700">{calMonth.getFullYear()}/{String(calMonth.getMonth() + 1).padStart(2, '0')}</span>
+                <button type="button" onClick={() => setCalMonth(new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1))}
+                  className="w-7 h-7 rounded-full hover:bg-slate-200 flex items-center justify-center text-slate-500"><i className="bi bi-chevron-right text-xs"></i></button>
+              </div>
+              <div className="grid grid-cols-7 text-center text-[10px] text-slate-400 font-bold mb-1">
+                {['日','月','火','水','木','金','土'].map(d => <div key={d}>{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 gap-0.5">
+                {(() => {
+                  const year = calMonth.getFullYear(), month = calMonth.getMonth();
+                  const firstDay = new Date(year, month, 1).getDay();
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const cells = [];
+                  for (let i = 0; i < firstDay; i++) cells.push(<div key={`e${i}`}></div>);
+                  for (let d = 1; d <= daysInMonth; d++) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const hasSchedule = scheduleDates.has(dateStr);
+                    const expenseStatus = expenseMap[dateStr];
+                    const isSelected = form.date === dateStr;
+                    const isFuture = dateStr > today;
+                    const isToday = dateStr === today;
+                    cells.push(
+                      <button key={d} type="button" disabled={isFuture}
+                        onClick={async () => {
+                          if (!hasSchedule) { if (!confirm('この日にスケジュールがありません。追加しますか？')) return; }
+                          setForm(f => ({ ...f, date: dateStr }));
+                        }}
+                        className={`py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          isSelected ? 'bg-indigo-600 text-white ring-2 ring-indigo-300' : isFuture ? 'text-slate-200' : 'hover:bg-slate-200 text-slate-700'
+                        }`}>
+                        <span className={isToday && !isSelected ? 'underline decoration-2 decoration-indigo-500' : ''}>{d}</span>
+                        <div className="flex justify-center gap-0.5 mt-0.5 h-1.5">
+                          {hasSchedule && !expenseStatus && <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>}
+                          {hasSchedule && expenseStatus && <span className={`w-1.5 h-1.5 rounded-full ${expenseStatus === 'APPROVED' ? 'bg-emerald-500' : expenseStatus === 'REJECTED' ? 'bg-rose-500' : 'bg-indigo-400'}`}></span>}
+                        </div>
+                      </button>
+                    );
+                  }
+                  return cells;
+                })()}
+              </div>
+              <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
+                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span><span className="text-[9px] text-slate-500">未請求</span></div>
+                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400"></span><span className="text-[9px] text-slate-500">申請中</span></div>
+                <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span><span className="text-[9px] text-slate-500">承認済</span></div>
+              </div>
             </div>
-            <input
-              type="date"
-              required
-              max={today}
-              value={form.date}
-              onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
-              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:bg-white outline-none text-base"
-            />
+            {form.date && <p className="text-xs text-indigo-600 font-bold mt-1 ml-1">選択日: {form.date}</p>}
           </div>
 
           <div>
