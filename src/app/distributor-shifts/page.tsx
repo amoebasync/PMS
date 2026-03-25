@@ -29,7 +29,7 @@ type Shift = {
   distributor: Distributor;
 };
 
-type WeeklyShiftCell = { id: number; count: number; note: string | null } | null;
+type WeeklyShiftCell = { id: number; count: number; note: string | null; hasSchedule?: boolean } | null;
 
 type WeeklyDistributor = {
   id: number;
@@ -99,6 +99,7 @@ export default function DistributorShiftsPage() {
   const [weekDates, setWeekDates] = useState<string[]>([]);
   const [weekDistributors, setWeekDistributors] = useState<WeeklyDistributor[]>([]);
   const [weekLoading, setWeekLoading] = useState(false);
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string | null>(null);
 
   // 一覧
   const [listShifts, setListShifts] = useState<Shift[]>([]);
@@ -316,9 +317,14 @@ export default function DistributorShiftsPage() {
   };
 
   // ────── 週間ナビ ──────
-  const goToday = () => setWeekStartDate(getTodayStr());
-  const goPrev = () => setWeekStartDate(prev => addDays(prev, -7));
-  const goNext = () => setWeekStartDate(prev => addDays(prev, 7));
+  const goToday = () => { setWeekStartDate(getTodayStr()); setSelectedDateFilter(null); };
+  const goPrev = () => { setWeekStartDate(prev => addDays(prev, -7)); setSelectedDateFilter(null); };
+  const goNext = () => { setWeekStartDate(prev => addDays(prev, 7)); setSelectedDateFilter(null); };
+
+  // 日付ヘッダークリック → フィルタ切替
+  const toggleDateFilter = (dateStr: string) => {
+    setSelectedDateFilter(prev => prev === dateStr ? null : dateStr);
+  };
 
   // 日付ごとの出勤人数集計
   const dailyCounts = React.useMemo(() => {
@@ -328,6 +334,12 @@ export default function DistributorShiftsPage() {
     }
     return counts;
   }, [weekDates, weekDistributors]);
+
+  // フィルタ適用: 選択日にシフトがある配布員のみ表示
+  const filteredDistributors = React.useMemo(() => {
+    if (!selectedDateFilter) return weekDistributors;
+    return weekDistributors.filter(dist => dist.shifts[selectedDateFilter] !== null);
+  }, [weekDistributors, selectedDateFilter]);
 
   // ──────────────────────────────────────────
   // レンダリング
@@ -421,6 +433,20 @@ export default function DistributorShiftsPage() {
             {weekLoading && (
               <div className="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full ml-2" />
             )}
+            {selectedDateFilter && (
+              <button
+                onClick={() => setSelectedDateFilter(null)}
+                className="ml-2 flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
+              >
+                <i className="bi bi-funnel-fill text-[10px]"></i>
+                {(() => {
+                  const d = new Date(selectedDateFilter + 'T00:00:00');
+                  return `${d.getMonth() + 1}/${d.getDate()} (${WEEKDAYS[d.getDay()]})`;
+                })()}
+                — {filteredDistributors.length}{t('people_suffix')}
+                <i className="bi bi-x-lg text-[9px] ml-1"></i>
+              </button>
+            )}
           </div>
 
           {/* グリッドテーブル */}
@@ -445,12 +471,14 @@ export default function DistributorShiftsPage() {
                     const isSun = d.getDay() === 0;
                     const isSat = d.getDay() === 6;
                     const count = dailyCounts[dateStr] || 0;
+                    const isSelected = selectedDateFilter === dateStr;
                     return (
                       <th
                         key={dateStr}
-                        className={`text-center px-1 py-1.5 border-b border-r border-slate-200 ${
-                          isToday ? 'bg-indigo-50' : 'bg-slate-50'
-                        }`}
+                        className={`text-center px-1 py-1.5 border-b border-r border-slate-200 cursor-pointer transition-colors ${
+                          isSelected ? 'bg-indigo-100 ring-2 ring-inset ring-indigo-400' : isToday ? 'bg-indigo-50' : 'bg-slate-50'
+                        } hover:bg-indigo-50`}
+                        onClick={() => toggleDateFilter(dateStr)}
                       >
                         <div className={`text-[10px] font-bold leading-none ${
                           isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-500'
@@ -478,7 +506,7 @@ export default function DistributorShiftsPage() {
                 </tr>
               </thead>
               <tbody>
-                {weekDistributors.length === 0 && !weekLoading ? (
+                {filteredDistributors.length === 0 && !weekLoading ? (
                   <tr>
                     <td colSpan={1 + weekDates.length} className="text-center py-12 text-slate-400">
                       <i className="bi bi-people text-3xl mb-2 block"></i>
@@ -486,7 +514,7 @@ export default function DistributorShiftsPage() {
                     </td>
                   </tr>
                 ) : (
-                  weekDistributors.map(dist => (
+                  filteredDistributors.map(dist => (
                     <tr key={dist.id} className="hover:bg-slate-50/30 transition-colors group">
                       {/* 配布員名 */}
                       <td className="px-3 py-1 border-b border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/30 z-10">
@@ -519,9 +547,16 @@ export default function DistributorShiftsPage() {
                           >
                             {cell ? (
                               <div className="py-1">
-                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500 text-white text-xs font-bold shadow-sm">
+                                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-xs font-bold shadow-sm ${
+                                  cell.hasSchedule ? 'bg-emerald-500' : 'bg-emerald-500'
+                                }`}>
                                   {cell.count}
                                 </span>
+                                {cell.hasSchedule && (
+                                  <div className="text-[8px] font-bold text-blue-600 leading-tight mt-0.5">
+                                    {t('has_schedule')}
+                                  </div>
+                                )}
                                 {cell.note && (
                                   <div className="absolute top-0.5 right-0.5">
                                     <i className="bi bi-chat-left-text text-[8px] text-amber-500"></i>

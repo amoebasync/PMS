@@ -47,7 +47,7 @@ export async function GET(request: Request) {
         staffId: true,
         branch: { select: { id: true, nameJa: true } },
       },
-      orderBy: [{ branch: { nameJa: 'asc' } }, { name: 'asc' }],
+      orderBy: [{ staffId: 'asc' }],
     });
 
     const distributorIds = distributors.map(d => d.id);
@@ -116,14 +116,18 @@ export async function GET(request: Request) {
         if (scheduleDatesInRange.has(sortedDates[i])) afterCount++;
       }
 
-      const shifts: Record<string, { id: number; count: number; note: string | null } | null> = {};
+      const shifts: Record<string, { id: number; count: number; note: string | null; hasSchedule: boolean } | null> = {};
 
       for (const dateKey of dates) {
         const shift = shiftMap[d.id]?.[dateKey];
         if (shift) {
-          // この日時点での累計スケジュール数 = 全体 - この日より後のスケジュール数
           const countAtDate = totalCount - afterCounts[dateKey];
-          shifts[dateKey] = { id: shift.id, count: countAtDate, note: shift.note };
+          shifts[dateKey] = {
+            id: shift.id,
+            count: countAtDate,
+            note: shift.note,
+            hasSchedule: scheduleDatesInRange.has(dateKey),
+          };
         } else {
           shifts[dateKey] = null;
         }
