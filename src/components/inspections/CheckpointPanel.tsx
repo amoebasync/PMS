@@ -64,7 +64,9 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   const [sampleMode, setSampleMode] = useState<'trajectory' | 'area'>('area');
   const [generating, setGenerating] = useState(false);
   const [recordingIndex, setRecordingIndex] = useState<number | null>(null);
-  const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND' | 'UNABLE'>('CONFIRMED');
+  const [recordResult, setRecordResult] = useState<'CONFIRMED' | 'NOT_FOUND'>('CONFIRMED');
+  const [editingCheckpointId, setEditingCheckpointId] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState<number | null>(null);
   const [recordNote, setRecordNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
@@ -100,10 +102,11 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
   };
 
   /* ---- Open recording UI ---- */
-  const openRecording = (index: number) => {
+  const openRecording = (index: number, existingCheckpoint?: any) => {
     setRecordingIndex(index);
-    setRecordResult('CONFIRMED');
-    setRecordNote('');
+    setRecordResult(existingCheckpoint?.result === 'NOT_FOUND' ? 'NOT_FOUND' : 'CONFIRMED');
+    setRecordNote(existingCheckpoint?.note || '');
+    setEditingCheckpointId(existingCheckpoint?.id || null);
     setSelectedFile(null);
     setPreviewUrl(null);
   };
@@ -116,7 +119,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
     setPreviewUrl(URL.createObjectURL(file));
   };
 
-  /* ---- Submit checkpoint ---- */
+  /* ---- Submit checkpoint (create or update) ---- */
   const handleSubmit = async () => {
     if (recordingIndex === null) return;
     const point = samplePoints[recordingIndex];
@@ -127,8 +130,7 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       const formData = new FormData();
       formData.append('targetLat', point.lat.toString());
       formData.append('targetLng', point.lng.toString());
-      const resultMap: Record<string, string> = { CONFIRMED: 'CONFIRMED', NOT_FOUND: 'NOT_FOUND', UNABLE: 'UNABLE_TO_CHECK' };
-      formData.append('result', resultMap[recordResult] || recordResult);
+      formData.append('result', recordResult);
       if (currentPosition) {
         formData.append('actualLat', currentPosition.lat.toString());
         formData.append('actualLng', currentPosition.lng.toString());
@@ -136,8 +138,12 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       if (recordNote) formData.append('note', recordNote);
       if (selectedFile) formData.append('photo', selectedFile);
 
-      const res = await fetch(`/api/inspections/${inspectionId}/checkpoints`, {
-        method: 'POST',
+      // 編集モードの場合はPUT、新規の場合はPOST
+      const url = editingCheckpointId
+        ? `/api/inspections/${inspectionId}/checkpoints?checkpointId=${editingCheckpointId}`
+        : `/api/inspections/${inspectionId}/checkpoints`;
+      const res = await fetch(url, {
+        method: editingCheckpointId ? 'PUT' : 'POST',
         body: formData,
       });
       if (!res.ok) throw new Error();
@@ -151,6 +157,16 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
       showToast(t('error_generic'), 'error');
     }
     setSubmitting(false);
+  };
+
+  /* ---- Delete checkpoint ---- */
+  const handleDeleteCheckpoint = async (checkpointId: number) => {
+    setDeleting(checkpointId);
+    try {
+      const res = await fetch(`/api/inspections/${inspectionId}/checkpoints?checkpointId=${checkpointId}`, { method: 'DELETE' });
+      if (res.ok) onUpdate();
+    } catch { showToast(t('error_generic'), 'error'); }
+    setDeleting(null);
   };
 
   const checkedCount = samplePoints.filter((sp) => getMatchedCheckpoint(sp) !== null).length;
@@ -236,17 +252,15 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
               <i className="bi bi-x-lg text-sm"></i>
             </button>
           </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {(['CONFIRMED', 'NOT_FOUND', 'UNABLE'] as const).map((r) => {
+          <div className="grid grid-cols-2 gap-1.5">
+            {(['CONFIRMED', 'NOT_FOUND'] as const).map((r) => {
               const labels: Record<string, string> = {
                 CONFIRMED: t('checkpoint_confirmed'),
                 NOT_FOUND: t('checkpoint_not_found'),
-                UNABLE: t('checkpoint_unable'),
               };
               const colors: Record<string, string> = {
                 CONFIRMED: 'bg-emerald-600 text-white border-emerald-600',
                 NOT_FOUND: 'bg-red-500 text-white border-red-500',
-                UNABLE: 'bg-slate-500 text-white border-slate-500',
               };
               return (
                 <button
@@ -328,8 +342,8 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                 }`}
               >
                 <button
-                  onClick={() => isActive && !isChecked && openRecording(i)}
-                  disabled={!isActive || isChecked || recordingIndex !== null}
+                  onClick={() => isActive && (isChecked ? openRecording(i, matched) : openRecording(i))}
+                  disabled={!isActive || recordingIndex !== null}
                   className="flex-1 flex items-center gap-2.5 p-2.5 text-left disabled:opacity-70"
                 >
                   {/* Number badge */}
@@ -377,13 +391,24 @@ export default function CheckpointPanel({ inspectionId, checkpoints, currentPosi
                     <i className="bi bi-chevron-right text-slate-300 text-xs"></i>
                   ) : null}
                 </button>
-                {/* Delete button (only for unchecked, active) */}
-                {isActive && !isChecked && (
+                {/* Delete button */}
+                {isActive && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); onSamplePointsChange(samplePoints.filter((_, j) => j !== i)); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isChecked && matched) {
+                        handleDeleteCheckpoint(matched.id);
+                      } else {
+                        onSamplePointsChange(samplePoints.filter((_, j) => j !== i));
+                      }
+                    }}
+                    disabled={deleting === matched?.id}
                     className="px-2 py-2.5 text-slate-300 hover:text-red-500 transition-colors shrink-0"
                   >
-                    <i className="bi bi-trash3 text-xs"></i>
+                    {deleting === matched?.id
+                      ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin"></div>
+                      : <i className="bi bi-trash3 text-xs"></i>
+                    }
                   </button>
                 )}
               </div>

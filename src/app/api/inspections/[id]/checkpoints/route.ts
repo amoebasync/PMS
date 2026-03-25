@@ -45,9 +45,9 @@ export async function POST(
       );
     }
 
-    if (!['CONFIRMED', 'NOT_FOUND', 'UNABLE_TO_CHECK'].includes(result)) {
+    if (!['CONFIRMED', 'NOT_FOUND', 'UNABLE_TO_CHECK', 'UNABLE'].includes(result)) {
       return NextResponse.json(
-        { error: 'result は CONFIRMED, NOT_FOUND, UNABLE_TO_CHECK のいずれかです' },
+        { error: 'result は CONFIRMED, NOT_FOUND のいずれかです' },
         { status: 400 }
       );
     }
@@ -80,6 +80,71 @@ export async function POST(
     return NextResponse.json(checkpoint, { status: 201 });
   } catch (err) {
     console.error('POST /api/inspections/[id]/checkpoints error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+// PUT /api/inspections/[id]/checkpoints?checkpointId=xxx
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
+
+  try {
+    const checkpointId = parseInt(request.nextUrl.searchParams.get('checkpointId') || '');
+    if (isNaN(checkpointId)) {
+      return NextResponse.json({ error: '無効なcheckpointId' }, { status: 400 });
+    }
+
+    const formData = await request.formData();
+    const result = formData.get('result') as string;
+    const note = formData.get('note') as string | null;
+    const photoFile = formData.get('photo') as File | null;
+
+    const updateData: any = {};
+    if (result) updateData.result = result;
+    if (note !== null) updateData.note = note || null;
+
+    if (photoFile) {
+      const { id } = await params;
+      const buffer = Buffer.from(await photoFile.arrayBuffer());
+      const ext = photoFile.name.split('.').pop() || 'jpg';
+      const s3Key = `uploads/inspections/${id}/checkpoints/${Date.now()}.${ext}`;
+      updateData.photoUrl = await uploadToS3(buffer, s3Key, photoFile.type);
+    }
+
+    const updated = await prisma.inspectionCheckpoint.update({
+      where: { id: checkpointId },
+      data: updateData,
+    });
+
+    return NextResponse.json(updated);
+  } catch (err) {
+    console.error('PUT /api/inspections/[id]/checkpoints error:', err);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+// DELETE /api/inspections/[id]/checkpoints?checkpointId=xxx
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { error } = await requireAdminSession();
+  if (error) return error;
+
+  try {
+    const checkpointId = parseInt(request.nextUrl.searchParams.get('checkpointId') || '');
+    if (isNaN(checkpointId)) {
+      return NextResponse.json({ error: '無効なcheckpointId' }, { status: 400 });
+    }
+
+    await prisma.inspectionCheckpoint.delete({ where: { id: checkpointId } });
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error('DELETE /api/inspections/[id]/checkpoints error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
