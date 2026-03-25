@@ -682,7 +682,7 @@ model FlyerDistributor {
   transportationMethod String? @map("transportation_method") @db.VarChar(50) // 移動方法 (徒歩など)
 
   // 給与・評価レート情報
-  ratePlan          String? @map("rate_plan") @db.VarChar(50) // Rate (Basic, Regular, Advancedなど)
+  ratePlan          String? @default("Regular") @map("rate_plan") @db.VarChar(50) // Rate (Regular, Advanced, Proなど)
   rate1Type         Float?  @map("rate_1_type") // 1type
   rate2Type         Float?  @map("rate_2_type") // 2type
   rate3Type         Float?  @map("rate_3_type") // 3type
