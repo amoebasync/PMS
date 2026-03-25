@@ -16,13 +16,28 @@ function computeEarnings(
     );
     if (validItems.length === 0) continue;
 
-    const flyerTypeCount = Math.min(validItems.length, 6);
-    const baseRate = rates[flyerTypeCount] ?? 0;
     const areaUnitPrice = schedule.areaUnitPrice ?? 0;
     const sizeUnitPrice = schedule.sizeUnitPrice ?? 0;
+
+    // ティア制計算
+    const counts = validItems.map((i: any) => i.actualCount ?? 0).sort((a: number, b: number) => a - b);
+    let earnedAmount = 0;
+    let prev = 0;
+    for (let ci = 0; ci < counts.length; ci++) {
+      const band = counts[ci] - prev;
+      if (band > 0) {
+        const typesInBand = Math.min(counts.length - ci, 6);
+        const tierRate = rates[typesInBand] ?? 0;
+        earnedAmount += band * (tierRate + areaUnitPrice + sizeUnitPrice);
+      }
+      prev = counts[ci];
+    }
+    earnedAmount = Math.floor(earnedAmount);
+
+    const flyerTypeCount = Math.min(validItems.length, 6);
+    const baseRate = rates[flyerTypeCount] ?? 0;
     const unitPrice = baseRate + areaUnitPrice + sizeUnitPrice;
-    const actualCount = Math.max(...validItems.map((i: any) => i.actualCount ?? 0));
-    const earnedAmount = Math.floor(unitPrice * actualCount);
+    const actualCount = Math.max(...counts);
 
     totalEarnings += earnedAmount;
     details.push({
@@ -95,6 +110,53 @@ export async function GET(request: Request) {
 
       const { totalEarnings, details } = computeEarnings(schedules, rates);
 
+      // 交通費（承認済み経費）
+      let expensePay = 0;
+      try {
+        const expenses = await prisma.distributorExpense.findMany({
+          where: {
+            distributorId: distributor.id,
+            date: { gte: weekStart, lte: weekEnd },
+            status: { in: ['APPROVED', 'PENDING'] },
+          },
+          select: { date: true, totalAmount: true },
+        });
+
+        const feeSetting = distributor.transportationFee || '1000';
+        const fee1TypeSetting = (distributor as any).transportationFee1Type || '500';
+        const isFull = feeSetting === 'FULL';
+        const personalCap = isFull ? Infinity : parseInt(feeSetting) || 1000;
+        const personal1TypeCap = fee1TypeSetting === 'FULL' ? Infinity : parseInt(fee1TypeSetting) || 500;
+
+        // 日別スケジュール種別数
+        const dayFlyerCounts: Record<string, number> = {};
+        for (const s of schedules) {
+          const dateKey = s.date.toISOString().split('T')[0];
+          const count = s.items.filter((i: any) => i.actualCount && i.actualCount > 0).length;
+          dayFlyerCounts[dateKey] = Math.max(dayFlyerCounts[dateKey] || 0, count);
+        }
+
+        for (const exp of expenses) {
+          const dateKey = exp.date.toISOString().split('T')[0];
+          const flyerCount = dayFlyerCounts[dateKey] || 0;
+          const dailyCap = flyerCount <= 1 ? personal1TypeCap : personalCap;
+          expensePay += Math.min(exp.totalAmount, dailyCap);
+        }
+      } catch { /* ignore expense errors */ }
+
+      // 研修手当
+      let trainingPay = 0;
+      if (distributor.joinDate) {
+        const joinDateStr = new Date(distributor.joinDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+        const startStr = weekStart.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+        const endStr = weekEnd.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+        if (joinDateStr >= startStr && joinDateStr <= endStr) {
+          trainingPay = parseInt(distributor.trainingAllowance || '1000') || 1000;
+        }
+      }
+
+      const grossEarnings = totalEarnings + expensePay + trainingPay;
+
       // Group by date
       const dayMap: Record<string, { totalEarnings: number; schedules: any[] }> = {};
       for (let d = 0; d < 7; d++) {
@@ -123,7 +185,10 @@ export async function GET(request: Request) {
         mode: 'weekly',
         startDate: weekStart.toISOString().split('T')[0],
         endDate: weekEnd.toISOString().split('T')[0],
-        totalEarnings,
+        totalEarnings: grossEarnings,
+        schedulePay: totalEarnings,
+        expensePay,
+        trainingPay,
         days,
       });
     }

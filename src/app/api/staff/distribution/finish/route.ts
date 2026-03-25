@@ -187,13 +187,28 @@ async function calculateDailyEarnings(distributorId: number, date: Date) {
     );
     if (validItems.length === 0) continue;
 
-    const flyerTypeCount = Math.min(validItems.length, 6);
-    const baseRate = rates[flyerTypeCount] ?? 0;
     const areaUnitPrice = schedule.areaUnitPrice ?? 0;
     const sizeUnitPrice = schedule.sizeUnitPrice ?? 0;
+
+    // ティア制計算
+    const counts = validItems.map((i) => i.actualCount ?? 0).sort((a, b) => a - b);
+    let earnedAmount = 0;
+    let prev = 0;
+    for (let ci = 0; ci < counts.length; ci++) {
+      const band = counts[ci] - prev;
+      if (band > 0) {
+        const typesInBand = Math.min(counts.length - ci, 6);
+        const tierRate = rates[typesInBand] ?? 0;
+        earnedAmount += band * (tierRate + areaUnitPrice + sizeUnitPrice);
+      }
+      prev = counts[ci];
+    }
+    earnedAmount = Math.floor(earnedAmount);
+
+    const flyerTypeCount = Math.min(validItems.length, 6);
+    const baseRate = rates[flyerTypeCount] ?? 0;
     const unitPrice = baseRate + areaUnitPrice + sizeUnitPrice;
-    const actualCount = Math.max(...validItems.map((i) => i.actualCount ?? 0));
-    const earnedAmount = Math.floor(unitPrice * actualCount);
+    const actualCount = Math.max(...counts);
 
     totalEarnings += earnedAmount;
     details.push({

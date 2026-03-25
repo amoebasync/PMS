@@ -91,15 +91,30 @@ export async function POST(request: Request) {
       );
       if (validItems.length === 0) continue;
 
-      const flyerTypeCount = Math.min(validItems.length, 6);
-      const baseRate = rates[flyerTypeCount] ?? 0;
       const areaUnitPrice = schedule.areaUnitPrice ?? 0;
       const sizeUnitPrice = schedule.sizeUnitPrice ?? 0;
-      const unitPrice = baseRate + areaUnitPrice + sizeUnitPrice;
 
-      // 投函ポスト数 = 有効アイテムの actualCount の最大値（同エリアへの同時配布）
-      const actualCount = Math.max(...validItems.map((i) => i.actualCount ?? 0));
-      const earnedAmount = Math.floor(unitPrice * actualCount);
+      // ティア制計算: 枚数を昇順ソートし、段階的に種類数を減らして計算
+      const counts = validItems.map((i) => i.actualCount ?? 0).sort((a, b) => a - b);
+      const totalTypes = Math.min(counts.length, 6);
+      let earnedAmount = 0;
+      let prev = 0;
+      for (let i = 0; i < counts.length; i++) {
+        const band = counts[i] - prev;
+        if (band > 0) {
+          const typesInBand = Math.min(counts.length - i, 6);
+          const tierRate = rates[typesInBand] ?? 0;
+          earnedAmount += band * (tierRate + areaUnitPrice + sizeUnitPrice);
+        }
+        prev = counts[i];
+      }
+      earnedAmount = Math.floor(earnedAmount);
+
+      // 表示用: 最大種類数・最大枚数・最大種類数の基本レートを保存
+      const flyerTypeCount = totalTypes;
+      const baseRate = rates[flyerTypeCount] ?? 0;
+      const unitPrice = baseRate + areaUnitPrice + sizeUnitPrice;
+      const actualCount = Math.max(...counts);
 
       payrollItems.push({
         date: schedule.date!,
