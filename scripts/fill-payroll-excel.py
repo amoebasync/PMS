@@ -23,13 +23,21 @@ HAS_DATA_FILL = PatternFill(start_color="FF99CCFF", end_color="FF99CCFF", fill_t
 HEADER_FONT = Font(bold=True, size=9)
 
 
-def decrypt_workbook(path, password):
+def decrypt_workbook(path, password, tmp_path=None):
     with open(path, "rb") as f:
-        buf = io.BytesIO()
+        decrypted = io.BytesIO()
         ms = msoffcrypto.OfficeFile(f)
         ms.load_key(password=password)
-        ms.decrypt(buf)
-    return openpyxl.load_workbook(buf)
+        ms.decrypt(decrypted)
+    # decrypt後に一度ファイルに保存→再読み込みしないと大量のfill変更が保存時に消えるバグがある
+    import tempfile, os
+    tmp = tmp_path or tempfile.mktemp(suffix=".xlsx")
+    wb_raw = openpyxl.load_workbook(decrypted)
+    wb_raw.save(tmp)
+    wb_raw.close()
+    wb = openpyxl.load_workbook(tmp)
+    os.unlink(tmp)
+    return wb
 
 
 def find_target_sheet(wb, week_start_date):
@@ -214,6 +222,34 @@ def main():
         # ※ 小計行は SUM関数のまま触らない
 
         updated_count += 1
+
+    # --- Phase 3: 全スタッフ列の日付セル色を設定（PMS対象外の列も含む） ---
+    # PMS対象スタッフ（Phase 2で処理済み）はスキップ
+    pms_staff_ids = set(d["staffId"] for d in distributors)
+    for sid, col in staff_cols.items():
+        if sid in pms_staff_ids:
+            continue  # Phase 2で色設定済み
+        # スタッフコードっぽくない値はスキップ
+        if not any(sid.startswith(p) for p in ("MBF", "MSF", "MYF", "NAI", "MNA", "MKI", "TOD", "B0")):
+            continue
+        # エクセル上の7日間の値を確認
+        week_total = 0
+        for day_idx in range(7):
+            r = block_start + day_idx
+            val = ws.cell(r, col).value
+            if val is not None:
+                try:
+                    week_total += float(val)
+                except (ValueError, TypeError):
+                    pass
+        # 0円ならピンク、金額ありなら水色
+        fill = ZERO_FILL if week_total == 0 else HAS_DATA_FILL
+        for day_idx in range(7):
+            r = block_start + day_idx
+            try:
+                ws.cell(r, col).fill = fill
+            except (ValueError, TypeError):
+                pass  # スタイル設定できないセルはスキップ
 
     wb.save(output_path)
 

@@ -66,6 +66,7 @@ export async function POST(request: Request) {
     }
 
     const distributors = records
+      .filter(r => r.grossPay > 0)
       .sort((a, b) => a.distributor.staffId.localeCompare(b.distributor.staffId))
       .map(r => {
         const dailyEarnings: Record<string, number> = {};
