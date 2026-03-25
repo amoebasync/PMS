@@ -31,18 +31,23 @@ export async function GET(request: Request) {
       orderBy: { periodStart: 'desc' },
     });
 
-    // 今週の給与（金曜支払予定）を別途取得
+    // 次の金曜に支払われる給与を取得（対象: 前週の日曜〜土曜）
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    // 今週の日曜
-    const thisSunday = new Date(today);
-    thisSunday.setDate(today.getDate() - today.getDay());
+    // 次の金曜（金曜当日は今日）
+    const dayOfWeek = today.getDay();
+    const daysUntilFriday = (5 - dayOfWeek + 7) % 7; // 0 if today is Friday
+    const nextFriday = new Date(today);
+    nextFriday.setDate(today.getDate() + daysUntilFriday);
+    // 支払い対象週の日曜 = 金曜 - 12日
+    const paymentWeekSunday = new Date(nextFriday);
+    paymentWeekSunday.setDate(nextFriday.getDate() - 12);
 
     const upcomingRecord = await prisma.distributorPayrollRecord.findUnique({
       where: {
         distributorId_periodStart: {
           distributorId: distributor.id,
-          periodStart: thisSunday,
+          periodStart: paymentWeekSunday,
         },
       },
     });
