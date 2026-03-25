@@ -16,7 +16,28 @@ export async function GET() {
       take: 50,
     });
 
-    return NextResponse.json({ expenses });
+    // カレンダー用: 直近2ヶ月のスケジュール日と請求済み日
+    const now = new Date();
+    const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const [scheduleDates, expenseDates] = await Promise.all([
+      prisma.distributionSchedule.findMany({
+        where: { distributorId: distributor.id, date: { gte: twoMonthsAgo }, status: { not: 'CANCELLED' } },
+        select: { date: true },
+      }),
+      prisma.distributorExpense.findMany({
+        where: { distributorId: distributor.id, date: { gte: twoMonthsAgo } },
+        select: { date: true, status: true },
+      }),
+    ]);
+
+    const scheduleSet = [...new Set(scheduleDates.map(s => s.date?.toISOString().split('T')[0]).filter(Boolean))];
+    const expenseMap: Record<string, string> = {};
+    for (const e of expenseDates) {
+      const d = e.date?.toISOString().split('T')[0];
+      if (d) expenseMap[d] = e.status;
+    }
+
+    return NextResponse.json({ expenses, calendarData: { scheduleDates: scheduleSet, expenseMap } });
   } catch (error) {
     console.error('Distributor Expenses GET Error:', error);
     return NextResponse.json({ error: 'サーバーエラーが発生しました' }, { status: 500 });
