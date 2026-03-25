@@ -140,11 +140,17 @@ export default function DistributorDashboardEn() {
         } else {
           // payroll未作成 → earnings APIからリアルタイム推定
           try {
-            const earningsRes = await fetch(`/api/staff/distribution/earnings?mode=weekly&date=${formatDate(today)}`);
+            // 次の金曜の支払い対象 = 前週の日曜〜土曜
+            const friday = getUpcomingFriday(today);
+            const paymentWeekSunday = new Date(friday);
+            paymentWeekSunday.setDate(paymentWeekSunday.getDate() - 12); // 金曜 - 12日 = 前々週の日曜...ではなく
+            // 支払い金曜の前の週: 金曜 - 5日 = 日曜（同じ週の日曜）→ さらに -7日 = 前週の日曜
+            const targetSunday = new Date(friday);
+            targetSunday.setDate(friday.getDate() - 5 - 7); // 前週の日曜
+            const earningsRes = await fetch(`/api/staff/distribution/earnings?mode=weekly&date=${formatDate(targetSunday)}`);
             if (earningsRes.ok) {
               const earningsData = await earningsRes.json();
               if (earningsData.totalEarnings > 0) {
-                const friday = getUpcomingFriday(today);
                 setPayroll({
                   grossPay: earningsData.totalEarnings,
                   status: 'ESTIMATED',

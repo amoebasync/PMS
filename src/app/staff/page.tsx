@@ -140,11 +140,14 @@ export default function DistributorDashboard() {
           setPayroll(payrollData.upcomingRecord);
         } else {
           try {
-            const earningsRes = await fetch(`/api/staff/distribution/earnings?mode=weekly&date=${formatDate(today)}`);
+            // 次の金曜の支払い対象 = 前週の日曜〜土曜
+            const friday = getUpcomingFriday(today);
+            const targetSunday = new Date(friday);
+            targetSunday.setDate(friday.getDate() - 5 - 7); // 前週の日曜
+            const earningsRes = await fetch(`/api/staff/distribution/earnings?mode=weekly&date=${formatDate(targetSunday)}`);
             if (earningsRes.ok) {
               const earningsData = await earningsRes.json();
               if (earningsData.totalEarnings > 0) {
-                const friday = getUpcomingFriday(today);
                 setPayroll({
                   grossPay: earningsData.totalEarnings,
                   status: 'ESTIMATED',
