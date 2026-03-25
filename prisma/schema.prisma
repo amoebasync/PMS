@@ -205,7 +205,9 @@ model Employee {
   taskAssignments  TaskAssignee[]     @relation("TaskAssigneeEmployee")
   leads          Lead[]
 
-  announcements  Announcement[]
+  announcements      Announcement[]
+  payrollAdjustments PayrollAdjustment[]
+  createdAdjustments PayrollAdjustment[] @relation("AdjustmentCreator")
   announcementReads AnnouncementRead[]
 
   passwordResetTokens PasswordResetToken[]
@@ -733,6 +735,7 @@ model FlyerDistributor {
   evaluations           DistributorEvaluation[]
   fieldInspections      FieldInspection[]
   fraudAnalyses         FraudAnalysis[]
+  payrollAdjustments    PayrollAdjustment[]
   lineUser              LineUser?
 
   // 社員紐付け（同一人物が社員と配布員の両方として働く場合）
@@ -1948,6 +1951,26 @@ model DistributorPayrollItem {
   createdAt      DateTime                 @default(now()) @map("created_at")
 
   @@map("distributor_payroll_items")
+}
+
+// --- 給与調整（ボーナス・前借・罰金等）---
+model PayrollAdjustment {
+  id             Int              @id @default(autoincrement())
+  distributorId  Int?             @map("distributor_id")
+  distributor    FlyerDistributor? @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  employeeId     Int?             @map("employee_id")
+  employee       Employee?        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  periodStart    DateTime         @map("period_start") @db.Date
+  type           String           @db.VarChar(30)  // BONUS, ADVANCE, PENALTY, EQUIPMENT, TRANSFER_FEE, HOUSING, ADJUSTMENT
+  amount         Int              // 正=加算、負=控除
+  description    String?          @db.VarChar(200)
+  createdById    Int?             @map("created_by_id")
+  createdBy      Employee?        @relation("AdjustmentCreator", fields: [createdById], references: [id])
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  @@index([distributorId, periodStart])
+  @@index([employeeId, periodStart])
+  @@map("payroll_adjustments")
 }
 
 model Notification {

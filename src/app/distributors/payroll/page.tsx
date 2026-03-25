@@ -629,7 +629,11 @@ export default function DistributorPayrollPage() {
                             <i className={`bi ${statusConfig[record.status].icon} mr-0.5`}></i>
                             {statusConfig[record.status].label}
                           </span>
-                          <button onClick={() => setExpandedId(isExpanded ? null : record.id)}
+                          <button onClick={() => {
+                              const next = isExpanded ? null : record.id;
+                              setExpandedId(next);
+                              if (next && !adjustments[dist.id]) fetchAdjustments(dist.id);
+                            }}
                             className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0">
                             <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-xs`}></i>
                           </button>
@@ -709,6 +713,74 @@ export default function DistributorPayrollPage() {
                             </tfoot>
                           </table>
                         </div>
+
+                        {/* 調整 */}
+                        {(() => {
+                          const adjs = adjustments[dist.id] || [];
+                          const adjTotal = adjs.reduce((s, a) => s + a.amount, 0);
+                          return (
+                            <div className="pt-2 border-t border-slate-200 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">調整項目</h4>
+                                <button
+                                  onClick={() => { setAdjFormOpen(adjFormOpen === dist.id ? null : dist.id); setAdjType('BONUS'); setAdjAmount(''); setAdjDesc(''); }}
+                                  className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-0.5"
+                                >
+                                  <i className="bi bi-plus-circle"></i>追加
+                                </button>
+                              </div>
+                              {adjs.length > 0 && (
+                                <div className="space-y-1">
+                                  {adjs.map((a) => {
+                                    const typeInfo = ADJUSTMENT_TYPES.find(t => t.value === a.type);
+                                    return (
+                                      <div key={a.id} className="flex items-center gap-2 px-2 py-1.5 bg-slate-50 rounded-lg text-[11px]">
+                                        <i className={`bi ${typeInfo?.icon || 'bi-dash'} ${typeInfo?.color || 'text-slate-500'}`}></i>
+                                        <span className="font-bold text-slate-700">{typeInfo?.label || a.type}</span>
+                                        {a.description && <span className="text-slate-400 truncate">{a.description}</span>}
+                                        <span className={`ml-auto font-bold tabular-nums ${a.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                          {a.amount >= 0 ? '+' : ''}¥{a.amount.toLocaleString()}
+                                        </span>
+                                        <button onClick={() => handleDeleteAdjustment(a.id, dist.id)} className="text-slate-300 hover:text-red-500 ml-1">
+                                          <i className="bi bi-x-lg text-[9px]"></i>
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                  <div className="text-right text-[10px] font-bold text-slate-500">
+                                    調整合計: <span className={adjTotal >= 0 ? 'text-emerald-600' : 'text-red-600'}>
+                                      {adjTotal >= 0 ? '+' : ''}¥{adjTotal.toLocaleString()}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                              {adjFormOpen === dist.id && (
+                                <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3 space-y-2">
+                                  <div className="flex gap-2">
+                                    <select value={adjType} onChange={e => setAdjType(e.target.value)}
+                                      className="border border-slate-300 rounded-lg px-2 py-1.5 text-xs flex-1 outline-none focus:ring-2 focus:ring-indigo-500">
+                                      {ADJUSTMENT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                                    </select>
+                                    <input type="number" value={adjAmount} onChange={e => setAdjAmount(e.target.value)}
+                                      placeholder="金額（負=控除）" className="border border-slate-300 rounded-lg px-2 py-1.5 text-xs w-28 outline-none focus:ring-2 focus:ring-indigo-500" />
+                                  </div>
+                                  <input type="text" value={adjDesc} onChange={e => setAdjDesc(e.target.value)}
+                                    placeholder="説明（任意）" className="w-full border border-slate-300 rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-indigo-500" />
+                                  <div className="flex gap-2">
+                                    <button onClick={() => handleAddAdjustment(dist.id)} disabled={adjSaving || !adjAmount}
+                                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg disabled:opacity-50">
+                                      {adjSaving ? '保存中...' : '保存'}
+                                    </button>
+                                    <button onClick={() => setAdjFormOpen(null)}
+                                      className="px-3 py-1.5 bg-white border border-slate-200 text-slate-500 text-[10px] font-bold rounded-lg">
+                                      キャンセル
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Actions */}
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">

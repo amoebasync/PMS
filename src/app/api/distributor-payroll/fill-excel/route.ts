@@ -94,6 +94,23 @@ export async function POST(request: Request) {
         };
       });
 
+    // ── 調整データを取得してdistributorsに付与 ──
+    const allAdjustments = await prisma.payrollAdjustment.findMany({
+      where: { periodStart, distributorId: { not: null } },
+    });
+    const adjByDist = new Map<number, { type: string; amount: number }[]>();
+    for (const adj of allAdjustments) {
+      if (!adj.distributorId) continue;
+      if (!adjByDist.has(adj.distributorId)) adjByDist.set(adj.distributorId, []);
+      adjByDist.get(adj.distributorId)!.push({ type: adj.type, amount: adj.amount });
+    }
+    for (const d of distributors) {
+      const rec = records.find(r => r.distributor.staffId === d.staffId);
+      if (rec) {
+        (d as any).adjustments = adjByDist.get(rec.distributor.id) || [];
+      }
+    }
+
     // ── 社員の週払い給与も取得 ──
     const empRecords = await prisma.payrollRecord.findMany({
       where: {

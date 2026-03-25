@@ -122,10 +122,26 @@ def main():
         print(json.dumps({"error": f"週ブロックが見つかりません: {data['weekStart']}"}))
         sys.exit(0)
 
-    # 小計・交通費・合計の行位置
+    # 小計・各種控除・合計の行位置（block_startからのオフセット）
     expense_row = block_start + 11       # 交通費（経費）
-    total_row = block_start + 22         # 合計
-    # ※ 小計行 (block_start + 7, +8) は SUM関数が入っているので触らない
+    penalty_row = block_start + 12       # 罰金
+    equipment_row = block_start + 13     # 備品代
+    advance_row = block_start + 14       # 前借
+    transfer_fee_row = block_start + 15  # 振込手数料
+    housing_row = block_start + 17       # 寮費
+    adjustment_row = block_start + 18    # 調整金（中継等）
+    # ※ 小計行・合計行は SUM関数が入っているので触らない
+
+    # 調整タイプ → Excel行のマッピング
+    ADJ_ROW_MAP = {
+        'PENALTY': penalty_row,
+        'EQUIPMENT': equipment_row,
+        'ADVANCE': advance_row,
+        'TRANSFER_FEE': transfer_fee_row,
+        'HOUSING': housing_row,
+        'ADJUSTMENT': adjustment_row,
+        'BONUS': adjustment_row,  # ボーナスも調整金行に入れる
+    }
 
     staff_cols, max_used_col = find_staff_columns(ws)
 
@@ -215,6 +231,18 @@ def main():
 
         # 交通費
         ws.cell(expense_row, col).value = expense_pay
+
+        # 調整項目
+        adj_list = dist.get("adjustments", [])
+        # 行ごとに集計（同じ行に複数の調整がある場合は合算）
+        adj_by_row = {}
+        for adj in adj_list:
+            row = ADJ_ROW_MAP.get(adj.get("type"))
+            if row:
+                adj_by_row[row] = adj_by_row.get(row, 0) + adj.get("amount", 0)
+        for row, amount in adj_by_row.items():
+            if amount != 0:
+                ws.cell(row, col).value = amount
 
         # ※ 小計行・合計行は SUM関数のまま触らない
 
