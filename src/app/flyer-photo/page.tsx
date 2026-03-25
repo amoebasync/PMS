@@ -179,7 +179,7 @@ export default function FlyerPhotoPage() {
                   )}
                   <input
                     ref={el => { fileInputRefs.current[flyerKey] = el; }}
-                    type="file" accept="image/*" capture="environment" className="hidden"
+                    type="file" accept="image/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(s.id, 'FLYER', f); e.target.value = ''; }}
                   />
                   <button
@@ -213,7 +213,7 @@ export default function FlyerPhotoPage() {
                   )}
                   <input
                     ref={el => { fileInputRefs.current[mapKey] = el; }}
-                    type="file" accept="image/*" capture="environment" className="hidden"
+                    type="file" accept="image/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleUpload(s.id, 'MAP', f); e.target.value = ''; }}
                   />
                   <button
