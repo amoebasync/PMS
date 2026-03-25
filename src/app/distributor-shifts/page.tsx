@@ -424,11 +424,17 @@ export default function DistributorShiftsPage() {
           </div>
 
           {/* グリッドテーブル */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="bg-slate-50/80">
-                  <th className="text-left px-4 py-3 font-semibold text-slate-600 border-b border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10 min-w-[180px]">
+          <div className="overflow-auto max-h-[calc(100vh-220px)]">
+            <table className="w-full text-sm border-collapse table-fixed">
+              <colgroup>
+                <col className="w-[180px] min-w-[180px]" />
+                {weekDates.map(d => (
+                  <col key={d} className="w-[72px] min-w-[72px]" />
+                ))}
+              </colgroup>
+              <thead className="sticky top-0 z-20">
+                <tr className="bg-slate-50">
+                  <th className="text-left px-3 py-2 font-semibold text-slate-600 border-b border-r border-slate-200 sticky left-0 bg-slate-50 z-30">
                     {t('table_distributor')}
                   </th>
                   {weekDates.map(dateStr => {
@@ -441,21 +447,21 @@ export default function DistributorShiftsPage() {
                     return (
                       <th
                         key={dateStr}
-                        className={`text-center px-2 py-2 border-b border-r border-slate-100 min-w-[90px] ${
-                          isToday ? 'bg-indigo-50' : ''
+                        className={`text-center px-1 py-1.5 border-b border-r border-slate-200 ${
+                          isToday ? 'bg-indigo-50' : 'bg-slate-50'
                         }`}
                       >
-                        <div className={`text-[11px] font-bold ${
+                        <div className={`text-[10px] font-bold leading-none ${
                           isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-500'
                         }`}>
                           {wd}
                         </div>
-                        <div className={`text-lg font-bold leading-tight ${
+                        <div className={`text-base font-bold leading-tight ${
                           isToday ? 'text-indigo-600' : isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-slate-800'
                         }`}>
                           {day}
                         </div>
-                        <div className={`text-[10px] mt-0.5 ${
+                        <div className={`text-[9px] ${
                           isToday ? 'text-indigo-500' : 'text-slate-400'
                         }`}>
                           {d.getMonth() + 1}月
@@ -477,12 +483,12 @@ export default function DistributorShiftsPage() {
                   weekDistributors.map(dist => (
                     <tr key={dist.id} className="hover:bg-slate-50/30 transition-colors group">
                       {/* 配布員名 */}
-                      <td className="px-4 py-2.5 border-b border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/30 z-10">
-                        <div className="font-medium text-slate-800 text-[13px] leading-tight">{dist.name}</div>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className="text-[10px] font-mono text-slate-400">{dist.staffId}</span>
+                      <td className="px-3 py-1 border-b border-r border-slate-100 sticky left-0 bg-white group-hover:bg-slate-50/30 z-10">
+                        <div className="font-medium text-slate-800 text-xs leading-tight truncate" title={dist.name}>{dist.name}</div>
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[9px] font-mono text-slate-400">{dist.staffId}</span>
                           {dist.branch && (
-                            <span className="text-[10px] text-slate-400">{dist.branch.nameJa}</span>
+                            <span className="text-[9px] text-slate-400">{dist.branch.nameJa}</span>
                           )}
                         </div>
                       </td>
@@ -498,28 +504,27 @@ export default function DistributorShiftsPage() {
                             } ${cell ? 'hover:bg-emerald-50' : 'hover:bg-slate-100/50'}`}
                             onClick={() => {
                               if (cell) {
-                                // シフトあり → 削除確認
                                 handleDeleteShift(cell.id, dist.name, dateStr);
                               } else {
-                                // シフトなし → 作成
                                 openCreateModal(dateStr, dist.id, dist as Distributor);
                               }
                             }}
+                            title={cell?.note || undefined}
                           >
                             {cell ? (
-                              <div className="py-2">
-                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-emerald-500 text-white text-sm font-bold shadow-sm">
+                              <div className="py-1">
+                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-500 text-white text-xs font-bold shadow-sm">
                                   {cell.count}
                                 </span>
                                 {cell.note && (
-                                  <div className="text-[9px] text-slate-400 mt-0.5 truncate px-1" title={cell.note}>
-                                    {cell.note}
+                                  <div className="absolute top-0.5 right-0.5">
+                                    <i className="bi bi-chat-left-text text-[8px] text-amber-500"></i>
                                   </div>
                                 )}
                               </div>
                             ) : (
-                              <div className="py-2 opacity-0 group-hover:opacity-30 hover:!opacity-60 transition-opacity">
-                                <i className="bi bi-plus-circle text-slate-400 text-lg"></i>
+                              <div className="py-1 opacity-0 group-hover:opacity-30 hover:!opacity-60 transition-opacity">
+                                <i className="bi bi-plus-circle text-slate-400 text-sm"></i>
                               </div>
                             )}
                           </td>
@@ -531,9 +536,9 @@ export default function DistributorShiftsPage() {
               </tbody>
               {/* フッター: 日付ごとの合計 */}
               {weekDistributors.length > 0 && (
-                <tfoot>
-                  <tr className="bg-slate-50/80">
-                    <td className="px-4 py-2.5 border-r border-slate-100 sticky left-0 bg-slate-50/80 z-10">
+                <tfoot className="sticky bottom-0 z-20">
+                  <tr className="bg-slate-50 border-t border-slate-200">
+                    <td className="px-3 py-1.5 border-r border-slate-200 sticky left-0 bg-slate-50 z-30">
                       <span className="text-xs font-bold text-slate-500">{t('total')}</span>
                     </td>
                     {weekDates.map(dateStr => {
@@ -542,9 +547,9 @@ export default function DistributorShiftsPage() {
                       return (
                         <td
                           key={dateStr}
-                          className={`text-center py-2.5 border-r border-slate-100 ${isToday ? 'bg-indigo-50/60' : ''}`}
+                          className={`text-center py-1.5 border-r border-slate-200 ${isToday ? 'bg-indigo-50/60' : 'bg-slate-50'}`}
                         >
-                          <span className={`text-sm font-bold ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
+                          <span className={`text-xs font-bold ${count > 0 ? 'text-indigo-600' : 'text-slate-300'}`}>
                             {count}{t('people_suffix')}
                           </span>
                         </td>
