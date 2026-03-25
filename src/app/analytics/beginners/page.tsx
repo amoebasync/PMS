@@ -120,66 +120,69 @@ export default function BeginnersAnalyticsPage() {
       {searched && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="text-xs whitespace-nowrap">
-              <thead>
+            <table className="text-xs whitespace-nowrap border-collapse">
+              <thead className="sticky top-0 z-20">
                 <tr className="bg-slate-50">
-                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-0 bg-slate-50 z-10 min-w-[70px]">支店</th>
-                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-[70px] bg-slate-50 z-10 min-w-[70px]">Staff ID</th>
-                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-[140px] bg-slate-50 z-10 min-w-[120px]">配布員名</th>
-                  <th className="px-2 py-2 text-center font-bold text-slate-500 min-w-[80px]">加入日</th>
-                  <th className="px-2 py-2 text-center font-bold text-slate-500 min-w-[50px]">状態</th>
-                  <th className="px-2 py-2 text-center font-bold text-slate-500 min-w-[40px]">回数</th>
-                  {/* Milestone columns */}
-                  {MILESTONES.map(m => (
-                    <th key={m} className="px-1 py-2 text-center font-bold text-slate-400 min-w-[30px] bg-blue-50">{m}回</th>
+                  {/* Fixed columns: 支店(70) + StaffID(75) + 名前(130) + 加入日(82) + 状態(50) + 回数(42) + milestones(6*32=192) = 641px */}
+                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-0 z-30 bg-slate-50 w-[70px] min-w-[70px]">支店</th>
+                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-[70px] z-30 bg-slate-50 w-[75px] min-w-[75px]">Staff ID</th>
+                  <th className="px-2 py-2 text-left font-bold text-slate-500 sticky left-[145px] z-30 bg-slate-50 w-[130px] min-w-[130px]">配布員名</th>
+                  <th className="px-2 py-2 text-center font-bold text-slate-500 sticky left-[275px] z-30 bg-slate-50 w-[82px] min-w-[82px]">加入日</th>
+                  <th className="px-2 py-2 text-center font-bold text-slate-500 sticky left-[357px] z-30 bg-slate-50 w-[50px] min-w-[50px]">状態</th>
+                  <th className="px-2 py-2 text-center font-bold text-slate-500 sticky left-[407px] z-30 bg-slate-50 w-[42px] min-w-[42px] border-r border-slate-200">回数</th>
+                  {MILESTONES.map((m, mi) => (
+                    <th key={m} className={`px-1 py-2 text-center font-bold text-slate-400 sticky z-30 bg-blue-50 w-[32px] min-w-[32px] ${mi === MILESTONES.length - 1 ? 'border-r border-slate-300' : ''}`}
+                      style={{ left: `${449 + mi * 32}px` }}>{m}回</th>
                   ))}
-                  {/* Round columns */}
                   {Array.from({ length: maxRounds }, (_, i) => (
-                    <th key={i} className="px-2 py-2 text-center font-bold text-slate-500 min-w-[90px]">{i + 1}回目</th>
+                    <th key={i} className="px-2 py-2 text-center font-bold text-slate-500 min-w-[100px]">{i + 1}回目</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {data.length === 0 ? (
                   <tr><td colSpan={6 + MILESTONES.length + maxRounds} className="px-4 py-12 text-center text-slate-400">該当する配布員がいません</td></tr>
-                ) : data.map(d => (
-                  <tr key={d.id} className="hover:bg-slate-50/50">
-                    <td className="px-2 py-2 text-slate-600 sticky left-0 bg-white z-10">{d.branch}</td>
-                    <td className="px-2 py-2 font-mono text-slate-500 sticky left-[70px] bg-white z-10">{d.staffId}</td>
-                    <td className="px-2 py-2 font-bold text-slate-800 sticky left-[140px] bg-white z-10 truncate max-w-[120px]" title={d.name}>{d.name}</td>
-                    <td className="px-2 py-2 text-center text-slate-600">{formatDate(d.joinDate)}</td>
-                    <td className="px-2 py-2 text-center">
-                      {d.isActive ? (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">継続</span>
-                      ) : (
-                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 text-red-700">退職</span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-center font-bold text-slate-700">{d.attendanceCount}</td>
-                    {/* Milestones */}
-                    {MILESTONES.map(m => (
-                      <td key={m} className="px-1 py-2 text-center bg-blue-50/50">
-                        {d.attendanceCount >= m ? (
-                          <span className="text-emerald-600 font-bold">O</span>
+                ) : data.map(d => {
+                  const rowBg = d.isActive ? 'bg-white' : 'bg-slate-100';
+                  const textCls = d.isActive ? '' : 'opacity-50';
+                  return (
+                    <tr key={d.id} className={`${d.isActive ? 'hover:bg-slate-50/50' : ''}`}>
+                      <td className={`px-2 py-2 text-slate-600 sticky left-0 z-10 ${rowBg} ${textCls}`}>{d.branch}</td>
+                      <td className={`px-2 py-2 font-mono text-slate-500 sticky left-[70px] z-10 ${rowBg} ${textCls}`}>{d.staffId}</td>
+                      <td className={`px-2 py-2 font-bold text-slate-800 sticky left-[145px] z-10 ${rowBg} ${textCls} truncate max-w-[130px]`} title={d.name}>{d.name}</td>
+                      <td className={`px-2 py-2 text-center text-slate-600 sticky left-[275px] z-10 ${rowBg} ${textCls}`}>{formatDate(d.joinDate)}</td>
+                      <td className={`px-2 py-2 text-center sticky left-[357px] z-10 ${rowBg}`}>
+                        {d.isActive ? (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">継続</span>
                         ) : (
-                          <span className="text-slate-300">-</span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-200 text-slate-500">退職</span>
                         )}
                       </td>
-                    ))}
-                    {/* Rounds */}
-                    {Array.from({ length: maxRounds }, (_, i) => {
-                      const att = d.attendances[i];
-                      if (!att) return <td key={i} className="px-2 py-2"></td>;
-                      const colorCls = getCountColor(att.types, att.mainCount);
-                      return (
-                        <td key={i} className={`px-2 py-2 text-center ${colorCls}`} title={`${att.date} ${att.areaName}`}>
-                          <div className="font-bold">{att.types}種, {att.mainCount.toLocaleString()}枚</div>
-                          <div className="text-[9px] text-slate-400 truncate max-w-[85px]">{att.areaName}</div>
+                      <td className={`px-2 py-2 text-center font-bold text-slate-700 sticky left-[407px] z-10 ${rowBg} ${textCls} border-r border-slate-200`}>{d.attendanceCount}</td>
+                      {MILESTONES.map((m, mi) => (
+                        <td key={m} className={`px-1 py-2 text-center sticky z-10 ${rowBg} ${mi === MILESTONES.length - 1 ? 'border-r border-slate-300' : ''}`}
+                          style={{ left: `${449 + mi * 32}px` }}>
+                          {d.attendanceCount >= m ? (
+                            <span className="text-emerald-600 font-bold">O</span>
+                          ) : (
+                            <span className="text-slate-300">-</span>
+                          )}
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                      ))}
+                      {Array.from({ length: maxRounds }, (_, i) => {
+                        const att = d.attendances[i];
+                        if (!att) return <td key={i} className={`px-2 py-2 ${d.isActive ? '' : rowBg}`}></td>;
+                        const colorCls = d.isActive ? getCountColor(att.types, att.mainCount) : 'opacity-50';
+                        return (
+                          <td key={i} className={`px-2 py-2 text-center ${colorCls}`} title={`${att.date} ${att.areaName}`}>
+                            <div className="font-bold">{att.types}種, {att.mainCount.toLocaleString()}枚</div>
+                            <div className="text-[9px] text-slate-400 truncate max-w-[95px]">{att.areaName}</div>
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -97,10 +97,13 @@ export async function GET(request: NextRequest) {
     const attendances = sortedDates.map((dateStr, idx) => {
       const daySchedules = dateGrouped.get(dateStr)!;
 
-      // その日の全スケジュールからチラシ種類数とメイン枚数を計算
-      const allItems = daySchedules.flatMap(s => s.items);
-      const itemCount = allItems.length;
-      const maxPlanned = allItems.reduce((max, item) => Math.max(max, item.plannedCount || 0), 0);
+      // その日のスケジュールごとに種類数とメイン枚数を計算し、平均を取る
+      const perSchedule = daySchedules.map(s => ({
+        types: s.items.length,
+        maxCount: s.items.reduce((max, item) => Math.max(max, item.plannedCount || 0), 0),
+      }));
+      const itemCount = Math.round(perSchedule.reduce((s, p) => s + p.types, 0) / perSchedule.length);
+      const maxPlanned = Math.round(perSchedule.reduce((s, p) => s + p.maxCount, 0) / perSchedule.length);
 
       // エリア名（最初のスケジュールのエリア）
       const firstSchedule = daySchedules[0];
