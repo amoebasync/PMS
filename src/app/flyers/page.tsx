@@ -36,7 +36,7 @@ export default function FlyerPage() {
 
   const initialForm = {
     name: '', flyerCode: '', bundleCount: '', customerId: '', industryId: '', sizeId: '',
-    startDate: '', endDate: '', foldStatus: 'NO_FOLDING_REQUIRED', remarks: ''
+    startDate: '', endDate: '', foldStatus: 'NO_FOLDING_REQUIRED', isSubFlyer: false, remarks: ''
   };
   const [formData, setFormData] = useState(initialForm);
 
@@ -78,6 +78,7 @@ export default function FlyerPage() {
         startDate: flyer.startDate ? flyer.startDate.split('T')[0] : '',
         endDate: flyer.endDate ? flyer.endDate.split('T')[0] : '',
         foldStatus: flyer.foldStatus,
+        isSubFlyer: flyer.isSubFlyer || false,
         remarks: flyer.remarks || ''
       });
     } else {
@@ -237,7 +238,10 @@ export default function FlyerPage() {
              filteredFlyers.map(f => (
               <tr key={f.id} className="hover:bg-slate-50">
                 <td className="px-6 py-4">
-                  <div className="font-bold text-slate-800 text-base">{f.name}</div>
+                  <div className="font-bold text-slate-800 text-base flex items-center gap-1.5">
+                    {f.isSubFlyer && <span className="shrink-0 text-[9px] font-bold bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded">SUB</span>}
+                    {f.name}
+                  </div>
                   <div className="font-mono text-xs text-slate-400 mt-1"><i className="bi bi-upc-scan text-slate-300"></i> {f.flyerCode || t('no_code')}</div>
                 </td>
                 <td className="px-6 py-4">
@@ -573,6 +577,21 @@ export default function FlyerPage() {
                       <span className="text-sm font-bold text-blue-600">{t('form_fold_done')}</span>
                     </label>
                   </div>
+                </div>
+
+                <div className="col-span-2 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!formData.isSubFlyer}
+                      onChange={(e) => setFormData(prev => ({ ...prev, isSubFlyer: e.target.checked }))}
+                      className="w-4 h-4 rounded border-amber-300 text-amber-600 accent-amber-600"
+                    />
+                    <div>
+                      <span className="text-sm font-bold text-amber-700">{t('form_sub_flyer') || 'サブチラシ（自社練習用）'}</span>
+                      <p className="text-[10px] text-amber-500 mt-0.5">{t('form_sub_flyer_desc') || 'サブチラシは配布分析でメイン枚数から除外されます'}</p>
+                    </div>
+                  </label>
                 </div>
 
                 <div className="col-span-2">

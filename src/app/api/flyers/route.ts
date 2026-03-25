@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         startDate: parseDate(body.startDate),
         endDate: parseDate(body.endDate),
         foldStatus: body.foldStatus,
+        isSubFlyer: body.isSubFlyer === true,
         remarks: body.remarks || null,
       },
       include: { customer: true, industry: true, size: true }

@@ -23,6 +23,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         startDate: parseDate(body.startDate),
         endDate: parseDate(body.endDate),
         foldStatus: body.foldStatus,
+        isSubFlyer: body.isSubFlyer === true,
         remarks: body.remarks || null,
       },
     });

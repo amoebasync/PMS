@@ -1186,6 +1186,7 @@ model Flyer {
   totalReceived Int       @default(0) @map("total_received") // 累計納品枚数
   stockCount    Int       @default(0) @map("stock_count")    // 現在の有効在庫枚数
 
+  isSubFlyer   Boolean    @default(false) @map("is_sub_flyer") // サブチラシ（自社練習用）
   remarks      String?    @db.Text
   createdAt    DateTime   @default(now()) @map("created_at")
   updatedAt    DateTime   @updatedAt @map("updated_at")
