@@ -37,7 +37,7 @@ const STATUS_STYLE: Record<string, { bg: string; text: string; label: string; la
 };
 
 export default function InspectionMonitoringPage() {
-  const { t, language } = useTranslation('inspections');
+  const { t, lang: language } = useTranslation('inspections');
   const router = useRouter();
   const [data, setData] = useState<Distributor[]>([]);
   const [summary, setSummary] = useState<Summary | null>(null);
