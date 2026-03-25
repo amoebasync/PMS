@@ -201,11 +201,9 @@ export default function DistributorDashboard() {
                     {day.getDate()}
                   </span>
                   {shift ? (
-                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none ${statusColor[shift.status] || 'bg-slate-200 text-slate-600'}`}>
-                      {statusLabel[shift.status] || shift.status}
-                    </span>
+                    <span className={`w-2.5 h-2.5 rounded-full inline-block ${statusColor[shift.status]?.split(' ')[0] || 'bg-slate-200'}`} title={statusLabel[shift.status] || shift.status}></span>
                   ) : (
-                    <span className="text-[9px] text-slate-200">—</span>
+                    <span className="text-[9px] text-slate-300">—</span>
                   )}
                 </div>
               );
