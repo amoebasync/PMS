@@ -119,7 +119,7 @@ export async function GET(request: Request) {
             date: { gte: weekStart, lte: weekEnd },
             status: { in: ['APPROVED', 'PENDING'] },
           },
-          select: { date: true, totalAmount: true },
+          select: { date: true, amount: true },
         });
 
         const feeSetting = distributor.transportationFee || '1000';
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
           const dateKey = exp.date.toISOString().split('T')[0];
           const flyerCount = dayFlyerCounts[dateKey] || 0;
           const dailyCap = flyerCount <= 1 ? personal1TypeCap : personalCap;
-          expensePay += Math.min(exp.totalAmount, dailyCap);
+          expensePay += Math.min(exp.amount, dailyCap);
         }
       } catch { /* ignore expense errors */ }
 
