@@ -216,10 +216,7 @@ def main():
         # 交通費
         ws.cell(expense_row, col).value = expense_pay
 
-        # 合計
-        ws.cell(total_row, col).value = gross_pay
-
-        # ※ 小計行は SUM関数のまま触らない
+        # ※ 小計行・合計行は SUM関数のまま触らない
 
         updated_count += 1
 
