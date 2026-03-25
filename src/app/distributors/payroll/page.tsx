@@ -210,7 +210,10 @@ export default function DistributorPayrollPage() {
       list = list.filter(d => d.name.toLowerCase().includes(q) || d.staffId.toLowerCase().includes(q));
     }
     if (showWithDataOnly) {
-      list = list.filter(d => recordMap.has(d.id));
+      list = list.filter(d => {
+        const rec = recordMap.get(d.id);
+        return rec && rec.grossPay > 0;
+      });
     }
     if (statusFilter !== 'all') {
       list = list.filter(d => {
@@ -243,6 +246,47 @@ export default function DistributorPayrollPage() {
       return { day, dayStr, scheduleEarned, scheduleItems, expenseAmount, total };
     });
   }
+
+  const [copied, setCopied] = useState(false);
+
+  /* ---- Excel貼り付け用TSVコピー ---- */
+  const handleCopyForExcel = () => {
+    // データありの配布員をスタッフコード順に
+    const sorted = [...records]
+      .filter(r => r.grossPay > 0)
+      .sort((a, b) => a.distributor.staffId.localeCompare(b.distributor.staffId));
+    if (sorted.length === 0) return;
+
+    const tab = '\t';
+    const lines: string[] = [];
+
+    // Row 1: スタッフコード
+    lines.push(['スタッフコード', ...sorted.map(r => r.distributor.staffId)].join(tab));
+    // Row 2: 名前
+    lines.push(['名前', ...sorted.map(r => r.distributor.name)].join(tab));
+
+    // Daily rows
+    weekDays.forEach((day) => {
+      const dayStr = isoDate(day);
+      const dayLabel = `${formatDateJa(dayStr)}（${DAY_LABELS[day.getDay()]}）`;
+      const vals = sorted.map(r => {
+        const earned = r.items.filter(it => it.date.startsWith(dayStr)).reduce((s, it) => s + it.earnedAmount, 0);
+        return earned || 0;
+      });
+      lines.push([dayLabel, ...vals].join(tab));
+    });
+
+    // Summary rows
+    lines.push(['配布報酬 小計', ...sorted.map(r => r.schedulePay)].join(tab));
+    lines.push(['交通費', ...sorted.map(r => r.expensePay)].join(tab));
+    lines.push(['総支給額', ...sorted.map(r => r.grossPay)].join(tab));
+    lines.push(['ステータス', ...sorted.map(r => statusConfig[r.status]?.label || r.status)].join(tab));
+
+    navigator.clipboard.writeText(lines.join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   // 配布員選択ドロップダウンの候補
   const searchSuggestions = useMemo(() => {
@@ -296,6 +340,15 @@ export default function DistributorPayrollPage() {
             className="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-bold rounded-lg transition-colors">
             <i className="bi bi-upload text-slate-400"></i>取込
           </Link>
+          {viewMode === 'week' && (
+            <button onClick={handleCopyForExcel}
+              className={`flex items-center gap-1.5 px-3 py-2 border text-xs font-bold rounded-lg transition-colors ${
+                copied ? 'bg-emerald-50 border-emerald-300 text-emerald-700' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600'
+              }`}>
+              <i className={`bi ${copied ? 'bi-check-lg' : 'bi-clipboard'} ${copied ? 'text-emerald-600' : 'text-slate-400'}`}></i>
+              {copied ? 'コピー済' : 'Excel用コピー'}
+            </button>
+          )}
           {viewMode === 'week' && (
             <button onClick={handleGenerateAll} disabled={generatingAll || loading}
               className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-60">
