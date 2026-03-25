@@ -79,6 +79,8 @@
   "or_divider": "or",
   "tab_file": "File Upload",
   "tab_paste": "Clipboard Paste",
+  "drop_file": "Drop file here",
+  "drag_or_click": "Drag & drop a file here, or click to select",
 
   "partner_project": "Partner Project",
   "select_partner": "Select Partner",

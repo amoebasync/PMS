@@ -62,6 +62,8 @@ export default function DataImportPage() {
   const [pasteText, setPasteText] = useState('');
   const [importStatus, setImportStatus] = useState<'COMPLETED' | 'UNSTARTED'>('UNSTARTED');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // パートナー案件用
   const [partners, setPartners] = useState<{ id: number; name: string }[]>([]);
@@ -715,12 +717,39 @@ export default function DataImportPage() {
 
         <div className="p-6">
           {inputMode === 'file' ? (
-            <input
-              type="file"
-              onChange={handleFileUpload}
-              onClick={resetInput}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200 cursor-pointer"
-            />
+            <div
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+              onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+              onDrop={(e) => {
+                e.preventDefault(); e.stopPropagation(); setIsDragging(false);
+                const file = e.dataTransfer.files?.[0];
+                if (file) {
+                  setMessage(loadingMsg); setParsedData([]);
+                  readFileToRows(file).then(rows => processRows(rows)).catch(() => setMessage(errorReadMsg));
+                }
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${
+                isDragging
+                  ? 'border-indigo-400 bg-indigo-50'
+                  : 'border-slate-300 hover:border-indigo-300 hover:bg-slate-50'
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                onChange={handleFileUpload}
+                onClick={resetInput}
+                className="hidden"
+                accept=".xlsx,.xls,.csv,.tsv"
+              />
+              <i className={`bi bi-cloud-arrow-up text-3xl ${isDragging ? 'text-indigo-500' : 'text-slate-400'}`}></i>
+              <p className="mt-2 text-sm font-semibold text-slate-600">
+                {isDragging ? (ts('drop_file') || 'ファイルをドロップ') : (ts('drag_or_click') || 'ここにファイルをドラッグ＆ドロップ、またはクリックして選択')}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">Excel (.xlsx) / CSV / TSV</p>
+            </div>
           ) : (
             <div>
               <p className="text-sm text-slate-500 mb-3">{ts('paste_description')}</p>
@@ -820,6 +849,7 @@ export default function DataImportPage() {
                     <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_date')}</th>
                     <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_branch')}</th>
                     <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_distributor_id')}</th>
+                    <th className="px-3 py-2.5 whitespace-nowrap">{ts('col_staff_name') || 'スタッフ名'}</th>
                     <th className="px-3 py-2.5">{ts('col_area_info')}</th>
                     <th className="px-3 py-2.5 text-right whitespace-nowrap">{ts('col_area_unit_price')}</th>
                     <th className="px-3 py-2.5">{ts('th_flyer')}</th>
@@ -835,6 +865,7 @@ export default function DataImportPage() {
                         <td className="px-3 py-2.5 whitespace-nowrap text-slate-600">{s.date}</td>
                         <td className="px-3 py-2.5 font-semibold whitespace-nowrap">{s.branchName}</td>
                         <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">{s.distributorStaffId}</td>
+                        <td className="px-3 py-2.5 font-semibold text-slate-700 whitespace-nowrap">{s.staffName || '-'}</td>
                         <td className="px-3 py-2.5 max-w-[200px]">
                           <div className="truncate" title={`${s.dbPrefectureName || ''} ${s.dbFullAreaName || ''}`}>
                             {s.dbPrefectureName ? <span className="text-slate-400">{s.dbPrefectureName} </span> : ''}{s.dbFullAreaName}
