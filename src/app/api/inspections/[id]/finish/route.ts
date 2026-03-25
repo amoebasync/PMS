@@ -227,7 +227,7 @@ export async function POST(
                   const dLat = Math.max(...lats) - Math.min(...lats);
                   const maxSpan = Math.max(dLng, dLat);
                   // 経験的なズーム計算: span→zoom の近似
-                  if (maxSpan > 0) zoom = Math.min(17, Math.max(13, Math.log2(0.015 / maxSpan) + 15.5));
+                  if (maxSpan > 0) zoom = Math.min(15.5, Math.max(13, Math.log2(0.03 / maxSpan) + 15));
                 }
               } catch {}
             }
