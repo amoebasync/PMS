@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    // LIFFログインフラグ（パスワード変更チェックスキップ用）
+    cookieStore.set('pms_liff_session', '1', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    });
 
     await writeAuditLog({
       actorType: 'STAFF',

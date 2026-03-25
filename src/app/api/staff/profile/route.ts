@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { cookies } from 'next/headers';
 import { getDistributorFromCookie } from '@/lib/distributorAuth';
 
 
@@ -11,6 +12,13 @@ export async function GET() {
     }
 
     const { passwordHash, ...safeData } = distributor;
+
+    // LIFFログインの場合はパスワード変更を強制しない
+    const cookieStore = await cookies();
+    if (cookieStore.get('pms_liff_session')?.value) {
+      safeData.isPasswordTemp = false;
+    }
+
     return NextResponse.json(safeData);
   } catch (error) {
     console.error('Distributor Profile GET Error:', error);
