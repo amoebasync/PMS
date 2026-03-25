@@ -32,8 +32,7 @@ export default function StaffLineLoginPage() {
 
         if (res.ok) {
           const data = await res.json();
-          const lang = data.language || 'ja';
-          router.replace(lang === 'en' ? '/staff/en/shifts' : '/staff/shifts');
+          router.replace('/staff');
         } else {
           const err = await res.json();
           setError(err.error || 'Login failed');
