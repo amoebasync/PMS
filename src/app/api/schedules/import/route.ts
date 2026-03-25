@@ -475,13 +475,13 @@ export async function POST(request: Request) {
               date: new Date(dateStr),
               id: { notIn: [...allKeepIds] },
             },
-            select: { id: true, status: true, psGpsAvailable: true, session: { select: { id: true, finishedAt: true } } },
+            select: { id: true, status: true, session: { select: { id: true, finishedAt: true } } },
           });
 
           for (const old of candidates) {
-            // 配布中のスケジュールは絶対に削除しない（PS Fallback含む）
+            // アクティブセッション（配布中）のスケジュールのみ削除しない
             const hasActiveSession = old.session && !old.session.finishedAt;
-            if (old.status === 'DISTRIBUTING' || hasActiveSession || old.psGpsAvailable === true) {
+            if (hasActiveSession) {
               continue;
             }
 
