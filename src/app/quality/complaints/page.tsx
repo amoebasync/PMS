@@ -86,8 +86,8 @@ interface BranchOption {
 // ===== Constants =====
 const STATUS_STYLE: Record<string, { bg: string; text: string }> = {
   UNRESOLVED: { bg: 'bg-red-100', text: 'text-red-700' },
-  IN_PROGRESS: { bg: 'bg-yellow-100', text: 'text-yellow-700' },
-  RESOLVED: { bg: 'bg-green-100', text: 'text-green-700' },
+  IN_PROGRESS: { bg: 'bg-amber-100', text: 'text-amber-700' },
+  RESOLVED: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
 };
 
 const STATUS_LABEL_KEYS: Record<string, string> = {
@@ -243,7 +243,7 @@ function AutocompleteInput({
             value={query}
             onChange={handleChange}
             placeholder={placeholder}
-            className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+            className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
           />
           {isLoading && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -286,7 +286,7 @@ function StatusBadge({ status, t }: { status: string; t?: (key: string) => strin
   const labelKey = STATUS_LABEL_KEYS[status] || status;
   const label = t ? t(labelKey) : labelKey;
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold ${style.bg} ${style.text}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${style.bg} ${style.text}`}>
       {label}
     </span>
   );
@@ -478,39 +478,35 @@ export default function ComplaintsPage() {
   // ================================================================
   return (
     <div className="max-w-[1400px] mx-auto">
-      {/* Action buttons */}
-      <div className="flex justify-end gap-2 mb-4">
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition-colors"
-        >
-          <i className="bi bi-plus-lg"></i>
-          {t('create')}
-        </button>
-      </div>
-
       {/* Filter Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-6">
-        {/* Status Tabs */}
-        <div className="flex flex-wrap gap-2 mb-5">
-          {STATUS_KEYS.map((key) => (
-            <button
-              key={key}
-              onClick={() => { setStatusFilter(key); setPage(1); }}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
-                statusFilter === key
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {t(STATUS_LABEL_KEYS[key])}
-              <span className={`ml-1.5 text-xs font-normal ${
-                statusFilter === key ? 'text-indigo-200' : 'text-slate-400'
-              }`}>
-                ({statusCounts[key] ?? 0})
-              </span>
-            </button>
-          ))}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3 md:p-4 mb-4 space-y-3">
+        {/* Status Tabs + Action Button */}
+        <div className="flex items-center justify-between gap-3">
+          <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+            {STATUS_KEYS.map((key) => (
+              <button
+                key={key}
+                onClick={() => { setStatusFilter(key); setPage(1); }}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+                  statusFilter === key
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {t(STATUS_LABEL_KEYS[key])}
+                <span className={`ml-1 text-[10px] ${statusFilter === key ? 'text-slate-400' : 'text-slate-400'}`}>
+                  {statusCounts[key] ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition-colors md:ml-auto shrink-0"
+          >
+            <i className="bi bi-plus-lg"></i>
+            {t('create')}
+          </button>
         </div>
 
         {/* Filter Row */}
@@ -520,7 +516,7 @@ export default function ComplaintsPage() {
             <select
               value={branchFilter}
               onChange={e => { setBranchFilter(e.target.value); setPage(1); }}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
               <option value="">{t('filter_all_branches')}</option>
               {branches.map(b => (
@@ -534,7 +530,7 @@ export default function ComplaintsPage() {
               type="date"
               value={dateFrom}
               onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
@@ -543,19 +539,19 @@ export default function ComplaintsPage() {
               type="date"
               value={dateTo}
               onChange={e => { setDateTo(e.target.value); setPage(1); }}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
             <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_keyword')}</label>
             <div className="relative">
-              <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+              <i className="bi bi-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
               <input
                 type="text"
                 value={searchKeyword}
                 onChange={e => setSearchKeyword(e.target.value)}
                 placeholder={t('filter_keyword_placeholder')}
-                className="w-full border border-slate-300 pl-9 pr-3 py-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 pl-8 pr-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -563,33 +559,33 @@ export default function ComplaintsPage() {
       </div>
 
       {/* Table Card */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
-            <span className="ml-3 text-sm text-slate-500">{t('loading')}</span>
+            <span className="ml-3 text-xs text-slate-500">{t('loading')}</span>
           </div>
         ) : complaints.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <i className="bi bi-inbox text-4xl mb-3"></i>
-            <p className="text-sm">{t('no_complaints')}</p>
+          <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+            <i className="bi bi-inbox text-3xl mb-2 block"></i>
+            <p className="text-xs">{t('no_complaints')}</p>
           </div>
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200">
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_received_date')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_type')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_title')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_address')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_customer')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_distributor')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_status')}</th>
-                    <th className="text-left px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_assignee')}</th>
-                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_response_count')}</th>
-                    <th className="text-center px-4 py-3 font-bold text-slate-600 whitespace-nowrap">{t('table_actions')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_received_date')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_type')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_title')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_address')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_customer')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_distributor')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_status')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{t('table_assignee')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-center">{t('table_response_count')}</th>
+                    <th className="px-3 py-2.5 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap text-center">{t('table_actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -597,45 +593,45 @@ export default function ComplaintsPage() {
                     <tr
                       key={c.id}
                       onClick={() => openDetail(c.id)}
-                      className="border-b border-slate-100 hover:bg-indigo-50/50 cursor-pointer transition-colors"
+                      className="border-b border-slate-100 hover:bg-indigo-50/30 cursor-pointer transition-colors"
                     >
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-700">{formatDate(c.occurredAt)}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-700">{formatDate(c.occurredAt)}</td>
+                      <td className="px-3 py-3 whitespace-nowrap">
                         {c.complaintType ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
                             {c.complaintType.name}
                           </span>
                         ) : (
                           <span className="text-slate-300">-</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 max-w-[200px] truncate font-medium text-slate-800">{c.title}</td>
-                      <td className="px-4 py-3 max-w-[180px] truncate text-slate-600">{c.address}</td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">
+                      <td className="px-3 py-3 max-w-[200px] truncate font-medium text-slate-800">{c.title}</td>
+                      <td className="px-3 py-3 max-w-[180px] truncate text-slate-600">{c.address}</td>
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-600">
                         {c.customer ? c.customer.name : <span className="text-slate-300">-</span>}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-600">
                         {c.distributor ? c.distributor.name : <span className="text-slate-300">-</span>}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3 whitespace-nowrap">
                         <StatusBadge status={c.status} t={t} />
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-slate-600">
+                      <td className="px-3 py-3 whitespace-nowrap text-slate-600">
                         {c.assignee ? employeeName(c.assignee) : <span className="text-slate-300">-</span>}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center">
                         {(c._count?.responses ?? 0) > 0 ? (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
+                          <span className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
                             {c._count?.responses}
                           </span>
                         ) : (
                           <span className="text-slate-300">0</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-3 py-3 text-center">
                         <button
                           onClick={(e) => { e.stopPropagation(); openDetail(c.id); }}
-                          className="text-indigo-600 hover:text-indigo-800 font-bold text-xs transition-colors"
+                          className="text-indigo-600 hover:text-indigo-800 font-bold text-[10px] transition-colors"
                         >
                           {t('details')}
                         </button>
@@ -941,7 +937,7 @@ function CreateComplaintModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end md:items-start justify-center bg-black/50 backdrop-blur-sm md:overflow-y-auto md:py-8">
-      <div className="bg-white w-full md:max-w-2xl rounded-t-2xl md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-none overflow-y-auto">
+      <div className="bg-white w-full md:max-w-2xl rounded-t-xl md:rounded-xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-none overflow-y-auto">
         {/* Mobile drag handle */}
         <div className="md:hidden flex justify-center pt-2 pb-1 sticky top-0 bg-white z-10">
           <div className="w-10 h-1 bg-slate-300 rounded-full" />
@@ -969,7 +965,7 @@ function CreateComplaintModal({
                 value={occurredAt}
                 onChange={e => setOccurredAt(e.target.value)}
                 required
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -979,7 +975,7 @@ function CreateComplaintModal({
               <select
                 value={complaintTypeId}
                 onChange={e => setComplaintTypeId(e.target.value)}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="">{t('form_select_placeholder')}</option>
                 {complaintTypes.filter(t => t.isActive).map(t => (
@@ -999,7 +995,7 @@ function CreateComplaintModal({
               onChange={e => setTitle(e.target.value)}
               required
               placeholder={t('form_title_placeholder')}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -1013,7 +1009,7 @@ function CreateComplaintModal({
               onChange={e => setAddress(e.target.value)}
               required
               placeholder={t('form_address_placeholder')}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
 
@@ -1027,7 +1023,7 @@ function CreateComplaintModal({
                 value={buildingName}
                 onChange={e => setBuildingName(e.target.value)}
                 placeholder={t('form_building_name')}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -1039,7 +1035,7 @@ function CreateComplaintModal({
                 value={roomNumber}
                 onChange={e => setRoomNumber(e.target.value)}
                 placeholder={t('form_room_number')}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -1054,7 +1050,7 @@ function CreateComplaintModal({
               required
               rows={4}
               placeholder={t('form_detail_placeholder')}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
 
@@ -1103,7 +1099,7 @@ function CreateComplaintModal({
               <select
                 value={scheduleId}
                 onChange={e => setScheduleId(e.target.value)}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="">{t('form_select_placeholder')}</option>
                 {scheduleOptions.map(s => (
@@ -1123,7 +1119,7 @@ function CreateComplaintModal({
               <select
                 value={branchId}
                 onChange={e => setBranchId(e.target.value)}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="">{t('form_select_placeholder')}</option>
                 {branches.map(b => (
@@ -1159,7 +1155,7 @@ function CreateComplaintModal({
                 value={latitude}
                 onChange={e => setLatitude(e.target.value)}
                 placeholder="35.6812"
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
@@ -1172,7 +1168,7 @@ function CreateComplaintModal({
                 value={longitude}
                 onChange={e => setLongitude(e.target.value)}
                 placeholder="139.7671"
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -1194,7 +1190,7 @@ function CreateComplaintModal({
                   setSourcePartnerId('');
                   setSourcePartnerName('');
                 }}
-                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
               >
                 <option value="">{t('form_select_placeholder')}</option>
                 {Object.entries(SOURCE_LABEL_KEYS).map(([key, labelKey]) => (
@@ -1215,7 +1211,7 @@ function CreateComplaintModal({
                     value={sourceContactName}
                     onChange={e => setSourceContactName(e.target.value)}
                     placeholder={t('source_contact_name_placeholder')}
-                    className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
                 <div>
@@ -1227,7 +1223,7 @@ function CreateComplaintModal({
                     value={sourceContactPhone}
                     onChange={e => setSourceContactPhone(e.target.value)}
                     placeholder="090-1234-5678"
-                    className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                 </div>
               </div>
@@ -1373,7 +1369,7 @@ function CreateComplaintModal({
                       onChange={e => setResponseTaskContent(e.target.value)}
                       rows={2}
                       placeholder={t('task_response_content_placeholder')}
-                      className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
                   </div>
                   <AutocompleteInput
@@ -1431,7 +1427,7 @@ function CreateComplaintModal({
                       onChange={e => setCustomerReportContent(e.target.value)}
                       rows={2}
                       placeholder={t('task_report_content_placeholder')}
-                      className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                      className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
                     />
                   </div>
                   <AutocompleteInput
@@ -1459,14 +1455,14 @@ function CreateComplaintModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+              className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-xs transition-colors border border-slate-200"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-50"
             >
               {submitting ? (
                 <span className="flex items-center gap-2">
@@ -1652,7 +1648,7 @@ function DetailModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-end md:items-start justify-center bg-black/50 backdrop-blur-sm md:overflow-y-auto md:py-6">
-      <div className="bg-white w-full h-full md:h-auto md:max-w-5xl rounded-none md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 overflow-y-auto">
+      <div className="bg-white w-full h-full md:h-auto md:max-w-5xl rounded-none md:rounded-xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 overflow-y-auto">
         {/* Mobile drag handle */}
         <div className="md:hidden flex justify-center pt-2 pb-1 sticky top-0 bg-white z-10">
           <div className="w-10 h-1 bg-slate-300 rounded-full" />
@@ -1928,7 +1924,7 @@ function DetailModal({
                       value={complaint.status}
                       onChange={e => handleStatusChange(e.target.value)}
                       disabled={changingStatus}
-                      className="w-full border border-slate-300 p-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-50"
+                      className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white disabled:opacity-50"
                     >
                       <option value="UNRESOLVED">{t('status_unresolved')}</option>
                       <option value="IN_PROGRESS">{t('status_in_progress')}</option>
@@ -1947,7 +1943,7 @@ function DetailModal({
                       value={penaltyScoreInput}
                       onChange={e => setPenaltyScoreInput(e.target.value)}
                       placeholder={t('sidebar_penalty_type_default', { score: String(complaint.complaintType?.penaltyScore ?? 10) })}
-                      className="w-full border border-slate-300 p-2.5 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                      className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
                     />
                     <p className="text-[10px] text-slate-400">{t('sidebar_penalty_empty_hint')}</p>
                     <button
@@ -2069,7 +2065,7 @@ function DetailModal({
                                 {task.taskCategory?.icon && <i className={`${task.taskCategory.icon} mr-1 text-xs`}></i>}
                                 {task.title}
                               </p>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${tStyle.bg} ${tStyle.text}`}>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold shrink-0 ${tStyle.bg} ${tStyle.text}`}>
                                 {t(tLabelKey)}
                               </span>
                             </div>
@@ -2191,7 +2187,7 @@ function ProhibitedPropertyModal({
 
   return (
     <div className="fixed inset-0 z-[210] flex items-end md:items-center justify-center bg-black/40 md:p-4">
-      <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+      <div className="bg-white w-full md:max-w-md rounded-t-xl md:rounded-xl shadow-2xl md:mx-4 animate-in zoom-in-95 duration-200 max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
         {/* Mobile drag handle */}
         <div className="md:hidden flex justify-center pt-2 pb-1">
           <div className="w-10 h-1 bg-slate-300 rounded-full" />
@@ -2239,7 +2235,7 @@ function ProhibitedPropertyModal({
             <select
               value={prohibitedReasonId}
               onChange={e => setProhibitedReasonId(e.target.value)}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
               <option value="">{t('form_select_placeholder')}</option>
               {prohibitedReasons.filter(r => r.isActive).map(r => (
@@ -2290,7 +2286,7 @@ function ProhibitedPropertyModal({
               onChange={e => setReasonDetail(e.target.value)}
               rows={3}
               placeholder={t('prohibited_reason_placeholder')}
-              className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+              className="w-full border border-slate-300 px-3 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
             />
           </div>
 
@@ -2299,14 +2295,14 @@ function ProhibitedPropertyModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-xl font-bold text-sm transition-colors border border-slate-200"
+              className="px-5 py-2.5 text-slate-600 hover:bg-slate-100 rounded-lg font-bold text-xs transition-colors border border-slate-200"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-sm shadow-md transition-colors disabled:opacity-50"
+              className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors disabled:opacity-50"
             >
               {submitting ? (
                 <span className="flex items-center gap-2">
