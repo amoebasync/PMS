@@ -163,3 +163,13 @@ export function buildRegistrationFlexMessage() {
 export function isLineConfigured(): boolean {
   return !!getAccessToken() && !!getChannelSecret();
 }
+
+/** 研修テスト割当の LINE 通知メッセージを構築 */
+export function buildTrainingTestMessage(distributorName: string, portalUrl: string) {
+  return [
+    {
+      type: 'text' as const,
+      text: `${distributorName}さん\n\n研修テストが届きました。\n以下のリンクから受験してください。\n\nA training test has been assigned to you.\nPlease take the test from the link below.\n\n${portalUrl}/staff/test`
+    }
+  ];
+}
