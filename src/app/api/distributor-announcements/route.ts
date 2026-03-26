@@ -126,9 +126,9 @@ export async function POST(request: Request) {
                 header: {
                   type: 'box', layout: 'vertical',
                   contents: [
-                    { type: 'text', text: isEn ? 'Important Notice' : '重要なお知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' },
+                    { type: 'text', text: isEn ? 'Notice' : 'お知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' },
                   ],
-                  backgroundColor: '#DC2626', paddingAll: '12px',
+                  backgroundColor: '#4F46E5', paddingAll: '12px',
                 },
                 body: {
                   type: 'box', layout: 'vertical',
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
                   contents: [{
                     type: 'button',
                     action: { type: 'uri', label: isEn ? 'Open Portal' : 'ポータルを開く', uri: portalUrl },
-                    style: 'primary', color: '#DC2626',
+                    style: 'primary', color: '#4F46E5',
                   }],
                   paddingAll: '12px',
                 },
