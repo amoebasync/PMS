@@ -172,6 +172,7 @@ function CreateModal({ t, onClose, onCreated }: {
   const [contentEn, setContentEn] = useState('');
   const [targetMode, setTargetMode] = useState<'all' | 'ja' | 'en' | 'select'>('all');
   const [distributorIds, setDistributorIds] = useState<number[]>([]);
+  const [selectedDistributors, setSelectedDistributors] = useState<Map<number, DistributorOption>>(new Map());
   const [distributorSearch, setDistributorSearch] = useState('');
   const [distributorOptions, setDistributorOptions] = useState<DistributorOption[]>([]);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -360,7 +361,11 @@ function CreateModal({ t, onClose, onCreated }: {
                     {distributorOptions.filter(d => !distributorIds.includes(d.id)).map(d => (
                       <div
                         key={d.id}
-                        onClick={() => { setDistributorIds(prev => [...prev, d.id]); setDistributorSearch(''); }}
+                        onClick={() => {
+                          setDistributorIds(prev => [...prev, d.id]);
+                          setSelectedDistributors(prev => new Map(prev).set(d.id, d));
+                          setDistributorSearch('');
+                        }}
                         className="px-3 py-1.5 text-xs hover:bg-indigo-50 cursor-pointer flex justify-between"
                       >
                         <span>{d.name}</span>
@@ -372,11 +377,11 @@ function CreateModal({ t, onClose, onCreated }: {
                 {distributorIds.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {distributorIds.map(id => {
-                      const d = distributorOptions.find(o => o.id === id);
+                      const d = selectedDistributors.get(id);
                       return (
                         <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-[10px] font-bold">
-                          {d?.name || `ID:${id}`}
-                          <button onClick={() => setDistributorIds(prev => prev.filter(x => x !== id))} className="hover:text-red-500">
+                          {d?.name || `ID:${id}`}{d?.staffId ? ` (${d.staffId})` : ''}
+                          <button onClick={() => { setDistributorIds(prev => prev.filter(x => x !== id)); setSelectedDistributors(prev => { const m = new Map(prev); m.delete(id); return m; }); }} className="hover:text-red-500">
                             <i className="bi bi-x" />
                           </button>
                         </span>
