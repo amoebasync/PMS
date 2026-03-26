@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const result = await Promise.all(announcements.map(async (a) => {
       let targetCount: number;
       if (a.targetAll) {
-        targetCount = await prisma.flyerDistributor.count({ where: { isActive: true } });
+        targetCount = await prisma.flyerDistributor.count();
       } else {
         targetCount = a.targets.length;
       }
