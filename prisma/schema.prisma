@@ -2251,6 +2251,8 @@ model DistributorAnnouncement {
   id          Int      @id @default(autoincrement())
   title       String   @db.VarChar(255)
   content     String   @db.Text
+  titleEn     String?  @db.VarChar(255) @map("title_en")
+  contentEn   String?  @db.Text @map("content_en")
   imageUrls   String?  @db.Text @map("image_urls") // JSON array of S3 URLs
   targetAll   Boolean  @default(true) @map("target_all")
   createdById Int      @map("created_by_id")

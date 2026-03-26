@@ -30,6 +30,8 @@ export async function GET() {
         id: true,
         title: true,
         content: true,
+        titleEn: true,
+        contentEn: true,
         imageUrls: true,
         createdAt: true,
       },

@@ -168,6 +168,8 @@ function CreateModal({ t, onClose, onCreated }: {
 }) {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [titleEn, setTitleEn] = useState('');
+  const [contentEn, setContentEn] = useState('');
   const [targetAll, setTargetAll] = useState(true);
   const [distributorIds, setDistributorIds] = useState<number[]>([]);
   const [distributorSearch, setDistributorSearch] = useState('');
@@ -226,7 +228,7 @@ function CreateModal({ t, onClose, onCreated }: {
       const res = await fetch('/api/distributor-announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, imageUrls, targetAll, distributorIds: targetAll ? [] : distributorIds }),
+        body: JSON.stringify({ title, content, titleEn: titleEn || undefined, contentEn: contentEn || undefined, imageUrls, targetAll, distributorIds: targetAll ? [] : distributorIds }),
       });
       if (res.ok) onCreated();
     } catch (e) { console.error(e); }
@@ -254,14 +256,40 @@ function CreateModal({ t, onClose, onCreated }: {
 
           {/* Content */}
           <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_content')}</label>
+            <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_content')} (日本語)</label>
             <textarea
               value={content}
               onChange={e => setContent(e.target.value)}
-              rows={6}
+              rows={4}
               className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
               placeholder={t('placeholder_content')}
             />
+          </div>
+
+          {/* English fields */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
+              <i className="bi bi-translate" /> English Version
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_title')} (English)</label>
+              <input
+                value={titleEn}
+                onChange={e => setTitleEn(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="Enter announcement title in English..."
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_content')} (English)</label>
+              <textarea
+                value={contentEn}
+                onChange={e => setContentEn(e.target.value)}
+                rows={4}
+                className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                placeholder="Enter announcement content in English..."
+              />
+            </div>
           </div>
 
           {/* Images */}

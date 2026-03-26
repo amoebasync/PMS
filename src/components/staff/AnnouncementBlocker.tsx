@@ -1,16 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 
 interface BlockingAnnouncement {
   id: number;
   title: string;
   content: string;
+  titleEn: string | null;
+  contentEn: string | null;
   imageUrls: string[];
   createdAt: string;
 }
 
 export default function AnnouncementBlocker() {
+  const pathname = usePathname();
+  const isEn = pathname.startsWith('/staff/en');
   const [announcements, setAnnouncements] = useState<BlockingAnnouncement[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
@@ -80,6 +85,9 @@ export default function AnnouncementBlocker() {
 
   if (!current) return null;
 
+  const displayTitle = isEn ? (current.titleEn || current.title) : current.title;
+  const displayContent = isEn ? (current.contentEn || current.content) : current.content;
+
   return (
     <div className="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
@@ -90,9 +98,9 @@ export default function AnnouncementBlocker() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-[11px] text-indigo-200">
-              お知らせ {announcements.length > 1 ? `(${currentIndex + 1}/${announcements.length})` : ''}
+              {isEn ? 'Notice' : 'お知らせ'} {announcements.length > 1 ? `(${currentIndex + 1}/${announcements.length})` : ''}
             </div>
-            <div className="text-sm font-bold truncate">{current.title}</div>
+            <div className="text-sm font-bold truncate">{displayTitle}</div>
           </div>
         </div>
 
@@ -119,7 +127,7 @@ export default function AnnouncementBlocker() {
 
           {/* Text content - preserve whitespace */}
           <div className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-            {current.content}
+            {displayContent}
           </div>
         </div>
 
@@ -128,7 +136,7 @@ export default function AnnouncementBlocker() {
           {!scrolledToBottom && (
             <div className="flex items-center justify-center gap-1 text-xs text-amber-600 mb-3 animate-bounce">
               <i className="bi bi-arrow-down-circle" />
-              下までスクロールしてください
+              {isEn ? 'Please scroll to the bottom to continue' : '下までスクロールしてください'}
             </div>
           )}
           <button
@@ -143,10 +151,10 @@ export default function AnnouncementBlocker() {
             {confirming ? (
               <span className="flex items-center justify-center gap-2">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
-                確認中...
+                {isEn ? 'Confirming...' : '確認中...'}
               </span>
             ) : (
-              '確認しました'
+              isEn ? 'I have read and understood' : '確認しました'
             )}
           </button>
         </div>

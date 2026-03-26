@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { title, content, imageUrls, targetAll, distributorIds } = body;
+    const { title, content, titleEn, contentEn, imageUrls, targetAll, distributorIds } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: 'title と content は必須です' }, { status: 400 });
@@ -78,6 +78,8 @@ export async function POST(request: Request) {
       data: {
         title,
         content,
+        titleEn: titleEn || null,
+        contentEn: contentEn || null,
         imageUrls: imageUrls?.length ? JSON.stringify(imageUrls) : null,
         targetAll: targetAll !== false,
         createdById: employee!.id,
@@ -89,66 +91,62 @@ export async function POST(request: Request) {
 
     // Send LINE notifications
     if (isLineConfigured()) {
-      let targetDistributors;
+      let targetDistributors: Array<{ lineUserId: string; language: string }> | undefined;
       if (targetAll !== false) {
         targetDistributors = await prisma.lineUser.findMany({
           where: { distributorId: { not: null }, isFollowing: true },
-          select: { lineUserId: true },
-        });
+          select: { lineUserId: true, distributor: { select: { language: true } } },
+        }).then(rows => rows.map(r => ({ lineUserId: r.lineUserId, language: r.distributor?.language || 'ja' })));
       } else if (distributorIds?.length) {
         targetDistributors = await prisma.lineUser.findMany({
           where: { distributorId: { in: distributorIds }, isFollowing: true },
-          select: { lineUserId: true },
-        });
+          select: { lineUserId: true, distributor: { select: { language: true } } },
+        }).then(rows => rows.map(r => ({ lineUserId: r.lineUserId, language: r.distributor?.language || 'ja' })));
       }
 
-      const portalUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'https://pms.tiramis.co.jp'}/staff`;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://pms.tiramis.co.jp';
 
       if (targetDistributors?.length) {
-        const messages = [
-          {
-            type: 'flex',
-            altText: `【お知らせ】${title}`,
-            contents: {
-              type: 'bubble',
-              header: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  { type: 'text', text: 'お知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' },
-                ],
-                backgroundColor: '#4F46E5',
-                paddingAll: '12px',
-              },
-              body: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  { type: 'text', text: title, weight: 'bold', size: 'md', wrap: true },
-                  { type: 'text', text: content.substring(0, 100) + (content.length > 100 ? '...' : ''), size: 'sm', color: '#666666', wrap: true, margin: 'md' },
-                ],
-                paddingAll: '16px',
-              },
-              footer: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  {
+        const buildMessages = (lang: string) => {
+          const isEn = lang === 'en';
+          const t = isEn ? (titleEn || title) : title;
+          const c = isEn ? (contentEn || content) : content;
+          const portalUrl = isEn ? `${baseUrl}/staff/en` : `${baseUrl}/staff`;
+          return [
+            {
+              type: 'flex',
+              altText: isEn ? `[Notice] ${t}` : `【お知らせ】${t}`,
+              contents: {
+                type: 'bubble',
+                header: {
+                  type: 'box', layout: 'vertical',
+                  contents: [{ type: 'text', text: isEn ? 'Notice' : 'お知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' }],
+                  backgroundColor: '#4F46E5', paddingAll: '12px',
+                },
+                body: {
+                  type: 'box', layout: 'vertical',
+                  contents: [
+                    { type: 'text', text: t, weight: 'bold', size: 'md', wrap: true },
+                    { type: 'text', text: c.substring(0, 100) + (c.length > 100 ? '...' : ''), size: 'sm', color: '#666666', wrap: true, margin: 'md' },
+                  ],
+                  paddingAll: '16px',
+                },
+                footer: {
+                  type: 'box', layout: 'vertical',
+                  contents: [{
                     type: 'button',
-                    action: { type: 'uri', label: '確認する', uri: portalUrl },
-                    style: 'primary',
-                    color: '#4F46E5',
-                  },
-                ],
-                paddingAll: '12px',
+                    action: { type: 'uri', label: isEn ? 'View Details' : '確認する', uri: portalUrl },
+                    style: 'primary', color: '#4F46E5',
+                  }],
+                  paddingAll: '12px',
+                },
               },
             },
-          },
-        ];
+          ];
+        };
 
-        // Send in parallel, don't fail on individual errors
         await Promise.allSettled(
-          targetDistributors.map(u => pushMessage(u.lineUserId, messages)),
+          targetDistributors.map(u => pushMessage(u.lineUserId, buildMessages(u.language))),
         );
       }
     }
