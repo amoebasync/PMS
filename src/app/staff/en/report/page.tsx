@@ -16,7 +16,7 @@ type Schedule = {
   status: string;
   areaUnitPrice: number | null;
   sizeUnitPrice: number | null;
-  area: { town_name: string; chome_name: string } | null;
+  area: { town_name: string; chome_name: string; prefecture?: { name: string } | null; city?: { name: string } | null } | null;
   city: { name: string } | null;
   items: ScheduleItem[];
 };
@@ -134,6 +134,10 @@ export default function StaffHistoryPageEn() {
             const isSat = dayOfWeek === 6;
             const isSun = dayOfWeek === 0;
             const isToday = dateStr === formatDate(today);
+            const isFuture = date > today;
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const isTomorrow = dateStr === formatDate(tomorrow);
 
             return (
               <div key={dateStr}>
@@ -142,23 +146,42 @@ export default function StaffHistoryPageEn() {
                     {DAY_NAMES[dayOfWeek]}, {date.toLocaleString('en-US', { month: 'short', day: 'numeric' })}
                   </span>
                   {isToday && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full">Today</span>}
+                  {isTomorrow && <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Tomorrow</span>}
+                  {isFuture && <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">Upcoming</span>}
                 </div>
 
+                {isFuture && (
+                  <div className="flex items-center gap-1.5 px-2 mb-2 text-[10px] text-amber-600">
+                    <i className="bi bi-exclamation-triangle-fill"></i>
+                    <span>* This schedule may be subject to change</span>
+                  </div>
+                )}
+
                 {grouped[dateStr].map((schedule) => {
-                  const areaLabel = schedule.area
-                    ? `${schedule.city?.name || ''} ${schedule.area.town_name}${schedule.area.chome_name}`
-                    : 'Area not set';
+                  const pref = schedule.area?.prefecture?.name || '';
+                  const city = schedule.area?.city?.name || schedule.city?.name || '';
+                  const chome = schedule.area?.chome_name || schedule.area?.town_name || '';
+                  const areaLabel = schedule.area ? `${city} ${chome}` : 'Area not set';
+                  const fullAddress = `${pref}${city}${chome}`;
+                  const mapUrl = schedule.area ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null;
 
                   return (
-                    <div key={schedule.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mb-3">
+                    <div key={schedule.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden mb-3 ${isFuture ? 'border-amber-200 bg-amber-50/30' : 'border-slate-100'}`}>
                       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
-                        <div>
-                          <p className="text-xs font-bold text-slate-600">{areaLabel}</p>
+                        <div className="flex-1 min-w-0">
+                          {mapUrl ? (
+                            <a href={mapUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1">
+                              <i className="bi bi-geo-alt-fill text-[10px]"></i>{areaLabel}
+                            </a>
+                          ) : (
+                            <p className="text-xs font-bold text-slate-600">{areaLabel}</p>
+                          )}
                           <p className="text-[11px] text-slate-400 mt-0.5">
                             {schedule.items.length} type(s)
                           </p>
                         </div>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${statusColor[schedule.status] || 'bg-slate-100 text-slate-500'}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${statusColor[schedule.status] || 'bg-slate-100 text-slate-500'}`}>
                           {statusLabel[schedule.status] || schedule.status}
                         </span>
                       </div>
