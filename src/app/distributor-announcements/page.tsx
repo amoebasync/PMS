@@ -244,7 +244,7 @@ function CreateModal({ t, onClose, onCreated }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-800">{t('create_title')}</h2>
@@ -417,7 +417,7 @@ function DetailModal({ item, t, onClose }: {
   const readIds = new Set(item.reads.map(r => r.distributorId));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex items-center justify-between">
           <h2 className="text-sm font-bold text-slate-800">{t('read_status_title')}</h2>
