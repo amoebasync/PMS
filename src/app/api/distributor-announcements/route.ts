@@ -115,7 +115,7 @@ export async function POST(request: Request) {
           const t = isEn ? (titleEn || title) : title;
           const portalUrl = isEn ? `${baseUrl}/staff/en` : `${baseUrl}/staff`;
           const notice = isEn
-            ? 'You have a new announcement. Please read and confirm it on the portal before starting work.'
+            ? 'You have a new announcement.\nPlease read and confirm it on the portal before starting work.'
             : '新しいお知らせがあります。業務開始前にポータルで必ず確認してください。';
           return [
             {
