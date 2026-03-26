@@ -761,7 +761,7 @@ function CreateComplaintModal({
   const [scheduleOptions, setScheduleOptions] = useState<Array<{ id: number; date: string; area: string; status: string }>>([]);
 
   // 配布禁止物件リンク
-  const [prohibitedMatches, setProhibitedMatches] = useState<Array<{ id: number; address: string; buildingName?: string; distance?: number; matchType: string }>>([]);
+  const [prohibitedMatches, setProhibitedMatches] = useState<Array<{ id: number; address: string; buildingName?: string; roomNumber?: string; distance?: number; matchType: string }>>([]);
   const [linkedProhibitedId, setLinkedProhibitedId] = useState<number | null>(null);
   const [registerAsProhibited, setRegisterAsProhibited] = useState(false);
   const [prohibitedReasonId, setProhibitedReasonId] = useState('');
@@ -1058,6 +1058,89 @@ function CreateComplaintModal({
             </div>
           </div>
 
+          {/* ===== 配布禁止物件リンク（住所の直下） ===== */}
+          {(prohibitedMatches.length > 0 || linkedProhibitedId) && (
+            <div>
+              {linkedProhibitedId ? (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <i className="bi bi-link-45deg text-emerald-600"></i>
+                    <div>
+                      <span className="text-xs font-bold text-emerald-700">{t('form_prohibited_linked') || '禁止物件とリンク済み'}</span>
+                      <span className="text-xs text-emerald-600 ml-2">#{linkedProhibitedId}</span>
+                    </div>
+                  </div>
+                  <button type="button" onClick={() => setLinkedProhibitedId(null)} className="text-xs text-slate-400 hover:text-red-500 transition-colors">
+                    <i className="bi bi-x-lg"></i>
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <i className="bi bi-exclamation-triangle text-amber-600"></i>
+                    <span className="text-xs font-bold text-amber-700">{t('form_prohibited_matches') || 'この住所付近に配布禁止物件があります'}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {prohibitedMatches.map(m => (
+                      <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-xs font-medium text-slate-700 truncate block">{m.address}</span>
+                          {m.buildingName && <span className="text-[10px] text-slate-400">{m.buildingName}</span>}
+                          {m.roomNumber && <span className="text-[10px] text-slate-400 ml-1">{m.roomNumber}</span>}
+                          {m.distance != null && <span className="text-[10px] text-amber-600 ml-1">({m.distance}m)</span>}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setLinkedProhibitedId(m.id);
+                            setRegisterAsProhibited(false);
+                            if (m.buildingName && !buildingName) setBuildingName(m.buildingName);
+                            if (m.roomNumber && !roomNumber) setRoomNumber(m.roomNumber);
+                          }}
+                          className="shrink-0 ml-2 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors"
+                        >
+                          {t('form_prohibited_link_btn') || 'リンク'}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Register as new prohibited property (always visible when not linked) */}
+          {!linkedProhibitedId && (
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={registerAsProhibited}
+                  onChange={e => setRegisterAsProhibited(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 accent-red-600"
+                />
+                <span className="text-xs font-bold text-slate-600">{t('form_register_prohibited') || 'この物件を配布禁止に登録する'}</span>
+              </label>
+              {registerAsProhibited && (
+                <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                  <label className="block text-xs font-bold text-slate-600 mb-1">
+                    {t('form_prohibited_reason') || '禁止理由'}
+                  </label>
+                  <select
+                    value={prohibitedReasonId}
+                    onChange={e => setProhibitedReasonId(e.target.value)}
+                    className="w-full border border-slate-300 p-2.5 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                  >
+                    <option value="">{t('form_select_placeholder')}</option>
+                    {prohibitedReasons.map(r => (
+                      <option key={r.id} value={r.id}>{r.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-bold text-slate-600 mb-1">
               <i className="bi bi-body-text mr-1"></i>{t('form_detail')} <span className="text-red-500">*</span>
@@ -1272,90 +1355,6 @@ function CreateComplaintModal({
                     <span className="font-medium text-slate-800">{item.name as string}</span>
                   )}
                 />
-              </div>
-            )}
-          </div>
-
-          {/* ===== 配布禁止物件リンク ===== */}
-          <div className="border-t border-slate-200 pt-5">
-            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-              <i className="bi bi-house-x text-red-500"></i>
-              {t('form_prohibited_section') || '配布禁止物件'}
-            </h3>
-
-            {/* Auto-match results */}
-            {linkedProhibitedId ? (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <i className="bi bi-link-45deg text-emerald-600"></i>
-                  <div>
-                    <span className="text-xs font-bold text-emerald-700">{t('form_prohibited_linked') || '禁止物件とリンク済み'}</span>
-                    <span className="text-xs text-emerald-600 ml-2">#{linkedProhibitedId}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setLinkedProhibitedId(null)}
-                  className="text-xs text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  <i className="bi bi-x-lg"></i>
-                </button>
-              </div>
-            ) : prohibitedMatches.length > 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <i className="bi bi-exclamation-triangle text-amber-600"></i>
-                  <span className="text-xs font-bold text-amber-700">{t('form_prohibited_matches') || 'この住所付近に配布禁止物件があります'}</span>
-                </div>
-                <div className="space-y-1.5">
-                  {prohibitedMatches.slice(0, 3).map(m => (
-                    <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs font-medium text-slate-700 truncate block">{m.address}</span>
-                        {m.buildingName && <span className="text-[10px] text-slate-400">{m.buildingName}</span>}
-                        {m.distance != null && <span className="text-[10px] text-amber-600 ml-1">({m.distance}m)</span>}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => { setLinkedProhibitedId(m.id); setRegisterAsProhibited(false); }}
-                        className="shrink-0 ml-2 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors"
-                      >
-                        {t('form_prohibited_link_btn') || 'リンク'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-
-            {/* Register as new prohibited property */}
-            {!linkedProhibitedId && (
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={registerAsProhibited}
-                  onChange={e => setRegisterAsProhibited(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 accent-red-600"
-                />
-                <span className="text-xs font-bold text-slate-600">{t('form_register_prohibited') || 'この物件を配布禁止に登録する'}</span>
-              </label>
-            )}
-
-            {registerAsProhibited && !linkedProhibitedId && (
-              <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
-                <label className="block text-xs font-bold text-slate-600 mb-1">
-                  {t('form_prohibited_reason') || '禁止理由'}
-                </label>
-                <select
-                  value={prohibitedReasonId}
-                  onChange={e => setProhibitedReasonId(e.target.value)}
-                  className="w-full border border-slate-300 p-2.5 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400 bg-white"
-                >
-                  <option value="">{t('form_select_placeholder')}</option>
-                  {prohibitedReasons.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
               </div>
             )}
           </div>
