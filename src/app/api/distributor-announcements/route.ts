@@ -113,24 +113,29 @@ export async function POST(request: Request) {
         const buildMessages = (lang: string) => {
           const isEn = lang === 'en';
           const t = isEn ? (titleEn || title) : title;
-          const c = isEn ? (contentEn || content) : content;
           const portalUrl = isEn ? `${baseUrl}/staff/en` : `${baseUrl}/staff`;
+          const notice = isEn
+            ? 'You have a new announcement. Please read and confirm it on the portal before starting work.'
+            : '新しいお知らせがあります。業務開始前にポータルで必ず確認してください。';
           return [
             {
               type: 'flex',
-              altText: isEn ? `[Notice] ${t}` : `【お知らせ】${t}`,
+              altText: isEn ? `[Important] ${t}` : `【重要】${t}`,
               contents: {
                 type: 'bubble',
                 header: {
                   type: 'box', layout: 'vertical',
-                  contents: [{ type: 'text', text: isEn ? 'Notice' : 'お知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' }],
-                  backgroundColor: '#4F46E5', paddingAll: '12px',
+                  contents: [
+                    { type: 'text', text: isEn ? 'Important Notice' : '重要なお知らせ', size: 'sm', color: '#FFFFFF', weight: 'bold' },
+                  ],
+                  backgroundColor: '#DC2626', paddingAll: '12px',
                 },
                 body: {
                   type: 'box', layout: 'vertical',
                   contents: [
                     { type: 'text', text: t, weight: 'bold', size: 'md', wrap: true },
-                    { type: 'text', text: c.substring(0, 100) + (c.length > 100 ? '...' : ''), size: 'sm', color: '#666666', wrap: true, margin: 'md' },
+                    { type: 'separator', margin: 'md' },
+                    { type: 'text', text: notice, size: 'sm', color: '#666666', wrap: true, margin: 'md' },
                   ],
                   paddingAll: '16px',
                 },
@@ -138,8 +143,8 @@ export async function POST(request: Request) {
                   type: 'box', layout: 'vertical',
                   contents: [{
                     type: 'button',
-                    action: { type: 'uri', label: isEn ? 'View Details' : '確認する', uri: portalUrl },
-                    style: 'primary', color: '#4F46E5',
+                    action: { type: 'uri', label: isEn ? 'Open Portal' : 'ポータルを開く', uri: portalUrl },
+                    style: 'primary', color: '#DC2626',
                   }],
                   paddingAll: '12px',
                 },
