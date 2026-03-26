@@ -160,7 +160,7 @@ export default function CrmTasksPage() {
   // ----- タスク一覧 -----
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoadingTasks, setIsLoadingTasks] = useState(true);
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState('NOT_DONE');
   const [filterAssignee, setFilterAssignee] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
   const [filterDue, setFilterDue] = useState('');
@@ -670,6 +670,7 @@ export default function CrmTasksPage() {
               <label className="block text-xs font-bold text-slate-500 mb-1">{t('filter_status')}</label>
               <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
                 className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none min-w-[110px] bg-white cursor-pointer">
+                <option value="NOT_DONE">{t('filter_not_done')}</option>
                 <option value="">{t('filter_all')}</option>
                 <option value="PENDING">{t('status_pending')}</option>
                 <option value="IN_PROGRESS">{t('status_in_progress')}</option>

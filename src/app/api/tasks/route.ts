@@ -36,7 +36,11 @@ export async function GET(req: NextRequest) {
   const myTasks = searchParams.get('myTasks');
 
   const where: any = {};
-  if (status) where.status = status;
+  if (status === 'NOT_DONE') {
+    where.status = { not: 'DONE' };
+  } else if (status) {
+    where.status = status;
+  }
   if (assigneeId) where.assigneeId = parseInt(assigneeId);
   if (customerId) where.customerId = parseInt(customerId);
   if (distributorId) where.distributorId = parseInt(distributorId);

@@ -105,6 +105,7 @@
   "day_suffix": "日",
   "month_suffix": "月",
   "filter_all": "すべて",
+  "filter_not_done": "未完了",
   "btn_reset": "リセット",
   "btn_create": "作成"
 }

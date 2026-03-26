@@ -105,6 +105,7 @@
   "day_suffix": "",
   "month_suffix": "",
   "filter_all": "All",
+  "filter_not_done": "Not Done",
   "btn_reset": "Reset",
   "btn_create": "Create"
 }
