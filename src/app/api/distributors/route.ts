@@ -45,6 +45,11 @@ export async function GET(request: Request) {
         branch: true,
         country: true,
         visaType: true,
+        testAssignments: {
+          where: { status: 'PENDING' },
+          select: { id: true, status: true },
+          take: 1,
+        },
       },
     });
 
