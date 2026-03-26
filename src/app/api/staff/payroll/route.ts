@@ -52,7 +52,15 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ records, upcomingRecord: upcomingRecord || null });
+    return NextResponse.json({
+      records: records.map(r => ({
+        ...r,
+        cashReceivedAt: r.cashReceivedAt,
+        cashSignatureUrl: r.cashSignatureUrl,
+      })),
+      upcomingRecord: upcomingRecord || null,
+      paymentMethod: distributor.paymentMethod || null,
+    });
   } catch (error) {
     console.error('Staff Payroll GET Error:', error);
     return NextResponse.json({ error: 'サーバーエラー' }, { status: 500 });

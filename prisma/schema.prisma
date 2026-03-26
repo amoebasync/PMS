@@ -1925,6 +1925,10 @@ model DistributorPayrollRecord {
   status        DistributorPayrollStatus  @default(DRAFT)
   note          String?                   @db.Text
 
+  // 現金受取確認
+  cashReceivedAt       DateTime?          @map("cash_received_at")
+  cashSignatureUrl     String?            @map("cash_signature_url") @db.Text
+
   items         DistributorPayrollItem[]
 
   createdAt     DateTime                  @default(now()) @map("created_at")
