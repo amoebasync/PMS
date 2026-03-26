@@ -3,6 +3,7 @@
 import React from 'react';
 import { usePathname } from 'next/navigation';
 import { StaffHeaderEn } from '@/components/staff/StaffHeaderEn';
+import AnnouncementBlocker from '@/components/staff/AnnouncementBlocker';
 import { useState, useEffect } from 'react';
 
 export default function DistributorLayoutEn({ children }: { children: React.ReactNode }) {
@@ -46,6 +47,7 @@ export default function DistributorLayoutEn({ children }: { children: React.Reac
       <main className={`flex-1 max-w-lg mx-auto w-full px-4 py-6 ${showNav ? 'pb-24' : ''}`}>
         {children}
       </main>
+      {showNav && <AnnouncementBlocker />}
     </div>
   );
 }
