@@ -155,5 +155,11 @@
   "prohibited_registered": "Prohibited property registered successfully",
   "detail_send": "Send",
   "detail_delete_tooltip": "Delete",
-  "prohibited_registering": "Registering..."
+  "prohibited_registering": "Registering...",
+  "form_prohibited_section": "Prohibited Properties",
+  "form_register_prohibited": "Register this property as prohibited",
+  "form_prohibited_linked": "Linked to prohibited property",
+  "form_prohibited_matches": "Prohibited properties found near this address",
+  "form_prohibited_link_btn": "Link",
+  "form_prohibited_reason": "Prohibition reason"
 }

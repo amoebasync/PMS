@@ -155,5 +155,11 @@
   "prohibited_registered": "禁止物件を登録しました",
   "detail_send": "送信",
   "detail_delete_tooltip": "削除",
-  "prohibited_registering": "登録中..."
+  "prohibited_registering": "登録中...",
+  "form_prohibited_section": "配布禁止物件",
+  "form_register_prohibited": "この物件を配布禁止に登録する",
+  "form_prohibited_linked": "禁止物件とリンク済み",
+  "form_prohibited_matches": "この住所付近に配布禁止物件があります",
+  "form_prohibited_link_btn": "リンク",
+  "form_prohibited_reason": "禁止理由"
 }
