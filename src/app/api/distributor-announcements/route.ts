@@ -143,7 +143,7 @@ export async function POST(request: Request) {
                   type: 'box', layout: 'vertical',
                   contents: [{
                     type: 'button',
-                    action: { type: 'uri', label: isEn ? 'Open Portal' : 'ポータルを開く', uri: portalUrl },
+                    action: { type: 'uri', label: isEn ? 'OPEN ANNOUNCEMENT' : 'お知らせを確認する', uri: portalUrl },
                     style: 'primary', color: '#4F46E5',
                   }],
                   paddingAll: '12px',
