@@ -116,7 +116,7 @@ interface FillExcelResult {
 }
 
 export default function DistributorPayrollPage() {
-  const { showConfirm } = useNotification();
+  const { showConfirm, showToast } = useNotification();
   const today = new Date();
   const [weekStart, setWeekStart] = useState<Date>(() => getSunday(today));
   const [distributors, setDistributors] = useState<Distributor[]>([]);
@@ -243,6 +243,25 @@ export default function DistributorPayrollPage() {
     });
     await fetchRecords();
     setStatusUpdating((prev) => ({ ...prev, [recordId]: false }));
+  };
+
+  const [bulkUpdating, setBulkUpdating] = useState(false);
+  const handleBulkStatusChange = async (fromStatus: string, toStatus: string) => {
+    const targets = records.filter(r => r.status === fromStatus);
+    if (targets.length === 0) return;
+    const label = toStatus === 'CONFIRMED' ? '確定' : '支払済';
+    if (!await showConfirm(`${targets.length}件の給与を一括で「${label}」に変更しますか？`, { confirmLabel: `${label}にする` })) return;
+    setBulkUpdating(true);
+    for (const rec of targets) {
+      await fetch(`/api/distributor-payroll/${rec.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: toStatus }),
+      });
+    }
+    await fetchRecords();
+    setBulkUpdating(false);
+    showToast(`${targets.length}件を「${label}」に変更しました`, 'success');
   };
 
   const handleDelete = async (recordId: number) => {
@@ -541,6 +560,20 @@ export default function DistributorPayrollPage() {
                   {draftCount > 0 && <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">{draftCount} 下書き</span>}
                   {confirmedCount > 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{confirmedCount} 確定</span>}
                   {paidCount > 0 && <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">{paidCount} 支払済</span>}
+                </div>
+                <div className="flex gap-2 mt-2">
+                  {draftCount > 0 && (
+                    <button onClick={() => handleBulkStatusChange('DRAFT', 'CONFIRMED')} disabled={bulkUpdating}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors">
+                      {bulkUpdating ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-check-all mr-0.5"></i>一括確定</>}
+                    </button>
+                  )}
+                  {confirmedCount > 0 && (
+                    <button onClick={() => handleBulkStatusChange('CONFIRMED', 'PAID')} disabled={bulkUpdating}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors">
+                      {bulkUpdating ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-check-all mr-0.5"></i>一括支払済</>}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
