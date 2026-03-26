@@ -559,20 +559,20 @@ export default function InspectionDetailPage() {
           className={`bg-white border-t md:border-t-0 md:border-l border-slate-200 rounded-t-2xl md:rounded-none shadow-[0_-4px_20px_rgba(0,0,0,0.1)] md:shadow-none transition-all duration-300 shrink-0 flex flex-col md:w-[400px] md:h-full ${
             sheetPosition === 'full' ? 'max-h-[85vh] md:max-h-none' :
             sheetPosition === 'half' ? 'max-h-[40vh] md:max-h-none' :
-            'h-[88px] md:max-h-none'
+            'h-[36px] md:max-h-none'
           }`}
         >
-          {/* Drag handle (mobile only) */}
+          {/* Drag handle (mobile only) — toggles panel visibility */}
           <div
-            className="md:hidden flex flex-col items-center pt-2 pb-1 cursor-pointer"
-            onClick={() => setSheetPosition(prev => prev === 'collapsed' ? 'half' : prev === 'half' ? 'full' : 'collapsed')}
+            className="md:hidden flex flex-col items-center pt-1.5 pb-0.5 cursor-pointer active:bg-slate-50 transition-colors"
+            onClick={() => setSheetPosition(prev => prev === 'collapsed' ? 'half' : 'collapsed')}
           >
             <div className="w-10 h-1 bg-slate-300 rounded-full"></div>
-            <i className={`bi ${sheetPosition === 'full' ? 'bi-chevron-down' : 'bi-chevron-up'} text-[10px] text-slate-400 mt-0.5`}></i>
+            <i className={`bi ${sheetPosition === 'collapsed' ? 'bi-chevron-up' : 'bi-chevron-down'} text-[10px] text-slate-400 mt-0.5`}></i>
           </div>
 
           {/* Tab bar — icon + short label */}
-          <div className="flex border-b border-slate-100 shrink-0">
+          <div className={`flex border-b border-slate-100 shrink-0 ${sheetPosition === 'collapsed' ? 'hidden md:flex' : ''}`}>
             {tabs.map((tab) => (
               <button
                 key={tab.key}
