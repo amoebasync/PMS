@@ -536,16 +536,16 @@ export default function InspectionDetailPage() {
         )}
 
         {inspection.status === 'IN_PROGRESS' && sheetPosition === 'collapsed' && (
-          <div className="absolute bottom-16 left-4 right-4 z-10">
+          <div className="absolute top-2 right-2 z-10">
             <button
               onClick={() => setShowFinishConfirm(true)}
               disabled={actionLoading}
-              className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white text-base font-bold rounded-2xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold rounded-xl shadow-lg transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-1.5"
             >
               {actionLoading ? (
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                <i className="bi bi-stop-fill text-xl"></i>
+                <i className="bi bi-stop-fill"></i>
               )}
               {t('btn_finish')}
             </button>
