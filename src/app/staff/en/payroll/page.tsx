@@ -65,21 +65,9 @@ export default function StaffPayrollPageEn() {
 
   const [downloading, setDownloading] = useState(false);
 
-  const handleDownloadStatement = async () => {
-    setDownloading(true);
-    try {
-      const res = await fetch(`/api/distributor-payroll/statement?distributorId=me&year=${year}&month=${month}`);
-      if (res.ok) {
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `payslip_${year}_${String(month).padStart(2, '0')}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-    } catch { /* silent */ }
-    setDownloading(false);
+  const handleDownloadStatement = () => {
+    // Open PDF directly in new tab/window (works on mobile/LIFF)
+    window.open(`/api/distributor-payroll/statement?distributorId=me&year=${year}&month=${month}`, '_blank');
   };
 
   const monthLabel = new Date(year, month - 1, 1).toLocaleString('en-US', { month: 'long', year: 'numeric' });

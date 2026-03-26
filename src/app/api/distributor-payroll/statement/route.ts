@@ -162,7 +162,7 @@ export async function GET(request: Request) {
           const entry = dayMap.get(dateStr) || { schedulePay: 0, expensePay: 0, descriptions: [] };
           entry.schedulePay += item.earnedAmount;
           entry.descriptions.push(
-            item.flyerTypeCount === 0 ? '研修手当' : `${item.flyerTypeCount}種×¥${item.unitPrice.toFixed(1)} ${item.actualCount}投`
+            item.flyerTypeCount === 0 ? '研修手当' : `${item.flyerTypeCount}種×¥${item.unitPrice % 1 === 0 ? item.unitPrice : item.unitPrice.toFixed(2)} ${item.actualCount}投`
           );
           dayMap.set(dateStr, entry);
         }
