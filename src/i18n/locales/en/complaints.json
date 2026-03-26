@@ -50,6 +50,7 @@
   "form_customer_placeholder": "Search by customer name...",
   "form_distributor": "Distributor",
   "form_distributor_placeholder": "Search by distributor name...",
+  "form_schedule": "Schedule",
   "form_related_branch": "Related Branch",
   "form_assignee": "Assignee",
   "form_assignee_placeholder": "Search by employee name...",

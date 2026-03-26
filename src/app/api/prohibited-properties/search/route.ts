@@ -61,13 +61,23 @@ export async function GET(request: Request) {
     if (q.trim() && results.length < 5) {
       const existingIds = new Set(results.map(r => r.id));
 
+      // Generate search variants: progressively strip prefecture/city prefixes
+      // "東京都練馬区旭丘1-5-7" → ["東京都練馬区旭丘1-5-7", "練馬区旭丘1-5-7", "旭丘1-5-7"]
+      const searchTerms: string[] = [q.trim()];
+      const prefectureMatch = q.trim().match(/^(.+?[都道府県])(.+)$/);
+      if (prefectureMatch) searchTerms.push(prefectureMatch[2]); // without prefecture
+      const cityMatch = q.trim().match(/^(?:.+?[都道府県])?(.+?[市区町村郡])(.+)$/);
+      if (cityMatch) searchTerms.push(cityMatch[2]); // without prefecture+city
+
+      const orConditions = searchTerms.flatMap(term => [
+        { address: { contains: term } },
+        { buildingName: { contains: term } },
+      ]);
+
       const textResults = await prisma.prohibitedProperty.findMany({
         where: {
           isActive: true,
-          OR: [
-            { address: { contains: q.trim() } },
-            { buildingName: { contains: q.trim() } },
-          ],
+          OR: orConditions,
         },
         select: {
           id: true,
