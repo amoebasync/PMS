@@ -181,6 +181,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         defaultDailyTransportation: body.defaultDailyTransportation !== undefined && body.defaultDailyTransportation !== ''
           ? parseInt(body.defaultDailyTransportation) || 500 : undefined,
         trainingAllowance: body.trainingAllowance,
+        excludeFromPayroll: body.excludeFromPayroll !== undefined
+          ? body.excludeFromPayroll === true || body.excludeFromPayroll === 'true' : undefined,
         inspectionInterval: body.inspectionInterval !== undefined && body.inspectionInterval !== ''
           ? parseInt(body.inspectionInterval)
           : null,

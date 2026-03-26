@@ -9,6 +9,7 @@ type Distributor = {
   staffId: string;
   name: string;
   paymentMethod: string | null;
+  excludeFromPayroll: boolean;
 };
 
 type DailyExpense = {
@@ -159,7 +160,10 @@ export default function DistributorPayrollPage() {
   useEffect(() => {
     fetch('/api/distributors')
       .then((r) => r.json())
-      .then((data) => setDistributors(Array.isArray(data) ? data : (data.distributors || [])));
+      .then((data) => {
+        const list = Array.isArray(data) ? data : (data.distributors || []);
+        setDistributors(list.filter((d: any) => !d.excludeFromPayroll));
+      });
   }, []);
 
   const fetchRecords = useCallback(async () => {

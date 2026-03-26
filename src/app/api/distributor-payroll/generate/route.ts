@@ -43,11 +43,16 @@ export async function POST(request: Request) {
         defaultDailyTransportation: true,
         trainingAllowance: true,
         joinDate: true,
+        excludeFromPayroll: true,
       },
     });
 
     if (!distributor) {
       return NextResponse.json({ error: '配布員が見つかりません' }, { status: 404 });
+    }
+
+    if (distributor.excludeFromPayroll) {
+      return NextResponse.json({ error: '給与計算対象外の配布員です' }, { status: 400 });
     }
 
     const rates: (number | null)[] = [

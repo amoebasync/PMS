@@ -696,6 +696,7 @@ model FlyerDistributor {
   transportationFee1Type String? @map("transportation_fee_1_type") @db.VarChar(50) // 1種配布時の交通費上限 (デフォルト500)
   defaultDailyTransportation Int @default(500) @map("default_daily_transportation") // 交通費未記入日のデフォルト日額
   trainingAllowance      String? @map("training_allowance") @db.VarChar(50) // 研修手当
+  excludeFromPayroll     Boolean @default(false) @map("exclude_from_payroll") // 給与計算対象外（テスト・社員等）
 
   // チェック・指導追跡
   lastInspectedAt     DateTime? @map("last_inspected_at")

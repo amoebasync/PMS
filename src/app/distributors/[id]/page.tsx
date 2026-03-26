@@ -225,7 +225,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
     visaTypeId: '', visaExpiryDate: '',
     hasAgreedPersonalInfo: false, hasSignedContract: false, hasResidenceCard: false,
     joinDate: todayStr(), leaveDate: '', leaveReason: '',
-    paymentMethod: '現金', bankName: '', bankBranchCode: '',
+    paymentMethod: '現金', excludeFromPayroll: 'false', bankName: '', bankBranchCode: '',
     bankAccountType: '普通', bankAccountNumber: '', bankAccountName: '',
     bankAccountNameKana: '', transferNumber: '',
     equipmentBattery: '', equipmentBag: '', equipmentMobile: '',
@@ -550,6 +550,7 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
       trainingAllowance: distributor.trainingAllowance || '',
       inspectionInterval: distributor.inspectionInterval != null ? String(distributor.inspectionInterval) : '',
       paymentMethod: distributor.paymentMethod || '現金',
+      excludeFromPayroll: distributor.excludeFromPayroll ? 'true' : 'false',
       bankBranchCode: distributor.bankBranchCode || '',
       bankAccountType: distributor.bankAccountType || '普通',
       bankAccountNumber: distributor.bankAccountNumber || '',
@@ -1171,6 +1172,11 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
               <i className="bi bi-bank2 text-emerald-500"></i> 口座情報
             </h2>
             <InfoRow label="支払方法" value={d.paymentMethod} />
+            {d.excludeFromPayroll && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">給与計算対象外</span>
+              </div>
+            )}
             <InfoRow label="銀行名" value={d.bankName} />
             <InfoRow label="支店番号" value={d.bankBranchCode} />
             <InfoRow label="口座種類" value={d.bankAccountType} />
@@ -1788,6 +1794,14 @@ export default function DistributorDetailPage({ params }: { params: Promise<{ id
                       <div>
                         <Label>振込番号</Label>
                         <input name="transferNumber" value={formData.transferNumber} onChange={handleInputChange} className={inputCls} />
+                      </div>
+                      <div className="flex items-center pt-5">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input type="checkbox" name="excludeFromPayroll" checked={formData.excludeFromPayroll === 'true' || formData.excludeFromPayroll === true as any}
+                            onChange={e => setFormData(prev => ({ ...prev, excludeFromPayroll: e.target.checked ? 'true' : 'false' }))}
+                            className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500" />
+                          <span className="text-xs font-bold text-red-600">給与計算対象外</span>
+                        </label>
                       </div>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4 space-y-3">
