@@ -523,7 +523,7 @@ export default function DistributorPage() {
                             return;
                           }
                           showToast(t('send_test_success'));
-                          fetchDistributors();
+                          loadData();
                         } catch {
                           showToast('エラーが発生しました', 'error');
                         }

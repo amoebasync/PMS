@@ -1,0 +1,190 @@
+<h2>給料分析ページ — レイアウト設計</h2>
+<p class="subtitle">サマリータブのモックアップ</p>
+
+<div class="mockup">
+  <div class="mockup-header">給料分析 — サマリータブ</div>
+  <div class="mockup-body" style="padding: 20px; background: #f8fafc; font-family: system-ui, sans-serif;">
+
+    <!-- Date Range Picker -->
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; background: white; padding: 12px 16px; border-radius: 8px; border: 1px solid #e2e8f0;">
+      <span style="font-size: 13px; color: #64748b; font-weight: 500;">期間:</span>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <div style="padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #334155; background: white;">2026-01-04</div>
+        <span style="color: #94a3b8;">〜</span>
+        <div style="padding: 6px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #334155; background: white;">2026-03-28</div>
+      </div>
+      <div style="display: flex; gap: 6px; margin-left: 12px;">
+        <div style="padding: 4px 10px; border-radius: 4px; font-size: 12px; background: #f1f5f9; color: #475569; cursor: pointer;">1ヶ月</div>
+        <div style="padding: 4px 10px; border-radius: 4px; font-size: 12px; background: #3b82f6; color: white; cursor: pointer;">3ヶ月</div>
+        <div style="padding: 4px 10px; border-radius: 4px; font-size: 12px; background: #f1f5f9; color: #475569; cursor: pointer;">6ヶ月</div>
+        <div style="padding: 4px 10px; border-radius: 4px; font-size: 12px; background: #f1f5f9; color: #475569; cursor: pointer;">1年</div>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display: flex; gap: 0; border-bottom: 2px solid #e2e8f0; margin-bottom: 20px;">
+      <div style="padding: 8px 20px; font-size: 14px; font-weight: 600; color: #3b82f6; border-bottom: 2px solid #3b82f6; margin-bottom: -2px;">サマリー</div>
+      <div style="padding: 8px 20px; font-size: 14px; color: #94a3b8;">社員別</div>
+      <div style="padding: 8px 20px; font-size: 14px; color: #94a3b8;">配布員別</div>
+      <div style="padding: 8px 20px; font-size: 14px; color: #94a3b8;">部署/支店別</div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px;">
+      <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">社員給与</div>
+        <div style="font-size: 22px; font-weight: 700; color: #1e293b;">¥3,240,000</div>
+        <div style="font-size: 11px; color: #22c55e; margin-top: 4px;">▲ 2.3% vs 前期</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">配布員給与</div>
+        <div style="font-size: 22px; font-weight: 700; color: #1e293b;">¥1,856,000</div>
+        <div style="font-size: 11px; color: #ef4444; margin-top: 4px;">▼ 1.1% vs 前期</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">社員交通費</div>
+        <div style="font-size: 22px; font-weight: 700; color: #1e293b;">¥186,000</div>
+        <div style="font-size: 11px; color: #94a3b8; margin-top: 4px;">— 0% vs 前期</div>
+      </div>
+      <div style="background: white; border-radius: 8px; padding: 16px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 11px; color: #64748b; margin-bottom: 4px;">配布員交通費</div>
+        <div style="font-size: 22px; font-weight: 700; color: #1e293b;">¥423,000</div>
+        <div style="font-size: 11px; color: #22c55e; margin-top: 4px;">▲ 5.2% vs 前期</div>
+      </div>
+      <div style="background: linear-gradient(135deg, #3b82f6, #2563eb); border-radius: 8px; padding: 16px; border: none;">
+        <div style="font-size: 11px; color: rgba(255,255,255,0.8); margin-bottom: 4px;">総合計</div>
+        <div style="font-size: 22px; font-weight: 700; color: white;">¥5,705,000</div>
+        <div style="font-size: 11px; color: rgba(255,255,255,0.8); margin-top: 4px;">▲ 1.8% vs 前期</div>
+      </div>
+    </div>
+
+    <!-- Line Chart Mockup -->
+    <div style="background: white; border-radius: 8px; padding: 20px; border: 1px solid #e2e8f0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="font-size: 14px; font-weight: 600; color: #1e293b;">週次推移</div>
+        <div style="display: flex; gap: 16px; font-size: 12px;">
+          <span style="color: #3b82f6;">● 社員給与</span>
+          <span style="color: #f97316;">● 配布員給与</span>
+          <span style="color: #06b6d4;">● 社員交通費</span>
+          <span style="color: #a855f7;">● 配布員交通費</span>
+        </div>
+      </div>
+      <!-- SVG Line Chart -->
+      <svg viewBox="0 0 800 250" style="width: 100%; height: 250px;">
+        <!-- Grid lines -->
+        <line x1="60" y1="30" x2="780" y2="30" stroke="#f1f5f9" stroke-width="1"/>
+        <line x1="60" y1="80" x2="780" y2="80" stroke="#f1f5f9" stroke-width="1"/>
+        <line x1="60" y1="130" x2="780" y2="130" stroke="#f1f5f9" stroke-width="1"/>
+        <line x1="60" y1="180" x2="780" y2="180" stroke="#f1f5f9" stroke-width="1"/>
+        <line x1="60" y1="230" x2="780" y2="230" stroke="#e2e8f0" stroke-width="1"/>
+
+        <!-- Y-axis labels -->
+        <text x="55" y="34" text-anchor="end" font-size="11" fill="#94a3b8">¥400K</text>
+        <text x="55" y="84" text-anchor="end" font-size="11" fill="#94a3b8">¥300K</text>
+        <text x="55" y="134" text-anchor="end" font-size="11" fill="#94a3b8">¥200K</text>
+        <text x="55" y="184" text-anchor="end" font-size="11" fill="#94a3b8">¥100K</text>
+        <text x="55" y="234" text-anchor="end" font-size="11" fill="#94a3b8">¥0</text>
+
+        <!-- X-axis labels -->
+        <text x="120" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">1/4</text>
+        <text x="180" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">1/11</text>
+        <text x="240" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">1/18</text>
+        <text x="300" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">1/25</text>
+        <text x="360" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">2/1</text>
+        <text x="420" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">2/8</text>
+        <text x="480" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">2/15</text>
+        <text x="540" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">2/22</text>
+        <text x="600" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">3/1</text>
+        <text x="660" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">3/8</text>
+        <text x="720" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">3/15</text>
+        <text x="780" y="248" text-anchor="middle" font-size="10" fill="#94a3b8">3/22</text>
+
+        <!-- Employee Salary line (blue) -->
+        <polyline points="120,55 180,50 240,60 300,45 360,52 420,48 480,55 540,42 600,50 660,47 720,53 780,40" fill="none" stroke="#3b82f6" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Distributor Salary line (orange) -->
+        <polyline points="120,110 180,100 240,115 300,105 360,120 420,108 480,112 540,95 600,105 660,100 720,110 780,98" fill="none" stroke="#f97316" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Employee Transport line (cyan) -->
+        <polyline points="120,200 180,198 240,200 300,197 360,200 420,198 480,200 540,197 600,200 660,198 720,200 780,197" fill="none" stroke="#06b6d4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Distributor Transport line (purple) -->
+        <polyline points="120,178 180,175 240,180 300,172 360,176 420,170 480,175 540,168 600,173 660,170 720,174 780,165" fill="none" stroke="#a855f7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <!-- Dots on Employee Salary -->
+        <circle cx="780" cy="40" r="4" fill="#3b82f6"/>
+        <circle cx="720" cy="53" r="4" fill="#3b82f6"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 24px;"></div>
+
+<div class="mockup">
+  <div class="mockup-header">給料分析 — 社員別タブ</div>
+  <div class="mockup-body" style="padding: 20px; background: #f8fafc; font-family: system-ui, sans-serif;">
+
+    <!-- Search bar -->
+    <div style="display: flex; gap: 12px; margin-bottom: 16px; align-items: center;">
+      <div style="flex:1; max-width: 300px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #94a3b8; background: white;">🔍 社員名・社員コードで検索...</div>
+      <div style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #334155; background: white;">雇用形態: 全て ▼</div>
+      <div style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; color: #334155; background: white;">部署: 全て ▼</div>
+      <div style="margin-left: auto; padding: 8px 16px; background: #3b82f6; color: white; border-radius: 6px; font-size: 13px; cursor: pointer;">CSV出力</div>
+    </div>
+
+    <!-- Table -->
+    <div style="background: white; border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="background: #f8fafc;">
+            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">社員コード</th>
+            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">氏名</th>
+            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">雇用形態</th>
+            <th style="padding: 10px 12px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">部署</th>
+            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">給与合計</th>
+            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">交通費</th>
+            <th style="padding: 10px 12px; text-align: right; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0;">総計</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 12px; color: #64748b;">NBF1001</td>
+            <td style="padding: 10px 12px; color: #1e293b; font-weight: 500;">田中 太郎</td>
+            <td style="padding: 10px 12px;"><span style="background: #dbeafe; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-size: 11px;">正社員</span></td>
+            <td style="padding: 10px 12px; color: #64748b;">営業部</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥810,000</td>
+            <td style="padding: 10px 12px; text-align: right; color: #64748b;">¥36,000</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥846,000</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 12px; color: #64748b;">NBF1003</td>
+            <td style="padding: 10px 12px; color: #1e293b; font-weight: 500;">鈴木 花子</td>
+            <td style="padding: 10px 12px;"><span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px;">パート</span></td>
+            <td style="padding: 10px 12px; color: #64748b;">管理部</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥432,000</td>
+            <td style="padding: 10px 12px; text-align: right; color: #64748b;">¥24,000</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥456,000</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #f1f5f9;">
+            <td style="padding: 10px 12px; color: #64748b;">NBF1007</td>
+            <td style="padding: 10px 12px; color: #1e293b; font-weight: 500;">佐藤 次郎</td>
+            <td style="padding: 10px 12px;"><span style="background: #f3e8ff; color: #6b21a8; padding: 2px 8px; border-radius: 4px; font-size: 11px;">業務委託</span></td>
+            <td style="padding: 10px 12px; color: #64748b;">開発部</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥600,000</td>
+            <td style="padding: 10px 12px; text-align: right; color: #64748b;">¥12,000</td>
+            <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #1e293b;">¥612,000</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr style="background: #f8fafc; font-weight: 600;">
+            <td colspan="4" style="padding: 10px 12px; color: #475569;">合計（3名）</td>
+            <td style="padding: 10px 12px; text-align: right; color: #1e293b;">¥1,842,000</td>
+            <td style="padding: 10px 12px; text-align: right; color: #64748b;">¥72,000</td>
+            <td style="padding: 10px 12px; text-align: right; color: #1e293b;">¥1,914,000</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+</div>
