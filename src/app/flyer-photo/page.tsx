@@ -190,7 +190,7 @@ export default function FlyerPhotoPage() {
                     {uploading === flyerKey ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading...</>
                     ) : (
-                      <><i className="bi bi-camera" /> Take / Select Flyer Photo</>
+                      <><i className="bi bi-camera" /> Take photo of Flyer</>
                     )}
                   </button>
                 </div>
@@ -199,7 +199,7 @@ export default function FlyerPhotoPage() {
                 <div className="px-4 py-3">
                   <div className="flex items-center gap-2 mb-2">
                     <i className="bi bi-map text-amber-500" />
-                    <span className="text-xs font-bold text-slate-600">Map Photo</span>
+                    <span className="text-xs font-bold text-slate-600">Finished Map</span>
                     {mapPhotos.length > 0 && (
                       <span className="text-[10px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-bold">{mapPhotos.length}</span>
                     )}
@@ -224,7 +224,7 @@ export default function FlyerPhotoPage() {
                     {uploading === mapKey ? (
                       <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading...</>
                     ) : (
-                      <><i className="bi bi-camera" /> Take / Select Map Photo</>
+                      <><i className="bi bi-camera" /> Take photo of Finished Map</>
                     )}
                   </button>
                 </div>
