@@ -2,6 +2,94 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
+const PS_API_URL = process.env.POSTING_SYSTEM_API_URL;
+const PS_API_KEY = process.env.POSTING_SYSTEM_API_KEY;
+
+/**
+ * Posting System から GPS データを取得して PMS セッションに保存する
+ * セッションにGPSポイントがない場合のみ実行（PS Fallback → PMS 取り込み）
+ */
+async function importPsGpsToSession(sessionId: number, staffId: string, scheduleDate: Date): Promise<number> {
+  if (!PS_API_URL) return 0;
+
+  const targetDate = scheduleDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+  };
+  if (PS_API_KEY) headers['X-API-Key'] = PS_API_KEY;
+
+  try {
+    const psRes = await fetch(`${PS_API_URL}/GetStaffGPS.php`, {
+      method: 'POST',
+      headers,
+      body: new URLSearchParams({ STAFF_ID: staffId, TARGET_DATE: targetDate }).toString(),
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!psRes.ok) return 0;
+
+    const psBody = await psRes.text();
+    const parsed = JSON.parse(psBody);
+    const rows: any[] = Array.isArray(parsed) ? parsed : (parsed.data || []);
+
+    const gpsPoints = rows
+      .filter((r: any) => {
+        const lat = parseFloat(r.LATITUDE || '0');
+        const lng = parseFloat(r.LONGITUDE || '0');
+        return lat !== 0 && lng !== 0;
+      })
+      .map((r: any) => {
+        const terminalTime = (r.TERMINAL_TIME || '').trim();
+        const isoTimestamp = terminalTime
+          ? `${targetDate}T${terminalTime}+09:00`
+          : new Date().toISOString();
+        return {
+          sessionId,
+          latitude: parseFloat(r.LATITUDE),
+          longitude: parseFloat(r.LONGITUDE),
+          timestamp: new Date(isoTimestamp),
+        };
+      })
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+
+    if (gpsPoints.length === 0) return 0;
+
+    // 一括挿入
+    await prisma.gpsPoint.createMany({ data: gpsPoints });
+
+    // セッションの totalDistance を GPS から概算更新
+    let totalDistance = 0;
+    for (let i = 1; i < gpsPoints.length; i++) {
+      totalDistance += haversine(
+        gpsPoints[i - 1].latitude, gpsPoints[i - 1].longitude,
+        gpsPoints[i].latitude, gpsPoints[i].longitude,
+      );
+    }
+    if (totalDistance > 0) {
+      await prisma.distributionSession.update({
+        where: { id: sessionId },
+        data: { totalDistance },
+      });
+    }
+
+    return gpsPoints.length;
+  } catch (e) {
+    console.error('PS GPS import error:', e);
+    return 0;
+  }
+}
+
+/** Haversine distance in meters */
+function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 // GET /api/schedules/[id]/trajectory — 軌跡ビューア用データ取得
 export async function GET(
   request: Request,
@@ -53,6 +141,37 @@ export async function GET(
       return NextResponse.json({ error: '配布セッションがまだ開始されていません' }, { status: 404 });
     }
 
+    let sess = schedule.session;
+
+    // GPSポイントが0件の場合、Posting System から取り込みを試行
+    if (sess.gpsPoints.length === 0 && schedule.distributor?.staffId) {
+      const imported = await importPsGpsToSession(
+        sess.id,
+        schedule.distributor.staffId,
+        schedule.date,
+      );
+      if (imported > 0) {
+        // 取り込んだデータを再取得
+        const updatedSession = await prisma.distributionSession.findUnique({
+          where: { id: sess.id },
+          include: {
+            gpsPoints: { orderBy: { timestamp: 'asc' } },
+            progressEvents: { orderBy: { timestamp: 'asc' } },
+            skipEvents: {
+              orderBy: { timestamp: 'asc' },
+              include: {
+                prohibitedProperty: {
+                  select: { id: true, address: true, buildingName: true },
+                },
+              },
+            },
+            pauseEvents: { orderBy: { pausedAt: 'asc' } },
+          },
+        });
+        if (updatedSession) sess = updatedSession;
+      }
+    }
+
     // エリア内の禁止物件（PMS DBのみ、顧客コードでフィルタ）
     let prohibitedProperties: any[] = [];
     if (schedule.areaId) {
@@ -94,8 +213,6 @@ export async function GET(
         prohibitedReason: undefined,
       }));
     }
-
-    const sess = schedule.session;
 
     return NextResponse.json({
       session: {

@@ -314,23 +314,32 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
   // Fetch trajectory data (PMS session first, then fallback to Posting System)
   const fetchData = useCallback(async () => {
     try {
+      let pmsJson: any = null;
       const res = await fetch(`/api/schedules/${scheduleId}/trajectory`);
       if (res.ok) {
-        const json = await res.json();
-        setData(json);
-        setDataSource('pms');
-        setIsLive(json.session.finishedAt === null);
-        return;
+        pmsJson = await res.json();
+        // GPSポイントがある場合はPMSデータを使用
+        if (pmsJson.gpsPoints && pmsJson.gpsPoints.length > 0) {
+          setData(pmsJson);
+          setDataSource('pms');
+          setIsLive(pmsJson.session.finishedAt === null);
+          return;
+        }
+        // GPSポイント0件 → PS Fallbackを試行（セッションは存在するがGPSはPSにある場合）
       }
 
-      // PMS session not available — try Posting System fallback
+      // PMS session not available or has no GPS points — try Posting System fallback
       const psRes = await fetch(`/api/schedules/${scheduleId}/trajectory/posting-system`);
       if (psRes.ok) {
         const psJson = await psRes.json();
         const isCompleted = psJson.schedule?.status === 'COMPLETED';
+        // PMSセッションがある場合はそのデータ（startedAt, finishedAt, steps等）を優先使用
+        const hasPmsSession = pmsJson?.session;
         // Wrap Posting System data into TrajectoryData shape
         const wrapped: TrajectoryData = {
-          session: {
+          session: hasPmsSession ? {
+            ...pmsJson.session,
+          } : {
             id: 0,
             startedAt: psJson.gpsPoints.length > 0 ? psJson.gpsPoints[0].timestamp : new Date().toISOString(),
             // 配布完了時のみ finishedAt を設定（未完了は null → 現在地ピン表示）
@@ -344,9 +353,9 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
             incompleteNote: null,
           },
           gpsPoints: psJson.gpsPoints,
-          progressEvents: [],
-          skipEvents: [],
-          pauseEvents: [],
+          progressEvents: hasPmsSession ? pmsJson.progressEvents : [],
+          skipEvents: hasPmsSession ? pmsJson.skipEvents : [],
+          pauseEvents: hasPmsSession ? (pmsJson.pauseEvents || []) : [],
           area: psJson.area,
           prohibitedProperties: psJson.prohibitedProperties || [],
           schedule: psJson.schedule,
@@ -358,6 +367,13 @@ export default function TrajectoryViewer({ scheduleId, onClose, onSwitchToMapbox
         return;
       }
 
+      // PS fallback も失敗した場合、PMSデータがあればそれを使う（GPSなしでもセッション情報は表示）
+      if (pmsJson) {
+        setData(pmsJson);
+        setDataSource('pms');
+        setIsLive(pmsJson.session.finishedAt === null);
+        return;
+      }
       const err = await psRes.json().catch(() => ({}));
       setError(err.error || 'データの取得に失敗しました');
     } catch {
