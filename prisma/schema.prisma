@@ -248,6 +248,9 @@ model Employee {
   // 配布員紐付け（同一人物が社員と配布員の両方として働く場合）
   linkedDistributor           FlyerDistributor?     @relation("EmployeeDistributorLink")
 
+  // 研修テスト割当
+  testAssignments             TrainingTestAssignment[] @relation("TestAssigner")
+
   @@map("employees")
 }
 
@@ -719,6 +722,11 @@ model FlyerDistributor {
 
   // システム用
   note      String?  @db.Text // 備考
+
+  // 研修テスト
+  isTrainingTestPassed  Boolean   @default(false) @map("is_training_test_passed")
+  trainingTestPassedAt  DateTime? @map("training_test_passed_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -742,6 +750,7 @@ model FlyerDistributor {
   lineUser              LineUser?
   distributorAnnouncementTargets DistributorAnnouncementTarget[]
   distributorAnnouncementReads   DistributorAnnouncementRead[]
+  testAssignments                TrainingTestAssignment[]
 
   // 社員紐付け（同一人物が社員と配布員の両方として働く場合）
   linkedEmployeeId Int?      @unique @map("linked_employee_id")
@@ -1076,6 +1085,24 @@ enum AdminNotificationType {
   DISTRIBUTION_START    // 配布開始
   DISTRIBUTION_FINISH   // 配布完了
   ALERT                 // アラート通知
+  TRAINING_TEST_PASSED  // 研修テスト合格
+}
+
+// --- 研修テスト問題種別 ---
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  IMAGE
+
+  @@map("question_type")
+}
+
+// --- テスト割当ステータス ---
+enum TestAssignmentStatus {
+  PENDING
+  PASSED
+
+  @@map("test_assignment_status")
 }
 
 // --- アラート定義の周期 ---
@@ -3531,4 +3558,80 @@ model SchedulePhoto {
 
   @@index([scheduleId])
   @@map("schedule_photos")
+}
+
+// ==========================================
+// 研修マニュアル・テスト機能
+// ==========================================
+
+model TrainingManualPage {
+  id             Int      @id @default(autoincrement())
+  language       String   @db.VarChar(5)
+  pageNumber     Int      @map("page_number")
+  imageUrl       String   @map("image_url") @db.Text
+  manualVersion  String   @map("manual_version") @db.VarChar(20)
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([language, pageNumber, manualVersion])
+  @@map("training_manual_pages")
+}
+
+model TrainingQuestion {
+  id              Int              @id @default(autoincrement())
+  type            QuestionType
+  questionJa      String           @map("question_ja") @db.Text
+  questionEn      String           @map("question_en") @db.Text
+  imageUrl        String?          @map("image_url") @db.Text
+  explanationJa   String           @map("explanation_ja") @db.Text
+  explanationEn   String           @map("explanation_en") @db.Text
+  isActive        Boolean          @default(true) @map("is_active")
+  sortOrder       Int              @default(0) @map("sort_order")
+  createdAt       DateTime         @default(now()) @map("created_at")
+  updatedAt       DateTime         @updatedAt @map("updated_at")
+  choices         TrainingChoice[]
+
+  @@map("training_questions")
+}
+
+model TrainingChoice {
+  id              Int              @id @default(autoincrement())
+  questionId      Int              @map("question_id")
+  question        TrainingQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  choiceTextJa    String           @map("choice_text_ja") @db.VarChar(500)
+  choiceTextEn    String           @map("choice_text_en") @db.VarChar(500)
+  isCorrect       Boolean          @default(false) @map("is_correct")
+  sortOrder       Int              @default(0) @map("sort_order")
+
+  @@map("training_choices")
+}
+
+model TrainingTestAssignment {
+  id              Int                    @id @default(autoincrement())
+  distributorId   Int                    @map("distributor_id")
+  distributor     FlyerDistributor       @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+  assignedById    Int                    @map("assigned_by_id")
+  assignedBy      Employee               @relation("TestAssigner", fields: [assignedById], references: [id])
+  status          TestAssignmentStatus   @default(PENDING)
+  assignedAt      DateTime               @default(now()) @map("assigned_at")
+  passedAt        DateTime?              @map("passed_at")
+  results         TrainingTestResult[]
+
+  @@map("training_test_assignments")
+}
+
+model TrainingTestResult {
+  id              Int                    @id @default(autoincrement())
+  assignmentId    Int                    @map("assignment_id")
+  assignment      TrainingTestAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  score           Int
+  totalQuestions  Int                    @map("total_questions")
+  isPassed        Boolean                @map("is_passed")
+  attemptNumber   Int                    @default(1) @map("attempt_number")
+  questionIds     Json                   @map("question_ids")
+  answers         Json
+  completedAt     DateTime               @default(now()) @map("completed_at")
+
+  @@map("training_test_results")
 }
