@@ -68,7 +68,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { title, content, titleEn, contentEn, imageUrls, targetAll, distributorIds } = body;
+    const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: 'title と content は必須です' }, { status: 400 });
@@ -93,8 +93,11 @@ export async function POST(request: Request) {
     if (isLineConfigured()) {
       let targetDistributors: Array<{ lineUserId: string; language: string }> | undefined;
       if (targetAll !== false) {
+        const langFilter = targetLanguage === 'ja' || targetLanguage === 'en'
+          ? { distributor: { language: targetLanguage } }
+          : {};
         targetDistributors = await prisma.lineUser.findMany({
-          where: { distributorId: { not: null }, isFollowing: true },
+          where: { distributorId: { not: null }, isFollowing: true, ...langFilter },
           select: { lineUserId: true, distributor: { select: { language: true } } },
         }).then(rows => rows.map(r => ({ lineUserId: r.lineUserId, language: r.distributor?.language || 'ja' })));
       } else if (distributorIds?.length) {

@@ -170,7 +170,7 @@ function CreateModal({ t, onClose, onCreated }: {
   const [content, setContent] = useState('');
   const [titleEn, setTitleEn] = useState('');
   const [contentEn, setContentEn] = useState('');
-  const [targetAll, setTargetAll] = useState(true);
+  const [targetMode, setTargetMode] = useState<'all' | 'ja' | 'en' | 'select'>('all');
   const [distributorIds, setDistributorIds] = useState<number[]>([]);
   const [distributorSearch, setDistributorSearch] = useState('');
   const [distributorOptions, setDistributorOptions] = useState<DistributorOption[]>([]);
@@ -181,7 +181,7 @@ function CreateModal({ t, onClose, onCreated }: {
 
   // Search distributors
   useEffect(() => {
-    if (targetAll || !distributorSearch.trim()) {
+    if (targetMode !== 'select' || !distributorSearch.trim()) {
       setDistributorOptions([]);
       return;
     }
@@ -200,7 +200,7 @@ function CreateModal({ t, onClose, onCreated }: {
       } catch (e) { console.error(e); }
     }, 300);
     return () => clearTimeout(timer);
-  }, [distributorSearch, targetAll]);
+  }, [distributorSearch, targetMode]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -228,7 +228,15 @@ function CreateModal({ t, onClose, onCreated }: {
       const res = await fetch('/api/distributor-announcements', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content, titleEn: titleEn || undefined, contentEn: contentEn || undefined, imageUrls, targetAll, distributorIds: targetAll ? [] : distributorIds }),
+        body: JSON.stringify({
+          title, content,
+          titleEn: titleEn || undefined,
+          contentEn: contentEn || undefined,
+          imageUrls,
+          targetAll: targetMode !== 'select',
+          targetLanguage: targetMode === 'ja' || targetMode === 'en' ? targetMode : undefined,
+          distributorIds: targetMode === 'select' ? distributorIds : [],
+        }),
       });
       if (res.ok) onCreated();
     } catch (e) { console.error(e); }
@@ -321,17 +329,25 @@ function CreateModal({ t, onClose, onCreated }: {
           {/* Target */}
           <div>
             <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_target')}</label>
-            <div className="flex gap-3 mb-2">
+            <div className="flex flex-wrap gap-3 mb-2">
               <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <input type="radio" checked={targetAll} onChange={() => setTargetAll(true)} className="accent-indigo-600" />
+                <input type="radio" checked={targetMode === 'all'} onChange={() => setTargetMode('all')} className="accent-indigo-600" />
                 {t('target_all')}
               </label>
               <label className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <input type="radio" checked={!targetAll} onChange={() => setTargetAll(false)} className="accent-indigo-600" />
+                <input type="radio" checked={targetMode === 'ja'} onChange={() => setTargetMode('ja')} className="accent-indigo-600" />
+                🇯🇵 日本語
+              </label>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input type="radio" checked={targetMode === 'en'} onChange={() => setTargetMode('en')} className="accent-indigo-600" />
+                🇬🇧 English
+              </label>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <input type="radio" checked={targetMode === 'select'} onChange={() => setTargetMode('select')} className="accent-indigo-600" />
                 {t('target_select')}
               </label>
             </div>
-            {!targetAll && (
+            {targetMode === 'select' && (
               <div>
                 <input
                   value={distributorSearch}
