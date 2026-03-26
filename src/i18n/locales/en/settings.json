@@ -1,4 +1,10 @@
 {
+  "group_basic": "Basic",
+  "group_organization": "Organization",
+  "group_recruiting": "Recruiting",
+  "group_distribution": "Distribution",
+  "group_quality": "Quality",
+  "group_task_alert": "Tasks & Alerts",
   "tab_general": "General",
   "tab_department": "Departments",
   "tab_industry": "Industries",

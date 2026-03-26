@@ -1,4 +1,10 @@
 {
+  "group_basic": "基本設定",
+  "group_organization": "組織・マスタ",
+  "group_recruiting": "採用・研修",
+  "group_distribution": "配布業務",
+  "group_quality": "品質管理",
+  "group_task_alert": "タスク・通知",
   "tab_general": "全般",
   "tab_department": "部署",
   "tab_industry": "業種",

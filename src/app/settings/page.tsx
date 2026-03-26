@@ -48,7 +48,9 @@ export default function SettingsPage() {
 
   const WEEK_DAY_OPTIONS = useMemo(() => WEEK_DAY_KEYS.map(k => ({ value: k.value, label: t(k.labelKey) })), [t]);
 
-  const [tab, setTab] = useState<'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'ratePlans' | 'headerLinks' | 'legal'>('general');
+  type TabKey = 'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'ratePlans' | 'headerLinks' | 'legal';
+  type TabItem = { key: TabKey; label: string; icon: string };
+  const [tab, setTab] = useState<TabKey>('general');
 
   // 自社情報
   const [companyForm, setCompanyForm] = useState<CompanySetting>(COMPANY_DEFAULTS);
@@ -571,29 +573,43 @@ export default function SettingsPage() {
     }
   };
 
-  const tabs = useMemo(() => [
-    { key: 'general' as const,            label: t('tab_general'),       icon: 'bi-gear-fill' },
-    { key: 'department' as const,         label: t('tab_department'),        icon: 'bi-diagram-3' },
-    { key: 'industry' as const,           label: t('tab_industry'),        icon: 'bi-tag' },
-    { key: 'country' as const,            label: t('tab_country'),          icon: 'bi-globe2' },
-    { key: 'visaType' as const,           label: t('tab_visaType'),    icon: 'bi-card-checklist' },
-    { key: 'bank' as const,               label: t('tab_bank'),        icon: 'bi-bank2' },
-    { key: 'distributionMethod' as const, label: t('tab_distributionMethod'),    icon: 'bi-signpost-2' },
-    { key: 'company' as const,            label: t('tab_company'),    icon: 'bi-building' },
-    { key: 'interviewSlot' as const,      label: t('tab_interviewSlot'), icon: 'bi-calendar-check' },
-    { key: 'trainingSlot' as const,       label: t('tab_trainingSlot'), icon: 'bi-mortarboard' },
-    { key: 'taskCategory' as const,        label: t('tab_taskCategory'),  icon: 'bi-list-check' },
-    { key: 'recruitingMedia' as const,     label: t('tab_recruitingMedia'),    icon: 'bi-megaphone-fill' },
-    { key: 'prohibitedReason' as const,   label: t('tab_prohibitedReason'),    icon: 'bi-shield-x' },
-    { key: 'complaintType' as const,      label: t('tab_complaintType'), icon: 'bi-exclamation-circle' },
-    { key: 'alertCategory' as const,      label: t('tab_alertCategory'), icon: 'bi-bell' },
-    { key: 'alertDefinition' as const,    label: t('tab_alertDefinition'),     icon: 'bi-bell-fill' },
-    { key: 'evaluation' as const,          label: t('tab_evaluation'),    icon: 'bi-speedometer2' },
-    { key: 'rankRates' as const,            label: t('tab_rankRates'), icon: 'bi-currency-yen' },
-    { key: 'ratePlans' as const,            label: t('tab_ratePlans') || 'レートプラン', icon: 'bi-tags' },
-    { key: 'headerLinks' as const,          label: t('tab_headerLinks'),     icon: 'bi-link-45deg' },
-    { key: 'legal' as const,                label: t('tab_legal'),         icon: 'bi-file-earmark-text' },
+  const tabGroups = useMemo<{ group: string; tabs: TabItem[] }[]>(() => [
+    { group: t('group_basic'), tabs: [
+      { key: 'general' as const,            label: t('tab_general'),       icon: 'bi-gear-fill' },
+      { key: 'company' as const,            label: t('tab_company'),       icon: 'bi-building' },
+      { key: 'headerLinks' as const,        label: t('tab_headerLinks'),   icon: 'bi-link-45deg' },
+      { key: 'legal' as const,              label: t('tab_legal'),         icon: 'bi-file-earmark-text' },
+    ]},
+    { group: t('group_organization'), tabs: [
+      { key: 'department' as const,         label: t('tab_department'),        icon: 'bi-diagram-3' },
+      { key: 'industry' as const,           label: t('tab_industry'),          icon: 'bi-tag' },
+      { key: 'bank' as const,              label: t('tab_bank'),              icon: 'bi-bank2' },
+      { key: 'country' as const,            label: t('tab_country'),           icon: 'bi-globe2' },
+      { key: 'visaType' as const,           label: t('tab_visaType'),          icon: 'bi-card-checklist' },
+    ]},
+    { group: t('group_recruiting'), tabs: [
+      { key: 'interviewSlot' as const,      label: t('tab_interviewSlot'), icon: 'bi-calendar-check' },
+      { key: 'trainingSlot' as const,       label: t('tab_trainingSlot'),  icon: 'bi-mortarboard' },
+      { key: 'recruitingMedia' as const,    label: t('tab_recruitingMedia'),   icon: 'bi-megaphone-fill' },
+    ]},
+    { group: t('group_distribution'), tabs: [
+      { key: 'distributionMethod' as const, label: t('tab_distributionMethod'), icon: 'bi-signpost-2' },
+      { key: 'evaluation' as const,         label: t('tab_evaluation'),    icon: 'bi-speedometer2' },
+      { key: 'rankRates' as const,          label: t('tab_rankRates'),     icon: 'bi-currency-yen' },
+      { key: 'ratePlans' as const,          label: t('tab_ratePlans') || 'レートプラン', icon: 'bi-tags' },
+    ]},
+    { group: t('group_quality'), tabs: [
+      { key: 'prohibitedReason' as const,   label: t('tab_prohibitedReason'),  icon: 'bi-shield-x' },
+      { key: 'complaintType' as const,      label: t('tab_complaintType'),     icon: 'bi-exclamation-circle' },
+    ]},
+    { group: t('group_task_alert'), tabs: [
+      { key: 'taskCategory' as const,       label: t('tab_taskCategory'),  icon: 'bi-list-check' },
+      { key: 'alertCategory' as const,      label: t('tab_alertCategory'), icon: 'bi-bell' },
+      { key: 'alertDefinition' as const,    label: t('tab_alertDefinition'),   icon: 'bi-bell-fill' },
+    ]},
   ], [t]);
+
+  const allTabs = useMemo(() => tabGroups.flatMap(g => g.tabs), [tabGroups]);
 
   const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'alertDefinition' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'ratePlans' && tab !== 'headerLinks' && tab !== 'legal';
 
@@ -858,16 +874,23 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {/* タブ */}
-        <div className="flex overflow-x-auto scrollbar-hide gap-1 mb-6 bg-slate-200/60 p-1 rounded-xl -mx-4 px-4 md:mx-0 md:px-1 md:overflow-visible md:flex-wrap">
-          {tabs.map(tb => (
-            <button
-              key={tb.key}
-              onClick={() => { setTab(tb.key); setErrorMsg(''); if (tb.key === 'company') fetchCompanySettings(); if (tb.key === 'prohibitedReason') fetchProhibitedReasons(); if (tb.key === 'complaintType') fetchComplaintTypes(); if (tb.key === 'alertCategory') fetchAlertCategories(); if (tb.key === 'alertDefinition') fetchAlertDefinitions(); if (tb.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (tb.key === 'rankRates') fetchRankRates(); if (tb.key === 'headerLinks') fetchHeaderLinks(); if (tb.key === 'legal') fetchLegalContents(); }}
-              className={`shrink-0 whitespace-nowrap px-3 md:px-4 py-2 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${tab === tb.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
-            >
-              <i className={`bi ${tb.icon}`}></i> {tb.label}
-            </button>
+        {/* タブ（グループ化） */}
+        <div className="mb-6 bg-slate-200/60 p-2 rounded-xl -mx-4 px-4 md:mx-0 md:px-2 space-y-1">
+          {tabGroups.map((g, gi) => (
+            <div key={gi} className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider w-16 md:w-20 shrink-0 text-right pr-2">{g.group}</span>
+              <div className="flex gap-1 flex-wrap flex-1">
+                {g.tabs.map(tb => (
+                  <button
+                    key={tb.key}
+                    onClick={() => { setTab(tb.key); setErrorMsg(''); if (tb.key === 'company') fetchCompanySettings(); if (tb.key === 'prohibitedReason') fetchProhibitedReasons(); if (tb.key === 'complaintType') fetchComplaintTypes(); if (tb.key === 'alertCategory') fetchAlertCategories(); if (tb.key === 'alertDefinition') fetchAlertDefinitions(); if (tb.key === 'evaluation') { fetchEvalSettings(); fetchComplaintTypes(); } if (tb.key === 'rankRates') fetchRankRates(); if (tb.key === 'headerLinks') fetchHeaderLinks(); if (tb.key === 'legal') fetchLegalContents(); }}
+                    className={`shrink-0 whitespace-nowrap px-3 md:px-4 py-1.5 rounded-lg text-xs md:text-sm font-bold flex items-center gap-1.5 transition-all ${tab === tb.key ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-800'}`}
+                  >
+                    <i className={`bi ${tb.icon}`}></i> {tb.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -1414,7 +1437,7 @@ export default function SettingsPage() {
         {isMasterTab && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="font-bold text-slate-700">{tabs.find(tb => tb.key === tab)?.label}{t('master_suffix')}</h2>
+              <h2 className="font-bold text-slate-700">{allTabs.find(tb => tb.key === tab)?.label}{t('master_suffix')}</h2>
               <button onClick={openCreate} className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-1.5 shadow-sm">
                 <i className="bi bi-plus-lg"></i> {t('btn_add')}
               </button>
@@ -2717,7 +2740,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between mb-5">
               <h2 className="font-black text-slate-800 text-lg">
-                {showModal === 'create' ? t('modal_add') : t('modal_edit')} — {tabs.find(tb => tb.key === tab)?.label}
+                {showModal === 'create' ? t('modal_add') : t('modal_edit')} — {allTabs.find(tb => tb.key === tab)?.label}
               </h2>
               <button onClick={() => setShowModal(null)} className="w-8 h-8 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center justify-center">
                 <i className="bi bi-x text-xl"></i>
