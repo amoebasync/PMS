@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNotification } from '@/components/ui/NotificationProvider';
 
 // ===== 共通型定義（page.tsx からも利用） =====
@@ -162,15 +163,41 @@ export function AutocompleteInput({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0, width: 0 });
+
+  // ドロップダウン位置を計算
+  const updateDropdownPos = useCallback(() => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setDropdownPos({ top: rect.bottom + 4, left: rect.left, width: rect.width });
+    }
+  }, []);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setIsOpen(false);
+      if (
+        wrapRef.current && !wrapRef.current.contains(e.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target as Node)
+      ) setIsOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // スクロール・リサイズ時に位置更新
+  useEffect(() => {
+    if (!isOpen) return;
+    updateDropdownPos();
+    window.addEventListener('scroll', updateDropdownPos, true);
+    window.addEventListener('resize', updateDropdownPos);
+    return () => {
+      window.removeEventListener('scroll', updateDropdownPos, true);
+      window.removeEventListener('resize', updateDropdownPos);
+    };
+  }, [isOpen, updateDropdownPos]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const q = e.target.value;
@@ -184,6 +211,7 @@ export function AutocompleteInput({
         if (res.ok) {
           const data = await res.json();
           setCandidates(Array.isArray(data) ? data : []);
+          updateDropdownPos();
           setIsOpen(true);
         }
       } finally { setIsLoading(false); }
@@ -194,6 +222,24 @@ export function AutocompleteInput({
     onSelect(item.id.toString(), item.name);
     setQuery(''); setCandidates([]); setIsOpen(false);
   };
+
+  const dropdownContent = isOpen && (candidates.length > 0 || (query.trim() && !isLoading)) ? (
+    <div
+      ref={dropdownRef}
+      className="bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+      style={{ position: 'fixed', top: dropdownPos.top, left: dropdownPos.left, width: dropdownPos.width, zIndex: 9999 }}
+    >
+      {candidates.length > 0 ? candidates.map(item => (
+        <button key={item.id} type="button" onMouseDown={() => handleSelect(item)}
+          className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0">
+          <span className="font-medium text-slate-800">{item.name}</span>
+          {item.staffId && <span className="ml-2 text-xs text-slate-400">{item.staffId}</span>}
+        </button>
+      )) : (
+        <p className="px-3 py-2 text-sm text-slate-400">該当なし</p>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div ref={wrapRef} className="relative">
@@ -209,6 +255,7 @@ export function AutocompleteInput({
       ) : (
         <div className="relative">
           <input
+            ref={inputRef}
             type="text" value={query} onChange={handleChange}
             placeholder={placeholder}
             className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-8"
@@ -218,22 +265,7 @@ export function AutocompleteInput({
               <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
             </div>
           )}
-          {isOpen && candidates.length > 0 && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
-              {candidates.map(item => (
-                <button key={item.id} type="button" onMouseDown={() => handleSelect(item)}
-                  className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0">
-                  <span className="font-medium text-slate-800">{item.name}</span>
-                  {item.staffId && <span className="ml-2 text-xs text-slate-400">{item.staffId}</span>}
-                </button>
-              ))}
-            </div>
-          )}
-          {isOpen && query.trim() && candidates.length === 0 && !isLoading && (
-            <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg">
-              <p className="px-3 py-2 text-sm text-slate-400">該当なし</p>
-            </div>
-          )}
+          {dropdownContent && createPortal(dropdownContent, document.body)}
         </div>
       )}
     </div>
