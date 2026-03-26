@@ -280,6 +280,8 @@ export default function NotificationBell() {
                     if (!n.isRead) markRead(n.id);
                     if (n.type === 'ALERT') {
                       window.location.href = '/alerts';
+                    } else if (n.type === 'TRAINING_TEST_PASSED') {
+                      window.location.href = '/distributors';
                     } else if (n.scheduleId) {
                       window.location.href = `/schedules?trajectory=${n.scheduleId}`;
                     }
@@ -292,16 +294,20 @@ export default function NotificationBell() {
                     <span className={`mt-0.5 shrink-0 ${
                       n.type === 'ALERT'
                         ? 'text-orange-500'
-                        : n.type === 'DISTRIBUTION_START'
+                        : n.type === 'TRAINING_TEST_PASSED'
                           ? 'text-emerald-500'
-                          : 'text-blue-500'
+                          : n.type === 'DISTRIBUTION_START'
+                            ? 'text-emerald-500'
+                            : 'text-blue-500'
                     }`}>
                       <i className={`bi ${
                         n.type === 'ALERT'
                           ? 'bi-exclamation-triangle-fill'
-                          : n.type === 'DISTRIBUTION_START'
-                            ? 'bi-play-circle-fill'
-                            : 'bi-check-circle-fill'
+                          : n.type === 'TRAINING_TEST_PASSED'
+                            ? 'bi-mortarboard-fill'
+                            : n.type === 'DISTRIBUTION_START'
+                              ? 'bi-play-circle-fill'
+                              : 'bi-check-circle-fill'
                       }`}></i>
                     </span>
                     <div className="flex-1 min-w-0">
