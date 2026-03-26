@@ -153,6 +153,10 @@ export async function POST(request: Request) {
       customerReportAssigneeId,
       customerReportContent,
       customerReportCustomerId,
+      // 配布禁止物件リンク
+      linkProhibitedPropertyId,
+      registerAsProhibited,
+      prohibitedReasonId,
     } = body;
 
     if (!occurredAt || !address || !title || !description) {
@@ -245,7 +249,30 @@ export async function POST(request: Request) {
         });
       }
 
-      // 4. 監査ログ
+      // 4. 配布禁止物件リンク or 新規作成
+      if (linkProhibitedPropertyId) {
+        // 既存禁止物件とリンク
+        await tx.prohibitedProperty.update({
+          where: { id: Number(linkProhibitedPropertyId) },
+          data: { complaintId: complaint.id },
+        });
+      } else if (registerAsProhibited) {
+        // 新規禁止物件を同時作成
+        await tx.prohibitedProperty.create({
+          data: {
+            address: complaint.address,
+            buildingName: complaint.buildingName,
+            roomNumber: complaint.roomNumber,
+            latitude: complaint.latitude,
+            longitude: complaint.longitude,
+            customerId: complaint.customerId,
+            prohibitedReasonId: prohibitedReasonId ? Number(prohibitedReasonId) : null,
+            complaintId: complaint.id,
+          },
+        });
+      }
+
+      // 5. 監査ログ
       await writeAuditLog({
         actorType: 'EMPLOYEE',
         actorId,

@@ -760,6 +760,17 @@ function CreateComplaintModal({
   const [assigneeId, setAssigneeId] = useState('');
   const [assigneeName, setAssigneeName] = useState('');
 
+  // スケジュール紐付け
+  const [scheduleId, setScheduleId] = useState('');
+  const [scheduleOptions, setScheduleOptions] = useState<Array<{ id: number; date: string; area: string; status: string }>>([]);
+
+  // 配布禁止物件リンク
+  const [prohibitedMatches, setProhibitedMatches] = useState<Array<{ id: number; address: string; buildingName?: string; distance?: number; matchType: string }>>([]);
+  const [linkedProhibitedId, setLinkedProhibitedId] = useState<number | null>(null);
+  const [registerAsProhibited, setRegisterAsProhibited] = useState(false);
+  const [prohibitedReasonId, setProhibitedReasonId] = useState('');
+  const [prohibitedReasons, setProhibitedReasons] = useState<Array<{ id: number; name: string }>>([]);
+
   // クレーム元
   const [source, setSource] = useState('');
   const [sourceContactName, setSourceContactName] = useState('');
@@ -779,6 +790,68 @@ function CreateComplaintModal({
   const [customerReportAssigneeName, setCustomerReportAssigneeName] = useState('');
   const [customerReportCustomerId, setCustomerReportCustomerId] = useState('');
   const [customerReportCustomerName, setCustomerReportCustomerName] = useState('');
+
+  // クレーム種別選択 → タイトル自動入力
+  useEffect(() => {
+    if (complaintTypeId && !title) {
+      const ct = complaintTypes.find(t => t.id === Number(complaintTypeId));
+      if (ct) setTitle(ct.name);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complaintTypeId]);
+
+  // 配布員選択 → 直近30日のスケジュールを取得
+  useEffect(() => {
+    if (!distributorId) { setScheduleOptions([]); setScheduleId(''); return; }
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(from.getDate() - 30);
+    const toDate = new Date(today);
+    toDate.setDate(toDate.getDate() + 7);
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    fetch(`/api/schedules?distributorId=${distributorId}&from=${fmt(from)}&to=${fmt(toDate)}`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => {
+        const list = Array.isArray(data) ? data : data.schedules || [];
+        const opts = list.map((s: any) => ({
+          id: s.id,
+          date: (s.date || '').slice(0, 10),
+          area: s.area ? `${s.city?.name || ''} ${s.area?.chome_name || s.area?.town_name || ''}` : '',
+          status: s.status,
+        }));
+        setScheduleOptions(opts.reverse());
+      })
+      .catch(() => setScheduleOptions([]));
+  }, [distributorId]);
+
+  // 住所・緯度経度 → 禁止物件自動マッチング
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const lat = parseFloat(latitude);
+      const lng = parseFloat(longitude);
+      const hasGps = !isNaN(lat) && !isNaN(lng);
+      const hasAddress = address.trim().length >= 3;
+      if (!hasGps && !hasAddress) { setProhibitedMatches([]); return; }
+
+      const params = new URLSearchParams();
+      if (hasGps) { params.set('lat', String(lat)); params.set('lng', String(lng)); }
+      if (hasAddress) params.set('q', address.trim());
+
+      fetch(`/api/prohibited-properties/search?${params}`)
+        .then(r => r.ok ? r.json() : { results: [] })
+        .then(data => setProhibitedMatches(data.results || []))
+        .catch(() => setProhibitedMatches([]));
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [address, latitude, longitude]);
+
+  // 禁止理由マスタ取得
+  useEffect(() => {
+    fetch('/api/prohibited-reasons')
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setProhibitedReasons(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
 
   // クレーム元が顧客の場合、顧客報告の顧客を自動プリフィル
   useEffect(() => {
@@ -822,6 +895,13 @@ function CreateComplaintModal({
       if (roomNumber.trim()) body.roomNumber = roomNumber.trim();
       if (latitude) body.latitude = Number(latitude);
       if (longitude) body.longitude = Number(longitude);
+      if (scheduleId) body.scheduleId = Number(scheduleId);
+      // 配布禁止物件リンク
+      if (linkedProhibitedId) body.linkProhibitedPropertyId = linkedProhibitedId;
+      else if (registerAsProhibited) {
+        body.registerAsProhibited = true;
+        if (prohibitedReasonId) body.prohibitedReasonId = Number(prohibitedReasonId);
+      }
       // クレーム元
       if (source) body.source = source;
       if (sourceContactName.trim()) body.sourceContactName = sourceContactName.trim();
@@ -1014,6 +1094,27 @@ function CreateComplaintModal({
             />
           </div>
 
+          {/* Schedule selector (when distributor is selected) */}
+          {distributorId && scheduleOptions.length > 0 && (
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">
+                <i className="bi bi-calendar-check mr-1"></i>{t('form_schedule') || 'スケジュール'}
+              </label>
+              <select
+                value={scheduleId}
+                onChange={e => setScheduleId(e.target.value)}
+                className="w-full border border-slate-300 p-3 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+              >
+                <option value="">{t('form_select_placeholder')}</option>
+                {scheduleOptions.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.date} - {s.area} ({s.status === 'COMPLETED' ? '完了' : s.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
@@ -1157,6 +1258,90 @@ function CreateComplaintModal({
                     <span className="font-medium text-slate-800">{item.name as string}</span>
                   )}
                 />
+              </div>
+            )}
+          </div>
+
+          {/* ===== 配布禁止物件リンク ===== */}
+          <div className="border-t border-slate-200 pt-5">
+            <h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+              <i className="bi bi-house-x text-red-500"></i>
+              {t('form_prohibited_section') || '配布禁止物件'}
+            </h3>
+
+            {/* Auto-match results */}
+            {linkedProhibitedId ? (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <i className="bi bi-link-45deg text-emerald-600"></i>
+                  <div>
+                    <span className="text-xs font-bold text-emerald-700">{t('form_prohibited_linked') || '禁止物件とリンク済み'}</span>
+                    <span className="text-xs text-emerald-600 ml-2">#{linkedProhibitedId}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLinkedProhibitedId(null)}
+                  className="text-xs text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <i className="bi bi-x-lg"></i>
+                </button>
+              </div>
+            ) : prohibitedMatches.length > 0 ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <i className="bi bi-exclamation-triangle text-amber-600"></i>
+                  <span className="text-xs font-bold text-amber-700">{t('form_prohibited_matches') || 'この住所付近に配布禁止物件があります'}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {prohibitedMatches.slice(0, 3).map(m => (
+                    <div key={m.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-amber-100">
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-medium text-slate-700 truncate block">{m.address}</span>
+                        {m.buildingName && <span className="text-[10px] text-slate-400">{m.buildingName}</span>}
+                        {m.distance != null && <span className="text-[10px] text-amber-600 ml-1">({m.distance}m)</span>}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => { setLinkedProhibitedId(m.id); setRegisterAsProhibited(false); }}
+                        className="shrink-0 ml-2 px-2.5 py-1 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors"
+                      >
+                        {t('form_prohibited_link_btn') || 'リンク'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Register as new prohibited property */}
+            {!linkedProhibitedId && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={registerAsProhibited}
+                  onChange={e => setRegisterAsProhibited(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-red-600 focus:ring-red-500 accent-red-600"
+                />
+                <span className="text-xs font-bold text-slate-600">{t('form_register_prohibited') || 'この物件を配布禁止に登録する'}</span>
+              </label>
+            )}
+
+            {registerAsProhibited && !linkedProhibitedId && (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-xl p-3">
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  {t('form_prohibited_reason') || '禁止理由'}
+                </label>
+                <select
+                  value={prohibitedReasonId}
+                  onChange={e => setProhibitedReasonId(e.target.value)}
+                  className="w-full border border-slate-300 p-2.5 rounded-lg text-sm outline-none focus:ring-2 focus:ring-red-400 bg-white"
+                >
+                  <option value="">{t('form_select_placeholder')}</option>
+                  {prohibitedReasons.map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
