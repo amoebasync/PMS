@@ -130,7 +130,7 @@ export default function DistributorPayrollPage() {
   // 検索・フィルタ
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [showWithDataOnly, setShowWithDataOnly] = useState(false);
+  const [showWithDataOnly, setShowWithDataOnly] = useState(true);
 
   // 配布員検索モード
   const [viewMode, setViewMode] = useState<ViewMode>('week');
