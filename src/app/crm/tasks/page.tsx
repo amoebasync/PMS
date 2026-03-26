@@ -741,13 +741,13 @@ export default function CrmTasksPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-12">{t('col_priority')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-16 whitespace-nowrap">{t('col_priority')}</th>
                       <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_task')}</th>
                       <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_type')}</th>
                       <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_related')}</th>
                       <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider">{t('col_assignee')}</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-24">{t('col_due_date')}</th>
-                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-20">{t('col_status')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-28 whitespace-nowrap">{t('col_due_date')}</th>
+                      <th className="text-left px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wider w-24 whitespace-nowrap">{t('col_status')}</th>
                       <th className="px-4 py-3 w-24"></th>
                     </tr>
                   </thead>
@@ -813,24 +813,24 @@ export default function CrmTasksPage() {
                           <td className="px-4 py-3">
                             {isOverdue ? (
                               <div>
-                                <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-red-200">
+                                <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-red-200 whitespace-nowrap">
                                   <i className="bi bi-exclamation-triangle-fill"></i> {t('overdue_badge')}
                                 </span>
-                                <p className="text-xs text-red-600 font-bold mt-0.5">{formatDueDate(task.dueDate)}</p>
+                                <p className="text-xs text-red-600 font-bold mt-0.5 whitespace-nowrap">{formatDueDate(task.dueDate)}</p>
                               </div>
                             ) : isDueToday ? (
                               <div>
-                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-orange-200">
+                                <span className="inline-flex items-center gap-1 bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-orange-200 whitespace-nowrap">
                                   <i className="bi bi-clock-fill"></i> {t('today_badge')}
                                 </span>
-                                <p className="text-xs text-orange-600 font-bold mt-0.5">{formatDueDate(task.dueDate)}</p>
+                                <p className="text-xs text-orange-600 font-bold mt-0.5 whitespace-nowrap">{formatDueDate(task.dueDate)}</p>
                               </div>
                             ) : (
                               <span className="text-xs text-slate-600">{formatDueDate(task.dueDate)}</span>
                             )}
                           </td>
                           <td className="px-4 py-3">
-                            <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${scfg.cls}`}>{scfg.label}</span>
+                            <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${scfg.cls}`}>{scfg.label}</span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
