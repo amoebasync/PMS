@@ -11,11 +11,23 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()));
-    const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1));
+    const startParam = searchParams.get('startDate');
+    const endParam = searchParams.get('endDate');
 
-    const startDate = new Date(year, month - 1, 1);
-    const endDate = new Date(year, month, 0, 23, 59, 59);
+    let startDate: Date;
+    let endDate: Date;
+
+    if (startParam && endParam) {
+      // Date range mode (for week views spanning months)
+      startDate = new Date(startParam + 'T00:00:00Z');
+      endDate = new Date(endParam + 'T23:59:59Z');
+    } else {
+      // Legacy month mode
+      const year = parseInt(searchParams.get('year') || String(new Date().getFullYear()));
+      const month = parseInt(searchParams.get('month') || String(new Date().getMonth() + 1));
+      startDate = new Date(year, month - 1, 1);
+      endDate = new Date(year, month, 0, 23, 59, 59);
+    }
 
     const shifts = await prisma.distributorShift.findMany({
       where: {

@@ -82,9 +82,8 @@ export default function ShiftsPage() {
 
   const fetchShifts = useCallback(async () => {
     setLoading(true);
-    const year = weekStart.getFullYear();
-    const month = weekStart.getMonth() + 1;
-    const res = await fetch(`/api/staff/shifts?year=${year}&month=${month}`);
+    const weekEnd = addDays(weekStart, 6);
+    const res = await fetch(`/api/staff/shifts?startDate=${formatDate(weekStart)}&endDate=${formatDate(weekEnd)}`);
     if (res.ok) {
       const data = await res.json();
       setShifts(data.shifts || []);
