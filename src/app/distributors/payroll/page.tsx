@@ -8,6 +8,7 @@ type Distributor = {
   id: number;
   staffId: string;
   name: string;
+  paymentMethod: string | null;
 };
 
 type DailyExpense = {
@@ -62,6 +63,8 @@ type PayrollRecord = {
   grossPay: number;
   status: 'DRAFT' | 'CONFIRMED' | 'PAID';
   note: string | null;
+  cashReceivedAt: string | null;
+  cashSignatureUrl: string | null;
   items: PayrollItem[];
   expenses: DailyExpense[];
 };
@@ -246,11 +249,17 @@ export default function DistributorPayrollPage() {
   };
 
   const [bulkUpdating, setBulkUpdating] = useState(false);
-  const handleBulkStatusChange = async (fromStatus: string, toStatus: string) => {
-    const targets = records.filter(r => r.status === fromStatus);
+  const handleBulkStatusChange = async (fromStatus: string, toStatus: string, paymentFilter?: '現金' | '振込') => {
+    let targets = records.filter(r => r.status === fromStatus);
+    if (paymentFilter === '現金') {
+      targets = targets.filter(r => (r.distributor as any)?.paymentMethod === '現金');
+    } else if (paymentFilter === '振込') {
+      targets = targets.filter(r => (r.distributor as any)?.paymentMethod !== '現金');
+    }
     if (targets.length === 0) return;
     const label = toStatus === 'CONFIRMED' ? '確定' : '支払済';
-    if (!await showConfirm(`${targets.length}件の給与を一括で「${label}」に変更しますか？`, { confirmLabel: `${label}にする` })) return;
+    const filterLabel = paymentFilter ? `（${paymentFilter}）` : '';
+    if (!await showConfirm(`${targets.length}件${filterLabel}の給与を一括で「${label}」に変更しますか？`, { confirmLabel: `${label}にする` })) return;
     setBulkUpdating(true);
     for (const rec of targets) {
       await fetch(`/api/distributor-payroll/${rec.id}`, {
@@ -561,7 +570,7 @@ export default function DistributorPayrollPage() {
                   {confirmedCount > 0 && <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">{confirmedCount} 確定</span>}
                   {paidCount > 0 && <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">{paidCount} 支払済</span>}
                 </div>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-1.5 mt-2">
                   {draftCount > 0 && (
                     <button onClick={() => handleBulkStatusChange('DRAFT', 'CONFIRMED')} disabled={bulkUpdating}
                       className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 transition-colors">
@@ -569,9 +578,15 @@ export default function DistributorPayrollPage() {
                     </button>
                   )}
                   {confirmedCount > 0 && (
-                    <button onClick={() => handleBulkStatusChange('CONFIRMED', 'PAID')} disabled={bulkUpdating}
-                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-50 transition-colors">
-                      {bulkUpdating ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-check-all mr-0.5"></i>一括支払済</>}
+                    <button onClick={() => handleBulkStatusChange('CONFIRMED', 'PAID', '振込')} disabled={bulkUpdating}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 transition-colors">
+                      {bulkUpdating ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-bank mr-0.5"></i>振込 一括支払済</>}
+                    </button>
+                  )}
+                  {confirmedCount > 0 && (
+                    <button onClick={() => handleBulkStatusChange('CONFIRMED', 'PAID', '現金')} disabled={bulkUpdating}
+                      className="text-[10px] font-bold px-2.5 py-1 rounded-lg bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 transition-colors">
+                      {bulkUpdating ? <i className="bi bi-arrow-repeat animate-spin"></i> : <><i className="bi bi-cash-coin mr-0.5"></i>現金 一括支給済</>}
                     </button>
                   )}
                 </div>
@@ -630,9 +645,16 @@ export default function DistributorPayrollPage() {
                         {dist.name.charAt(0)}
                       </Link>
 
-                      {/* Name */}
+                      {/* Name + Payment Method */}
                       <Link href={`/distributors/${dist.id}?tab=payroll`} className="flex-1 min-w-0 group">
-                        <p className="text-[10px] text-slate-400 font-mono">{dist.staffId}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[10px] text-slate-400 font-mono">{dist.staffId}</p>
+                          {(record?.distributor as any)?.paymentMethod === '現金' ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0 rounded bg-orange-100 text-orange-600">現金</span>
+                          ) : (record?.distributor as any)?.paymentMethod ? (
+                            <span className="text-[9px] font-bold px-1.5 py-0 rounded bg-blue-50 text-blue-500">振込</span>
+                          ) : null}
+                        </div>
                         <p className="text-sm font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">{dist.name}</p>
                       </Link>
 
@@ -658,10 +680,26 @@ export default function DistributorPayrollPage() {
                           <div className="text-right min-w-[70px]">
                             <p className="text-sm font-black text-slate-800">¥{record.grossPay.toLocaleString()}</p>
                           </div>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusConfig[record.status].color}`}>
-                            <i className={`bi ${statusConfig[record.status].icon} mr-0.5`}></i>
-                            {statusConfig[record.status].label}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${statusConfig[record.status].color}`}>
+                              <i className={`bi ${statusConfig[record.status].icon} mr-0.5`}></i>
+                              {statusConfig[record.status].label}
+                            </span>
+                            {record.cashReceivedAt && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700" title={`受取確認: ${new Date(record.cashReceivedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' })}`}>
+                                <i className="bi bi-pen mr-0.5"></i>受取済
+                              </span>
+                            )}
+                            {(record?.distributor as any)?.paymentMethod === '現金' && record.status === 'CONFIRMED' && !statusUpdating[record.id] && (
+                              <button onClick={(e) => { e.stopPropagation(); handleStatusChange(record.id, 'PAID'); }}
+                                className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white hover:bg-emerald-600 transition-colors whitespace-nowrap">
+                                支給済にする
+                              </button>
+                            )}
+                            {statusUpdating[record.id] && (
+                              <div className="w-3.5 h-3.5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                            )}
+                          </div>
                           <button onClick={() => {
                               const next = isExpanded ? null : record.id;
                               setExpandedId(next);
@@ -814,6 +852,29 @@ export default function DistributorPayrollPage() {
                             </div>
                           );
                         })()}
+
+                        {/* Cash Receipt Confirmation */}
+                        {record.cashReceivedAt && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-3">
+                            {record.cashSignatureUrl && (
+                              <a href={record.cashSignatureUrl} target="_blank" rel="noopener noreferrer"
+                                className="shrink-0 border border-blue-200 rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
+                                <img src={record.cashSignatureUrl} alt="署名" className="w-24 h-16 object-contain" />
+                              </a>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-bold text-blue-700 mb-1">
+                                <i className="bi bi-pen-fill mr-1"></i>現金受取確認済
+                              </p>
+                              <p className="text-[10px] text-blue-600">
+                                確認日時: {new Date(record.cashReceivedAt).toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                              <p className="text-[10px] text-blue-600">
+                                確認金額: ¥{record.grossPay.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Actions */}
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">

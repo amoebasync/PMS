@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     const records = await prisma.distributorPayrollRecord.findMany({
       where,
       include: {
-        distributor: { select: { id: true, staffId: true, name: true, transportationFee: true, transportationFee1Type: true } },
+        distributor: { select: { id: true, staffId: true, name: true, transportationFee: true, transportationFee1Type: true, paymentMethod: true } },
         items: { orderBy: { date: 'asc' } },
       },
       orderBy: [{ periodStart: 'desc' }, { distributorId: 'asc' }],
