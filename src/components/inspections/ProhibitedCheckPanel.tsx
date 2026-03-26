@@ -94,13 +94,21 @@ export default function ProhibitedCheckPanel({ inspectionId, prohibitedPropertie
   const violationCount = prohibitedChecks.filter((c) => c.result === 'VIOLATION').length;
   const checkedCount = prohibitedChecks.filter((c) => c.result !== null).length;
 
-  /* ---- Open recording ---- */
+  /* ---- Open recording (new or edit existing) ---- */
   const openRecording = (propId: number) => {
+    const existing = checkMap.get(propId);
     setRecordingId(propId);
-    setRecordResult('COMPLIANT');
-    setRecordNote('');
+    // 既存チェックがある場合はその値をセット
+    const resultMapping: Record<string, 'COMPLIANT' | 'VIOLATION' | 'UNABLE'> = {
+      COMPLIANT: 'COMPLIANT',
+      VIOLATION: 'VIOLATION',
+      UNABLE: 'UNABLE',
+      UNABLE_TO_CHECK: 'UNABLE',
+    };
+    setRecordResult(existing?.result ? (resultMapping[existing.result] || 'COMPLIANT') : 'COMPLIANT');
+    setRecordNote(existing?.note || '');
     setSelectedFile(null);
-    setPreviewUrl(null);
+    setPreviewUrl(existing?.photoUrl || null);
   };
 
   /* ---- Handle file ---- */
@@ -266,10 +274,10 @@ export default function ProhibitedCheckPanel({ inspectionId, prohibitedPropertie
             return (
               <button
                 key={pp.id}
-                onClick={() => isActive && !check && openRecording(pp.id)}
-                disabled={!isActive || !!check || recordingId !== null}
+                onClick={() => isActive && openRecording(pp.id)}
+                disabled={!isActive || recordingId !== null}
                 className={`w-full flex items-center gap-3 p-3 border rounded-xl transition-colors text-left ${checkStatusCls(check?.result || null)} ${
-                  !check && isActive ? 'hover:border-amber-300 cursor-pointer' : ''
+                  isActive ? 'hover:border-amber-300 cursor-pointer' : ''
                 } ${isViolation ? 'ring-1 ring-red-300' : ''}`}
               >
                 <div className="shrink-0 text-lg">
@@ -297,8 +305,8 @@ export default function ProhibitedCheckPanel({ inspectionId, prohibitedPropertie
                 {check?.photoUrl && (
                   <img src={check.photoUrl} alt="" className="w-10 h-10 object-cover rounded-lg shrink-0" />
                 )}
-                {!check && isActive && (
-                  <i className="bi bi-chevron-right text-slate-300 shrink-0"></i>
+                {isActive && (
+                  <i className={`bi ${check ? 'bi-pencil' : 'bi-chevron-right'} text-slate-300 shrink-0 text-xs`}></i>
                 )}
               </button>
             );

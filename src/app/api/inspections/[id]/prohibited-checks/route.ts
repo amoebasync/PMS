@@ -58,21 +58,42 @@ export async function POST(
       photoUrl = await uploadToS3(buffer, s3Key, photoFile.type);
     }
 
-    const prohibitedCheck = await prisma.inspectionProhibitedCheck.create({
-      data: {
-        inspectionId,
-        prohibitedPropertyId: prohibitedPropertyId ? parseInt(prohibitedPropertyId) : null,
-        latitude: latitude ? parseFloat(latitude) : null,
-        longitude: longitude ? parseFloat(longitude) : null,
-        address: address || null,
-        result: result as 'COMPLIANT' | 'VIOLATION' | 'UNABLE_TO_CHECK',
-        photoUrl,
-        note: note || null,
-        checkedAt: new Date(),
-      },
-    });
+    const parsedPropId = prohibitedPropertyId ? parseInt(prohibitedPropertyId) : null;
 
-    return NextResponse.json(prohibitedCheck, { status: 201 });
+    // 既存チェックがあれば更新（upsert）
+    const existing = parsedPropId
+      ? await prisma.inspectionProhibitedCheck.findFirst({
+          where: { inspectionId, prohibitedPropertyId: parsedPropId },
+        })
+      : null;
+
+    const data = {
+      result: result as 'COMPLIANT' | 'VIOLATION' | 'UNABLE_TO_CHECK',
+      ...(photoUrl && { photoUrl }),
+      note: note || null,
+      checkedAt: new Date(),
+    };
+
+    let prohibitedCheck;
+    if (existing) {
+      prohibitedCheck = await prisma.inspectionProhibitedCheck.update({
+        where: { id: existing.id },
+        data,
+      });
+    } else {
+      prohibitedCheck = await prisma.inspectionProhibitedCheck.create({
+        data: {
+          inspectionId,
+          prohibitedPropertyId: parsedPropId,
+          latitude: latitude ? parseFloat(latitude) : null,
+          longitude: longitude ? parseFloat(longitude) : null,
+          address: address || null,
+          ...data,
+        },
+      });
+    }
+
+    return NextResponse.json(prohibitedCheck, { status: existing ? 200 : 201 });
   } catch (err) {
     console.error('POST /api/inspections/[id]/prohibited-checks error:', err);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
