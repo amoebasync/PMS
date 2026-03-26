@@ -206,6 +206,7 @@ model Employee {
   leads          Lead[]
 
   announcements      Announcement[]
+  distributorAnnouncements DistributorAnnouncement[] @relation("DistributorAnnouncementCreatedBy")
   payrollAdjustments PayrollAdjustment[]
   createdAdjustments PayrollAdjustment[] @relation("AdjustmentCreator")
   announcementReads AnnouncementRead[]
@@ -737,6 +738,8 @@ model FlyerDistributor {
   fraudAnalyses         FraudAnalysis[]
   payrollAdjustments    PayrollAdjustment[]
   lineUser              LineUser?
+  distributorAnnouncementTargets DistributorAnnouncementTarget[]
+  distributorAnnouncementReads   DistributorAnnouncementRead[]
 
   // 社員紐付け（同一人物が社員と配布員の両方として働く場合）
   linkedEmployeeId Int?      @unique @map("linked_employee_id")
@@ -2235,6 +2238,47 @@ model AnnouncementRead {
 
   @@unique([announcementId, employeeId])
   @@map("announcement_reads")
+}
+
+// --- 配布員向けアナウンス ---
+model DistributorAnnouncement {
+  id          Int      @id @default(autoincrement())
+  title       String   @db.VarChar(255)
+  content     String   @db.Text
+  imageUrls   String?  @db.Text @map("image_urls") // JSON array of S3 URLs
+  targetAll   Boolean  @default(true) @map("target_all")
+  createdById Int      @map("created_by_id")
+  createdBy   Employee @relation("DistributorAnnouncementCreatedBy", fields: [createdById], references: [id])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  targets DistributorAnnouncementTarget[]
+  reads   DistributorAnnouncementRead[]
+
+  @@map("distributor_announcements")
+}
+
+model DistributorAnnouncementTarget {
+  id             Int                     @id @default(autoincrement())
+  announcementId Int                     @map("announcement_id")
+  distributorId  Int                     @map("distributor_id")
+  announcement   DistributorAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  distributor    FlyerDistributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, distributorId])
+  @@map("distributor_announcement_targets")
+}
+
+model DistributorAnnouncementRead {
+  id             Int                     @id @default(autoincrement())
+  announcementId Int                     @map("announcement_id")
+  distributorId  Int                     @map("distributor_id")
+  readAt         DateTime                @default(now()) @map("read_at")
+  announcement   DistributorAnnouncement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  distributor    FlyerDistributor        @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@unique([announcementId, distributorId])
+  @@map("distributor_announcement_reads")
 }
 
 // ─────────────────────────────────────────────

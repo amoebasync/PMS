@@ -62,6 +62,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { nameKey: 'picking_verification', href: '/picking', icon: 'bi-camera-fill' },
       { nameKey: 'partner_management', href: '/partners', icon: 'bi-truck' },
       { nameKey: 'distributor_management', href: '/distributors', icon: 'bi-bicycle' },
+      { nameKey: 'distributor_announcements', href: '/distributor-announcements', icon: 'bi-megaphone-fill' },
       { nameKey: 'shift_management', href: '/distributor-shifts', icon: 'bi-calendar-week' },
       { nameKey: 'expense_management', href: '/distributor-expenses', icon: 'bi-cash-coin' },
       { nameKey: 'relay_management', href: '/relay', icon: 'bi-arrow-left-right' },
@@ -98,6 +99,7 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     title: 'ANALYTICS',
     items: [
+      { nameKey: 'salary_analytics', href: '/analytics/salary', icon: 'bi-currency-yen' },
       { nameKey: 'area_analytics', href: '/analytics/areas', icon: 'bi-bar-chart-line-fill' },
       { nameKey: 'distribution_analytics', href: '/analytics/distribution', icon: 'bi-graph-up' },
       { nameKey: 'beginner_analytics', href: '/analytics/beginners', icon: 'bi-person-plus-fill' },
