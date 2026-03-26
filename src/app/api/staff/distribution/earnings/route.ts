@@ -136,11 +136,23 @@ export async function GET(request: Request) {
           dayFlyerCounts[dateKey] = Math.max(dayFlyerCounts[dateKey] || 0, count);
         }
 
+        // 日別に交通費を集計
+        const dailyExpenses: Record<string, number> = {};
         for (const exp of expenses) {
           const dateKey = exp.date.toISOString().split('T')[0];
+          dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + exp.amount;
+        }
+        // 出勤日で交通費未記入の日にデフォルト日額を補填
+        const defaultDaily = (distributor as any).defaultDailyTransportation ?? 500;
+        for (const dateKey of Object.keys(dayFlyerCounts)) {
+          if (dayFlyerCounts[dateKey] > 0 && !dailyExpenses[dateKey]) {
+            dailyExpenses[dateKey] = defaultDaily;
+          }
+        }
+        for (const [dateKey, totalAmount] of Object.entries(dailyExpenses)) {
           const flyerCount = dayFlyerCounts[dateKey] || 0;
           const dailyCap = flyerCount <= 1 ? personal1TypeCap : personalCap;
-          expensePay += Math.min(exp.amount, dailyCap);
+          expensePay += Math.min(totalAmount, dailyCap);
         }
       } catch { /* ignore expense errors */ }
 

@@ -694,6 +694,7 @@ model FlyerDistributor {
   rate6Type         Float?  @map("rate_6_type") // 6type
   transportationFee      String? @map("transportation_fee") @db.VarChar(50) // 交通費上限 (FULL, 1000, 500など)
   transportationFee1Type String? @map("transportation_fee_1_type") @db.VarChar(50) // 1種配布時の交通費上限 (デフォルト500)
+  defaultDailyTransportation Int @default(500) @map("default_daily_transportation") // 交通費未記入日のデフォルト日額
   trainingAllowance      String? @map("training_allowance") @db.VarChar(50) // 研修手当
 
   // チェック・指導追跡

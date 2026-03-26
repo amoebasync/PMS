@@ -40,6 +40,7 @@ export async function POST(request: Request) {
         rate6Type: true,
         transportationFee: true,
         transportationFee1Type: true,
+        defaultDailyTransportation: true,
         trainingAllowance: true,
         joinDate: true,
       },
@@ -180,18 +181,26 @@ export async function POST(request: Request) {
       scheduleFlyerCounts[dateKey] = Math.max(scheduleFlyerCounts[dateKey] || 0, itemCount);
     }
 
+    // 交通費未記入の出勤日にデフォルト日額を自動適用
+    const defaultDaily = distributor.defaultDailyTransportation ?? 500;
+    const dailyExpenses: Record<string, number> = {};
+    for (const expense of expenses) {
+      const dateKey = expense.date.toISOString().split('T')[0];
+      dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + expense.amount;
+    }
+    // 出勤日（actualCount > 0 のスケジュールがある日）で交通費未記入の日にデフォルト額を補填
+    for (const dateKey of Object.keys(scheduleFlyerCounts)) {
+      if (scheduleFlyerCounts[dateKey] > 0 && !dailyExpenses[dateKey]) {
+        dailyExpenses[dateKey] = defaultDaily;
+      }
+    }
+
     let expensePay = 0;
     if (isFull) {
-      for (const expense of expenses) {
-        expensePay += expense.amount;
+      for (const amount of Object.values(dailyExpenses)) {
+        expensePay += amount;
       }
     } else {
-      // 日別に合算してからキャップを適用
-      const dailyExpenses: Record<string, number> = {};
-      for (const expense of expenses) {
-        const dateKey = expense.date.toISOString().split('T')[0];
-        dailyExpenses[dateKey] = (dailyExpenses[dateKey] || 0) + expense.amount;
-      }
       for (const [dateKey, totalAmount] of Object.entries(dailyExpenses)) {
         const flyerCount = scheduleFlyerCounts[dateKey] || 0;
         const dailyCap = flyerCount === 1
