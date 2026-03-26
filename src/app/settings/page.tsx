@@ -5,6 +5,8 @@ import { useNotification } from '@/components/ui/NotificationProvider';
 import { handlePostalInput, handlePhoneChange } from '@/lib/formatters';
 import InterviewSlotMasterSettings from '@/components/settings/InterviewSlotMasterSettings';
 import DefaultTrainingSlotSettings from '@/components/settings/DefaultTrainingSlotSettings';
+import TrainingManualUpload from '@/components/settings/TrainingManualUpload';
+import TrainingTestSettings from '@/components/settings/TrainingTestSettings';
 import { useTranslation } from '@/i18n/useTranslation';
 
 type Department = { id: number; code: string | null; name: string; _count: { employees: number } };
@@ -48,7 +50,7 @@ export default function SettingsPage() {
 
   const WEEK_DAY_OPTIONS = useMemo(() => WEEK_DAY_KEYS.map(k => ({ value: k.value, label: t(k.labelKey) })), [t]);
 
-  type TabKey = 'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'ratePlans' | 'headerLinks' | 'legal';
+  type TabKey = 'general' | 'department' | 'industry' | 'country' | 'visaType' | 'bank' | 'distributionMethod' | 'company' | 'interviewSlot' | 'trainingSlot' | 'trainingManual' | 'trainingTest' | 'taskCategory' | 'recruitingMedia' | 'prohibitedReason' | 'complaintType' | 'alertCategory' | 'alertDefinition' | 'evaluation' | 'rankRates' | 'ratePlans' | 'headerLinks' | 'legal';
   type TabItem = { key: TabKey; label: string; icon: string };
   const [tab, setTab] = useState<TabKey>('general');
 
@@ -590,6 +592,8 @@ export default function SettingsPage() {
     { group: t('group_recruiting'), tabs: [
       { key: 'interviewSlot' as const,      label: t('tab_interviewSlot'), icon: 'bi-calendar-check' },
       { key: 'trainingSlot' as const,       label: t('tab_trainingSlot'),  icon: 'bi-mortarboard' },
+      { key: 'trainingManual' as const,     label: t('tab_trainingManual'), icon: 'bi-book' },
+      { key: 'trainingTest' as const,       label: t('tab_trainingTest'),  icon: 'bi-pencil-square' },
       { key: 'recruitingMedia' as const,    label: t('tab_recruitingMedia'),   icon: 'bi-megaphone-fill' },
     ]},
     { group: t('group_distribution'), tabs: [
@@ -611,7 +615,7 @@ export default function SettingsPage() {
 
   const allTabs = useMemo(() => tabGroups.flatMap(g => g.tabs), [tabGroups]);
 
-  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'alertDefinition' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'ratePlans' && tab !== 'headerLinks' && tab !== 'legal';
+  const isMasterTab = tab !== 'general' && tab !== 'company' && tab !== 'interviewSlot' && tab !== 'trainingSlot' && tab !== 'trainingManual' && tab !== 'trainingTest' && tab !== 'taskCategory' && tab !== 'recruitingMedia' && tab !== 'prohibitedReason' && tab !== 'complaintType' && tab !== 'alertCategory' && tab !== 'alertDefinition' && tab !== 'evaluation' && tab !== 'rankRates' && tab !== 'ratePlans' && tab !== 'headerLinks' && tab !== 'legal';
 
   // 法務コンテンツ
   const [legalContents, setLegalContents] = useState<Record<string, string>>({
@@ -1551,6 +1555,12 @@ export default function SettingsPage() {
 
         {/* 研修スロット設定タブ */}
         {tab === 'trainingSlot' && (<DefaultTrainingSlotSettings />)}
+
+        {/* 研修マニュアルタブ */}
+        {tab === 'trainingManual' && (<TrainingManualUpload />)}
+
+        {/* 研修テストタブ */}
+        {tab === 'trainingTest' && (<TrainingTestSettings />)}
 
         {/* タスク種類設定タブ */}
         {tab === 'taskCategory' && (
