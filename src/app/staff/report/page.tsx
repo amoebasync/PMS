@@ -65,7 +65,7 @@ export default function StaffHistoryPage() {
     if (!grouped[d]) grouped[d] = [];
     grouped[d].push(s);
   }
-  const sortedDates = Object.keys(grouped).sort();
+  const sortedDates = Object.keys(grouped).sort().reverse();
 
   // 月合計
   const totalPlanned = schedules.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.plannedCount || 0), 0), 0);

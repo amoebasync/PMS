@@ -65,7 +65,7 @@ export default function StaffHistoryPageEn() {
     if (!grouped[d]) grouped[d] = [];
     grouped[d].push(s);
   }
-  const sortedDates = Object.keys(grouped).sort();
+  const sortedDates = Object.keys(grouped).sort().reverse();
 
   const totalPlanned = schedules.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.plannedCount || 0), 0), 0);
   const totalActual = schedules.reduce((sum, s) => sum + s.items.reduce((a, i) => a + (i.actualCount || 0), 0), 0);
