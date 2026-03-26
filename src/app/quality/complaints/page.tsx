@@ -796,29 +796,47 @@ function CreateComplaintModal({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [complaintTypeId]);
 
-  // 配布員選択 → 直近30日のスケジュールを取得
+  // 住所 → エリアベースでスケジュール候補を取得
   useEffect(() => {
-    if (!distributorId) { setScheduleOptions([]); setScheduleId(''); return; }
-    const today = new Date();
-    const from = new Date(today);
-    from.setDate(from.getDate() - 30);
-    const toDate = new Date(today);
-    toDate.setDate(toDate.getDate() + 7);
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
-    fetch(`/api/schedules?distributorId=${distributorId}&from=${fmt(from)}&to=${fmt(toDate)}`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => {
-        const list = Array.isArray(data) ? data : data.schedules || [];
-        const opts = list.map((s: any) => ({
-          id: s.id,
-          date: (s.date || '').slice(0, 10),
-          area: s.area ? `${s.city?.name || ''} ${s.area?.chome_name || s.area?.town_name || ''}` : '',
-          status: s.status,
+    if (address.trim().length < 3) { setScheduleOptions([]); setScheduleId(''); return; }
+    const timer = setTimeout(async () => {
+      try {
+        // 住所からエリアを検索
+        const areaRes = await fetch(`/api/areas?search=${encodeURIComponent(address.trim())}&limit=5`);
+        if (!areaRes.ok) return;
+        const areaData = await areaRes.json();
+        const areas = areaData.data || areaData || [];
+        if (areas.length === 0) { setScheduleOptions([]); return; }
+
+        // エリアIDで直近スケジュールを検索
+        const today = new Date();
+        const from = new Date(today); from.setDate(from.getDate() - 30);
+        const toDate = new Date(today); toDate.setDate(toDate.getDate() + 7);
+        const fmt = (d: Date) => d.toISOString().slice(0, 10);
+
+        const allOpts: typeof scheduleOptions = [];
+        await Promise.all(areas.slice(0, 3).map(async (area: any) => {
+          const res = await fetch(`/api/schedules?areaId=${area.id}&from=${fmt(from)}&to=${fmt(toDate)}`);
+          if (!res.ok) return;
+          const data = await res.json();
+          const list = Array.isArray(data) ? data : data.schedules || [];
+          for (const s of list) {
+            allOpts.push({
+              id: s.id,
+              date: (s.date || '').slice(0, 10),
+              area: `${s.city?.name || ''} ${s.area?.chome_name || s.area?.town_name || ''} - ${s.distributor?.name || ''}`,
+              status: s.status,
+            });
+          }
         }));
-        setScheduleOptions(opts.reverse());
-      })
-      .catch(() => setScheduleOptions([]));
-  }, [distributorId]);
+
+        // 日付の新しい順にソート
+        allOpts.sort((a, b) => b.date.localeCompare(a.date));
+        setScheduleOptions(allOpts);
+      } catch { setScheduleOptions([]); }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [address]);
 
   // 住所・緯度経度 → 禁止物件自動マッチング
   useEffect(() => {
@@ -1090,8 +1108,8 @@ function CreateComplaintModal({
             />
           </div>
 
-          {/* Schedule selector (when distributor is selected) */}
-          {distributorId && scheduleOptions.length > 0 && (
+          {/* Schedule selector (when matching schedules found by area) */}
+          {scheduleOptions.length > 0 && (
             <div>
               <label className="block text-xs font-bold text-slate-600 mb-1">
                 <i className="bi bi-calendar-check mr-1"></i>{t('form_schedule') || 'スケジュール'}

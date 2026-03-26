@@ -14,9 +14,13 @@ export async function GET(request: Request) {
 
   try {
     const distributorId = searchParams.get('distributorId');
+    const areaId = searchParams.get('areaId');
     const whereClause: any = {};
     if (distributorId) {
       whereClause.distributorId = parseInt(distributorId);
+    }
+    if (areaId) {
+      whereClause.areaId = parseInt(areaId);
     }
     if (date) {
       const d = new Date(date);
