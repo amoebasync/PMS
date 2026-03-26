@@ -124,7 +124,7 @@ export default function StaffPayrollPage() {
                       {record.items.map((item) => (
                         <div key={item.id} className="flex items-center justify-between text-xs">
                           <span className="text-slate-500">{formatDateJa(item.date)}</span>
-                          <span className="text-slate-500">{item.flyerTypeCount}種 × ¥{item.unitPrice.toFixed(1)}</span>
+                          <span className="text-slate-500">{item.flyerTypeCount}種 × ¥{item.unitPrice % 1 === 0 ? item.unitPrice : item.unitPrice.toFixed(2)}</span>
                           <span className="text-slate-600">{item.actualCount.toLocaleString()}ポスト</span>
                           <span className="font-bold text-slate-800">¥{item.earnedAmount.toLocaleString()}</span>
                         </div>
