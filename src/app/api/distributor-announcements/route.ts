@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
 // POST: Create announcement + send LINE notifications
 export async function POST(request: Request) {
-  const { session, error } = await requireAdminSession();
+  const { employee, error } = await requireAdminSession();
   if (error) return error;
 
   try {
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
         content,
         imageUrls: imageUrls?.length ? JSON.stringify(imageUrls) : null,
         targetAll: targetAll !== false,
-        createdById: session!.id,
+        createdById: employee!.id,
         targets: !targetAll && distributorIds?.length
           ? { create: distributorIds.map((id: number) => ({ distributorId: id })) }
           : undefined,
