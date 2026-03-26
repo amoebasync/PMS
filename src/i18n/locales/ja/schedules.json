@@ -109,6 +109,9 @@
   "compliance_gps": "GPS確認",
   "compliance_gps_comment_placeholder": "NGの理由を入力...",
   "compliance_map_photo": "地図写真送信",
+  "compliance_completion_photo": "完了写真",
+  "upload_photo": "写真アップロード",
+  "paste_hint": "Ctrl+V で画像を貼り付け",
   "compliance_checked_by": "確認者",
   "compliance_checked_at": "確認日時",
 

@@ -65,11 +65,20 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
   const popoverRef = useRef<HTMLDivElement>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [gpsComment, setGpsComment] = useState<string>(schedule.checkGpsComment || '');
+  const [uploading, setUploading] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const photoTypeMap: Record<string, string> = {
+    checkFlyerPhoto: 'FLYER',
+    checkMapPhoto: 'MAP',
+    checkCompletion: 'COMPLETION',
+  };
 
   const simpleChecks = [
     { key: 'checkFlyerPhoto', icon: 'bi-camera', label: t('compliance_flyer_photo') },
     { key: 'checkAppOperation', icon: 'bi-phone', label: t('compliance_app_operation') },
     { key: 'checkMapPhoto', icon: 'bi-map', label: t('compliance_map_photo') },
+    { key: 'checkCompletion', icon: 'bi-check-circle', label: t('compliance_completion_photo') || '完了写真' },
   ];
 
   const toggleCheck = useCallback(async (field: string) => {
@@ -128,10 +137,13 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
 
   const flyerPhotos = (schedule.photos || []).filter((p: any) => p.type === 'FLYER');
   const mapPhotos = (schedule.photos || []).filter((p: any) => p.type === 'MAP');
+  const completionPhotos = (schedule.photos || []).filter((p: any) => p.type === 'COMPLETION');
   const photosByCheck: Record<string, any[]> = {
     checkFlyerPhoto: flyerPhotos,
     checkMapPhoto: mapPhotos,
+    checkCompletion: completionPhotos,
   };
+  const uploadableChecks = ['checkFlyerPhoto', 'checkMapPhoto', 'checkCompletion'];
   const [enlargedPhoto, setEnlargedPhoto] = useState<string | null>(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState<number | null>(null);
 
@@ -144,20 +156,106 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
     setDeletingPhotoId(null);
   }, [schedule, onUpdate]);
 
+  const uploadPhoto = useCallback(async (file: File, checkKey: string) => {
+    const photoType = photoTypeMap[checkKey] || 'FLYER';
+    setUploading(checkKey);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('type', photoType);
+      const res = await fetch(`/api/schedules/${schedule.id}/photos`, { method: 'POST', body: formData });
+      if (res.ok) {
+        const { photo } = await res.json();
+        onUpdate({ ...schedule, photos: [...(schedule.photos || []), photo], [checkKey === 'checkCompletion' ? '' : checkKey]: true });
+      }
+    } catch { /* silent */ }
+    setUploading(null);
+  }, [schedule, onUpdate, photoTypeMap]);
+
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>, checkKey: string) => {
+    const file = e.target.files?.[0];
+    if (file) uploadPhoto(file, checkKey);
+    e.target.value = '';
+  }, [uploadPhoto]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent, checkKey: string) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        if (file) uploadPhoto(file, checkKey);
+        return;
+      }
+    }
+  }, [uploadPhoto]);
+
   return (
     <>
     <div ref={popoverRef} className="w-80 bg-white rounded-xl shadow-xl border border-slate-200 p-3 space-y-2">
       {simpleChecks.map(({ key, icon, label }) => (
         <div key={key}>
-          <label className="flex items-center gap-2.5 cursor-pointer hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
-            <input type="checkbox" checked={!!schedule[key]} onChange={() => toggleCheck(key)} disabled={saving === key}
-              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600" />
-            <i className={`bi ${icon} text-slate-500 text-sm`}></i>
-            <span className="text-xs text-slate-700 flex-1">{label}</span>
+          <div className="flex items-center gap-2.5 hover:bg-slate-50 rounded-lg px-2 py-1.5 transition-colors">
+            {key !== 'checkCompletion' ? (
+              <label className="flex items-center gap-2.5 cursor-pointer flex-1">
+                <input type="checkbox" checked={!!schedule[key]} onChange={() => toggleCheck(key)} disabled={saving === key}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600" />
+                <i className={`bi ${icon} text-slate-500 text-sm`}></i>
+                <span className="text-xs text-slate-700 flex-1">{label}</span>
+              </label>
+            ) : (
+              <div className="flex items-center gap-2.5 flex-1">
+                <i className={`bi ${icon} text-slate-500 text-sm ml-[26px]`}></i>
+                <span className="text-xs text-slate-700 flex-1">{label}</span>
+              </div>
+            )}
             {photosByCheck[key]?.length > 0 && <span className="text-[9px] bg-indigo-100 text-indigo-600 px-1 rounded font-bold">{photosByCheck[key].length}</span>}
             {saving === key && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
-          </label>
-          {photosByCheck[key]?.length > 0 && (
+            {uploadableChecks.includes(key) && (
+              <>
+                <input type="file" accept="image/*" ref={el => { fileInputRefs.current[key] = el; }} onChange={e => handleFileSelect(e, key)} className="hidden" />
+                <button
+                  onClick={() => fileInputRefs.current[key]?.click()}
+                  disabled={!!uploading}
+                  className="p-1 rounded hover:bg-indigo-50 text-slate-400 hover:text-indigo-600 transition-colors disabled:opacity-40"
+                  title={t('upload_photo') || '写真アップロード'}
+                >
+                  {uploading === key ? (
+                    <div className="w-3.5 h-3.5 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>
+                  ) : (
+                    <i className="bi bi-upload text-xs"></i>
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+          {/* クリップボード貼り付けエリア + 写真サムネイル */}
+          {uploadableChecks.includes(key) && (
+            <div
+              className="px-2 py-1"
+              onPaste={e => handlePaste(e, key)}
+            >
+              {photosByCheck[key]?.length > 0 ? (
+                <div className="flex gap-1.5 overflow-x-auto">
+                  {photosByCheck[key].map((p: any) => (
+                    <div key={p.id} className="relative group shrink-0">
+                      <img src={p.photoUrl} alt="" className="w-10 h-10 rounded object-cover border border-slate-200 cursor-pointer hover:opacity-80"
+                        onClick={() => setEnlargedPhoto(p.photoUrl)} />
+                      <button onClick={() => handleDeletePhoto(p.id)} disabled={deletingPhotoId === p.id}
+                        className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-[8px]">
+                        {deletingPhotoId === p.id ? <span className="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></span> : <i className="bi bi-x"></i>}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-[9px] text-slate-300 italic pl-[26px]">{t('paste_hint') || 'Ctrl+V で画像を貼り付け'}</div>
+              )}
+            </div>
+          )}
+          {/* チェックボックスのみの行（アプリ操作確認）の場合は写真表示不要 */}
+          {!uploadableChecks.includes(key) && photosByCheck[key]?.length > 0 && (
             <div className="flex gap-1.5 px-2 py-1 overflow-x-auto">
               {photosByCheck[key].map((p: any) => (
                 <div key={p.id} className="relative group shrink-0">
