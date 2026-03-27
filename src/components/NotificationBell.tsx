@@ -284,6 +284,8 @@ export default function NotificationBell() {
                       window.location.href = '/distributors';
                     } else if (n.scheduleId) {
                       window.location.href = `/schedules?trajectory=${n.scheduleId}`;
+                    } else if (n.type === 'DISTRIBUTION_START' || n.type === 'DISTRIBUTION_FINISH') {
+                      window.location.href = '/schedules?orphanLinker=true';
                     }
                   }}
                   className={`px-4 py-3 border-b border-slate-50 hover:bg-slate-50 cursor-pointer transition-colors ${

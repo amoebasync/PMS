@@ -808,7 +808,9 @@ export default function ScheduleListPage() {
   const [detailDistributorId, setDetailDistributorId] = useState<number | null>(null);
 
   // 孤児セッション紐付けモーダル
-  const [showOrphanLinker, setShowOrphanLinker] = useState(false);
+  const [showOrphanLinker, setShowOrphanLinker] = useState(() => {
+    return searchParams.get('orphanLinker') === 'true';
+  });
 
   // 巡回割り当てモーダル
   const [inspectionAssignSchedule, setInspectionAssignSchedule] = useState<any>(null);
