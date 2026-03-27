@@ -80,6 +80,7 @@ export async function GET(
       select: {
         id: true, date: true, status: true,
         distributor: { select: { id: true, name: true, staffId: true } },
+        items: { select: { actualCount: true } },
         session: {
           select: {
             id: true, startedAt: true, finishedAt: true, totalDistance: true,
@@ -111,6 +112,8 @@ export async function GET(
         startedAt: ps.session?.startedAt,
         finishedAt: ps.session?.finishedAt,
         gpsPointCount: gps.length,
+        totalSheets: ps.items.reduce((sum, item) => sum + (item.actualCount || 0), 0),
+        totalPosted: 0,
         gpsPoints: gps.map(p => ({ lat: p.latitude, lng: p.longitude, timestamp: p.timestamp.toISOString() })),
       });
     }
@@ -149,6 +152,8 @@ export async function GET(
             startedAt: gps[0].timestamp,
             finishedAt: gps[gps.length - 1].timestamp,
             gpsPointCount: gps.length,
+            totalSheets: rec.totalSheets || 0,
+            totalPosted: rec.totalPosted || 0,
             gpsPoints: gps,
           });
           psCount++;

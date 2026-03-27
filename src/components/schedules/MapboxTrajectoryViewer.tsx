@@ -876,6 +876,85 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     };
   }, [pastGpsFiltered]);
 
+  // 軌跡一致率: 今回のGPS点のうち、過去軌跡の近く（30m以内）にある割合
+  const trajectoryMatchRate = useMemo(() => {
+    if (!data || data.gpsPoints.length === 0 || pastGpsFiltered.length === 0 || !showPastComparison) return null;
+
+    const MATCH_RADIUS_M = 30; // 30m以内を一致とみなす
+    const currentPoints = data.gpsPoints;
+
+    // 過去GPSをグリッドに分割して高速検索（O(n*m) → O(n) に近い）
+    const gridSize = 0.0003; // 約30m
+    const pastGrid: Record<string, { lat: number; lng: number }[]> = {};
+    for (const p of pastGpsFiltered) {
+      const key = `${Math.floor(p.lat / gridSize)},${Math.floor(p.lng / gridSize)}`;
+      if (!pastGrid[key]) pastGrid[key] = [];
+      pastGrid[key].push(p);
+    }
+
+    let matchedCount = 0;
+    for (const cp of currentPoints) {
+      const gx = Math.floor(cp.lat / gridSize);
+      const gy = Math.floor(cp.lng / gridSize);
+      let found = false;
+      // 周囲9セルを検索
+      outer: for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighbors = pastGrid[`${gx + dx},${gy + dy}`];
+          if (!neighbors) continue;
+          for (const pp of neighbors) {
+            if (haversineM(cp.lat, cp.lng, pp.lat, pp.lng) <= MATCH_RADIUS_M) {
+              found = true;
+              break outer;
+            }
+          }
+        }
+      }
+      if (found) matchedCount++;
+    }
+
+    const rate = matchedCount / currentPoints.length;
+
+    // 逆方向: 過去GPSのうち今回の近くにある割合
+    const currentGrid: Record<string, { lat: number; lng: number }[]> = {};
+    for (const p of currentPoints) {
+      const key = `${Math.floor(p.lat / gridSize)},${Math.floor(p.lng / gridSize)}`;
+      if (!currentGrid[key]) currentGrid[key] = [];
+      currentGrid[key].push(p);
+    }
+
+    let reverseMatchedCount = 0;
+    for (const pp of pastGpsFiltered) {
+      const gx = Math.floor(pp.lat / gridSize);
+      const gy = Math.floor(pp.lng / gridSize);
+      let found = false;
+      outer2: for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          const neighbors = currentGrid[`${gx + dx},${gy + dy}`];
+          if (!neighbors) continue;
+          for (const cp of neighbors) {
+            if (haversineM(pp.lat, pp.lng, cp.lat, cp.lng) <= MATCH_RADIUS_M) {
+              found = true;
+              break outer2;
+            }
+          }
+        }
+      }
+      if (found) reverseMatchedCount++;
+    }
+
+    const reverseRate = reverseMatchedCount / pastGpsFiltered.length;
+
+    return {
+      currentMatchRate: rate,                    // 今回→過去: 今回のルートのうち過去と同じ道を通った割合
+      pastCoverageRate: reverseRate,             // 過去→今回: 過去のルートのうち今回もカバーした割合
+      currentMatched: matchedCount,
+      currentTotal: currentPoints.length,
+      pastMatched: reverseMatchedCount,
+      pastTotal: pastGpsFiltered.length,
+    };
+  }, [data, pastGpsFiltered, showPastComparison]);
+
   // Road-based coverage analysis（配布エリアポリゴン内の道路のみ対象）
   const [coverageGeoJson, setCoverageGeoJson] = useState<any>(null);
 
@@ -2121,6 +2200,71 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         </div>
                       </div>
                     )}
+                    {/* 配布実績 */}
+                    {(selectedPast as any).totalSheets > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">過去 配布枚数</span>
+                          <span className="font-bold text-amber-600">{((selectedPast as any).totalSheets || 0).toLocaleString()} 枚</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 軌跡一致率 */}
+              {trajectoryMatchRate && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-intersect mr-1 text-indigo-500"></i>
+                    軌跡一致率
+                  </h3>
+                  <div className="space-y-3">
+                    {/* 今回→過去 */}
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-1">
+                        <span className="text-slate-500">今回ルートの再現率</span>
+                        <span className={`font-black text-lg ${
+                          trajectoryMatchRate.currentMatchRate >= 0.7 ? 'text-emerald-600' :
+                          trajectoryMatchRate.currentMatchRate >= 0.4 ? 'text-amber-600' : 'text-red-500'
+                        }`}>
+                          {Math.round(trajectoryMatchRate.currentMatchRate * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            trajectoryMatchRate.currentMatchRate >= 0.7 ? 'bg-emerald-500' :
+                            trajectoryMatchRate.currentMatchRate >= 0.4 ? 'bg-amber-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.round(trajectoryMatchRate.currentMatchRate * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">今回の軌跡のうち過去と同じ道を通った割合</p>
+                    </div>
+                    {/* 過去→今回 */}
+                    <div>
+                      <div className="flex justify-between items-center text-xs mb-1">
+                        <span className="text-slate-500">過去ルートのカバー率</span>
+                        <span className={`font-black text-lg ${
+                          trajectoryMatchRate.pastCoverageRate >= 0.7 ? 'text-emerald-600' :
+                          trajectoryMatchRate.pastCoverageRate >= 0.4 ? 'text-amber-600' : 'text-red-500'
+                        }`}>
+                          {Math.round(trajectoryMatchRate.pastCoverageRate * 100)}%
+                        </span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            trajectoryMatchRate.pastCoverageRate >= 0.7 ? 'bg-emerald-500' :
+                            trajectoryMatchRate.pastCoverageRate >= 0.4 ? 'bg-amber-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.round(trajectoryMatchRate.pastCoverageRate * 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 mt-0.5">過去の軌跡のうち今回もカバーした割合</p>
+                    </div>
                   </div>
                 </div>
               )}
