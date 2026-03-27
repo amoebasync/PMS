@@ -25,6 +25,12 @@ interface InspectionDetail {
   complianceRate: number | null;
   note: string | null;
   followUpRequired: boolean;
+  followUpTaskId: number | null;
+  followUpTask: { id: number; status: string } | null;
+  followUpNote: string | null;
+  feedbackTaskId: number | null;
+  feedbackTask: { id: number; status: string } | null;
+  feedbackNote: string | null;
   distributor: {
     id: number;
     name: string;
