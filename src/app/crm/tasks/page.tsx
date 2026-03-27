@@ -761,7 +761,7 @@ export default function CrmTasksPage() {
                       const isDueToday = task.status !== 'DONE' && dueDate.getTime() === today.getTime();
 
                       return (
-                        <tr key={task.id} className={`border-b transition-colors group ${
+                        <tr key={task.id} onClick={() => openTaskEdit(task)} className={`border-b transition-colors group cursor-pointer ${
                           isOverdue ? 'bg-red-50 border-red-100 hover:bg-red-100'
                           : isDueToday ? 'bg-orange-50 border-orange-100 hover:bg-orange-100'
                           : 'border-slate-50 hover:bg-slate-50'
@@ -786,7 +786,7 @@ export default function CrmTasksPage() {
                           </td>
                           <td className="px-4 py-3">
                             {task.customer ? (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <i className="bi bi-person-lines-fill text-blue-400 text-xs"></i>
                                 <Link href={`/customers/${task.customer.id}`} className="text-blue-600 hover:underline text-xs">{task.customer.name}</Link>
                               </div>
@@ -796,7 +796,7 @@ export default function CrmTasksPage() {
                                 <span className="text-xs text-emerald-700">{task.branch.nameJa}</span>
                               </div>
                             ) : task.distributor ? (
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <i className="bi bi-bicycle text-emerald-500 text-xs"></i>
                                 <Link href={`/distributors/${task.distributor.id}`} className="text-emerald-700 hover:underline text-xs">
                                   {task.distributor.name}
@@ -833,7 +833,7 @@ export default function CrmTasksPage() {
                             <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap ${scfg.cls}`}>{scfg.label}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                               {task.status !== 'DONE' && (
                                 <button onClick={() => handleQuickDone(task.id)} className="text-green-600 hover:bg-green-50 p-1.5 rounded-lg transition-colors" title={t('btn_mark_done')}>
                                   <i className="bi bi-check-lg text-base"></i>
