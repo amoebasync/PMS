@@ -2200,68 +2200,93 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         </div>
                       </div>
                     )}
-                    {/* 配布実績 */}
-                    {(selectedPast as any).totalSheets > 0 && (
-                      <div className="mt-2 pt-2 border-t border-slate-100">
-                        <div className="flex justify-between items-center">
-                          <span className="text-slate-500">過去 配布枚数</span>
-                          <span className="font-bold text-amber-600">{((selectedPast as any).totalSheets || 0).toLocaleString()} 枚</span>
-                        </div>
+                    {/* 配布実績比較 */}
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">今回 配布枚数</span>
+                        <span className="font-bold text-slate-700">
+                          {data.schedule.items.reduce((s: number, i: any) => s + (i.actualCount || 0), 0).toLocaleString()} 枚
+                        </span>
                       </div>
-                    )}
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500">過去 配布枚数</span>
+                        <span className="font-bold text-amber-600">
+                          {((selectedPast as any).totalSheets || 0) > 0
+                            ? `${((selectedPast as any).totalSheets).toLocaleString()} 枚`
+                            : '-'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* エリアカバー率比較 */}
+              {/* エリアカバー率 — 今回 vs 過去の差分比較 */}
               {trajectoryMatchRate && (
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-grid-3x3-gap mr-1 text-indigo-500"></i>
                     エリアカバー率
                   </h3>
-                  {/* メイン指標: 過去と比べたカバー率 */}
-                  <div className="text-center mb-3">
-                    <div className={`font-black text-3xl ${
-                      trajectoryMatchRate.pastCoverageRate >= 0.7 ? 'text-emerald-600' :
-                      trajectoryMatchRate.pastCoverageRate >= 0.4 ? 'text-amber-600' : 'text-red-500'
-                    }`}>
-                      {Math.round(trajectoryMatchRate.pastCoverageRate * 100)}%
+                  {/* 2つのバーを並べて比較 */}
+                  <div className="space-y-2 mb-3">
+                    <div>
+                      <div className="flex justify-between items-center text-[10px] mb-0.5">
+                        <span className="text-pink-600 font-bold">今回</span>
+                        <span className="font-black text-pink-600">{Math.round(trajectoryMatchRate.currentMatchRate * 100)}%</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-pink-500 transition-all" style={{ width: `${Math.round(trajectoryMatchRate.currentMatchRate * 100)}%` }} />
+                      </div>
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">過去の配布ルートに対するカバー率</p>
+                    <div>
+                      <div className="flex justify-between items-center text-[10px] mb-0.5">
+                        <span className="text-amber-600 font-bold">過去</span>
+                        <span className="font-black text-amber-600">100%</span>
+                      </div>
+                      <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: '100%' }} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden mb-3">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        trajectoryMatchRate.pastCoverageRate >= 0.7 ? 'bg-emerald-500' :
-                        trajectoryMatchRate.pastCoverageRate >= 0.4 ? 'bg-amber-500' : 'bg-red-500'
-                      }`}
-                      style={{ width: `${Math.round(trajectoryMatchRate.pastCoverageRate * 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-slate-500 space-y-1">
+                  {/* 差分表示 */}
+                  {(() => {
+                    const diff = Math.round(trajectoryMatchRate.pastCoverageRate * 100) - 100;
+                    const absDiff = Math.abs(diff);
+                    return (
+                      <div className={`text-center px-3 py-2.5 rounded-lg border ${
+                        diff >= -10
+                          ? 'bg-emerald-50 border-emerald-200'
+                          : diff >= -30
+                            ? 'bg-amber-50 border-amber-200'
+                            : 'bg-red-50 border-red-200'
+                      }`}>
+                        <div className={`font-black text-2xl ${
+                          diff >= -10 ? 'text-emerald-600' : diff >= -30 ? 'text-amber-600' : 'text-red-600'
+                        }`}>
+                          {diff >= 0 ? `+${diff}%` : `${diff}%`}
+                        </div>
+                        <p className={`text-[10px] font-bold mt-0.5 ${
+                          diff >= -10 ? 'text-emerald-600' : diff >= -30 ? 'text-amber-700' : 'text-red-700'
+                        }`}>
+                          {diff >= -10
+                            ? '過去と同等以上のカバレッジ'
+                            : diff >= -30
+                              ? `過去より${absDiff}%少ないカバレッジ`
+                              : `過去より${absDiff}%少ない — 要確認`}
+                        </p>
+                      </div>
+                    );
+                  })()}
+                  <div className="text-[10px] text-slate-400 mt-2 space-y-0.5">
                     <div className="flex justify-between">
                       <span>カバー済み</span>
-                      <span className="font-bold text-slate-700">{trajectoryMatchRate.pastMatched.toLocaleString()} / {trajectoryMatchRate.pastTotal.toLocaleString()} 地点</span>
+                      <span>{trajectoryMatchRate.pastMatched.toLocaleString()} / {trajectoryMatchRate.pastTotal.toLocaleString()} 地点</span>
                     </div>
                     <div className="flex justify-between">
                       <span>判定基準</span>
-                      <span className="text-slate-400">30m以内を同一ルートとみなす</span>
+                      <span>30m以内を同一ルートとみなす</span>
                     </div>
-                  </div>
-                  {/* 判定 */}
-                  <div className={`mt-3 px-3 py-2 rounded-lg text-xs font-bold text-center ${
-                    trajectoryMatchRate.pastCoverageRate >= 0.7
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : trajectoryMatchRate.pastCoverageRate >= 0.4
-                        ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                        : 'bg-red-50 text-red-700 border border-red-200'
-                  }`}>
-                    {trajectoryMatchRate.pastCoverageRate >= 0.7
-                      ? '✓ 過去の配布ルートを十分にカバーしています'
-                      : trajectoryMatchRate.pastCoverageRate >= 0.4
-                        ? '△ カバーが不十分な可能性があります'
-                        : '✗ 過去の配布ルートと大きく異なります'}
                   </div>
                 </div>
               )}
