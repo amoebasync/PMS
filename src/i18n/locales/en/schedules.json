@@ -258,7 +258,7 @@
   "speed_slow_walk_label": "Walking & posting",
   "speed_normal_walk_label": "Normal walking",
   "speed_fast_label": "Fast movement",
-  "task_count": "{count} tasks",
+  "task_count": "{{count}} tasks",
   "tasks": "Tasks",
   "status_in_progress": "In Progress",
   "status_pending": "Pending",
