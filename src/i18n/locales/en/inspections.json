@@ -160,5 +160,14 @@
   "follow_up_task_created": "Follow-up task created",
   "feedback_task_created": "Feedback task created",
   "already_has_follow_up": "Follow-up task already exists",
-  "already_has_feedback": "Feedback task already exists"
+  "already_has_feedback": "Feedback task already exists",
+  "add_checkpoint_confirmed": "Confirmed",
+  "add_checkpoint_not_found": "Not Found",
+  "add_problem": "Problem",
+  "add_out_of_area": "Out of Area",
+  "type_checkpoint": "Checkpoint",
+  "type_problem": "Problem",
+  "type_out_of_area": "Out of Area",
+  "problem_note_placeholder": "Describe the problem... (e.g., delivered to manager post, ignored sticker, etc.)",
+  "out_of_area_note_placeholder": "Describe the out-of-area situation... (no delivery = normal, delivery found = issue)"
 }

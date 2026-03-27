@@ -160,5 +160,14 @@
   "follow_up_task_created": "フォローアップタスクを登録しました",
   "feedback_task_created": "フィードバックタスクを登録しました",
   "already_has_follow_up": "フォローアップタスクは既に登録済みです",
-  "already_has_feedback": "フィードバックタスクは既に登録済みです"
+  "already_has_feedback": "フィードバックタスクは既に登録済みです",
+  "add_checkpoint_confirmed": "確認あり",
+  "add_checkpoint_not_found": "確認なし",
+  "add_problem": "問題あり",
+  "add_out_of_area": "エリア外",
+  "type_checkpoint": "チェックポイント",
+  "type_problem": "問題あり",
+  "type_out_of_area": "エリア外確認",
+  "problem_note_placeholder": "問題の詳細を入力...(例: 管理人ポストに投函、貼り紙無視等)",
+  "out_of_area_note_placeholder": "エリア外の状況を入力...(配布無し=正常、配布あり=問題)"
 }
