@@ -141,5 +141,24 @@
   "line_share_success": "Sent to LINE ({count} inspections)",
   "line_group_select_title": "Select LINE Group",
   "line_no_groups": "No LINE groups available",
-  "refresh": "Refresh"
+  "refresh": "Refresh",
+
+  "follow_up": "Follow-up",
+  "feedback": "Feedback",
+  "follow_up_check": "Requires Follow-up",
+  "feedback_check": "Requires Feedback",
+  "follow_up_note_placeholder": "Enter follow-up details... (e.g., schedule next check, send warning, etc.)",
+  "feedback_note_placeholder": "Enter good points / areas for improvement...",
+  "add_follow_up_task": "Add Follow-up Task",
+  "add_feedback_task": "Add Feedback Task",
+  "task_pending": "Pending",
+  "task_in_progress": "In Progress",
+  "task_done": "Done",
+  "open_task": "Open Task",
+  "due_date": "Due Date",
+  "assignee": "Assignee",
+  "follow_up_task_created": "Follow-up task created",
+  "feedback_task_created": "Feedback task created",
+  "already_has_follow_up": "Follow-up task already exists",
+  "already_has_feedback": "Feedback task already exists"
 }

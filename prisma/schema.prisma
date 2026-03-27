@@ -2119,6 +2119,9 @@ model Task {
   // 複数担当者
   assignees      TaskAssignee[]
 
+  inspectionFollowUp  FieldInspection? @relation("InspectionFollowUpTask")
+  inspectionFeedback  FieldInspection? @relation("InspectionFeedbackTask")
+
   @@index([categoryId])
   @@index([templateId])
   @@index([complaintId])
@@ -3068,6 +3071,17 @@ model FieldInspection {
   // 共通
   note               String?         @db.Text
   followUpRequired   Boolean         @default(false) @map("follow_up_required")
+
+  // フォローアップタスク
+  followUpNote    String?  @map("follow_up_note") @db.Text
+  followUpTaskId  Int?     @unique @map("follow_up_task_id")
+  followUpTask    Task?    @relation("InspectionFollowUpTask", fields: [followUpTaskId], references: [id])
+
+  // フィードバックタスク
+  feedbackNote    String?  @map("feedback_note") @db.Text
+  feedbackTaskId  Int?     @unique @map("feedback_task_id")
+  feedbackTask    Task?    @relation("InspectionFeedbackTask", fields: [feedbackTaskId], references: [id])
+
   samplePointsJson   String?         @map("sample_points_json") @db.Text  // サンプルポイントのJSON配列
 
   createdAt          DateTime        @default(now()) @map("created_at")

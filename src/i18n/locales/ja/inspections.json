@@ -141,5 +141,24 @@
   "line_share_success": "LINE送信完了（{count}件）",
   "line_group_select_title": "送信先LINEグループを選択",
   "line_no_groups": "利用可能なLINEグループがありません",
-  "refresh": "更新"
+  "refresh": "更新",
+
+  "follow_up": "フォローアップ",
+  "feedback": "フィードバック",
+  "follow_up_check": "要フォローアップ",
+  "feedback_check": "要フィードバック",
+  "follow_up_note_placeholder": "フォローアップ内容を入力...(例: 次回もチェックを行う、注意事項を伝える等)",
+  "feedback_note_placeholder": "良い点・改善点を入力...",
+  "add_follow_up_task": "フォローアップタスク追加",
+  "add_feedback_task": "フィードバックタスク追加",
+  "task_pending": "未着手",
+  "task_in_progress": "対応中",
+  "task_done": "完了",
+  "open_task": "タスクを開く",
+  "due_date": "期限",
+  "assignee": "担当者",
+  "follow_up_task_created": "フォローアップタスクを登録しました",
+  "feedback_task_created": "フィードバックタスクを登録しました",
+  "already_has_follow_up": "フォローアップタスクは既に登録済みです",
+  "already_has_feedback": "フィードバックタスクは既に登録済みです"
 }
