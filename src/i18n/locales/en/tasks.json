@@ -107,5 +107,22 @@
   "filter_all": "All",
   "filter_not_done": "Not Done",
   "btn_reset": "Reset",
-  "btn_create": "Create"
+  "btn_create": "Create",
+  "detail_title": "Task Detail",
+  "detail_source": "Source",
+  "source_template": "Recurring Task",
+  "source_complaint": "Complaint",
+  "source_inspection_followup": "Inspection (Follow-up)",
+  "source_inspection_feedback": "Inspection (Feedback)",
+  "source_manual": "Manual",
+  "detail_description": "Description",
+  "detail_category": "Category",
+  "detail_due_date": "Due Date",
+  "detail_related": "Related",
+  "detail_assignees": "Assignees",
+  "detail_created_by": "Created by",
+  "detail_view_link": "View details",
+  "btn_edit": "Edit",
+  "btn_complete": "Mark Complete",
+  "btn_close": "Close"
 }

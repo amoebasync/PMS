@@ -12,6 +12,9 @@ const taskInclude = {
   branch: { select: { id: true, nameJa: true } },
   schedule: { select: { id: true, jobNumber: true } },
   template: { select: { id: true, title: true } },
+  complaint: { select: { id: true, title: true } },
+  inspectionFollowUp: { select: { id: true, category: true, schedule: { select: { id: true, date: true, distributor: { select: { name: true } } } } } },
+  inspectionFeedback: { select: { id: true, category: true, schedule: { select: { id: true, date: true, distributor: { select: { name: true } } } } } },
   assignees: {
     include: {
       employee: { select: { id: true, lastNameJa: true, firstNameJa: true } },

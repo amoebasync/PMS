@@ -41,6 +41,9 @@ type Task = {
   branch: BranchInfo | null;
   schedule: { id: number; jobNumber: string } | null;
   template: { id: number; title: string } | null;
+  complaint: { id: number; title: string } | null;
+  inspectionFollowUp: { id: number; category: string; schedule: { id: number; date: string; distributor: { name: string } | null } | null } | null;
+  inspectionFeedback: { id: number; category: string; schedule: { id: number; date: string; distributor: { name: string } | null } | null } | null;
   assignees: TaskAssigneeData[];
 };
 
@@ -167,6 +170,9 @@ export default function CrmTasksPage() {
   const [filterKeyword, setFilterKeyword] = useState('');
   const [filterCategoryId, setFilterCategoryId] = useState('');
   const [filterMyTasks, setFilterMyTasks] = useState(false);
+
+  // タスク詳細モーダル（読み取り専用）
+  const [detailTask, setDetailTask] = useState<Task | null>(null);
 
   // タスク編集モーダル（インライン）
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
@@ -761,7 +767,7 @@ export default function CrmTasksPage() {
                       const isDueToday = task.status !== 'DONE' && dueDate.getTime() === today.getTime();
 
                       return (
-                        <tr key={task.id} onClick={() => openTaskEdit(task)} className={`border-b transition-colors group cursor-pointer ${
+                        <tr key={task.id} onClick={() => setDetailTask(task)} className={`border-b transition-colors group cursor-pointer ${
                           isOverdue ? 'bg-red-50 border-red-100 hover:bg-red-100'
                           : isDueToday ? 'bg-orange-50 border-orange-100 hover:bg-orange-100'
                           : 'border-slate-50 hover:bg-slate-50'
@@ -953,9 +959,240 @@ export default function CrmTasksPage() {
         </div>{/* /p-5 */}
       </div>{/* /bg-white card */}
 
+      {/* ==================== タスク詳細モーダル（読み取り専用） ==================== */}
+      {detailTask && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setDetailTask(null)}></div>
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            {/* ヘッダー */}
+            <div className="flex items-start justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <div className="flex-1 min-w-0 pr-4">
+                <div className="flex items-center gap-2 mb-1">
+                  {PRIORITY_CONFIG[detailTask.priority] && (
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${PRIORITY_CONFIG[detailTask.priority].cls}`}>
+                      {PRIORITY_CONFIG[detailTask.priority].label}
+                    </span>
+                  )}
+                  {STATUS_CONFIG[detailTask.status] && (
+                    <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${STATUS_CONFIG[detailTask.status].cls}`}>
+                      {STATUS_CONFIG[detailTask.status].label}
+                    </span>
+                  )}
+                </div>
+                <h2 className="font-bold text-slate-800 text-lg truncate">{detailTask.title}</h2>
+              </div>
+              <button onClick={() => setDetailTask(null)} className="text-slate-400 hover:text-slate-600 flex-shrink-0">
+                <i className="bi bi-x-lg text-xl"></i>
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5">
+              {/* 詳細（description） */}
+              {detailTask.description && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1">
+                    <i className="bi bi-text-left"></i> {t('detail_description')}
+                  </p>
+                  <p className="text-sm text-slate-700 whitespace-pre-wrap bg-slate-50 rounded-lg p-3">{detailTask.description}</p>
+                </div>
+              )}
+
+              {/* 情報グリッド */}
+              <div className="border border-slate-100 rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {/* 種類 */}
+                    <tr className="border-b border-slate-50">
+                      <td className="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-50 w-28">{t('detail_category')}</td>
+                      <td className="px-4 py-2.5">
+                        {detailTask.taskCategory ? (
+                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${detailTask.taskCategory.colorCls || 'bg-slate-100 text-slate-600'}`}>
+                            {detailTask.taskCategory.icon && <i className={`bi ${detailTask.taskCategory.icon} mr-0.5`}></i>}
+                            {detailTask.taskCategory.name}
+                          </span>
+                        ) : <span className="text-slate-400 text-xs">--</span>}
+                      </td>
+                    </tr>
+                    {/* 期限 */}
+                    <tr className="border-b border-slate-50">
+                      <td className="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-50">{t('detail_due_date')}</td>
+                      <td className="px-4 py-2.5 text-sm text-slate-700">{formatDueDate(detailTask.dueDate)}</td>
+                    </tr>
+                    {/* 関連先 */}
+                    <tr className="border-b border-slate-50">
+                      <td className="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-50">{t('detail_related')}</td>
+                      <td className="px-4 py-2.5">
+                        {detailTask.customer ? (
+                          <span onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1">
+                            <i className="bi bi-person-lines-fill text-blue-400 text-xs"></i>
+                            <Link href={`/customers/${detailTask.customer.id}`} className="text-blue-600 hover:underline text-sm">{detailTask.customer.name}</Link>
+                          </span>
+                        ) : detailTask.distributor ? (
+                          <span onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1">
+                            <i className="bi bi-bicycle text-emerald-500 text-xs"></i>
+                            <Link href={`/distributors/${detailTask.distributor.id}`} className="text-emerald-700 hover:underline text-sm">
+                              {detailTask.distributor.name}
+                            </Link>
+                            <span className="text-slate-400 text-[11px]">({detailTask.distributor.staffId})</span>
+                          </span>
+                        ) : detailTask.branch ? (
+                          <span className="inline-flex items-center gap-1">
+                            <i className="bi bi-building text-emerald-500 text-xs"></i>
+                            <span className="text-sm text-emerald-700">{detailTask.branch.nameJa}</span>
+                          </span>
+                        ) : <span className="text-slate-400 text-xs">--</span>}
+                      </td>
+                    </tr>
+                    {/* 担当者 */}
+                    <tr className="border-b border-slate-50">
+                      <td className="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-50">{t('detail_assignees')}</td>
+                      <td className="px-4 py-2.5 text-sm text-slate-700">
+                        {detailTask.assignees && detailTask.assignees.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {detailTask.assignees.map((a, i) => (
+                              <span key={i} className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 text-xs px-2 py-0.5 rounded-full">
+                                {a.employee && <><i className="bi bi-person-fill text-slate-400"></i>{a.employee.lastNameJa} {a.employee.firstNameJa}</>}
+                                {a.department && <><i className="bi bi-diagram-3-fill text-slate-400"></i>{a.department.name}</>}
+                                {a.branch && <><i className="bi bi-building text-slate-400"></i>{a.branch.nameJa}</>}
+                              </span>
+                            ))}
+                          </div>
+                        ) : detailTask.assignee ? (
+                          <span className="text-sm">{detailTask.assignee.lastNameJa} {detailTask.assignee.firstNameJa}</span>
+                        ) : <span className="text-slate-400 text-xs">--</span>}
+                      </td>
+                    </tr>
+                    {/* 作成者 */}
+                    <tr>
+                      <td className="px-4 py-2.5 text-xs font-bold text-slate-500 bg-slate-50">{t('detail_created_by')}</td>
+                      <td className="px-4 py-2.5 text-sm text-slate-700">
+                        {detailTask.createdBy ? `${detailTask.createdBy.lastNameJa} ${detailTask.createdBy.firstNameJa}` : <span className="text-slate-400 text-xs">--</span>}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* 生成元セクション */}
+              {(detailTask.template || detailTask.complaint || detailTask.inspectionFollowUp || detailTask.inspectionFeedback || detailTask.createdBy) && (
+                <div>
+                  <p className="text-xs font-bold text-slate-500 mb-1.5 flex items-center gap-1">
+                    <i className="bi bi-link-45deg"></i> {t('detail_source')}
+                  </p>
+                  <div className="border border-slate-100 rounded-xl p-4 bg-slate-50 space-y-2">
+                    {detailTask.template && (
+                      <div className="flex items-center gap-2">
+                        <i className="bi bi-arrow-repeat text-indigo-500"></i>
+                        <span className="text-sm text-slate-700">
+                          <span className="font-bold text-indigo-600">{t('source_template')}</span>: {detailTask.template.title}
+                        </span>
+                      </div>
+                    )}
+                    {detailTask.complaint && (
+                      <div className="flex items-start gap-2">
+                        <i className="bi bi-exclamation-circle text-red-500 mt-0.5"></i>
+                        <div>
+                          <span className="text-sm text-slate-700">
+                            <span className="font-bold text-red-600">{t('source_complaint')}</span>: {detailTask.complaint.title}
+                          </span>
+                          <div className="mt-1">
+                            <Link href={`/quality/complaints?id=${detailTask.complaint.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                              {t('detail_view_link')} <i className="bi bi-arrow-right"></i>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {detailTask.inspectionFollowUp && (
+                      <div className="flex items-start gap-2">
+                        <i className="bi bi-search text-amber-500 mt-0.5"></i>
+                        <div>
+                          <span className="text-sm text-slate-700">
+                            <span className="font-bold text-amber-600">{t('source_inspection_followup')}</span>
+                          </span>
+                          {detailTask.inspectionFollowUp.schedule && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {new Date(detailTask.inspectionFollowUp.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                              {detailTask.inspectionFollowUp.schedule.distributor && ` ${detailTask.inspectionFollowUp.schedule.distributor.name}`}
+                            </p>
+                          )}
+                          <div className="mt-1">
+                            <Link href={`/inspections?id=${detailTask.inspectionFollowUp.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                              {t('detail_view_link')} <i className="bi bi-arrow-right"></i>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {detailTask.inspectionFeedback && (
+                      <div className="flex items-start gap-2">
+                        <i className="bi bi-chat-dots text-purple-500 mt-0.5"></i>
+                        <div>
+                          <span className="text-sm text-slate-700">
+                            <span className="font-bold text-purple-600">{t('source_inspection_feedback')}</span>
+                          </span>
+                          {detailTask.inspectionFeedback.schedule && (
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {new Date(detailTask.inspectionFeedback.schedule.date).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                              {detailTask.inspectionFeedback.schedule.distributor && ` ${detailTask.inspectionFeedback.schedule.distributor.name}`}
+                            </p>
+                          )}
+                          <div className="mt-1">
+                            <Link href={`/inspections?id=${detailTask.inspectionFeedback.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                              {t('detail_view_link')} <i className="bi bi-arrow-right"></i>
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {!detailTask.template && !detailTask.complaint && !detailTask.inspectionFollowUp && !detailTask.inspectionFeedback && detailTask.createdBy && (
+                      <div className="flex items-center gap-2">
+                        <i className="bi bi-person-fill text-slate-500"></i>
+                        <span className="text-sm text-slate-700">
+                          <span className="font-bold text-slate-600">{t('source_manual')}</span>: {detailTask.createdBy.lastNameJa} {detailTask.createdBy.firstNameJa}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* アクションボタン */}
+              <div className="flex items-center gap-3 pt-2">
+                {detailTask.status !== 'DONE' && (
+                  <button
+                    onClick={async () => {
+                      await handleQuickDone(detailTask.id);
+                      setDetailTask(prev => prev ? { ...prev, status: 'DONE' } : null);
+                    }}
+                    className="flex items-center gap-1.5 bg-green-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-green-700 transition-colors">
+                    <i className="bi bi-check-lg"></i> {t('btn_complete')}
+                  </button>
+                )}
+                <button
+                  onClick={() => { openTaskEdit(detailTask); setDetailTask(null); }}
+                  className="flex items-center gap-1.5 bg-indigo-600 text-white text-sm font-bold px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                  <i className="bi bi-pencil"></i> {t('btn_edit')}
+                </button>
+                <button
+                  onClick={async () => { await handleDeleteTask(detailTask.id); setDetailTask(null); }}
+                  className="flex items-center gap-1.5 text-red-500 hover:bg-red-50 text-sm font-bold px-4 py-2 rounded-lg border border-red-200 transition-colors">
+                  <i className="bi bi-trash"></i> {t('delete')}
+                </button>
+                <div className="flex-1"></div>
+                <button onClick={() => setDetailTask(null)}
+                  className="text-slate-600 text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors">
+                  {t('btn_close')}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== タスク編集モーダル ==================== */}
       {isTaskModalOpen && editingTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTaskModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
@@ -1109,7 +1346,7 @@ export default function CrmTasksPage() {
 
       {/* ==================== テンプレート作成/編集モーダル ==================== */}
       {isTmplModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTmplModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">

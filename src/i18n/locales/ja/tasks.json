@@ -107,5 +107,22 @@
   "filter_all": "すべて",
   "filter_not_done": "未完了",
   "btn_reset": "リセット",
-  "btn_create": "作成"
+  "btn_create": "作成",
+  "detail_title": "タスク詳細",
+  "detail_source": "生成元",
+  "source_template": "定期タスク",
+  "source_complaint": "クレーム",
+  "source_inspection_followup": "巡回チェック（フォローアップ）",
+  "source_inspection_feedback": "巡回チェック（フィードバック）",
+  "source_manual": "手動作成",
+  "detail_description": "詳細",
+  "detail_category": "種類",
+  "detail_due_date": "期限",
+  "detail_related": "関連先",
+  "detail_assignees": "担当者",
+  "detail_created_by": "作成者",
+  "detail_view_link": "詳細を見る",
+  "btn_edit": "編集",
+  "btn_complete": "完了にする",
+  "btn_close": "閉じる"
 }
