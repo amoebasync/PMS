@@ -428,7 +428,6 @@ export default function DistributorPage() {
               <th className="px-5 py-3 text-center cursor-pointer select-none hover:text-emerald-600 transition-colors" onClick={() => handleSort('rate')}>{t('th_distribution_rate')}<SortIcon col="rate" /></th>
               <th className="px-5 py-3">{t('th_nationality')}</th>
               <th className="px-5 py-3 text-center">{t('th_status')}</th>
-              <th className="px-5 py-3 text-center">{t('th_test')}</th>
               <th className="px-5 py-3 text-right">{t('th_actions')}</th>
             </tr>
           </thead>
@@ -500,39 +499,6 @@ export default function DistributorPage() {
                   {d.leaveDate
                     ? <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-bold rounded-full">{t('status_inactive')}</span>
                     : <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">{t('status_active')}</span>}
-                </td>
-                <td className="px-5 py-3 text-center" onClick={e => e.stopPropagation()}>
-                  {d.isTrainingTestPassed ? (
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-bold rounded-full">{t('test_passed')}</span>
-                  ) : d.testAssignments?.some((a: { status: string }) => a.status === 'PENDING') ? (
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[10px] font-bold rounded-full">{t('test_pending')}</span>
-                  ) : (
-                    <button
-                      onClick={async () => {
-                        const ok = await showConfirm(t('send_test_confirm', { name: d.name }));
-                        if (!ok) return;
-                        try {
-                          const res = await fetch('/api/training-test-assignments', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ distributorId: d.id }),
-                          });
-                          if (!res.ok) {
-                            const data = await res.json();
-                            showToast(data.error || 'エラーが発生しました', 'error');
-                            return;
-                          }
-                          showToast(t('send_test_success'));
-                          loadData();
-                        } catch {
-                          showToast('エラーが発生しました', 'error');
-                        }
-                      }}
-                      className="px-2.5 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-full hover:bg-indigo-700 transition-colors"
-                    >
-                      {t('send_test')}
-                    </button>
-                  )}
                 </td>
                 <td className="px-5 py-3 text-right" onClick={e => e.stopPropagation()}>
                   {!d.leaveDate && (
