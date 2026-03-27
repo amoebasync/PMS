@@ -1,41 +1,33 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
+import { fetchAreaHistory, fetchStaffGps } from '@/lib/posting-system';
 
-const PS_API_URL = process.env.POSTING_SYSTEM_API_URL;
-const PS_API_KEY = process.env.POSTING_SYSTEM_API_KEY;
+/** Haversine distance (meters) */
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
-/** Posting System から GPS データを取得 */
-async function fetchPsGps(staffId: string, dateStr: string): Promise<{ lat: number; lng: number; timestamp: string }[]> {
-  if (!PS_API_URL) return [];
-  try {
-    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
-    if (PS_API_KEY) headers['X-API-Key'] = PS_API_KEY;
-    const res = await fetch(`${PS_API_URL}/GetStaffGPS.php`, {
-      method: 'POST',
-      headers,
-      body: new URLSearchParams({ STAFF_ID: staffId, TARGET_DATE: dateStr }).toString(),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) return [];
-    const parsed = JSON.parse(await res.text());
-    const rows: any[] = Array.isArray(parsed) ? parsed : (parsed.data || []);
-    return rows
-      .filter((r: any) => parseFloat(r.LATITUDE || '0') !== 0 && parseFloat(r.LONGITUDE || '0') !== 0)
-      .map((r: any) => {
-        const terminalTime = (r.TERMINAL_TIME || '').trim();
-        const ts = terminalTime ? `${dateStr}T${terminalTime}+09:00` : new Date().toISOString();
-        return { lat: parseFloat(r.LATITUDE), lng: parseFloat(r.LONGITUDE), timestamp: new Date(ts).toISOString() };
-      })
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-  } catch {
-    return [];
+/** GPS点列から総距離を算出 */
+function calcTotalDistance(points: { lat: number; lng: number }[]): number {
+  let d = 0;
+  for (let i = 1; i < points.length; i++) {
+    d += haversine(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
   }
+  return d;
 }
 
 // GET /api/schedules/[id]/trajectory/past-area
 // 同エリアの過去の配布GPS軌跡を取得（比較用）
-// PMS GPS → なければ Posting System から取得
+// ステップ:
+//   1. PMS の同エリア過去スケジュールを検索（GPS付き）
+//   2. Posting System の GetAreaHistory で同エリア過去配布を検索
+//   3. 両方をマージし、日付の重複を除去して返す
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -54,43 +46,43 @@ export async function GET(
     }
 
     const { searchParams } = new URL(request.url);
-    const limit = Math.min(parseInt(searchParams.get('limit') || '3'), 5);
+    const limit = Math.min(parseInt(searchParams.get('limit') || '5'), 10);
 
-    // 現在のスケジュール情報を取得
+    // 現在のスケジュール + エリア情報を取得
     const schedule = await prisma.distributionSchedule.findUnique({
       where: { id: scheduleId },
-      select: { id: true, areaId: true, date: true, distributorId: true },
+      select: {
+        id: true, areaId: true, date: true, distributorId: true,
+        area: { select: { address_code: true } },
+      },
     });
 
     if (!schedule) {
       return NextResponse.json({ error: 'スケジュールが見つかりません' }, { status: 404 });
     }
-
     if (!schedule.areaId) {
       return NextResponse.json({ error: 'エリアが設定されていません' }, { status: 400 });
     }
 
-    // 同エリアの過去のスケジュールを取得（セッション有無問わず）
-    const pastSchedules = await prisma.distributionSchedule.findMany({
+    const currentDateStr = new Date(schedule.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+
+    // ─── 1. PMS: 同エリア過去スケジュール（GPSデータ付き） ───
+    const pmsSchedules = await prisma.distributionSchedule.findMany({
       where: {
         areaId: schedule.areaId,
         id: { not: scheduleId },
         date: { lt: schedule.date },
         distributorId: { not: null },
+        session: { gpsPoints: { some: {} } },
       },
       orderBy: { date: 'desc' },
       take: limit,
       select: {
-        id: true,
-        date: true,
-        status: true,
+        id: true, date: true, status: true,
         distributor: { select: { id: true, name: true, staffId: true } },
         session: {
           select: {
-            id: true,
-            startedAt: true,
-            finishedAt: true,
-            totalDistance: true,
+            id: true, startedAt: true, finishedAt: true, totalDistance: true,
             gpsPoints: {
               orderBy: { timestamp: 'asc' },
               select: { latitude: true, longitude: true, timestamp: true },
@@ -100,57 +92,68 @@ export async function GET(
       },
     });
 
-    // PMS GPS がなければ Posting System から取得
-    const results = [];
-    for (const ps of pastSchedules) {
-      const pmsGps = ps.session?.gpsPoints || [];
-      let gpsPoints: { lat: number; lng: number; timestamp: string }[];
-      let source: 'pms' | 'ps';
+    // PMS結果をマップ（dateStr → result）
+    const resultMap = new Map<string, any>();
 
-      if (pmsGps.length > 0) {
-        gpsPoints = pmsGps.map(p => ({
-          lat: p.latitude,
-          lng: p.longitude,
-          timestamp: p.timestamp.toISOString(),
-        }));
-        source = 'pms';
-      } else {
-        // Posting System フォールバック
-        const staffId = ps.distributor?.staffId;
-        if (!staffId) continue;
-        const dateStr = new Date(ps.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
-        gpsPoints = await fetchPsGps(staffId, dateStr);
-        source = 'ps';
-        if (gpsPoints.length === 0) continue; // GPS データがどこにもない場合はスキップ
-      }
-
-      // 距離計算
-      let totalDistance = ps.session?.totalDistance || 0;
-      if (totalDistance === 0 && gpsPoints.length > 1) {
-        for (let i = 1; i < gpsPoints.length; i++) {
-          const R = 6371000;
-          const dLat = ((gpsPoints[i].lat - gpsPoints[i - 1].lat) * Math.PI) / 180;
-          const dLng = ((gpsPoints[i].lng - gpsPoints[i - 1].lng) * Math.PI) / 180;
-          const a = Math.sin(dLat / 2) ** 2 +
-            Math.cos((gpsPoints[i - 1].lat * Math.PI) / 180) * Math.cos((gpsPoints[i].lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-          totalDistance += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        }
-      }
-
-      results.push({
+    for (const ps of pmsSchedules) {
+      const gps = ps.session!.gpsPoints;
+      const dateStr = new Date(ps.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+      resultMap.set(dateStr, {
         scheduleId: ps.id,
         date: ps.date,
         status: ps.status,
-        source,
+        source: 'pms',
         distributorName: ps.distributor?.name || '-',
         distributorStaffId: ps.distributor?.staffId || '-',
-        totalDistance,
-        startedAt: ps.session?.startedAt || (gpsPoints.length > 0 ? gpsPoints[0].timestamp : null),
-        finishedAt: ps.session?.finishedAt || (gpsPoints.length > 0 ? gpsPoints[gpsPoints.length - 1].timestamp : null),
-        gpsPointCount: gpsPoints.length,
-        gpsPoints,
+        totalDistance: ps.session?.totalDistance || calcTotalDistance(gps.map(p => ({ lat: p.latitude, lng: p.longitude }))),
+        startedAt: ps.session?.startedAt,
+        finishedAt: ps.session?.finishedAt,
+        gpsPointCount: gps.length,
+        gpsPoints: gps.map(p => ({ lat: p.latitude, lng: p.longitude, timestamp: p.timestamp.toISOString() })),
       });
     }
+
+    // ─── 2. PS: GetAreaHistory で同エリア過去配布を検索 ───
+    const addressCode = schedule.area?.address_code;
+    if (addressCode) {
+      try {
+        const psHistory = await fetchAreaHistory(addressCode, 20);
+        // PMS に既にある日付と、当日を除外して、GPS取得
+        const psOnlyRecords = psHistory.filter(h =>
+          h.conditionDate !== currentDateStr && !resultMap.has(h.conditionDate)
+        );
+
+        // GPS取得は直列で最大 limit 件まで
+        let psCount = 0;
+        for (const rec of psOnlyRecords) {
+          if (resultMap.size >= limit) break;
+          if (psCount >= limit) break;
+          const gps = await fetchStaffGps(rec.manageCode, rec.conditionDate, { maxPoints: 5000 });
+          if (gps.length === 0) continue;
+          resultMap.set(rec.conditionDate, {
+            scheduleId: null,
+            date: `${rec.conditionDate}T00:00:00+09:00`,
+            status: 'COMPLETED',
+            source: 'ps',
+            distributorName: rec.staffName || '-',
+            distributorStaffId: rec.manageCode || '-',
+            totalDistance: calcTotalDistance(gps),
+            startedAt: gps[0].timestamp,
+            finishedAt: gps[gps.length - 1].timestamp,
+            gpsPointCount: gps.length,
+            gpsPoints: gps,
+          });
+          psCount++;
+        }
+      } catch (e) {
+        console.error('PS area history fetch error:', e);
+      }
+    }
+
+    // ─── 3. マージして日付降順でソート ───
+    const results = [...resultMap.values()]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      .slice(0, limit);
 
     return NextResponse.json({
       areaId: schedule.areaId,
