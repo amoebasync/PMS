@@ -53,6 +53,70 @@ const MAP_CONTAINER = { width: '100%', height: '500px' };
 const MAP_CENTER = { lat: 35.7, lng: 139.7 };
 
 // ============================================================
+// Speed calculation (same as MapboxTrajectoryViewer)
+// ============================================================
+const SPEED_THRESHOLDS = {
+  posting: 1.5,     // 0〜1.5 km/h: ほぼ停止・ポスティング中
+  slowWalk: 3.5,    // 1.5〜3.5 km/h: 配布しながら歩行
+  normalWalk: 5.0,  // 3.5〜5.0 km/h: 通常歩行
+};
+
+const SPEED_COLORS = {
+  posting: '#ef4444',    // 赤
+  slowWalk: '#f97316',   // オレンジ
+  normalWalk: '#22c55e', // 緑
+  fast: '#3b82f6',       // 青
+};
+
+const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371000;
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+type SpeedSegment = {
+  from: GpsPoint;
+  to: GpsPoint;
+  speedKmh: number;
+  color: string;
+};
+
+const speedToColor = (kmh: number): string => {
+  if (kmh <= SPEED_THRESHOLDS.posting) return SPEED_COLORS.posting;
+  if (kmh <= SPEED_THRESHOLDS.slowWalk) return SPEED_COLORS.slowWalk;
+  if (kmh <= SPEED_THRESHOLDS.normalWalk) return SPEED_COLORS.normalWalk;
+  return SPEED_COLORS.fast;
+};
+
+const computeSpeedSegments = (points: GpsPoint[]): SpeedSegment[] => {
+  if (points.length < 2) return [];
+  // Raw speeds
+  const rawSpeeds: number[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const distM = haversineM(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+    const dtSec = Math.max((new Date(points[i].timestamp).getTime() - new Date(points[i - 1].timestamp).getTime()) / 1000, 0.1);
+    rawSpeeds.push(Math.min((distM / dtSec) * 3.6, 30));
+  }
+  // 3-point moving average
+  const smoothed = rawSpeeds.map((_, i) => {
+    const start = Math.max(0, i - 1);
+    const end = Math.min(rawSpeeds.length - 1, i + 1);
+    let sum = 0, count = 0;
+    for (let j = start; j <= end; j++) { sum += rawSpeeds[j]; count++; }
+    return sum / count;
+  });
+  return smoothed.map((speed, i) => ({
+    from: points[i],
+    to: points[i + 1],
+    speedKmh: speed,
+    color: speedToColor(speed),
+  }));
+};
+
+// ============================================================
 // GeoJSON parser (same pattern as AllTrajectoriesViewer)
 // ============================================================
 const extractPaths = (geojsonStr: string) => {
@@ -400,31 +464,61 @@ export default function AreaGpsComparison() {
                     />
                   ))}
 
-                  {trajectories.map((traj) => (
-                    <Polyline
-                      key={traj.key}
-                      path={traj.gpsPoints}
-                      options={{
-                        strokeColor: traj.color,
-                        strokeOpacity: 0.8,
-                        strokeWeight: 3,
-                      }}
-                    />
-                  ))}
+                  {/* Speed-colored segments for each trajectory */}
+                  {trajectories.map((traj) => {
+                    const segments = computeSpeedSegments(traj.gpsPoints);
+                    // Group consecutive segments with same color for fewer Polyline components
+                    const grouped: { path: { lat: number; lng: number }[]; color: string }[] = [];
+                    for (const seg of segments) {
+                      const last = grouped[grouped.length - 1];
+                      if (last && last.color === seg.color) {
+                        last.path.push(seg.to);
+                      } else {
+                        grouped.push({ path: [seg.from, seg.to], color: seg.color });
+                      }
+                    }
+                    return grouped.map((g, i) => (
+                      <Polyline
+                        key={`${traj.key}-seg-${i}`}
+                        path={g.path}
+                        options={{
+                          strokeColor: g.color,
+                          strokeOpacity: 0.85,
+                          strokeWeight: 3,
+                        }}
+                      />
+                    ));
+                  })}
                 </GoogleMap>
 
-                {/* Legend */}
-                <div className="px-3 py-2 border-t border-slate-100 flex flex-wrap gap-3">
-                  <span className="text-[10px] font-bold text-slate-500">{t('legend_title')}:</span>
-                  {trajectories.map((traj) => (
-                    <span key={traj.key} className="inline-flex items-center gap-1 text-[10px] text-slate-700">
-                      <span
-                        className="w-3 h-3 rounded-full inline-block"
-                        style={{ backgroundColor: traj.color }}
-                      />
-                      {traj.staffName} ({traj.date})
+                {/* Legend: speed colors + distributor list */}
+                <div className="px-3 py-2 border-t border-slate-100 space-y-1.5">
+                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                    <span className="text-[10px] font-bold text-slate-500">{t('legend_title')}:</span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-600">
+                      <span className="w-4 h-1 rounded inline-block" style={{ background: SPEED_COLORS.posting }} />
+                      〜{SPEED_THRESHOLDS.posting} km/h
                     </span>
-                  ))}
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-600">
+                      <span className="w-4 h-1 rounded inline-block" style={{ background: SPEED_COLORS.slowWalk }} />
+                      〜{SPEED_THRESHOLDS.slowWalk} km/h
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-600">
+                      <span className="w-4 h-1 rounded inline-block" style={{ background: SPEED_COLORS.normalWalk }} />
+                      〜{SPEED_THRESHOLDS.normalWalk} km/h
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[10px] text-slate-600">
+                      <span className="w-4 h-1 rounded inline-block" style={{ background: SPEED_COLORS.fast }} />
+                      {SPEED_THRESHOLDS.normalWalk}+ km/h
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {trajectories.map((traj) => (
+                      <span key={traj.key} className="inline-flex items-center gap-1 text-[10px] text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
+                        {traj.staffName} ({traj.date})
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </>
             )}
