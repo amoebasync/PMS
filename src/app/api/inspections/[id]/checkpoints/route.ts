@@ -37,6 +37,7 @@ export async function POST(
     const result = formData.get('result') as string;
     const note = formData.get('note') as string | null;
     const photoFile = formData.get('photo') as File | null;
+    const checkpointType = formData.get('checkpointType') as string || 'CHECKPOINT';
 
     if (!targetLat || !targetLng || !result) {
       return NextResponse.json(
@@ -65,6 +66,7 @@ export async function POST(
     const checkpoint = await prisma.inspectionCheckpoint.create({
       data: {
         inspectionId,
+        checkpointType: checkpointType as any,
         targetLat: parseFloat(targetLat),
         targetLng: parseFloat(targetLng),
         targetAddress: targetAddress || null,
