@@ -24,6 +24,16 @@ const DEFAULTS: Record<string, string> = {
   headerLinks: JSON.stringify([]),  // ヘッダーリンク集
   subFlyerCustomerCodes: JSON.stringify([]),  // サブチラシ顧客コード一覧
   inspectionIntervalDays: '30',  // デフォルトチェック周期（日）
+  // ハウスキープ保持期間（日数）
+  hkNotifications: '30',
+  hkAuditLogs: '90',
+  hkGpsPoints: '365',
+  hkInspectionGps: '365',
+  hkPasswordTokens: '7',
+  hkPickingVerifications: '365',
+  hkInterviewSlots: '730',
+  hkTrainingSlots: '730',
+  hkSessionEvents: '365',
 };
 
 async function checkAdminAuth() {

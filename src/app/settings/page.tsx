@@ -1173,6 +1173,54 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+          {/* ハウスキープ設定 */}
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100">
+              <h2 className="font-bold text-slate-700"><i className="bi bi-trash3-fill text-rose-500 mr-2"></i>{t('housekeep_title') || 'ハウスキープ（データ保持期間）'}</h2>
+              <p className="text-xs text-slate-500 mt-1">{t('housekeep_desc') || '各データの保持期間を設定します。期間を過ぎたデータは毎日03:00のCRONジョブで自動削除またはS3アーカイブされます。'}</p>
+            </div>
+            <div className="px-6 pb-6 divide-y divide-slate-100">
+              {([
+                { key: 'hkNotifications', label: t('hk_notifications') || '管理者通知', desc: t('hk_notifications_desc') || '既読・未読問わず削除', icon: 'bi-bell', color: 'text-blue-500', unit: t('unit_days') || '日', default: '30', min: 7, max: 365 },
+                { key: 'hkAuditLogs', label: t('hk_audit_logs') || '監査ログ', desc: t('hk_audit_logs_desc') || 'S3にJSONLアーカイブ後に削除', icon: 'bi-shield-check', color: 'text-indigo-500', unit: t('unit_days') || '日', default: '90', min: 30, max: 3650 },
+                { key: 'hkGpsPoints', label: t('hk_gps_points') || 'GPS座標（配布）', desc: t('hk_gps_points_desc') || 'S3にアーカイブ後に削除（〜14.4万行/日）', icon: 'bi-geo-alt', color: 'text-emerald-500', unit: t('unit_days') || '日', default: '365', min: 30, max: 3650 },
+                { key: 'hkInspectionGps', label: t('hk_inspection_gps') || 'GPS座標（巡回）', desc: t('hk_inspection_gps_desc') || 'S3にアーカイブ後に削除', icon: 'bi-binoculars', color: 'text-teal-500', unit: t('unit_days') || '日', default: '365', min: 30, max: 3650 },
+                { key: 'hkPasswordTokens', label: t('hk_password_tokens') || 'パスワードリセットトークン', desc: t('hk_password_tokens_desc') || '期限切れ・使用済みトークンを削除', icon: 'bi-key', color: 'text-amber-500', unit: t('unit_days') || '日', default: '7', min: 1, max: 90 },
+                { key: 'hkPickingVerifications', label: t('hk_picking') || 'ピッキング照合', desc: t('hk_picking_desc') || '写真（S3）とレコードを削除', icon: 'bi-camera', color: 'text-pink-500', unit: t('unit_days') || '日', default: '365', min: 30, max: 3650 },
+                { key: 'hkInterviewSlots', label: t('hk_interview_slots') || '面接スロット', desc: t('hk_interview_slots_desc') || '未予約の過去スロットを削除', icon: 'bi-calendar-event', color: 'text-violet-500', unit: t('unit_days') || '日', default: '730', min: 90, max: 3650 },
+                { key: 'hkTrainingSlots', label: t('hk_training_slots') || '研修スロット', desc: t('hk_training_slots_desc') || '応募者ゼロの過去スロットを削除', icon: 'bi-mortarboard', color: 'text-orange-500', unit: t('unit_days') || '日', default: '730', min: 90, max: 3650 },
+                { key: 'hkSessionEvents', label: t('hk_session_events') || '配布セッションイベント', desc: t('hk_session_events_desc') || '進捗・スキップ・一時停止イベントを削除', icon: 'bi-activity', color: 'text-cyan-500', unit: t('unit_days') || '日', default: '365', min: 30, max: 3650 },
+              ] as const).map((item, idx) => (
+                <div key={item.key} className={`flex items-center justify-between gap-4 ${idx > 0 ? 'pt-4' : ''} ${idx < 8 ? 'pb-4' : ''}`}>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-800 text-sm flex items-center gap-2">
+                      <i className={`bi ${item.icon} ${item.color}`}></i>
+                      {item.label}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <input
+                      type="number"
+                      min={item.min}
+                      max={item.max}
+                      value={systemSettings[item.key] ?? item.default}
+                      onChange={e => setSystemSettings(prev => ({ ...prev, [item.key]: e.target.value }))}
+                      className="border border-slate-300 rounded-xl px-3 py-2 text-sm font-bold text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500 bg-white w-20 text-center"
+                    />
+                    <span className="text-xs text-slate-500 w-4">{item.unit}</span>
+                    <button
+                      onClick={() => handleSaveSystemSetting(item.key, systemSettings[item.key] ?? item.default)}
+                      disabled={isSavingSystem}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl disabled:opacity-50"
+                    >
+                      {systemSaved ? <i className="bi bi-check2"></i> : isSavingSystem ? '...' : t('btn_save')}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </>)}
 
         {/* 自社情報タブ */}
