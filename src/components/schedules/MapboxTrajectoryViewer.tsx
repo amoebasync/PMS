@@ -346,11 +346,22 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   // Speed visualization
   const [showSpeed, setShowSpeed] = useState(false);
 
-  // PS GPS comparison
-  const [showPsComparison, setShowPsComparison] = useState(false);
-  const [psGpsPoints, setPsGpsPoints] = useState<GpsPoint[] | null>(null);
-  const [psLoading, setPsLoading] = useState(false);
-  const [psError, setPsError] = useState('');
+  // 過去エリア軌跡比較
+  interface PastTrajectory {
+    scheduleId: number;
+    date: string;
+    distributorName: string;
+    distributorStaffId: string;
+    totalDistance: number;
+    startedAt: string | null;
+    finishedAt: string | null;
+    gpsPoints: { lat: number; lng: number; timestamp: string }[];
+  }
+  const [showPastComparison, setShowPastComparison] = useState(false);
+  const [pastTrajectories, setPastTrajectories] = useState<PastTrajectory[] | null>(null);
+  const [pastSelectedIdx, setPastSelectedIdx] = useState(0);
+  const [pastLoading, setPastLoading] = useState(false);
+  const [pastError, setPastError] = useState('');
 
   // Route suggestion
   const [suggestedRoute, setSuggestedRoute] = useState<any>(null);
@@ -490,42 +501,46 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // PS GPS比較データ取得
+  // 過去エリア軌跡データ取得
   useEffect(() => {
-    if (!showPsComparison || psGpsPoints !== null) return;
-    const fetchPsGps = async () => {
-      setPsLoading(true);
-      setPsError('');
+    if (!showPastComparison || pastTrajectories !== null) return;
+    const fetchPast = async () => {
+      setPastLoading(true);
+      setPastError('');
       try {
-        const res = await fetch(`/api/schedules/${scheduleId}/trajectory/posting-system`);
+        const res = await fetch(`/api/schedules/${scheduleId}/trajectory/past-area?limit=5`);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          setPsError(err.error || 'PS GPSデータ取得失敗');
+          setPastError(err.error || '過去データ取得失敗');
           return;
         }
-        const psData = await res.json();
-        setPsGpsPoints(psData.gpsPoints || []);
+        const json = await res.json();
+        setPastTrajectories(json.pastTrajectories || []);
+        setPastSelectedIdx(0);
       } catch {
-        setPsError('PS GPSデータ取得失敗');
+        setPastError('過去データ取得失敗');
       } finally {
-        setPsLoading(false);
+        setPastLoading(false);
       }
     };
-    fetchPsGps();
-  }, [showPsComparison, psGpsPoints, scheduleId]);
+    fetchPast();
+  }, [showPastComparison, pastTrajectories, scheduleId]);
 
-  // PS trajectory GeoJSON
-  const psTrajectoryGeoJson = useMemo(() => {
-    if (!psGpsPoints || psGpsPoints.length < 2) return null;
+  // 選択中の過去軌跡
+  const selectedPast = pastTrajectories && pastTrajectories.length > 0 ? pastTrajectories[pastSelectedIdx] : null;
+
+  // 過去軌跡 GeoJSON
+  const pastTrajectoryGeoJson = useMemo(() => {
+    if (!selectedPast || selectedPast.gpsPoints.length < 2) return null;
     return {
       type: 'Feature' as const,
       properties: {},
       geometry: {
         type: 'LineString' as const,
-        coordinates: psGpsPoints.map(p => [p.lng, p.lat]),
+        coordinates: selectedPast.gpsPoints.map(p => [p.lng, p.lat]),
       },
     };
-  }, [psGpsPoints]);
+  }, [selectedPast]);
 
   // GPS comment初期化
   useEffect(() => {
@@ -1086,12 +1101,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     ? data.skipEvents.filter((e) => new Date(e.timestamp) <= currentTimestamp)
     : [];
 
-  // Map center
-  const center = currentPoint
-    ? { lat: currentPoint.lat, lng: currentPoint.lng }
+  // Map center — エリアポリゴンの中心を優先
+  const center = areaCenter
+    ? areaCenter
     : points.length > 0
-    ? { lat: points[0].lat, lng: points[0].lng }
-    : areaCenter || { lat: 35.68, lng: 139.76 };
+    ? { lat: points[Math.floor(points.length / 2)].lat, lng: points[Math.floor(points.length / 2)].lng }
+    : { lat: 35.68, lng: 139.76 };
 
   // Duration / stats
   const totalPausedMs = (data.pauseEvents || []).reduce((sum, e) => {
@@ -1240,6 +1255,25 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             mapStyle="mapbox://styles/mapbox/streets-v12"
             onLoad={(e) => {
               const map = e.target;
+              // エリアポリゴンのboundsにフィット
+              if (areaGeoJson) {
+                const coords: number[][] = [];
+                for (const feature of areaGeoJson.features) {
+                  const geom = feature.geometry as any;
+                  if (geom.type === 'Polygon') coords.push(...geom.coordinates[0]);
+                  else if (geom.type === 'MultiPolygon') {
+                    for (const poly of geom.coordinates) coords.push(...poly[0]);
+                  }
+                }
+                if (coords.length > 0) {
+                  const lngs = coords.map(c => c[0]);
+                  const lats = coords.map(c => c[1]);
+                  map.fitBounds(
+                    [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+                    { padding: 60, duration: 0 }
+                  );
+                }
+              }
               // 番地番号のフォントサイズを大きくする
               if (map.getLayer('housenum-label')) {
                 map.setPaintProperty('housenum-label', 'text-color', '#333');
@@ -1350,30 +1384,30 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Source>
                 )}
 
-                {/* PS GPS comparison overlay */}
-                {showPsComparison && psTrajectoryGeoJson && (
-                  <Source id="ps-trajectory" type="geojson" data={psTrajectoryGeoJson}>
+                {/* Past area trajectory comparison overlay */}
+                {showPastComparison && pastTrajectoryGeoJson && (
+                  <Source id="past-trajectory" type="geojson" data={pastTrajectoryGeoJson}>
                     <Layer
-                      id="ps-trajectory-line"
+                      id="past-trajectory-line"
                       type="line"
                       paint={{
                         'line-color': '#f59e0b',
                         'line-width': 3,
-                        'line-opacity': 0.7,
+                        'line-opacity': 0.6,
                         'line-dasharray': [4, 3],
                       }}
                       layout={{ 'line-cap': 'round', 'line-join': 'round' }}
                     />
                   </Source>
                 )}
-                {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && (
+                {showPastComparison && selectedPast && selectedPast.gpsPoints.length > 0 && (
                   <>
-                    <Marker longitude={psGpsPoints[0].lng} latitude={psGpsPoints[0].lat} anchor="center">
+                    <Marker longitude={selectedPast.gpsPoints[0].lng} latitude={selectedPast.gpsPoints[0].lat} anchor="center">
                       <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center">
                         <span className="text-white text-[7px] font-bold">S</span>
                       </div>
                     </Marker>
-                    <Marker longitude={psGpsPoints[psGpsPoints.length - 1].lng} latitude={psGpsPoints[psGpsPoints.length - 1].lat} anchor="center">
+                    <Marker longitude={selectedPast.gpsPoints[selectedPast.gpsPoints.length - 1].lng} latitude={selectedPast.gpsPoints[selectedPast.gpsPoints.length - 1].lat} anchor="center">
                       <div className="w-4 h-4 rounded-full bg-amber-700 border-2 border-white shadow-md flex items-center justify-center">
                         <span className="text-white text-[7px] font-bold">E</span>
                       </div>
@@ -1775,43 +1809,62 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <i className="bi bi-speedometer2"></i>
                 移動速度
               </button>
-              {dataSource === 'pms' && (
-                <button
-                  onClick={() => setShowPsComparison(!showPsComparison)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
-                    showPsComparison
-                      ? 'bg-amber-600 text-white border-amber-700'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  <i className={`bi ${psLoading ? 'bi-arrow-repeat animate-spin' : 'bi-arrows-angle-expand'}`}></i>
-                  PS比較
-                </button>
+              <button
+                onClick={() => setShowPastComparison(!showPastComparison)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                  showPastComparison
+                    ? 'bg-amber-600 text-white border-amber-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <i className={`bi ${pastLoading ? 'bi-arrow-repeat animate-spin' : 'bi-clock-history'}`}></i>
+                過去比較
+              </button>
+            </div>
+          )}
+
+          {/* Past comparison legend */}
+          {showPastComparison && selectedPast && (
+            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10 max-w-56">
+              <div className="font-bold text-slate-700 mb-1.5">
+                <i className="bi bi-clock-history mr-1"></i>過去比較
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: '#ec4899' }}></div>
+                  <span className="text-slate-600">今回</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded border border-amber-400" style={{ background: '#f59e0b' }}></div>
+                  <span className="text-slate-600 truncate">
+                    {new Date(selectedPast.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                    {' '}{selectedPast.distributorName}
+                  </span>
+                </div>
+              </div>
+              {/* Past trajectory selector */}
+              {pastTrajectories && pastTrajectories.length > 1 && (
+                <div className="mt-2 pt-2 border-t border-slate-100 flex gap-1 flex-wrap">
+                  {pastTrajectories.map((pt, i) => (
+                    <button
+                      key={pt.scheduleId}
+                      onClick={() => setPastSelectedIdx(i)}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                        i === pastSelectedIdx ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {new Date(pt.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           )}
 
-          {/* PS comparison legend */}
-          {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && (
-            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10">
-              <div className="font-bold text-slate-700 mb-1.5">GPS比較</div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-1 rounded" style={{ background: '#ec4899' }}></div>
-                  <span className="text-slate-600">PMS（{data?.gpsPoints.length || 0}点）</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-1 rounded" style={{ background: '#f59e0b' }}></div>
-                  <span className="text-slate-600">Posting System（{psGpsPoints.length}点）</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* PS error */}
-          {showPsComparison && psError && (
+          {/* Past comparison error */}
+          {showPastComparison && pastError && (
             <div className="absolute bottom-4 right-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 z-10">
-              <i className="bi bi-exclamation-triangle mr-1"></i>{psError}
+              <i className="bi bi-exclamation-triangle mr-1"></i>{pastError}
             </div>
           )}
 
@@ -1992,76 +2045,70 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 </>
               )}
 
-              {/* PS GPS comparison stats */}
-              {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && data && (
+              {/* 過去エリア軌跡比較 stats */}
+              {showPastComparison && selectedPast && data && (
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
-                    <i className="bi bi-arrows-angle-expand mr-1 text-amber-500"></i>
-                    PS GPS 比較
+                    <i className="bi bi-clock-history mr-1 text-amber-500"></i>
+                    過去比較
                   </h3>
+                  {/* Past trajectory selector */}
+                  {pastTrajectories && pastTrajectories.length > 1 && (
+                    <div className="flex gap-1 flex-wrap mb-3">
+                      {pastTrajectories.map((pt, i) => (
+                        <button
+                          key={pt.scheduleId}
+                          onClick={() => setPastSelectedIdx(i)}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-colors ${
+                            i === pastSelectedIdx ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                          }`}
+                        >
+                          {new Date(pt.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="bg-amber-50 rounded-lg px-3 py-2 mb-3">
+                    <div className="text-[10px] text-amber-600 font-bold">{selectedPast.distributorName}</div>
+                    <div className="text-[10px] text-amber-500">
+                      {new Date(selectedPast.date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                    </div>
+                  </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-0.5 rounded bg-pink-500"></span>
-                        PMS
-                      </span>
-                      <span className="font-bold text-slate-700">{data.gpsPoints.length.toLocaleString()} 点</span>
+                      <span className="text-slate-500">今回 距離</span>
+                      <span className="font-bold text-slate-700">{(data.session.totalDistance / 1000).toFixed(1)} km</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-0.5 rounded bg-amber-500"></span>
-                        Posting System
-                      </span>
-                      <span className="font-bold text-slate-700">{psGpsPoints.length.toLocaleString()} 点</span>
+                      <span className="text-slate-500">過去 距離</span>
+                      <span className="font-bold text-amber-600">{(selectedPast.totalDistance / 1000).toFixed(1)} km</span>
                     </div>
-                    {(() => {
-                      // 時間範囲の比較
-                      const pmsStart = data.gpsPoints.length > 0 ? new Date(data.gpsPoints[0].timestamp) : null;
-                      const pmsEnd = data.gpsPoints.length > 0 ? new Date(data.gpsPoints[data.gpsPoints.length - 1].timestamp) : null;
-                      const psStart = psGpsPoints.length > 0 ? new Date(psGpsPoints[0].timestamp) : null;
-                      const psEnd = psGpsPoints.length > 0 ? new Date(psGpsPoints[psGpsPoints.length - 1].timestamp) : null;
-                      // PMS と PS の総距離比較
-                      let psDist = 0;
-                      for (let i = 1; i < psGpsPoints.length; i++) {
-                        psDist += haversineM(psGpsPoints[i - 1].lat, psGpsPoints[i - 1].lng, psGpsPoints[i].lat, psGpsPoints[i].lng);
-                      }
-                      return (
-                        <>
-                          <div className="mt-2 pt-2 border-t border-slate-100">
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">PMS 距離</span>
-                              <span className="font-bold text-slate-700">{(data.session.totalDistance / 1000).toFixed(1)} km</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">PS 距離</span>
-                              <span className="font-bold text-slate-700">{(psDist / 1000).toFixed(1)} km</span>
-                            </div>
-                          </div>
-                          <div className="mt-2 pt-2 border-t border-slate-100">
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">PMS 時間</span>
-                              <span className="font-bold text-slate-700">
-                                {pmsStart ? fmtTime(pmsStart.toISOString()) : '-'} ~ {pmsEnd ? fmtTime(pmsEnd.toISOString()) : '-'}
-                              </span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-slate-500">PS 時間</span>
-                              <span className="font-bold text-slate-700">
-                                {psStart ? fmtTime(psStart.toISOString()) : '-'} ~ {psEnd ? fmtTime(psEnd.toISOString()) : '-'}
-                              </span>
-                            </div>
-                          </div>
-                        </>
-                      );
-                    })()}
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">今回 GPS点数</span>
+                      <span className="font-bold text-slate-700">{data.gpsPoints.length.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500">過去 GPS点数</span>
+                      <span className="font-bold text-amber-600">{selectedPast.gpsPoints.length.toLocaleString()}</span>
+                    </div>
+                    {selectedPast.startedAt && selectedPast.finishedAt && (
+                      <div className="mt-2 pt-2 border-t border-slate-100">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">過去 時間</span>
+                          <span className="font-bold text-amber-600">
+                            {fmtTime(selectedPast.startedAt)} ~ {fmtTime(selectedPast.finishedAt)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
-              {showPsComparison && psGpsPoints && psGpsPoints.length === 0 && !psLoading && (
+              {showPastComparison && pastTrajectories && pastTrajectories.length === 0 && !pastLoading && (
                 <div className="p-4 border-b border-slate-100">
                   <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                     <i className="bi bi-info-circle mr-1"></i>
-                    Posting System に当日のGPSデータがありません。
+                    同エリアの過去の配布データがありません。
                   </div>
                 </div>
               )}
