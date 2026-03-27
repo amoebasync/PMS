@@ -2126,6 +2126,7 @@ model Task {
   @@index([categoryId])
   @@index([templateId])
   @@index([complaintId])
+  @@index([distributorId, status])
   @@map("tasks")
 }
 

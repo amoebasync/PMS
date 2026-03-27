@@ -81,10 +81,37 @@ export async function GET(request: Request) {
       console.error('Attendance count error:', e);
     }
 
+    // 各配布員の未完了タスク数を取得
+    let distributorTasks: Record<number, { count: number; tasks: { id: number; title: string; status: string; priority: string; dueDate: Date }[] }> = {};
+    try {
+      const distributorIds = [...new Set(schedules.filter(s => s.distributorId).map(s => s.distributorId!))];
+      if (distributorIds.length > 0) {
+        const tasks = await prisma.task.findMany({
+          where: {
+            distributorId: { in: distributorIds },
+            status: { not: 'DONE' },
+          },
+          select: { id: true, title: true, status: true, priority: true, dueDate: true, distributorId: true },
+          orderBy: [{ priority: 'desc' }, { dueDate: 'asc' }],
+        });
+        for (const t of tasks) {
+          if (!t.distributorId) continue;
+          if (!distributorTasks[t.distributorId]) distributorTasks[t.distributorId] = { count: 0, tasks: [] };
+          distributorTasks[t.distributorId].count++;
+          if (distributorTasks[t.distributorId].tasks.length < 5) {
+            distributorTasks[t.distributorId].tasks.push({ id: t.id, title: t.title, status: t.status, priority: t.priority, dueDate: t.dueDate });
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Distributor tasks count error:', e);
+    }
+
     const subCodes = await getSubFlyerCustomerCodes();
     const result = schedules.map(s => ({
       ...s,
       attendanceCount: s.distributorId ? (attendanceCounts[s.distributorId] || 0) : 0,
+      distributorTasks: s.distributorId ? (distributorTasks[s.distributorId] || null) : null,
       items: s.items.map(item => ({
         ...item,
         isSubFlyer: isSubFlyer(item.externalCustomerCode, subCodes, item.flyerName),

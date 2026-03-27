@@ -257,5 +257,10 @@
   "speed_posting_label": "配布中",
   "speed_slow_walk_label": "配布歩行",
   "speed_normal_walk_label": "通常歩行",
-  "speed_fast_label": "高速移動"
+  "speed_fast_label": "高速移動",
+  "task_count": "タスク{count}件",
+  "tasks": "タスク",
+  "status_in_progress": "進行中",
+  "status_pending": "未着手",
+  "and_more": "他{count}件"
 }
