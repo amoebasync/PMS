@@ -6,7 +6,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error, employeeId } = await requireAdminSession();
+  const { error, employee } = await requireAdminSession();
   if (error) return error;
 
   try {
@@ -79,7 +79,7 @@ export async function POST(
           status: 'PENDING',
           dueDate: taskDueDate,
           assigneeId: assigneeId || inspection.inspector.id,
-          createdById: employeeId!,
+          createdById: employee!.id,
         },
       });
 
