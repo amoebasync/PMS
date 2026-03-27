@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useTranslation } from '@/i18n';
+import { useNotification } from '@/components/ui/NotificationProvider';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -37,12 +38,20 @@ interface Inspection {
   workAttitude: string | null;
   note: string | null;
   followUpRequired: boolean;
+  status: string;
+  followUpTaskId: number | null;
+  followUpTask: { id: number; status: string } | null;
+  followUpNote: string | null;
+  feedbackTaskId: number | null;
+  feedbackTask: { id: number; status: string } | null;
+  feedbackNote: string | null;
 }
 
 interface Props {
   inspection: Inspection;
   checkpoints: Checkpoint[];
   prohibitedChecks: ProhibitedCheck[];
+  onRefresh?: () => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -118,8 +127,60 @@ const guidanceLabel = (value: string | null, t: (k: string) => string): { label:
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function InspectionSummary({ inspection, checkpoints, prohibitedChecks }: Props) {
+export default function InspectionSummary({ inspection, checkpoints, prohibitedChecks, onRefresh }: Props) {
   const { t } = useTranslation('inspections');
+  const { showToast } = useNotification();
+
+  const [showFollowUpForm, setShowFollowUpForm] = useState(false);
+  const [followUpNote, setFollowUpNote] = useState('');
+  const [followUpSubmitting, setFollowUpSubmitting] = useState(false);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+
+  const handleCreateFollowUp = async () => {
+    if (!followUpNote.trim()) return;
+    setFollowUpSubmitting(true);
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/follow-up-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: followUpNote.trim() }),
+      });
+      if (res.ok) {
+        showToast(t('follow_up_task_created'), 'success');
+        setShowFollowUpForm(false);
+        setFollowUpNote('');
+        onRefresh?.();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Error', 'error');
+      }
+    } catch { showToast('Error', 'error'); }
+    setFollowUpSubmitting(false);
+  };
+
+  const handleCreateFeedback = async () => {
+    if (!feedbackNote.trim()) return;
+    setFeedbackSubmitting(true);
+    try {
+      const res = await fetch(`/api/inspections/${inspection.id}/feedback-task`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: feedbackNote.trim() }),
+      });
+      if (res.ok) {
+        showToast(t('feedback_task_created'), 'success');
+        setShowFeedbackForm(false);
+        setFeedbackNote('');
+        onRefresh?.();
+      } else {
+        const data = await res.json();
+        showToast(data.error || 'Error', 'error');
+      }
+    } catch { showToast('Error', 'error'); }
+    setFeedbackSubmitting(false);
+  };
 
   /* ---- Checkpoint breakdown ---- */
   const cpBreakdown = useMemo(() => {
@@ -302,11 +363,107 @@ export default function InspectionSummary({ inspection, checkpoints, prohibitedC
         </div>
       )}
 
-      {/* Follow-up */}
-      {inspection.followUpRequired && (
-        <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-center gap-2">
-          <i className="bi bi-exclamation-triangle-fill text-rose-500"></i>
-          <span className="text-xs font-bold text-rose-700">{t('follow_up_required')}</span>
+      {/* Follow-up Task Section */}
+      {inspection.status === 'COMPLETED' && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase">{t('follow_up')}</p>
+          {inspection.followUpTask ? (
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-orange-700 flex items-center gap-1">
+                  <i className="bi bi-bell-fill"></i>{t('follow_up')}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  inspection.followUpTask.status === 'DONE' ? 'bg-emerald-100 text-emerald-700' :
+                  inspection.followUpTask.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                  'bg-amber-100 text-amber-700'
+                }`}>
+                  {t(`task_${inspection.followUpTask.status.toLowerCase()}`)}
+                </span>
+              </div>
+              {inspection.followUpNote && (
+                <p className="text-xs text-slate-600 whitespace-pre-wrap mb-2">{inspection.followUpNote}</p>
+              )}
+              <a href="/crm/tasks" className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1">
+                <i className="bi bi-box-arrow-up-right"></i>{t('open_task')}
+              </a>
+            </div>
+          ) : (
+            <>
+              {!showFollowUpForm ? (
+                <button onClick={() => setShowFollowUpForm(true)}
+                  className="w-full py-2 border border-dashed border-orange-300 rounded-xl text-xs font-bold text-orange-600 hover:bg-orange-50 transition-colors flex items-center justify-center gap-1">
+                  <i className="bi bi-plus-circle"></i>{t('add_follow_up_task')}
+                </button>
+              ) : (
+                <div className="border border-orange-200 rounded-xl p-3 space-y-2">
+                  <textarea value={followUpNote} onChange={e => setFollowUpNote(e.target.value)}
+                    placeholder={t('follow_up_note_placeholder')} rows={2}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-400 resize-none" />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setShowFollowUpForm(false); setFollowUpNote(''); }}
+                      className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-lg">{t('btn_cancel') || 'キャンセル'}</button>
+                    <button onClick={handleCreateFollowUp} disabled={!followUpNote.trim() || followUpSubmitting}
+                      className="px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 disabled:opacity-50">
+                      {followUpSubmitting ? <i className="bi bi-arrow-repeat animate-spin"></i> : t('add_follow_up_task')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Feedback Task Section */}
+      {inspection.status === 'COMPLETED' && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold text-slate-400 uppercase">{t('feedback')}</p>
+          {inspection.feedbackTask ? (
+            <div className="bg-purple-50 border border-purple-200 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-purple-700 flex items-center gap-1">
+                  <i className="bi bi-chat-dots-fill"></i>{t('feedback')}
+                </span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  inspection.feedbackTask.status === 'DONE' ? 'bg-emerald-100 text-emerald-700' :
+                  inspection.feedbackTask.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' :
+                  'bg-amber-100 text-amber-700'
+                }`}>
+                  {t(`task_${inspection.feedbackTask.status.toLowerCase()}`)}
+                </span>
+              </div>
+              {inspection.feedbackNote && (
+                <p className="text-xs text-slate-600 whitespace-pre-wrap mb-2">{inspection.feedbackNote}</p>
+              )}
+              <a href="/crm/tasks" className="text-[10px] text-indigo-600 hover:underline flex items-center gap-1">
+                <i className="bi bi-box-arrow-up-right"></i>{t('open_task')}
+              </a>
+            </div>
+          ) : (
+            <>
+              {!showFeedbackForm ? (
+                <button onClick={() => setShowFeedbackForm(true)}
+                  className="w-full py-2 border border-dashed border-purple-300 rounded-xl text-xs font-bold text-purple-600 hover:bg-purple-50 transition-colors flex items-center justify-center gap-1">
+                  <i className="bi bi-plus-circle"></i>{t('add_feedback_task')}
+                </button>
+              ) : (
+                <div className="border border-purple-200 rounded-xl p-3 space-y-2">
+                  <textarea value={feedbackNote} onChange={e => setFeedbackNote(e.target.value)}
+                    placeholder={t('feedback_note_placeholder')} rows={2}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-purple-400 resize-none" />
+                  <div className="flex gap-2 justify-end">
+                    <button onClick={() => { setShowFeedbackForm(false); setFeedbackNote(''); }}
+                      className="px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 rounded-lg">{t('btn_cancel') || 'キャンセル'}</button>
+                    <button onClick={handleCreateFeedback} disabled={!feedbackNote.trim() || feedbackSubmitting}
+                      className="px-3 py-1.5 bg-purple-500 text-white text-xs font-bold rounded-lg hover:bg-purple-600 disabled:opacity-50">
+                      {feedbackSubmitting ? <i className="bi bi-arrow-repeat animate-spin"></i> : t('add_feedback_task')}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

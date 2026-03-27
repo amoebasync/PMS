@@ -20,6 +20,10 @@ interface Inspection {
   category: InspectionCategory;
   confirmationRate: number | null;
   complianceRate: number | null;
+  followUpTask: { id: number; status: string } | null;
+  followUpNote: string | null;
+  feedbackTask: { id: number; status: string } | null;
+  feedbackNote: string | null;
   distributor: {
     id: number;
     name: string;
@@ -498,6 +502,7 @@ export default function InspectionsPage() {
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold">{t('col_category')}</th>
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_confirmation_rate')}</th>
               <th className="px-3 py-2.5 text-slate-500 text-[10px] uppercase tracking-wider font-bold text-right">{t('col_compliance_rate')}</th>
+              <th className="px-2 py-2.5 w-16"></th>
               <th className="px-3 py-2.5 w-10"></th>
             </tr>
           </thead>
@@ -538,6 +543,26 @@ export default function InspectionsPage() {
                 <td className="px-3 py-3">{renderCategoryBadge(inspection.category)}</td>
                 <td className="px-3 py-3 text-right">{renderRate(inspection.confirmationRate)}</td>
                 <td className="px-3 py-3 text-right">{renderRate(inspection.complianceRate)}</td>
+                <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex items-center gap-1">
+                    {inspection.followUpTask && (
+                      <span title={inspection.followUpNote || t('follow_up')}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs ${
+                          inspection.followUpTask.status === 'DONE' ? 'bg-slate-100 text-slate-400' : 'bg-orange-100 text-orange-600'
+                        }`}>
+                        <i className="bi bi-bell-fill text-[10px]"></i>
+                      </span>
+                    )}
+                    {inspection.feedbackTask && (
+                      <span title={inspection.feedbackNote || t('feedback')}
+                        className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs ${
+                          inspection.feedbackTask.status === 'DONE' ? 'bg-slate-100 text-slate-400' : 'bg-purple-100 text-purple-600'
+                        }`}>
+                        <i className="bi bi-chat-dots-fill text-[10px]"></i>
+                      </span>
+                    )}
+                  </div>
+                </td>
                 <td className="px-1 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleDelete(inspection.id)}
@@ -625,6 +650,25 @@ export default function InspectionsPage() {
                 {renderRate(inspection.complianceRate)}
               </div>
             </div>
+            {/* Follow-up / Feedback badges */}
+            {(inspection.followUpTask || inspection.feedbackTask) && (
+              <div className="flex items-center gap-1 mt-1">
+                {inspection.followUpTask && (
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    inspection.followUpTask.status === 'DONE' ? 'bg-slate-100 text-slate-400' : 'bg-orange-100 text-orange-600'
+                  }`}>
+                    <i className="bi bi-bell-fill"></i>{t('follow_up')}
+                  </span>
+                )}
+                {inspection.feedbackTask && (
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    inspection.feedbackTask.status === 'DONE' ? 'bg-slate-100 text-slate-400' : 'bg-purple-100 text-purple-600'
+                  }`}>
+                    <i className="bi bi-chat-dots-fill"></i>{t('feedback')}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
 

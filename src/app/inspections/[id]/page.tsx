@@ -339,15 +339,34 @@ export default function InspectionDetailPage() {
   };
 
   const [showFinishConfirm, setShowFinishConfirm] = useState(false);
+  const [finishFollowUp, setFinishFollowUp] = useState(false);
+  const [finishFollowUpNote, setFinishFollowUpNote] = useState('');
+  const [finishFeedback, setFinishFeedback] = useState(false);
+  const [finishFeedbackNote, setFinishFeedbackNote] = useState('');
 
   const handleFinish = async () => {
     setShowFinishConfirm(false);
     setActionLoading(true);
     try {
       stopGpsTracking();
-      const res = await fetch(`/api/inspections/${inspectionId}/finish`, { method: 'POST' });
+      const body: any = {};
+      if (finishFollowUp && finishFollowUpNote.trim()) {
+        body.followUp = { note: finishFollowUpNote.trim() };
+      }
+      if (finishFeedback && finishFeedbackNote.trim()) {
+        body.feedback = { note: finishFeedbackNote.trim() };
+      }
+      const res = await fetch(`/api/inspections/${inspectionId}/finish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
       if (!res.ok) throw new Error();
       showToast(t('success_finished'), 'success');
+      setFinishFollowUp(false);
+      setFinishFollowUpNote('');
+      setFinishFeedback(false);
+      setFinishFeedbackNote('');
       await fetchInspection();
     } catch {
       showToast(t('error_generic'), 'error');
@@ -629,6 +648,7 @@ export default function InspectionDetailPage() {
                   inspection={inspection}
                   checkpoints={inspection.checkpoints}
                   prohibitedChecks={inspection.prohibitedChecks}
+                  onRefresh={fetchInspection}
                 />
               )}
             </div>
@@ -671,7 +691,7 @@ export default function InspectionDetailPage() {
       {/* Finish confirmation modal */}
       {showFinishConfirm && (
         <div className="fixed inset-0 z-[300] bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 space-y-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="text-center">
               <div className="w-14 h-14 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-3">
                 <i className="bi bi-stop-fill text-2xl text-blue-600"></i>
@@ -679,18 +699,42 @@ export default function InspectionDetailPage() {
               <h3 className="text-lg font-bold text-slate-800">{t('confirm_finish_title') || '巡回を完了しますか？'}</h3>
               <p className="text-sm text-slate-500 mt-1">{t('confirm_finish_desc') || 'GPS記録が停止し、チェック結果が確定されます。'}</p>
             </div>
+
+            {/* フォローアップ */}
+            <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={finishFollowUp} onChange={e => setFinishFollowUp(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-orange-500 focus:ring-orange-400" />
+                <span className="text-sm font-bold text-slate-700"><i className="bi bi-bell text-orange-500 mr-1"></i>{t('follow_up_check')}</span>
+              </label>
+              {finishFollowUp && (
+                <textarea value={finishFollowUpNote} onChange={e => setFinishFollowUpNote(e.target.value)}
+                  placeholder={t('follow_up_note_placeholder')} rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-orange-400 resize-none" />
+              )}
+            </div>
+
+            {/* フィードバック */}
+            <div className="border border-slate-200 rounded-xl p-3 space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={finishFeedback} onChange={e => setFinishFeedback(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-purple-500 focus:ring-purple-400" />
+                <span className="text-sm font-bold text-slate-700"><i className="bi bi-chat-dots text-purple-500 mr-1"></i>{t('feedback_check')}</span>
+              </label>
+              {finishFeedback && (
+                <textarea value={finishFeedbackNote} onChange={e => setFinishFeedbackNote(e.target.value)}
+                  placeholder={t('feedback_note_placeholder')} rows={2}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-purple-400 resize-none" />
+              )}
+            </div>
+
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowFinishConfirm(false)}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors"
-              >
+              <button onClick={() => setShowFinishConfirm(false)}
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-xl transition-colors">
                 {t('btn_cancel') || 'キャンセル'}
               </button>
-              <button
-                onClick={handleFinish}
-                disabled={actionLoading}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-              >
+              <button onClick={handleFinish} disabled={actionLoading}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5">
                 {actionLoading ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 ) : (
