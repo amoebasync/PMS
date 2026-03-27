@@ -67,16 +67,16 @@ export async function GET(
     const currentDateStr = new Date(schedule.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
 
     // ─── 1. PMS: 同エリア過去スケジュール（GPSデータ付き） ───
-    const pmsSchedules = await prisma.distributionSchedule.findMany({
+    const pmsSchedulesRaw = await prisma.distributionSchedule.findMany({
       where: {
         areaId: schedule.areaId,
         id: { not: scheduleId },
         date: { lt: schedule.date },
         distributorId: { not: null },
-        session: { gpsPoints: { some: {} } },
+        session: { isNot: null },
       },
       orderBy: { date: 'desc' },
-      take: limit,
+      take: limit * 2, // GPS無しをフィルタするため多めに取得
       select: {
         id: true, date: true, status: true,
         distributor: { select: { id: true, name: true, staffId: true } },
@@ -91,6 +91,8 @@ export async function GET(
         },
       },
     });
+    // GPS付きのみフィルタ
+    const pmsSchedules = pmsSchedulesRaw.filter(s => s.session && s.session.gpsPoints.length > 0).slice(0, limit);
 
     // PMS結果をマップ（dateStr → result）
     const resultMap = new Map<string, any>();
@@ -115,13 +117,19 @@ export async function GET(
 
     // ─── 2. PS: GetAreaHistory で同エリア過去配布を検索 ───
     const addressCode = schedule.area?.address_code;
+    let psDebug: any = { addressCode, psHistoryCount: 0, psFilteredCount: 0, psGpsFetched: 0 };
     if (addressCode) {
       try {
         const psHistory = await fetchAreaHistory(addressCode, 20);
+        psDebug.psHistoryCount = psHistory.length;
+        if (psHistory.length > 0) {
+          psDebug.psHistorySample = psHistory.slice(0, 3);
+        }
         // PMS に既にある日付と、当日を除外して、GPS取得
         const psOnlyRecords = psHistory.filter(h =>
           h.conditionDate !== currentDateStr && !resultMap.has(h.conditionDate)
         );
+        psDebug.psFilteredCount = psOnlyRecords.length;
 
         // GPS取得は直列で最大 limit 件まで
         let psCount = 0;
@@ -158,6 +166,8 @@ export async function GET(
     return NextResponse.json({
       areaId: schedule.areaId,
       currentScheduleId: scheduleId,
+      pmsScheduleCount: pmsSchedules.length,
+      debug: psDebug,
       pastTrajectories: results,
     });
   } catch (error) {
