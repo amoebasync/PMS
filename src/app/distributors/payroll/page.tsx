@@ -892,13 +892,13 @@ export default function DistributorPayrollPage() {
 
                         {/* Actions */}
                         <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-200">
-                          {record.status === 'DRAFT' && (
+                          {record?.status === 'DRAFT' && (
                             <button onClick={() => handleStatusChange(record.id, 'CONFIRMED')} disabled={statusUpdating[record.id]}
                               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-60">
                               <i className="bi bi-check-circle mr-1"></i>確定する
                             </button>
                           )}
-                          {record.status === 'CONFIRMED' && (
+                          {record?.status === 'CONFIRMED' && (
                             <>
                               <button onClick={() => handleStatusChange(record.id, 'PAID')} disabled={statusUpdating[record.id]}
                                 className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-60">
@@ -914,10 +914,12 @@ export default function DistributorPayrollPage() {
                             className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg transition-colors disabled:opacity-60">
                             <i className="bi bi-arrow-repeat mr-1"></i>再計算
                           </button>
-                          <button onClick={() => handleDelete(record.id)}
-                            className="px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 text-[10px] font-bold rounded-lg transition-colors">
-                            <i className="bi bi-trash mr-1"></i>削除
-                          </button>
+                          {record && (
+                            <button onClick={() => handleDelete(record.id)}
+                              className="px-3 py-1.5 bg-white border border-rose-200 hover:bg-rose-50 text-rose-600 text-[10px] font-bold rounded-lg transition-colors">
+                              <i className="bi bi-trash mr-1"></i>削除
+                            </button>
+                          )}
                           <Link href={`/distributors/${dist.id}?tab=payroll`}
                             className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-[10px] font-bold rounded-lg transition-colors ml-auto">
                             <i className="bi bi-clock-history mr-1"></i>全履歴
