@@ -635,7 +635,7 @@ export default function DistributorPayrollPage() {
                 </div>
               ) : filteredDistributors.map((dist) => {
                 const record = recordMap.get(dist.id);
-                const isExpanded = expandedId === (record?.id ?? -1);
+                const isExpanded = expandedId === dist.id;
                 const dailyRows = record ? buildDailyRows(record) : [];
 
                 return (
@@ -705,7 +705,7 @@ export default function DistributorPayrollPage() {
                             )}
                           </div>
                           <button onClick={() => {
-                              const next = isExpanded ? null : record.id;
+                              const next = isExpanded ? null : dist.id;
                               setExpandedId(next);
                               if (next && !adjustments[dist.id]) fetchAdjustments(dist.id);
                             }}
@@ -714,17 +714,27 @@ export default function DistributorPayrollPage() {
                           </button>
                         </>
                       ) : (
-                        <button onClick={() => handleGenerate(dist.id)} disabled={generating[dist.id]}
-                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-60 shrink-0">
-                          {generating[dist.id] ? <><i className="bi bi-arrow-repeat animate-spin mr-1"></i>計算中</> : <><i className="bi bi-calculator mr-1"></i>計算</>}
-                        </button>
+                        <>
+                          <button onClick={() => handleGenerate(dist.id)} disabled={generating[dist.id]}
+                            className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-lg transition-colors disabled:opacity-60 shrink-0">
+                            {generating[dist.id] ? <><i className="bi bi-arrow-repeat animate-spin mr-1"></i>計算中</> : <><i className="bi bi-calculator mr-1"></i>計算</>}
+                          </button>
+                          <button onClick={() => {
+                              const next = isExpanded ? null : dist.id;
+                              setExpandedId(next);
+                              if (next && !adjustments[dist.id]) fetchAdjustments(dist.id);
+                            }}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors shrink-0">
+                            <i className={`bi bi-chevron-${isExpanded ? 'up' : 'down'} text-xs`}></i>
+                          </button>
+                        </>
                       )}
                     </div>
 
                     {/* Expanded detail */}
-                    {record && isExpanded && (
+                    {isExpanded && (
                       <div className="bg-slate-50 border-t border-slate-200 px-4 py-3 space-y-3">
-                        <div className="overflow-x-auto">
+                        {record && (<div className="overflow-x-auto">
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="border-b border-slate-200">
@@ -787,7 +797,7 @@ export default function DistributorPayrollPage() {
                               </tr>
                             </tfoot>
                           </table>
-                        </div>
+                        </div>)}
 
                         {/* 調整 */}
                         {(() => {
@@ -858,7 +868,7 @@ export default function DistributorPayrollPage() {
                         })()}
 
                         {/* Cash Receipt Confirmation */}
-                        {record.cashReceivedAt && (
+                        {record?.cashReceivedAt && (
                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-3">
                             {record.cashSignatureUrl && (
                               <a href={record.cashSignatureUrl} target="_blank" rel="noopener noreferrer"
