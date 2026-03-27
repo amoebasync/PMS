@@ -2,10 +2,40 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { cookies } from 'next/headers';
 
+const PS_API_URL = process.env.POSTING_SYSTEM_API_URL;
+const PS_API_KEY = process.env.POSTING_SYSTEM_API_KEY;
+
+/** Posting System から GPS データを取得 */
+async function fetchPsGps(staffId: string, dateStr: string): Promise<{ lat: number; lng: number; timestamp: string }[]> {
+  if (!PS_API_URL) return [];
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+    if (PS_API_KEY) headers['X-API-Key'] = PS_API_KEY;
+    const res = await fetch(`${PS_API_URL}/GetStaffGPS.php`, {
+      method: 'POST',
+      headers,
+      body: new URLSearchParams({ STAFF_ID: staffId, TARGET_DATE: dateStr }).toString(),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return [];
+    const parsed = JSON.parse(await res.text());
+    const rows: any[] = Array.isArray(parsed) ? parsed : (parsed.data || []);
+    return rows
+      .filter((r: any) => parseFloat(r.LATITUDE || '0') !== 0 && parseFloat(r.LONGITUDE || '0') !== 0)
+      .map((r: any) => {
+        const terminalTime = (r.TERMINAL_TIME || '').trim();
+        const ts = terminalTime ? `${dateStr}T${terminalTime}+09:00` : new Date().toISOString();
+        return { lat: parseFloat(r.LATITUDE), lng: parseFloat(r.LONGITUDE), timestamp: new Date(ts).toISOString() };
+      })
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  } catch {
+    return [];
+  }
+}
+
 // GET /api/schedules/[id]/trajectory/past-area
 // 同エリアの過去の配布GPS軌跡を取得（比較用）
-// Query params:
-//   limit: 取得する過去セッション数（デフォルト: 3, 最大: 5）
+// PMS GPS → なければ Posting System から取得
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -40,16 +70,13 @@ export async function GET(
       return NextResponse.json({ error: 'エリアが設定されていません' }, { status: 400 });
     }
 
-    // 同エリアの過去の完了済みスケジュール（GPSデータ付き）を取得
-    // まずGPSポイントが存在するセッションを持つスケジュールを検索
+    // 同エリアの過去のスケジュールを取得（セッション有無問わず）
     const pastSchedules = await prisma.distributionSchedule.findMany({
       where: {
         areaId: schedule.areaId,
         id: { not: scheduleId },
         date: { lt: schedule.date },
-        session: {
-          gpsPoints: { some: {} },
-        },
+        distributorId: { not: null },
       },
       orderBy: { date: 'desc' },
       take: limit,
@@ -73,24 +100,57 @@ export async function GET(
       },
     });
 
-    const results = pastSchedules
-      .filter(ps => ps.session && ps.session.gpsPoints.length > 0)
-      .map(ps => ({
-        scheduleId: ps.id,
-        date: ps.date,
-        status: ps.status,
-        distributorName: ps.distributor?.name || '-',
-        distributorStaffId: ps.distributor?.staffId || '-',
-        totalDistance: ps.session?.totalDistance || 0,
-        startedAt: ps.session?.startedAt || null,
-        finishedAt: ps.session?.finishedAt || null,
-        gpsPointCount: ps.session?.gpsPoints.length || 0,
-        gpsPoints: (ps.session?.gpsPoints || []).map(p => ({
+    // PMS GPS がなければ Posting System から取得
+    const results = [];
+    for (const ps of pastSchedules) {
+      const pmsGps = ps.session?.gpsPoints || [];
+      let gpsPoints: { lat: number; lng: number; timestamp: string }[];
+      let source: 'pms' | 'ps';
+
+      if (pmsGps.length > 0) {
+        gpsPoints = pmsGps.map(p => ({
           lat: p.latitude,
           lng: p.longitude,
           timestamp: p.timestamp.toISOString(),
-        })),
-      }));
+        }));
+        source = 'pms';
+      } else {
+        // Posting System フォールバック
+        const staffId = ps.distributor?.staffId;
+        if (!staffId) continue;
+        const dateStr = new Date(ps.date).toLocaleDateString('en-CA', { timeZone: 'Asia/Tokyo' });
+        gpsPoints = await fetchPsGps(staffId, dateStr);
+        source = 'ps';
+        if (gpsPoints.length === 0) continue; // GPS データがどこにもない場合はスキップ
+      }
+
+      // 距離計算
+      let totalDistance = ps.session?.totalDistance || 0;
+      if (totalDistance === 0 && gpsPoints.length > 1) {
+        for (let i = 1; i < gpsPoints.length; i++) {
+          const R = 6371000;
+          const dLat = ((gpsPoints[i].lat - gpsPoints[i - 1].lat) * Math.PI) / 180;
+          const dLng = ((gpsPoints[i].lng - gpsPoints[i - 1].lng) * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos((gpsPoints[i - 1].lat * Math.PI) / 180) * Math.cos((gpsPoints[i].lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+          totalDistance += R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+      }
+
+      results.push({
+        scheduleId: ps.id,
+        date: ps.date,
+        status: ps.status,
+        source,
+        distributorName: ps.distributor?.name || '-',
+        distributorStaffId: ps.distributor?.staffId || '-',
+        totalDistance,
+        startedAt: ps.session?.startedAt || (gpsPoints.length > 0 ? gpsPoints[0].timestamp : null),
+        finishedAt: ps.session?.finishedAt || (gpsPoints.length > 0 ? gpsPoints[gpsPoints.length - 1].timestamp : null),
+        gpsPointCount: gpsPoints.length,
+        gpsPoints,
+      });
+    }
 
     return NextResponse.json({
       areaId: schedule.areaId,
