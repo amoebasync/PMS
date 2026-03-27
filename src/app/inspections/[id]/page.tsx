@@ -83,6 +83,7 @@ interface Checkpoint {
   id: number;
   targetLat: number;
   targetLng: number;
+  checkpointType: 'CHECKPOINT' | 'PROBLEM' | 'OUT_OF_AREA';
   result: 'CONFIRMED' | 'NOT_FOUND' | 'UNABLE' | null;
   note: string | null;
   photoUrl: string | null;
@@ -162,8 +163,7 @@ export default function InspectionDetailPage() {
   const lastPositionRef = useRef<{ lat: number; lng: number } | null>(null);
   const [inspectorPosition, setInspectorPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsActive, setGpsActive] = useState(false);
-  const [samplePoints, setSamplePoints] = useState<{ lat: number; lng: number; index: number }[]>([]);
-  const sampleSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const [highlightedCheckpointId, setHighlightedCheckpointId] = useState<number | null>(null);
 
   // Request geolocation permission on page load
   useEffect(() => {
@@ -180,20 +180,6 @@ export default function InspectionDetailPage() {
     );
   }, []);
 
-  // サンプルポイントが変更されたらDBに自動保存（デバウンス1秒）
-  useEffect(() => {
-    if (!inspection || inspection.status === 'COMPLETED') return;
-    if (sampleSaveRef.current) clearTimeout(sampleSaveRef.current);
-    sampleSaveRef.current = setTimeout(() => {
-      const json = samplePoints.length > 0 ? JSON.stringify(samplePoints) : null;
-      fetch(`/api/inspections/${inspectionId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ samplePointsJson: json }),
-      }).catch(() => {});
-    }, 1000);
-    return () => { if (sampleSaveRef.current) clearTimeout(sampleSaveRef.current); };
-  }, [samplePoints, inspectionId, inspection]);
 
   /* ---- Fetch inspection detail ---- */
   const fetchInspection = useCallback(async () => {
@@ -202,13 +188,6 @@ export default function InspectionDetailPage() {
       if (!res.ok) throw new Error();
       const data = await res.json();
       setInspection(data);
-      // DBに保存されたサンプルポイントを復元（まだstateが空の場合のみ）
-      if (data.samplePointsJson && samplePoints.length === 0) {
-        try {
-          const saved = JSON.parse(data.samplePointsJson);
-          if (Array.isArray(saved) && saved.length > 0) setSamplePoints(saved);
-        } catch { /* ignore parse error */ }
-      }
     } catch {
       // エラーハンドリングは useEffect 内で行う（無限ループ防止）
     }
@@ -538,8 +517,7 @@ export default function InspectionDetailPage() {
           prohibitedChecks={inspection.prohibitedChecks}
           inspectorPosition={inspectorPosition}
           inspectorGpsPoints={mapData?.inspectorGpsPoints || []}
-          samplePoints={samplePoints}
-          onSamplePointsChange={inspection.status !== 'COMPLETED' ? setSamplePoints : undefined}
+          onCheckpointClick={(id) => setHighlightedCheckpointId(id)}
         />
 
         {/* Action button overlay */}
@@ -627,8 +605,8 @@ export default function InspectionDetailPage() {
                   currentPosition={inspectorPosition}
                   isActive={inspection.status === 'IN_PROGRESS'}
                   onUpdate={() => { fetchInspection(); fetchMapData(); }}
-                  samplePoints={samplePoints}
-                  onSamplePointsChange={setSamplePoints}
+                  highlightedCheckpointId={highlightedCheckpointId}
+                  onCheckpointSelect={setHighlightedCheckpointId}
                 />
               )}
               {activeTab === 'prohibited' && (

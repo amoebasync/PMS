@@ -31,6 +31,7 @@ interface Checkpoint {
   id: number;
   targetLat: number;
   targetLng: number;
+  checkpointType: 'CHECKPOINT' | 'PROBLEM' | 'OUT_OF_AREA';
   result: 'CONFIRMED' | 'NOT_FOUND' | 'UNABLE' | null;
   note: string | null;
   photoUrl: string | null;
@@ -61,8 +62,7 @@ interface Props {
   prohibitedChecks: ProhibitedCheck[];
   inspectorPosition: { lat: number; lng: number } | null;
   inspectorGpsPoints: GpsPoint[];
-  samplePoints?: { lat: number; lng: number; index: number }[];
-  onSamplePointsChange?: (points: { lat: number; lng: number; index: number }[]) => void;
+  onCheckpointClick?: (checkpointId: number) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -143,7 +143,7 @@ const prohibitedCheckColor = (result: string | null) => {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints, samplePoints = [], onSamplePointsChange }: Props) {
+export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, inspectorPosition, inspectorGpsPoints, onCheckpointClick }: Props) {
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
     libraries: LIBRARIES,
@@ -353,49 +353,51 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         </>
       )}
 
-      {/* Sample points — color-coded by check result, always showing number */}
-      {samplePoints.map((sp, idx) => {
-        const matchedCp = checkpoints.find(
-          (cp) => Math.abs(cp.targetLat - sp.lat) < 0.0002 && Math.abs(cp.targetLng - sp.lng) < 0.0002
-        );
-        const hasResult = matchedCp && matchedCp.result;
-        const fillColor = hasResult
-          ? (matchedCp.result === 'CONFIRMED' ? '#22c55e' : matchedCp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8')
-          : '#fbbf24'; // yellow for pending
-        const strokeColor = hasResult
-          ? (matchedCp.result === 'CONFIRMED' ? '#16a34a' : matchedCp.result === 'NOT_FOUND' ? '#dc2626' : '#6b7280')
-          : '#ffffff';
-        const labelColor = hasResult ? '#ffffff' : '#000000';
-        const isDraggable = !hasResult && !!onSamplePointsChange;
+      {/* Checkpoint markers — color-coded by type + result */}
+      {checkpoints.map((cp, idx) => {
+        const type = cp.checkpointType || 'CHECKPOINT';
+        const isMain = type === 'CHECKPOINT';
+        const scale = isMain ? 14 : 9;
+
+        let fillColor = '#fbbf24';
+        let strokeColor = '#ffffff';
+        let labelText = String(idx + 1);
+
+        if (type === 'CHECKPOINT') {
+          if (cp.result === 'CONFIRMED') { fillColor = '#22c55e'; strokeColor = '#16a34a'; labelText = '\u2713'; }
+          else if (cp.result === 'NOT_FOUND') { fillColor = '#ef4444'; strokeColor = '#dc2626'; labelText = '\u2717'; }
+        } else if (type === 'PROBLEM') {
+          fillColor = '#f97316'; strokeColor = '#ea580c'; labelText = '!';
+        } else if (type === 'OUT_OF_AREA') {
+          fillColor = '#8b5cf6'; strokeColor = '#7c3aed'; labelText = '\u25CE';
+        }
 
         return (
           <Marker
-            key={`sample-${idx}`}
-            position={{ lat: sp.lat, lng: sp.lng }}
-            draggable={isDraggable}
-            onDragEnd={(e) => {
-              if (e.latLng && onSamplePointsChange) {
-                const newPoints = [...samplePoints];
-                newPoints[idx] = { ...newPoints[idx], lat: e.latLng.lat(), lng: e.latLng.lng() };
-                onSamplePointsChange(newPoints);
-              }
-            }}
+            key={`cp-${cp.id}`}
+            position={{ lat: cp.targetLat, lng: cp.targetLng }}
+            onClick={() => onCheckpointClick?.(cp.id)}
             icon={{
               path: google.maps.SymbolPath.CIRCLE,
-              scale: 14,
+              scale,
               fillColor,
               fillOpacity: 0.95,
               strokeColor,
-              strokeWeight: 2.5,
+              strokeWeight: isMain ? 2.5 : 2,
             }}
-            label={{
-              text: String(idx + 1),
-              color: labelColor,
+            label={isMain ? {
+              text: labelText,
+              color: '#ffffff',
               fontSize: '11px',
               fontWeight: 'bold',
+            } : {
+              text: labelText,
+              color: '#ffffff',
+              fontSize: '9px',
+              fontWeight: 'bold',
             }}
-            zIndex={hasResult ? 40 : 30}
-            title={hasResult ? `#${idx + 1} — ${matchedCp.result}` : `#${idx + 1}`}
+            zIndex={isMain ? 40 : 35}
+            title={`${type} — ${cp.result || 'pending'}`}
           />
         );
       })}
@@ -476,36 +478,6 @@ export default function InspectionMap({ mapData, checkpoints, prohibitedChecks, 
         </InfoWindow>
       )}
 
-      {/* Checkpoint markers (only those NOT matching a sample point — manual adds) */}
-      {checkpoints.map((cp) => {
-        const matchesSample = samplePoints.some(
-          (sp) => Math.abs(cp.targetLat - sp.lat) < 0.0002 && Math.abs(cp.targetLng - sp.lng) < 0.0002
-        );
-        if (matchesSample) return null; // already rendered with sample point markers
-        const fillColor = cp.result === 'CONFIRMED' ? '#22c55e' : cp.result === 'NOT_FOUND' ? '#ef4444' : '#94a3b8';
-        const labelText = cp.result === 'CONFIRMED' ? '✓' : cp.result === 'NOT_FOUND' ? '✗' : '?';
-        return (
-          <Marker
-            key={`cp-${cp.id}`}
-            position={{ lat: cp.targetLat, lng: cp.targetLng }}
-            icon={{
-              path: google.maps.SymbolPath.CIRCLE,
-              scale: 12,
-              fillColor,
-              fillOpacity: 0.95,
-              strokeColor: '#ffffff',
-              strokeWeight: 2,
-            }}
-            label={{
-              text: labelText,
-              color: '#ffffff',
-              fontSize: '14px',
-              fontWeight: 'bold',
-            }}
-            zIndex={40}
-          />
-        );
-      })}
     </GoogleMap>
     {/* 現在地ボタン — 常に表示、押すとGPS取得してpanTo */}
     <button
