@@ -531,21 +531,17 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     fetchPast();
   }, [showPastComparison, pastTrajectories, scheduleId]);
 
+  // GPS点列の距離合計算出
+  const calcFilteredDistance = useCallback((points: { lat: number; lng: number }[]) => {
+    let d = 0;
+    for (let i = 1; i < points.length; i++) {
+      d += haversineM(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+    }
+    return d;
+  }, []);
+
   // 選択中の過去軌跡
   const selectedPast = pastTrajectories && pastTrajectories.length > 0 ? pastTrajectories[pastSelectedIdx] : null;
-
-  // 過去軌跡 GeoJSON
-  const pastTrajectoryGeoJson = useMemo(() => {
-    if (!selectedPast || selectedPast.gpsPoints.length < 2) return null;
-    return {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: {
-        type: 'LineString' as const,
-        coordinates: selectedPast.gpsPoints.map(p => [p.lng, p.lat]),
-      },
-    };
-  }, [selectedPast]);
 
   // GPS comment初期化
   useEffect(() => {
@@ -860,6 +856,25 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     }
     return false;
   }, [areaGeoJson, pointInPolygon]);
+
+  // 過去GPSをエリアポリゴン内のみにフィルタ（帰宅経路等を除外）
+  const pastGpsFiltered = useMemo(() => {
+    if (!selectedPast || selectedPast.gpsPoints.length === 0) return [];
+    if (!areaGeoJson) return selectedPast.gpsPoints;
+    return selectedPast.gpsPoints.filter(p => isInsideArea(p.lng, p.lat));
+  }, [selectedPast, areaGeoJson, isInsideArea]);
+
+  const pastTrajectoryGeoJson = useMemo(() => {
+    if (pastGpsFiltered.length < 2) return null;
+    return {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: pastGpsFiltered.map(p => [p.lng, p.lat]),
+      },
+    };
+  }, [pastGpsFiltered]);
 
   // Road-based coverage analysis（配布エリアポリゴン内の道路のみ対象）
   const [coverageGeoJson, setCoverageGeoJson] = useState<any>(null);
@@ -1405,14 +1420,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     />
                   </Source>
                 )}
-                {showPastComparison && selectedPast && selectedPast.gpsPoints.length > 0 && (
+                {showPastComparison && pastGpsFiltered.length > 0 && (
                   <>
-                    <Marker longitude={selectedPast.gpsPoints[0].lng} latitude={selectedPast.gpsPoints[0].lat} anchor="center">
+                    <Marker longitude={pastGpsFiltered[0].lng} latitude={pastGpsFiltered[0].lat} anchor="center">
                       <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center">
                         <span className="text-white text-[7px] font-bold">S</span>
                       </div>
                     </Marker>
-                    <Marker longitude={selectedPast.gpsPoints[selectedPast.gpsPoints.length - 1].lng} latitude={selectedPast.gpsPoints[selectedPast.gpsPoints.length - 1].lat} anchor="center">
+                    <Marker longitude={pastGpsFiltered[pastGpsFiltered.length - 1].lng} latitude={pastGpsFiltered[pastGpsFiltered.length - 1].lat} anchor="center">
                       <div className="w-4 h-4 rounded-full bg-amber-700 border-2 border-white shadow-md flex items-center justify-center">
                         <span className="text-white text-[7px] font-bold">E</span>
                       </div>
@@ -2085,16 +2100,16 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       <span className="font-bold text-slate-700">{(data.session.totalDistance / 1000).toFixed(1)} km</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">過去 距離</span>
-                      <span className="font-bold text-amber-600">{(selectedPast.totalDistance / 1000).toFixed(1)} km</span>
+                      <span className="text-slate-500">過去 距離（エリア内）</span>
+                      <span className="font-bold text-amber-600">{(calcFilteredDistance(pastGpsFiltered) / 1000).toFixed(1)} km</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">今回 GPS点数</span>
                       <span className="font-bold text-slate-700">{data.gpsPoints.length.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">過去 GPS点数</span>
-                      <span className="font-bold text-amber-600">{selectedPast.gpsPoints.length.toLocaleString()}</span>
+                      <span className="text-slate-500">過去 GPS点数（エリア内）</span>
+                      <span className="font-bold text-amber-600">{pastGpsFiltered.length.toLocaleString()}</span>
                     </div>
                     {selectedPast.startedAt && selectedPast.finishedAt && (
                       <div className="mt-2 pt-2 border-t border-slate-100">
