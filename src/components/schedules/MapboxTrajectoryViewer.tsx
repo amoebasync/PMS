@@ -410,33 +410,38 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     };
   }, [segmentSpeeds]);
 
-  // Speed gradient GeoJSON (full trajectory with lineMetrics)
-  const speedTrajectoryGeoJson = useMemo(() => {
-    if (!data || data.gpsPoints.length < 2) return null;
-    return {
-      type: 'Feature' as const,
-      properties: {},
-      geometry: { type: 'LineString' as const, coordinates: data.gpsPoints.map(p => [p.lng, p.lat]) },
-    };
-  }, [data]);
-
-  // line-gradient stops
-  const speedGradientStops = useMemo(() => {
+  // Speed segments GeoJSON — each segment is a separate Feature with a color property
+  const speedSegmentsGeoJson = useMemo<GeoJSON.FeatureCollection | null>(() => {
     if (!data || data.gpsPoints.length < 2 || segmentSpeeds.length === 0) return null;
-    const cumulativeDistances: number[] = [0];
-    let totalDist = 0;
+    const pts = data.gpsPoints;
+    const features: GeoJSON.Feature[] = [];
+    let currentColor = speedToColor(segmentSpeeds[0].speedKmh);
+    let currentCoords: [number, number][] = [[pts[0].lng, pts[0].lat]];
+
     for (let i = 0; i < segmentSpeeds.length; i++) {
-      totalDist += segmentSpeeds[i].distanceM;
-      cumulativeDistances.push(totalDist);
+      const color = speedToColor(segmentSpeeds[i].speedKmh);
+      if (color !== currentColor) {
+        // Flush current segment
+        currentCoords.push([pts[i].lng, pts[i].lat]);
+        features.push({
+          type: 'Feature',
+          properties: { color: currentColor },
+          geometry: { type: 'LineString', coordinates: currentCoords },
+        });
+        currentColor = color;
+        currentCoords = [[pts[i].lng, pts[i].lat]];
+      }
+      currentCoords.push([pts[i + 1].lng, pts[i + 1].lat]);
     }
-    if (totalDist === 0) return null;
-    const stops: [number, string][] = [];
-    for (let i = 0; i < cumulativeDistances.length; i++) {
-      const progress = cumulativeDistances[i] / totalDist;
-      const speed = i === 0 ? (segmentSpeeds[0]?.speedKmh ?? 0) : segmentSpeeds[i - 1].speedKmh;
-      stops.push([Math.min(progress, 1), speedToColor(speed)]);
+    // Flush last segment
+    if (currentCoords.length >= 2) {
+      features.push({
+        type: 'Feature',
+        properties: { color: currentColor },
+        geometry: { type: 'LineString', coordinates: currentCoords },
+      });
     }
-    return stops;
+    return { type: 'FeatureCollection', features };
   }, [data, segmentSpeeds]);
 
   // Fetch trajectory data
@@ -1345,20 +1350,15 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Source>
                 )}
 
-                {/* Speed-colored trajectory (always mounted, visibility toggled) */}
-                {speedTrajectoryGeoJson && speedGradientStops && speedGradientStops.length >= 2 && (
-                  <Source id="speed-trajectory" type="geojson" data={speedTrajectoryGeoJson} lineMetrics>
+                {/* Speed-colored trajectory segments (always mounted, visibility toggled) */}
+                {speedSegmentsGeoJson && (
+                  <Source id="speed-trajectory" type="geojson" data={speedSegmentsGeoJson}>
                     <Layer
                       id="speed-trajectory-line"
                       type="line"
                       paint={{
+                        'line-color': ['get', 'color'],
                         'line-width': 4,
-                        'line-gradient': [
-                          'interpolate',
-                          ['linear'],
-                          ['line-progress'],
-                          ...speedGradientStops.flatMap(([progress, color]) => [progress, color]),
-                        ],
                         'line-opacity': 0.9,
                       }}
                       layout={{
