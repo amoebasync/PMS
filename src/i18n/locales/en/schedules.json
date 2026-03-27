@@ -244,5 +244,18 @@
   "inspection_add_guidance": "Assign Training",
   "inspection_check": "Check",
   "inspection_guidance": "Training",
-  "th_field_inspection": "Inspection"
+  "th_field_inspection": "Inspection",
+  "speed_toggle": "Speed",
+  "speed_analysis": "Speed Analysis",
+  "speed_avg": "Avg km/h",
+  "speed_max": "Max km/h",
+  "speed_posting_vs_moving": "Posting vs Moving",
+  "speed_posting_activity": "Posting Activity",
+  "speed_moving": "Moving",
+  "speed_distribution": "Speed Distribution",
+  "speed_legend": "Movement Speed",
+  "speed_posting_label": "Posting",
+  "speed_slow_walk_label": "Walking & posting",
+  "speed_normal_walk_label": "Normal walking",
+  "speed_fast_label": "Fast movement"
 }

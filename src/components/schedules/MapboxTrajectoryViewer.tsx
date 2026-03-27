@@ -191,6 +191,53 @@ const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
+/** 隣接2点間のスピード */
+interface SegmentSpeed {
+  speedKmh: number;
+  distanceM: number;
+  durationSec: number;
+}
+
+const SPEED_THRESHOLDS = {
+  posting: 1.5,     // 0〜1.5 km/h: ほぼ停止・ポスティング中
+  slowWalk: 3.5,    // 1.5〜3.5 km/h: 配布しながら歩行
+  normalWalk: 5.0,  // 3.5〜5.0 km/h: 通常歩行
+};
+
+const SPEED_COLORS = {
+  posting: '#ef4444',    // 赤
+  slowWalk: '#f97316',   // オレンジ
+  normalWalk: '#22c55e', // 緑
+  fast: '#3b82f6',       // 青
+};
+
+const computeSegmentSpeeds = (points: GpsPoint[]): SegmentSpeed[] => {
+  if (points.length < 2) return [];
+  const rawSpeeds: SegmentSpeed[] = [];
+  for (let i = 1; i < points.length; i++) {
+    const distM = haversineM(points[i - 1].lat, points[i - 1].lng, points[i].lat, points[i].lng);
+    const dtMs = new Date(points[i].timestamp).getTime() - new Date(points[i - 1].timestamp).getTime();
+    const dtSec = Math.max(dtMs / 1000, 0.1);
+    const speedKmh = (distM / dtSec) * 3.6;
+    rawSpeeds.push({ speedKmh: Math.min(speedKmh, 30), distanceM: distM, durationSec: dtSec });
+  }
+  // 3-point moving average
+  return rawSpeeds.map((seg, i) => {
+    const start = Math.max(0, i - 1);
+    const end = Math.min(rawSpeeds.length - 1, i + 1);
+    let sumSpeed = 0, count = 0;
+    for (let j = start; j <= end; j++) { sumSpeed += rawSpeeds[j].speedKmh; count++; }
+    return { ...seg, speedKmh: sumSpeed / count };
+  });
+};
+
+const speedToColor = (kmh: number): string => {
+  if (kmh <= SPEED_THRESHOLDS.posting) return SPEED_COLORS.posting;
+  if (kmh <= SPEED_THRESHOLDS.slowWalk) return SPEED_COLORS.slowWalk;
+  if (kmh <= SPEED_THRESHOLDS.normalWalk) return SPEED_COLORS.normalWalk;
+  return SPEED_COLORS.fast;
+};
+
 const clusterDwellSpots = (points: GpsPoint[]): DwellSpot[] => {
   if (points.length < 2) return [];
   const spots: DwellSpot[] = [];
@@ -237,6 +284,40 @@ const dwellLabel = (ms: number) => {
 };
 
 // ============================================================
+// Speed Distribution Chart
+// ============================================================
+function SpeedDistributionChart({ speeds }: { speeds: SegmentSpeed[] }) {
+  const buckets = useMemo(() => {
+    const b = [0, 0, 0, 0, 0, 0, 0];
+    const labels = ['0-1', '1-2', '2-3', '3-4', '4-5', '5-6', '6+'];
+    const colors = [SPEED_COLORS.posting, SPEED_COLORS.posting, SPEED_COLORS.slowWalk, SPEED_COLORS.slowWalk, SPEED_COLORS.normalWalk, SPEED_COLORS.fast, SPEED_COLORS.fast];
+    for (const seg of speeds) {
+      const idx = Math.min(Math.floor(seg.speedKmh), 6);
+      b[idx] += seg.durationSec;
+    }
+    const maxVal = Math.max(...b, 1);
+    return labels.map((label, i) => ({ label, value: b[i], pct: (b[i] / maxVal) * 100, color: colors[i] }));
+  }, [speeds]);
+
+  return (
+    <div className="space-y-1">
+      {buckets.map((bucket) => (
+        <div key={bucket.label} className="flex items-center gap-2 text-[10px]">
+          <span className="w-8 text-right text-slate-500 shrink-0">{bucket.label}</span>
+          <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${bucket.pct}%`, background: bucket.color }} />
+          </div>
+          <span className="w-10 text-right text-slate-400 shrink-0">
+            {bucket.value > 0 ? fmtDuration(bucket.value * 1000) : '-'}
+          </span>
+        </div>
+      ))}
+      <div className="text-[9px] text-slate-400 text-center mt-1">km/h → 滞在時間</div>
+    </div>
+  );
+}
+
+// ============================================================
 // Component
 // ============================================================
 export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchToGoogle }: Props) {
@@ -261,6 +342,9 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   // Coverage analysis
   const [showCoverage, setShowCoverage] = useState(false);
   const [coverageRate, setCoverageRate] = useState<number | null>(null);
+
+  // Speed visualization
+  const [showSpeed, setShowSpeed] = useState(false);
 
   // Route suggestion
   const [suggestedRoute, setSuggestedRoute] = useState<any>(null);
@@ -290,6 +374,53 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     const totalMs = dwellSpots.reduce((s, d) => s + d.dwellMs, 0);
     return { count: dwellSpots.length, avgMs: totalMs / dwellSpots.length, maxMs: Math.max(...dwellSpots.map(d => d.dwellMs)), totalMs };
   }, [dwellSpots]);
+
+  // Speed analysis
+  const segmentSpeeds = useMemo(() => data ? computeSegmentSpeeds(data.gpsPoints) : [], [data]);
+
+  const speedStats = useMemo(() => {
+    if (segmentSpeeds.length === 0) return { avg: 0, max: 0, postingPct: 0, movingPct: 0, postingTime: 0, movingTime: 0 };
+    const totalSec = segmentSpeeds.reduce((s, seg) => s + seg.durationSec, 0);
+    const avgSpeed = totalSec > 0 ? segmentSpeeds.reduce((s, seg) => s + seg.speedKmh * seg.durationSec, 0) / totalSec : 0;
+    const maxSpeed = Math.max(...segmentSpeeds.map(s => s.speedKmh));
+    const postingSec = segmentSpeeds.filter(s => s.speedKmh <= SPEED_THRESHOLDS.slowWalk).reduce((sum, s) => sum + s.durationSec, 0);
+    const movingSec = totalSec - postingSec;
+    return {
+      avg: avgSpeed, max: maxSpeed,
+      postingPct: totalSec > 0 ? (postingSec / totalSec) * 100 : 0,
+      movingPct: totalSec > 0 ? (movingSec / totalSec) * 100 : 0,
+      postingTime: postingSec * 1000, movingTime: movingSec * 1000,
+    };
+  }, [segmentSpeeds]);
+
+  // Speed gradient GeoJSON (full trajectory with lineMetrics)
+  const speedTrajectoryGeoJson = useMemo(() => {
+    if (!data || data.gpsPoints.length < 2) return null;
+    return {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: { type: 'LineString' as const, coordinates: data.gpsPoints.map(p => [p.lng, p.lat]) },
+    };
+  }, [data]);
+
+  // line-gradient stops
+  const speedGradientStops = useMemo(() => {
+    if (!data || data.gpsPoints.length < 2 || segmentSpeeds.length === 0) return null;
+    const cumulativeDistances: number[] = [0];
+    let totalDist = 0;
+    for (let i = 0; i < segmentSpeeds.length; i++) {
+      totalDist += segmentSpeeds[i].distanceM;
+      cumulativeDistances.push(totalDist);
+    }
+    if (totalDist === 0) return null;
+    const stops: [number, string][] = [];
+    for (let i = 0; i < cumulativeDistances.length; i++) {
+      const progress = cumulativeDistances[i] / totalDist;
+      const speed = i === 0 ? (segmentSpeeds[0]?.speedKmh ?? 0) : segmentSpeeds[i - 1].speedKmh;
+      stops.push([Math.min(progress, 1), speedToColor(speed)]);
+    }
+    return stops;
+  }, [data, segmentSpeeds]);
 
   // Fetch trajectory data
   const fetchData = useCallback(async () => {
@@ -1117,8 +1248,8 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             {/* ========== TRAJECTORY MODE ========== */}
             {viewMode === 'trajectory' && (
               <>
-                {/* GPS trajectory - already traversed */}
-                {trajectoryGeoJson && (
+                {/* GPS trajectory - already traversed (normal mode) */}
+                {!showSpeed && trajectoryGeoJson && (
                   <Source id="trajectory" type="geojson" data={trajectoryGeoJson}>
                     <Layer
                       id="trajectory-line"
@@ -1136,8 +1267,29 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Source>
                 )}
 
+                {/* Speed-colored trajectory (when speed mode ON) */}
+                {showSpeed && speedTrajectoryGeoJson && speedGradientStops && speedGradientStops.length >= 2 && (
+                  <Source id="speed-trajectory" type="geojson" data={speedTrajectoryGeoJson} lineMetrics={true}>
+                    <Layer
+                      id="speed-trajectory-line"
+                      type="line"
+                      paint={{
+                        'line-width': 4,
+                        'line-gradient': [
+                          'interpolate',
+                          ['linear'],
+                          ['line-progress'],
+                          ...speedGradientStops.flatMap(([progress, color]) => [progress, color]),
+                        ],
+                        'line-opacity': 0.9,
+                      }}
+                      layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+                    />
+                  </Source>
+                )}
+
                 {/* GPS trajectory - remaining (dimmed) */}
-                {remainingGeoJson && (
+                {!showSpeed && remainingGeoJson && (
                   <Source id="trajectory-remaining" type="geojson" data={remainingGeoJson}>
                     <Layer
                       id="trajectory-remaining-line"
@@ -1538,6 +1690,17 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <i className={`bi ${loadingRoute ? 'bi-arrow-repeat animate-spin' : 'bi-signpost-2'}`}></i>
                 ルート提案
               </button>
+              <button
+                onClick={() => setShowSpeed(!showSpeed)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                  showSpeed
+                    ? 'bg-cyan-600 text-white border-cyan-700'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                <i className="bi bi-speedometer2"></i>
+                移動速度
+              </button>
             </div>
           )}
 
@@ -1546,6 +1709,31 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             <div className="absolute top-16 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg border border-slate-200 text-sm font-bold z-10">
               <i className="bi bi-grid-3x3 text-teal-500 mr-1.5"></i>
               カバレッジ: <span className={coverageRate > 0.8 ? 'text-emerald-600' : coverageRate > 0.5 ? 'text-amber-600' : 'text-red-600'}>{Math.round(coverageRate * 100)}%</span>
+            </div>
+          )}
+
+          {/* Speed legend */}
+          {showSpeed && (
+            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10">
+              <div className="font-bold text-slate-700 mb-1.5">移動速度</div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.posting }}></div>
+                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.posting} km/h（配布中）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.slowWalk }}></div>
+                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.slowWalk} km/h（配布歩行）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.normalWalk }}></div>
+                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.normalWalk} km/h（通常歩行）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.fast }}></div>
+                  <span className="text-slate-600">{SPEED_THRESHOLDS.normalWalk}+ km/h（高速移動）</span>
+                </div>
+              </div>
             </div>
           )}
 
@@ -1624,6 +1812,73 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* Speed analysis (when speed mode is ON) */}
+              {showSpeed && segmentSpeeds.length > 0 && (
+                <>
+                  <div className="p-4 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-700 text-sm mb-3">
+                      <i className="bi bi-speedometer2 mr-1"></i>
+                      速度分析
+                    </h3>
+                    <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                      <div className="bg-blue-50 rounded-lg p-2 text-center">
+                        <div className="text-blue-600 font-black text-lg">{speedStats.avg.toFixed(1)}</div>
+                        <div className="text-blue-400">平均 km/h</div>
+                      </div>
+                      <div className="bg-indigo-50 rounded-lg p-2 text-center">
+                        <div className="text-indigo-600 font-black text-lg">{speedStats.max.toFixed(1)}</div>
+                        <div className="text-indigo-400">最高 km/h</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-700 text-sm mb-3">
+                      <i className="bi bi-pie-chart mr-1"></i>
+                      配布 vs 移動
+                    </h3>
+                    <div className="flex h-6 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="flex items-center justify-center text-[10px] font-bold text-white"
+                        style={{ width: `${Math.max(speedStats.postingPct, 2)}%`, background: 'linear-gradient(90deg, #ef4444, #f97316)' }}
+                      >
+                        {speedStats.postingPct >= 15 ? `${Math.round(speedStats.postingPct)}%` : ''}
+                      </div>
+                      <div
+                        className="flex items-center justify-center text-[10px] font-bold text-white"
+                        style={{ width: `${Math.max(speedStats.movingPct, 2)}%`, background: 'linear-gradient(90deg, #22c55e, #3b82f6)' }}
+                      >
+                        {speedStats.movingPct >= 15 ? `${Math.round(speedStats.movingPct)}%` : ''}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500"></span>
+                          配布活動（〜{SPEED_THRESHOLDS.slowWalk} km/h）
+                        </span>
+                        <span className="font-bold text-slate-700">{fmtDuration(speedStats.postingTime)}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-green-500 to-blue-500"></span>
+                          移動（{SPEED_THRESHOLDS.slowWalk}+ km/h）
+                        </span>
+                        <span className="font-bold text-slate-700">{fmtDuration(speedStats.movingTime)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-4 border-b border-slate-100">
+                    <h3 className="font-bold text-slate-700 text-sm mb-3">
+                      <i className="bi bi-bar-chart mr-1"></i>
+                      速度分布
+                    </h3>
+                    <SpeedDistributionChart speeds={segmentSpeeds} />
+                  </div>
+                </>
               )}
 
               {/* Per-hour metrics — PMS session only */}

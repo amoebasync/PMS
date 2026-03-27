@@ -244,5 +244,18 @@
   "inspection_add_guidance": "指導割り当て",
   "inspection_check": "チェック",
   "inspection_guidance": "指導",
-  "th_field_inspection": "現場確認"
+  "th_field_inspection": "現場確認",
+  "speed_toggle": "移動速度",
+  "speed_analysis": "速度分析",
+  "speed_avg": "平均 km/h",
+  "speed_max": "最高 km/h",
+  "speed_posting_vs_moving": "配布 vs 移動",
+  "speed_posting_activity": "配布活動",
+  "speed_moving": "移動",
+  "speed_distribution": "速度分布",
+  "speed_legend": "移動速度",
+  "speed_posting_label": "配布中",
+  "speed_slow_walk_label": "配布歩行",
+  "speed_normal_walk_label": "通常歩行",
+  "speed_fast_label": "高速移動"
 }
