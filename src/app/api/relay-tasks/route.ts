@@ -68,7 +68,7 @@ export async function POST(request: Request) {
     if (!await authorize()) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const body = await request.json();
-    const { scheduleId, type, driverId, driverName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note, force, date } = body;
+    const { scheduleId, type, driverId, driverName, distributorName, locationName, latitude, longitude, timeSlotStart, timeSlotEnd, note, force, date } = body;
 
     if (!type) {
       return NextResponse.json({ error: 'type is required' }, { status: 400 });
@@ -112,6 +112,7 @@ export async function POST(request: Request) {
         type,
         driverId: driverId ? parseInt(driverId) : null,
         driverName: driverName || null,
+        distributorName: distributorName || null,
         locationName: locationName || null,
         latitude: latitude || null,
         longitude: longitude || null,

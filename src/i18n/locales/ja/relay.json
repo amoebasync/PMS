@@ -113,5 +113,10 @@
   "add_no_distributor": "配布員未割当",
   "add_success": "タスクを追加しました",
   "add_duplicate_confirm": "同じスケジュール・種別のタスクが既に存在します。追加しますか？",
-  "add_force": "追加する"
+  "add_force": "追加する",
+  "add_distributor_name": "配布員名",
+  "add_distributor_name_placeholder": "配布員名を入力",
+  "field_google_maps_link": "Google Mapsリンク or 住所を入力してEnter",
+  "location_searching": "検索中...",
+  "location_not_found": "場所が見つかりませんでした"
 }

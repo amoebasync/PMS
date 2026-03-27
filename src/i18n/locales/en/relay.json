@@ -113,5 +113,10 @@
   "add_no_distributor": "Unassigned",
   "add_success": "Task added",
   "add_duplicate_confirm": "A task with the same schedule and type already exists. Add anyway?",
-  "add_force": "Add"
+  "add_force": "Add",
+  "add_distributor_name": "Distributor Name",
+  "add_distributor_name_placeholder": "Enter distributor name",
+  "field_google_maps_link": "Enter Google Maps link or address and press Enter",
+  "location_searching": "Searching...",
+  "location_not_found": "Location not found"
 }

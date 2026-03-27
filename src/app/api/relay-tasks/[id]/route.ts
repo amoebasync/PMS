@@ -32,6 +32,7 @@ export async function PUT(
     if (body.status !== undefined) data.status = body.status;
     if (body.driverId !== undefined) data.driverId = body.driverId || null;
     if (body.driverName !== undefined) data.driverName = body.driverName || null;
+    if (body.distributorName !== undefined) data.distributorName = body.distributorName || null;
     if (body.locationName !== undefined) data.locationName = body.locationName || null;
     if (body.latitude !== undefined) data.latitude = body.latitude;
     if (body.longitude !== undefined) data.longitude = body.longitude;

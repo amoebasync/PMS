@@ -67,8 +67,9 @@ export default function RelayListPage() {
   const [polygonPaths, setPolygonPaths] = useState<google.maps.LatLngLiteral[][]>([]);
   const [showRouteOpt, setShowRouteOpt] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addForm, setAddForm] = useState({ scheduleId: '', type: 'RELAY' as string });
+  const [addForm, setAddForm] = useState({ scheduleId: '', type: 'RELAY' as string, distributorName: '' });
   const [addSchedules, setAddSchedules] = useState<any[]>([]);
+  const [locationSearching, setLocationSearching] = useState(false);
   const [addScheduleSearch, setAddScheduleSearch] = useState('');
   const [addSubmitting, setAddSubmitting] = useState(false);
   const dragItem = useRef<number | null>(null);
@@ -134,6 +135,7 @@ export default function RelayListPage() {
       status: task.status,
       driverId: task.driverId,
       driverName: task.driverName || '',
+      distributorName: task.distributorName || '',
       timeSlot: slot?.label || '',
       locationName: task.locationName || '',
       latitude: task.latitude,
@@ -186,6 +188,7 @@ export default function RelayListPage() {
           status: editForm.status,
           driverId: editForm.driverId || null,
           driverName: editForm.driverName || null,
+          distributorName: editForm.distributorName || null,
           timeSlotStart: slot?.start || null,
           timeSlotEnd: slot?.end || null,
           locationName: editForm.locationName || null,
@@ -304,7 +307,41 @@ export default function RelayListPage() {
     if (lat && lng && !isNaN(lat) && !isNaN(lng)) {
       setEditForm((f: any) => ({ ...f, latitude: lat, longitude: lng }));
       setShowMap(true);
+      setMapKey(k => k + 1);
     }
+  };
+
+  // 住所・Google Mapsリンクで検索（Enterキー対応）
+  const handleLocationSearch = (query: string) => {
+    if (!query.trim()) return;
+    // まずGoogle Mapsリンクとしてパース
+    handleGoogleMapsLink(query);
+    // リンクでヒットした場合はreturn（座標がセットされるはず）
+    const atMatch = query.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    const qMatch = query.match(/[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+    const plainMatch = query.trim().match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (atMatch || qMatch || plainMatch) return;
+
+    // Geocoding APIで住所検索
+    if (!isLoaded) return;
+    setLocationSearching(true);
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ address: query }, (results, status) => {
+      setLocationSearching(false);
+      if (status === 'OK' && results && results[0]) {
+        const loc = results[0].geometry.location;
+        setEditForm((f: any) => ({
+          ...f,
+          latitude: loc.lat(),
+          longitude: loc.lng(),
+          locationName: f.locationName || results![0].formatted_address || query,
+        }));
+        setShowMap(true);
+        setMapKey(k => k + 1);
+      } else {
+        showToast(t('location_not_found'), 'error');
+      }
+    });
   };
 
   const handleEvidenceUpload = async (files: FileList) => {
@@ -409,7 +446,7 @@ export default function RelayListPage() {
   };
 
   const openAddModal = async () => {
-    setAddForm({ scheduleId: '', type: 'RELAY' });
+    setAddForm({ scheduleId: '', type: 'RELAY', distributorName: '' });
     setAddScheduleSearch('');
     try {
       const res = await fetch(`/api/schedules?from=${filterDate}&to=${filterDate}`);
@@ -434,6 +471,7 @@ export default function RelayListPage() {
       payload.scheduleId = addForm.scheduleId;
     } else {
       payload.date = filterDate;
+      if (addForm.distributorName) payload.distributorName = addForm.distributorName;
     }
     try {
       const res = await fetch('/api/relay-tasks', {
@@ -608,7 +646,7 @@ export default function RelayListPage() {
                   </td>
                   <td className="px-3 py-3">
                     <div className="text-xs">
-                      <span className="font-bold text-slate-800">{task.schedule?.distributor?.name || '-'}</span>
+                      <span className="font-bold text-slate-800">{task.schedule?.distributor?.name || task.distributorName || '-'}</span>
                       {task.schedule?.distributor?.staffId && (
                         <span className="text-slate-400 ml-1">{task.schedule.distributor.staffId}</span>
                       )}
@@ -725,7 +763,7 @@ export default function RelayListPage() {
                 <div>
                   <span className="text-[10px] text-slate-400">{t('th_staff')}</span>
                   <div className="text-slate-800 font-bold">
-                    {task.schedule?.distributor?.name || '-'}
+                    {task.schedule?.distributor?.name || task.distributorName || '-'}
                     {task.schedule?.distributor?.staffId && (
                       <span className="text-slate-400 font-normal ml-1">{task.schedule.distributor.staffId}</span>
                     )}
@@ -876,23 +914,36 @@ export default function RelayListPage() {
                 </div>
               </div>
 
+              {/* Distributor Name (for tasks without schedule) */}
+              {!editTask.scheduleId && (
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">{t('add_distributor_name')}</label>
+                  <input type="text" value={editForm.distributorName} onChange={e => setEditForm({ ...editForm, distributorName: e.target.value })}
+                    placeholder={t('add_distributor_name_placeholder')}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
+                </div>
+              )}
+
               {/* Location */}
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1 block">{t('field_location')}</label>
                 <input type="text" value={editForm.locationName} onChange={e => setEditForm({ ...editForm, locationName: e.target.value })}
                   placeholder={t('field_location_placeholder')}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLocationSearch(editForm.locationName); } }}
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
-                <input type="text" placeholder={t('field_google_maps_link') || 'Google Mapsリンクを貼り付け'}
+                <input type="text" placeholder={t('field_google_maps_link')}
                   className="w-full mt-2 px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400"
                   onPaste={e => { setTimeout(() => handleGoogleMapsLink(e.currentTarget.value), 0); }}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleLocationSearch(e.currentTarget.value); } }}
                   onChange={e => handleGoogleMapsLink(e.target.value)} />
-                <div className="flex gap-2 mt-2">
+                <div className="flex gap-2 mt-2 items-center">
                   <button onClick={handleShowMap} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
                     <i className="bi bi-map"></i>{t('btn_set_location')}
                   </button>
                   <button onClick={handleCurrentLocation} className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 rounded-lg text-xs text-slate-600 flex items-center gap-1 transition-colors">
                     <i className="bi bi-crosshair"></i>{t('btn_current_location')}
                   </button>
+                  {locationSearching && <span className="text-xs text-indigo-500"><i className="bi bi-arrow-repeat animate-spin mr-1"></i>{t('location_searching')}</span>}
                 </div>
                 {editForm.latitude && editForm.longitude && (
                   <div className="text-[10px] text-slate-400 mt-1">
@@ -1063,6 +1114,15 @@ export default function RelayListPage() {
                   ))}
                 </div>
               </div>
+              {/* Distributor name (no schedule selected) */}
+              {!addForm.scheduleId && (
+                <div>
+                  <label className="text-xs font-bold text-slate-600 mb-1 block">{t('add_distributor_name')}</label>
+                  <input type="text" value={addForm.distributorName} onChange={e => setAddForm(f => ({ ...f, distributorName: e.target.value }))}
+                    placeholder={t('add_distributor_name_placeholder')}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-xs focus:ring-1 focus:ring-indigo-400" />
+                </div>
+              )}
             </div>
             <div className="px-5 py-4 border-t flex justify-end gap-2">
               <button onClick={() => setShowAddModal(false)} className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-lg">{t('btn_cancel')}</button>

@@ -1021,6 +1021,9 @@ model RelayTask {
   driver      Employee?    @relation("RelayDriver", fields: [driverId], references: [id])
   driverName  String?      @map("driver_name") @db.VarChar(100) // 業務委託等のフリーテキスト
 
+  // 配布員名（スケジュール無しの場合にフリーテキストで記入）
+  distributorName String?  @map("distributor_name") @db.VarChar(100)
+
   // 場所
   locationName String?     @map("location_name") @db.VarChar(200)
   latitude     Float?
