@@ -785,7 +785,7 @@ export default function ScheduleListPage() {
     const tid = searchParams.get('trajectory');
     return tid ? parseInt(tid) : null;
   });
-  const [mapEngine, setMapEngine] = useState<'google' | 'mapbox'>('google');
+  const [mapEngine, setMapEngine] = useState<'google' | 'mapbox'>('mapbox');
   const [compliancePopoverId, setCompliancePopoverId] = useState<number | null>(null);
   const [actionMenuId, setActionMenuId] = useState<number | null>(null);
   const [relayAddSchedule, setRelayAddSchedule] = useState<{ schedule: any; type: 'RELAY' | 'COLLECTION' | 'FULL_RELAY' } | null>(null);
@@ -811,6 +811,9 @@ export default function ScheduleListPage() {
   const [showOrphanLinker, setShowOrphanLinker] = useState(() => {
     return searchParams.get('orphanLinker') === 'true';
   });
+
+  // 配布員タスクポップオーバー
+  const [taskPopoverScheduleId, setTaskPopoverScheduleId] = useState<number | null>(null);
 
   // 巡回割り当てモーダル
   const [inspectionAssignSchedule, setInspectionAssignSchedule] = useState<any>(null);
@@ -1371,9 +1374,61 @@ export default function ScheduleListPage() {
                     <td className="pl-3 pr-1 py-2.5" onClick={e => e.stopPropagation()}>
                       {s.distributor ? (
                         <div className="flex items-center gap-1.5 group/dist">
-                          <div className="min-w-0 cursor-pointer" onClick={() => setDetailDistributorId(s.distributor.id)}>
-                            <div className="font-bold text-slate-800 text-xs hover:text-indigo-600 transition-colors">{s.distributor.name}</div>
-                            <div className="text-[10px] text-slate-400">{s.distributor.staffId}</div>
+                          <div className="min-w-0">
+                            <div className="font-bold text-slate-800 text-xs hover:text-indigo-600 transition-colors cursor-pointer" onClick={() => setDetailDistributorId(s.distributor.id)}>{s.distributor.name}</div>
+                            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                              <span className="cursor-pointer" onClick={() => setDetailDistributorId(s.distributor.id)}>{s.distributor.staffId}</span>
+                              {s.distributorTasks && s.distributorTasks.count > 0 && (
+                                <span className="relative">
+                                  <span className="text-slate-300 mx-0.5">·</span>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setTaskPopoverScheduleId(taskPopoverScheduleId === s.id ? null : s.id); }}
+                                    className={`inline-flex items-center gap-0.5 px-1 py-0 rounded hover:bg-amber-100 transition-colors ${
+                                      s.distributorTasks.tasks.some((tk: any) => new Date(tk.dueDate) < new Date()) ? 'text-red-500 font-bold' : 'text-amber-600'
+                                    }`}
+                                  >
+                                    <i className="bi bi-clipboard-check text-[9px]"></i>
+                                    {t('task_count', { count: s.distributorTasks.count }) || `タスク${s.distributorTasks.count}件`}
+                                  </button>
+                                  {/* Task popover */}
+                                  {taskPopoverScheduleId === s.id && (
+                                    <div className="absolute left-0 top-5 z-50 w-64 bg-white rounded-xl shadow-xl border border-slate-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+                                      <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                        <span className="text-[11px] font-bold text-slate-700"><i className="bi bi-clipboard-check mr-1"></i>{t('tasks') || 'タスク'}</span>
+                                        <button onClick={() => setTaskPopoverScheduleId(null)} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x"></i></button>
+                                      </div>
+                                      <div className="max-h-48 overflow-y-auto divide-y divide-slate-50">
+                                        {s.distributorTasks.tasks.map((tk: any) => {
+                                          const isOverdue = new Date(tk.dueDate) < new Date();
+                                          return (
+                                            <div key={tk.id} className="px-3 py-2 hover:bg-slate-50 cursor-pointer" onClick={() => { window.location.href = `/crm/tasks?taskId=${tk.id}`; }}>
+                                              <div className="flex items-center gap-1.5">
+                                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${tk.priority === 'HIGH' ? 'bg-red-500' : tk.priority === 'MEDIUM' ? 'bg-amber-500' : 'bg-slate-300'}`}></span>
+                                                <span className="text-[11px] font-medium text-slate-700 truncate">{tk.title}</span>
+                                              </div>
+                                              <div className="flex items-center gap-2 mt-0.5 ml-3">
+                                                <span className={`text-[9px] px-1.5 py-0 rounded ${tk.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                  {tk.status === 'IN_PROGRESS' ? t('status_in_progress') || '進行中' : t('status_pending') || '未着手'}
+                                                </span>
+                                                <span className={`text-[9px] ${isOverdue ? 'text-red-500 font-bold' : 'text-slate-400'}`}>
+                                                  {isOverdue && <i className="bi bi-exclamation-circle mr-0.5"></i>}
+                                                  {new Date(tk.dueDate).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      {s.distributorTasks.count > 5 && (
+                                        <div className="px-3 py-1.5 border-t border-slate-100 text-center">
+                                          <span className="text-[10px] text-slate-400">{t('and_more', { count: s.distributorTasks.count - 5 }) || `他${s.distributorTasks.count - 5}件`}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </span>
+                              )}
+                            </div>
                           </div>
                           {s.status !== 'DISTRIBUTING' && s.status !== 'COMPLETED' && (
                             <button onClick={() => openAssignModal(s)}
@@ -2140,7 +2195,7 @@ export default function ScheduleListPage() {
           </div>
         }>
           {mapEngine === 'mapbox' ? (
-            <MapboxTrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => { setTrajectoryScheduleId(null); setMapEngine('google'); }} onSwitchToGoogle={() => setMapEngine('google')} />
+            <MapboxTrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => { setTrajectoryScheduleId(null); setMapEngine('mapbox'); }} onSwitchToGoogle={() => setMapEngine('google')} />
           ) : (
             <TrajectoryViewer scheduleId={trajectoryScheduleId} onClose={() => setTrajectoryScheduleId(null)} onSwitchToMapbox={() => setMapEngine('mapbox')} />
           )}
