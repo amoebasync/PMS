@@ -346,6 +346,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   // Speed visualization
   const [showSpeed, setShowSpeed] = useState(false);
 
+  // PS GPS comparison
+  const [showPsComparison, setShowPsComparison] = useState(false);
+  const [psGpsPoints, setPsGpsPoints] = useState<GpsPoint[] | null>(null);
+  const [psLoading, setPsLoading] = useState(false);
+  const [psError, setPsError] = useState('');
+
   // Route suggestion
   const [suggestedRoute, setSuggestedRoute] = useState<any>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -483,6 +489,43 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   }, [scheduleId]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // PS GPS比較データ取得
+  useEffect(() => {
+    if (!showPsComparison || psGpsPoints !== null) return;
+    const fetchPsGps = async () => {
+      setPsLoading(true);
+      setPsError('');
+      try {
+        const res = await fetch(`/api/schedules/${scheduleId}/trajectory/posting-system`);
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          setPsError(err.error || 'PS GPSデータ取得失敗');
+          return;
+        }
+        const psData = await res.json();
+        setPsGpsPoints(psData.gpsPoints || []);
+      } catch {
+        setPsError('PS GPSデータ取得失敗');
+      } finally {
+        setPsLoading(false);
+      }
+    };
+    fetchPsGps();
+  }, [showPsComparison, psGpsPoints, scheduleId]);
+
+  // PS trajectory GeoJSON
+  const psTrajectoryGeoJson = useMemo(() => {
+    if (!psGpsPoints || psGpsPoints.length < 2) return null;
+    return {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: {
+        type: 'LineString' as const,
+        coordinates: psGpsPoints.map(p => [p.lng, p.lat]),
+      },
+    };
+  }, [psGpsPoints]);
 
   // GPS comment初期化
   useEffect(() => {
@@ -1307,6 +1350,37 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </Source>
                 )}
 
+                {/* PS GPS comparison overlay */}
+                {showPsComparison && psTrajectoryGeoJson && (
+                  <Source id="ps-trajectory" type="geojson" data={psTrajectoryGeoJson}>
+                    <Layer
+                      id="ps-trajectory-line"
+                      type="line"
+                      paint={{
+                        'line-color': '#f59e0b',
+                        'line-width': 3,
+                        'line-opacity': 0.7,
+                        'line-dasharray': [4, 3],
+                      }}
+                      layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+                    />
+                  </Source>
+                )}
+                {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && (
+                  <>
+                    <Marker longitude={psGpsPoints[0].lng} latitude={psGpsPoints[0].lat} anchor="center">
+                      <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-white text-[7px] font-bold">S</span>
+                      </div>
+                    </Marker>
+                    <Marker longitude={psGpsPoints[psGpsPoints.length - 1].lng} latitude={psGpsPoints[psGpsPoints.length - 1].lat} anchor="center">
+                      <div className="w-4 h-4 rounded-full bg-amber-700 border-2 border-white shadow-md flex items-center justify-center">
+                        <span className="text-white text-[7px] font-bold">E</span>
+                      </div>
+                    </Marker>
+                  </>
+                )}
+
                 {/* Heatmap overlay (toggle) */}
                 {showHeatmap && heatmapGeoJson && (
                   <Source id="heatmap" type="geojson" data={heatmapGeoJson}>
@@ -1701,6 +1775,43 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <i className="bi bi-speedometer2"></i>
                 移動速度
               </button>
+              {dataSource === 'pms' && (
+                <button
+                  onClick={() => setShowPsComparison(!showPsComparison)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
+                    showPsComparison
+                      ? 'bg-amber-600 text-white border-amber-700'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <i className={`bi ${psLoading ? 'bi-arrow-repeat animate-spin' : 'bi-arrows-angle-expand'}`}></i>
+                  PS比較
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* PS comparison legend */}
+          {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && (
+            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10">
+              <div className="font-bold text-slate-700 mb-1.5">GPS比較</div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: '#ec4899' }}></div>
+                  <span className="text-slate-600">PMS（{data?.gpsPoints.length || 0}点）</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-5 h-1 rounded" style={{ background: '#f59e0b' }}></div>
+                  <span className="text-slate-600">Posting System（{psGpsPoints.length}点）</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PS error */}
+          {showPsComparison && psError && (
+            <div className="absolute bottom-4 right-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-600 z-10">
+              <i className="bi bi-exclamation-triangle mr-1"></i>{psError}
             </div>
           )}
 
@@ -1879,6 +1990,80 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     <SpeedDistributionChart speeds={segmentSpeeds} />
                   </div>
                 </>
+              )}
+
+              {/* PS GPS comparison stats */}
+              {showPsComparison && psGpsPoints && psGpsPoints.length > 0 && data && (
+                <div className="p-4 border-b border-slate-100">
+                  <h3 className="font-bold text-slate-700 text-sm mb-3">
+                    <i className="bi bi-arrows-angle-expand mr-1 text-amber-500"></i>
+                    PS GPS 比較
+                  </h3>
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-0.5 rounded bg-pink-500"></span>
+                        PMS
+                      </span>
+                      <span className="font-bold text-slate-700">{data.gpsPoints.length.toLocaleString()} 点</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2.5 h-0.5 rounded bg-amber-500"></span>
+                        Posting System
+                      </span>
+                      <span className="font-bold text-slate-700">{psGpsPoints.length.toLocaleString()} 点</span>
+                    </div>
+                    {(() => {
+                      // 時間範囲の比較
+                      const pmsStart = data.gpsPoints.length > 0 ? new Date(data.gpsPoints[0].timestamp) : null;
+                      const pmsEnd = data.gpsPoints.length > 0 ? new Date(data.gpsPoints[data.gpsPoints.length - 1].timestamp) : null;
+                      const psStart = psGpsPoints.length > 0 ? new Date(psGpsPoints[0].timestamp) : null;
+                      const psEnd = psGpsPoints.length > 0 ? new Date(psGpsPoints[psGpsPoints.length - 1].timestamp) : null;
+                      // PMS と PS の総距離比較
+                      let psDist = 0;
+                      for (let i = 1; i < psGpsPoints.length; i++) {
+                        psDist += haversineM(psGpsPoints[i - 1].lat, psGpsPoints[i - 1].lng, psGpsPoints[i].lat, psGpsPoints[i].lng);
+                      }
+                      return (
+                        <>
+                          <div className="mt-2 pt-2 border-t border-slate-100">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">PMS 距離</span>
+                              <span className="font-bold text-slate-700">{(data.session.totalDistance / 1000).toFixed(1)} km</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">PS 距離</span>
+                              <span className="font-bold text-slate-700">{(psDist / 1000).toFixed(1)} km</span>
+                            </div>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-slate-100">
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">PMS 時間</span>
+                              <span className="font-bold text-slate-700">
+                                {pmsStart ? fmtTime(pmsStart.toISOString()) : '-'} ~ {pmsEnd ? fmtTime(pmsEnd.toISOString()) : '-'}
+                              </span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-slate-500">PS 時間</span>
+                              <span className="font-bold text-slate-700">
+                                {psStart ? fmtTime(psStart.toISOString()) : '-'} ~ {psEnd ? fmtTime(psEnd.toISOString()) : '-'}
+                              </span>
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+              )}
+              {showPsComparison && psGpsPoints && psGpsPoints.length === 0 && !psLoading && (
+                <div className="p-4 border-b border-slate-100">
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    <i className="bi bi-info-circle mr-1"></i>
+                    Posting System に当日のGPSデータがありません。
+                  </div>
+                </div>
               )}
 
               {/* Per-hour metrics — PMS session only */}
