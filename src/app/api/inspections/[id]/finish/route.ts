@@ -20,6 +20,16 @@ export async function POST(
       return NextResponse.json({ error: '無効なIDです' }, { status: 400 });
     }
 
+    let followUp: { note: string; dueDate?: string; assigneeId?: number } | null = null;
+    let feedback: { note: string; dueDate?: string; assigneeId?: number } | null = null;
+    try {
+      const body = await request.json();
+      followUp = body.followUp || null;
+      feedback = body.feedback || null;
+    } catch {
+      // body無しでも完了可能（後方互換）
+    }
+
     const inspection = await prisma.fieldInspection.findUnique({
       where: { id: inspectionId },
     });
@@ -112,6 +122,73 @@ export async function POST(
         description: `現地確認を完了（ID: ${inspectionId}, 確認率: ${confirmationRate != null ? (confirmationRate * 100).toFixed(1) : '-'}%, 遵守率: ${complianceRate != null ? (complianceRate * 100).toFixed(1) : '-'}%）`,
         tx,
       });
+
+      // フォローアップタスク生成
+      let followUpTaskId: number | null = null;
+      if (followUp?.note?.trim()) {
+        const area = (updated as any).schedule?.area;
+        const areaName = area
+          ? `${area.prefecture?.name || ''}${area.city?.name || ''}${area.chome_name || area.town_name || ''}`
+          : '';
+        const distName = updated.distributor?.name || '不明';
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 59, 999);
+
+        const fuTask = await tx.task.create({
+          data: {
+            title: `[フォローアップ] ${distName} - ${areaName}`,
+            description: followUp.note.trim(),
+            priority: 'HIGH',
+            status: 'PENDING',
+            dueDate: followUp.dueDate ? new Date(followUp.dueDate) : tomorrow,
+            assigneeId: followUp.assigneeId || inspection.inspectorId,
+            distributorId: inspection.distributorId,
+            scheduleId: inspection.scheduleId,
+            createdById: actorId || inspection.inspectorId || 1,
+          },
+        });
+        followUpTaskId = fuTask.id;
+      }
+
+      // フィードバックタスク生成
+      let feedbackTaskId: number | null = null;
+      if (feedback?.note?.trim()) {
+        const area = (updated as any).schedule?.area;
+        const areaName = area
+          ? `${area.prefecture?.name || ''}${area.city?.name || ''}${area.chome_name || area.town_name || ''}`
+          : '';
+        const distName = updated.distributor?.name || '不明';
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(23, 59, 59, 999);
+
+        const fbTask = await tx.task.create({
+          data: {
+            title: `[フィードバック] ${distName} - ${areaName}`,
+            description: feedback.note.trim(),
+            priority: 'MEDIUM',
+            status: 'PENDING',
+            dueDate: feedback.dueDate ? new Date(feedback.dueDate) : tomorrow,
+            assigneeId: feedback.assigneeId || inspection.inspectorId,
+            distributorId: inspection.distributorId,
+            scheduleId: inspection.scheduleId,
+            createdById: actorId || inspection.inspectorId || 1,
+          },
+        });
+        feedbackTaskId = fbTask.id;
+      }
+
+      // タスクIDをFieldInspectionに保存
+      if (followUpTaskId || feedbackTaskId) {
+        await tx.fieldInspection.update({
+          where: { id: inspectionId },
+          data: {
+            ...(followUpTaskId ? { followUpTaskId, followUpRequired: true, followUpNote: followUp!.note.trim() } : {}),
+            ...(feedbackTaskId ? { feedbackTaskId, feedbackNote: feedback!.note.trim() } : {}),
+          },
+        });
+      }
 
       return {
         ...updated,

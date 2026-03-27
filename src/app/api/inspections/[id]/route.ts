@@ -75,6 +75,8 @@ export async function GET(
           },
           orderBy: { checkedAt: 'asc' },
         },
+        followUpTask: { select: { id: true, status: true } },
+        feedbackTask: { select: { id: true, status: true } },
         inspectionSession: {
           include: {
             gpsPoints: {

@@ -65,6 +65,8 @@ export async function GET(request: NextRequest) {
               },
             },
           },
+          followUpTask: { select: { id: true, status: true } },
+          feedbackTask: { select: { id: true, status: true } },
           _count: {
             select: { checkpoints: true, prohibitedChecks: true },
           },
