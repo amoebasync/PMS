@@ -41,19 +41,22 @@ export async function GET(
     }
 
     // 同エリアの過去の完了済みスケジュール（GPSデータ付き）を取得
+    // まずGPSポイントが存在するセッションを持つスケジュールを検索
     const pastSchedules = await prisma.distributionSchedule.findMany({
       where: {
         areaId: schedule.areaId,
         id: { not: scheduleId },
         date: { lt: schedule.date },
-        status: 'COMPLETED',
-        session: { isNot: null },
+        session: {
+          gpsPoints: { some: {} },
+        },
       },
       orderBy: { date: 'desc' },
       take: limit,
       select: {
         id: true,
         date: true,
+        status: true,
         distributor: { select: { id: true, name: true, staffId: true } },
         session: {
           select: {
@@ -70,20 +73,24 @@ export async function GET(
       },
     });
 
-    const results = pastSchedules.map(ps => ({
-      scheduleId: ps.id,
-      date: ps.date,
-      distributorName: ps.distributor?.name || '-',
-      distributorStaffId: ps.distributor?.staffId || '-',
-      totalDistance: ps.session?.totalDistance || 0,
-      startedAt: ps.session?.startedAt || null,
-      finishedAt: ps.session?.finishedAt || null,
-      gpsPoints: (ps.session?.gpsPoints || []).map(p => ({
-        lat: p.latitude,
-        lng: p.longitude,
-        timestamp: p.timestamp.toISOString(),
-      })),
-    }));
+    const results = pastSchedules
+      .filter(ps => ps.session && ps.session.gpsPoints.length > 0)
+      .map(ps => ({
+        scheduleId: ps.id,
+        date: ps.date,
+        status: ps.status,
+        distributorName: ps.distributor?.name || '-',
+        distributorStaffId: ps.distributor?.staffId || '-',
+        totalDistance: ps.session?.totalDistance || 0,
+        startedAt: ps.session?.startedAt || null,
+        finishedAt: ps.session?.finishedAt || null,
+        gpsPointCount: ps.session?.gpsPoints.length || 0,
+        gpsPoints: (ps.session?.gpsPoints || []).map(p => ({
+          lat: p.latitude,
+          lng: p.longitude,
+          timestamp: p.timestamp.toISOString(),
+        })),
+      }));
 
     return NextResponse.json({
       areaId: schedule.areaId,
