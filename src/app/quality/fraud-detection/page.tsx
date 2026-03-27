@@ -2,6 +2,15 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from '@/i18n';
+import dynamic from 'next/dynamic';
+const AreaGpsComparison = dynamic(() => import('@/components/quality/AreaGpsComparison'), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-8 h-8 border-4 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+    </div>
+  ),
+});
 
 type FraudItem = {
   id: number;
@@ -64,6 +73,7 @@ export default function FraudDetectionPage() {
   const [reviewForm, setReviewForm] = useState({ result: '', note: '' });
   const [reviewing, setReviewing] = useState(false);
   const [kpis, setKpis] = useState<KpiData>({ totalAnalyzed: 0, highCriticalCount: 0, unreviewedCount: 0, averageScore: 0 });
+  const [activeTab, setActiveTab] = useState<'list' | 'comparison'>('list');
 
   const totalPages = Math.ceil(total / PAGE_SIZE);
 
@@ -145,6 +155,28 @@ export default function FraudDetectionPage() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4">
+      {/* Tab Bar */}
+      <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
+        <button
+          onClick={() => setActiveTab('list')}
+          className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${
+            activeTab === 'list' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <i className="bi bi-shield-exclamation mr-1.5"></i>{t('tab_fraud_list')}
+        </button>
+        <button
+          onClick={() => setActiveTab('comparison')}
+          className={`px-4 py-2 text-xs font-bold rounded-md transition-colors ${
+            activeTab === 'comparison' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <i className="bi bi-map mr-1.5"></i>{t('tab_area_comparison')}
+        </button>
+      </div>
+
+      {activeTab === 'list' && (
+        <>
       {/* Stats — inline badges */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-700">
@@ -338,6 +370,10 @@ export default function FraudDetectionPage() {
           </>
         )}
       </div>
+        </>
+      )}
+
+      {activeTab === 'comparison' && <AreaGpsComparison />}
 
       {/* Detail Modal */}
       {selectedItem && (
