@@ -1325,8 +1325,8 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             {/* ========== TRAJECTORY MODE ========== */}
             {viewMode === 'trajectory' && (
               <>
-                {/* GPS trajectory - already traversed (normal mode) */}
-                {!showSpeed && trajectoryGeoJson && (
+                {/* GPS trajectory - already traversed (normal mode, hidden when speed ON) */}
+                {trajectoryGeoJson && (
                   <Source id="trajectory" type="geojson" data={trajectoryGeoJson}>
                     <Layer
                       id="trajectory-line"
@@ -1339,14 +1339,15 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       layout={{
                         'line-cap': 'round',
                         'line-join': 'round',
+                        visibility: showSpeed ? 'none' : 'visible',
                       }}
                     />
                   </Source>
                 )}
 
-                {/* Speed-colored trajectory (when speed mode ON) */}
-                {showSpeed && speedTrajectoryGeoJson && speedGradientStops && speedGradientStops.length >= 2 && (
-                  <Source id="speed-trajectory" type="geojson" data={speedTrajectoryGeoJson} lineMetrics={true}>
+                {/* Speed-colored trajectory (always mounted, visibility toggled) */}
+                {speedTrajectoryGeoJson && speedGradientStops && speedGradientStops.length >= 2 && (
+                  <Source id="speed-trajectory" type="geojson" data={speedTrajectoryGeoJson} lineMetrics>
                     <Layer
                       id="speed-trajectory-line"
                       type="line"
@@ -1360,13 +1361,17 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         ],
                         'line-opacity': 0.9,
                       }}
-                      layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+                      layout={{
+                        'line-cap': 'round',
+                        'line-join': 'round',
+                        visibility: showSpeed ? 'visible' : 'none',
+                      }}
                     />
                   </Source>
                 )}
 
-                {/* GPS trajectory - remaining (dimmed) */}
-                {!showSpeed && remainingGeoJson && (
+                {/* GPS trajectory - remaining (dimmed, hidden when speed ON) */}
+                {remainingGeoJson && (
                   <Source id="trajectory-remaining" type="geojson" data={remainingGeoJson}>
                     <Layer
                       id="trajectory-remaining-line"
@@ -1379,6 +1384,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       layout={{
                         'line-cap': 'round',
                         'line-join': 'round',
+                        visibility: showSpeed ? 'none' : 'visible',
                       }}
                     />
                   </Source>
@@ -1386,15 +1392,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
 
                 {/* Past area trajectory comparison overlay */}
                 {showPastComparison && pastTrajectoryGeoJson && (
-                  <Source id="past-trajectory" type="geojson" data={pastTrajectoryGeoJson}>
+                  <Source key={`past-traj-${selectedPast?.scheduleId || 0}`} id={`past-traj-${selectedPast?.scheduleId || 0}`} type="geojson" data={pastTrajectoryGeoJson}>
                     <Layer
-                      id="past-trajectory-line"
+                      id={`past-traj-line-${selectedPast?.scheduleId || 0}`}
                       type="line"
                       paint={{
                         'line-color': '#f59e0b',
-                        'line-width': 3,
-                        'line-opacity': 0.6,
-                        'line-dasharray': [4, 3],
+                        'line-width': 4,
+                        'line-opacity': 0.75,
                       }}
                       layout={{ 'line-cap': 'round', 'line-join': 'round' }}
                     />
