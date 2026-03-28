@@ -36,6 +36,7 @@ jobs:
           NEXT_PUBLIC_MAPBOX_TOKEN: ${{ secrets.NEXT_PUBLIC_MAPBOX_TOKEN }}
           NEXT_PUBLIC_LIFF_ID: ${{ secrets.NEXT_PUBLIC_LIFF_ID }}
           NEXT_PUBLIC_LIFF_PHOTO_ID: ${{ secrets.NEXT_PUBLIC_LIFF_PHOTO_ID }}
+          NEXT_PUBLIC_LIFF_MANUAL_ID: ${{ secrets.NEXT_PUBLIC_LIFF_MANUAL_ID }}
 
       - name: Sync static to S3
         run: |
