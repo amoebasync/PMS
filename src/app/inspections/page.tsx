@@ -739,7 +739,7 @@ export default function InspectionsPage() {
       {/* ================================================================ */}
       {showLineGroupModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
           onClick={() => setShowLineGroupModal(false)}
         >
           <div
@@ -781,7 +781,7 @@ export default function InspectionsPage() {
       {/* ================================================================ */}
       {showAssignModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4"
           onClick={() => {
             setShowAssignModal(false);
             resetAssignForm();

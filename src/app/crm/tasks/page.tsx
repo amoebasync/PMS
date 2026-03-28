@@ -961,7 +961,7 @@ export default function CrmTasksPage() {
 
       {/* ==================== タスク詳細モーダル（読み取り専用） ==================== */}
       {detailTask && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setDetailTask(null)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* ヘッダー */}
@@ -1192,7 +1192,7 @@ export default function CrmTasksPage() {
 
       {/* ==================== タスク編集モーダル ==================== */}
       {isTaskModalOpen && editingTask && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTaskModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">
@@ -1346,7 +1346,7 @@ export default function CrmTasksPage() {
 
       {/* ==================== テンプレート作成/編集モーダル ==================== */}
       {isTmplModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/40" onClick={() => setIsTmplModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-6 border-b border-slate-100 sticky top-0 bg-white z-10">

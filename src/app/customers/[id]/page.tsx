@@ -928,7 +928,7 @@ export default function CustomerDetailPage({ params }: { params: Promise<{ id: s
 
       {/* ===== 担当者追加/編集モーダル ===== */}
       {contactModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h2 className="font-bold text-slate-800 text-base">{contactModal.mode === 'add' ? '担当者を追加' : '担当者を編集'}</h2>

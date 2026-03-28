@@ -337,7 +337,7 @@ function CompliancePopover({ schedule, onUpdate, t }: { schedule: any; onUpdate:
       )}
     </div>
     {enlargedPhoto && (
-      <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4" onClick={() => setEnlargedPhoto(null)}>
+      <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4" onClick={() => setEnlargedPhoto(null)}>
         <button onClick={() => setEnlargedPhoto(null)} className="absolute top-4 right-4 w-10 h-10 bg-white/20 text-white rounded-full flex items-center justify-center text-xl hover:bg-white/30 z-10">
           <i className="bi bi-x-lg"></i>
         </button>

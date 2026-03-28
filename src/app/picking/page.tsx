@@ -750,7 +750,7 @@ export default function PickingPage() {
       {/* ---- Image modal ---- */}
       {imageModalUrl && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4"
           onClick={() => setImageModalUrl(null)}
         >
           <div className="relative max-w-4xl max-h-full" onClick={(e) => e.stopPropagation()}>
