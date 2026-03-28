@@ -249,13 +249,20 @@ export default function GuidancePanel({ inspectionId, inspection, category, isAc
       {/* Note */}
       <div>
         <label className="block text-xs font-bold text-slate-600 mb-1">{t('note')}</label>
-        <textarea
-          value={note}
-          onChange={(e) => handleNoteChange(e.target.value)}
-          disabled={!isActive}
-          placeholder={t('note')}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white h-24 resize-none disabled:bg-slate-50 disabled:text-slate-400"
-        />
+        {isActive ? (
+          <textarea
+            value={note}
+            onChange={(e) => handleNoteChange(e.target.value)}
+            placeholder={t('note')}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-500 bg-white h-24 resize-none"
+          />
+        ) : note ? (
+          <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 whitespace-pre-wrap">
+            {note}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 italic">—</p>
+        )}
       </div>
 
       {/* Follow-up */}

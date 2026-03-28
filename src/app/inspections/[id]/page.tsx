@@ -152,6 +152,7 @@ export default function InspectionDetailPage() {
   const [mapData, setMapData] = useState<MapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>('checkpoints');
+  const [initialTabSet, setInitialTabSet] = useState(false);
   type SheetPosition = 'collapsed' | 'half' | 'full';
   const [sheetPosition, setSheetPosition] = useState<SheetPosition>('half');
   const [actionLoading, setActionLoading] = useState(false);
@@ -238,6 +239,14 @@ export default function InspectionDetailPage() {
     load();
     return () => { cancelled = true; };
   }, [fetchInspection, fetchMapData]);
+
+  // COMPLETED時は初期タブをサマリーにする
+  useEffect(() => {
+    if (!initialTabSet && inspection?.status === 'COMPLETED') {
+      setActiveTab('summary');
+      setInitialTabSet(true);
+    }
+  }, [inspection, initialTabSet]);
 
   /* ---- GPS tracking when IN_PROGRESS ---- */
   const startGpsTracking = useCallback(() => {
