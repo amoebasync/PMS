@@ -46,13 +46,9 @@ export default function StaffManualPage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4 p-4">
         <div className="h-6 w-24 bg-slate-200 rounded animate-pulse mx-auto"></div>
         <div className="w-full aspect-[3/4] bg-slate-200 rounded-lg animate-pulse"></div>
-        <div className="flex justify-between gap-4">
-          <div className="h-12 flex-1 bg-slate-200 rounded-xl animate-pulse"></div>
-          <div className="h-12 flex-1 bg-slate-200 rounded-xl animate-pulse"></div>
-        </div>
       </div>
     );
   }
@@ -66,68 +62,81 @@ export default function StaffManualPage() {
     );
   }
 
-  const currentUrl = pages[currentPage]?.imageUrl;
-  const currentIsPdf = currentUrl ? isPdfUrl(currentUrl) : false;
+  // PDFが含まれているかチェック（PDFは1ファイルで全ページを含む）
+  const pdfPage = pages.find(p => isPdfUrl(p.imageUrl));
+  const imagePages = pages.filter(p => !isPdfUrl(p.imageUrl));
+
+  // PDF全画面表示モード
+  if (pdfPage) {
+    return (
+      <div className="fixed inset-0 flex flex-col bg-white" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
+        <iframe
+          src={`${pdfPage.imageUrl}#toolbar=1&navpanes=0&scrollbar=1`}
+          className="flex-1 w-full border-none"
+          title="マニュアル"
+          style={{ minHeight: 0 }}
+        />
+      </div>
+    );
+  }
+
+  // 画像ページモード（従来通り）
+  const currentUrl = imagePages[currentPage]?.imageUrl;
 
   return (
     <div className="flex flex-col min-h-[calc(100vh-120px)]">
       {/* Page indicator */}
-      <div className="text-center text-sm text-slate-500 py-2 font-medium">
-        {currentPage + 1} / {pages.length}
-      </div>
+      {imagePages.length > 1 && (
+        <div className="text-center text-sm text-slate-500 py-2 font-medium">
+          {currentPage + 1} / {imagePages.length}
+        </div>
+      )}
 
-      {/* Content container with touch events */}
+      {/* Image container with touch events */}
       <div
-        className="flex-1 flex items-center justify-center select-none"
+        className="flex-1 flex items-center justify-center select-none overflow-hidden"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {currentIsPdf ? (
-          <iframe
-            src={currentUrl}
-            className="w-full rounded-lg shadow-sm"
-            style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}
-            title={`マニュアル ${currentPage + 1}ページ`}
-          />
-        ) : (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={currentUrl}
-            alt={`マニュアル ${currentPage + 1}ページ`}
-            className="w-full rounded-lg shadow-sm cursor-pointer"
-            onClick={() => setZoomImage(currentUrl)}
-            draggable={false}
-          />
-        )}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={currentUrl}
+          alt={`マニュアル ${currentPage + 1}ページ`}
+          className="w-full rounded-lg shadow-sm cursor-pointer"
+          onClick={() => setZoomImage(currentUrl)}
+          draggable={false}
+        />
       </div>
 
-      {/* Navigation buttons */}
-      <div className="flex justify-between items-center py-4 gap-4">
-        <button
-          onClick={() => setCurrentPage((p) => p - 1)}
-          disabled={currentPage === 0}
-          className={`flex-1 flex items-center justify-center gap-2 min-h-[48px] rounded-xl font-bold text-sm transition-colors ${
-            currentPage === 0
-              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              : 'bg-indigo-600 text-white active:bg-indigo-700'
-          }`}
-        >
-          <i className="bi bi-chevron-left"></i>
-          前へ
-        </button>
-        <button
-          onClick={() => setCurrentPage((p) => p + 1)}
-          disabled={currentPage === pages.length - 1}
-          className={`flex-1 flex items-center justify-center gap-2 min-h-[48px] rounded-xl font-bold text-sm transition-colors ${
-            currentPage === pages.length - 1
-              ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
-              : 'bg-indigo-600 text-white active:bg-indigo-700'
-          }`}
-        >
-          次へ
-          <i className="bi bi-chevron-right"></i>
-        </button>
-      </div>
+      {/* Navigation buttons (only if multiple pages) */}
+      {imagePages.length > 1 && (
+        <div className="flex justify-between items-center py-4 gap-4">
+          <button
+            onClick={() => setCurrentPage((p) => p - 1)}
+            disabled={currentPage === 0}
+            className={`flex-1 flex items-center justify-center gap-2 min-h-[48px] rounded-xl font-bold text-sm transition-colors ${
+              currentPage === 0
+                ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                : 'bg-indigo-600 text-white active:bg-indigo-700'
+            }`}
+          >
+            <i className="bi bi-chevron-left"></i>
+            前へ
+          </button>
+          <button
+            onClick={() => setCurrentPage((p) => p + 1)}
+            disabled={currentPage === imagePages.length - 1}
+            className={`flex-1 flex items-center justify-center gap-2 min-h-[48px] rounded-xl font-bold text-sm transition-colors ${
+              currentPage === imagePages.length - 1
+                ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+                : 'bg-indigo-600 text-white active:bg-indigo-700'
+            }`}
+          >
+            次へ
+            <i className="bi bi-chevron-right"></i>
+          </button>
+        </div>
+      )}
 
       {/* Zoom modal (images only) */}
       {zoomImage && (
