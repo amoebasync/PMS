@@ -1117,7 +1117,7 @@ export default function CrmTasksPage() {
                             </p>
                           )}
                           <div className="mt-1">
-                            <Link href={`/inspections?id=${detailTask.inspectionFollowUp.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                            <Link href={`/inspections/${detailTask.inspectionFollowUp.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                               {t('detail_view_link')} <i className="bi bi-arrow-right"></i>
                             </Link>
                           </div>
@@ -1138,7 +1138,7 @@ export default function CrmTasksPage() {
                             </p>
                           )}
                           <div className="mt-1">
-                            <Link href={`/inspections?id=${detailTask.inspectionFeedback.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
+                            <Link href={`/inspections/${detailTask.inspectionFeedback.id}`} className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1">
                               {t('detail_view_link')} <i className="bi bi-arrow-right"></i>
                             </Link>
                           </div>
