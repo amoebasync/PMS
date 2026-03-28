@@ -61,6 +61,7 @@ export function middleware(request: NextRequest) {
     path.startsWith('/map/') ||
     path === '/flyer-photo' ||
     path === '/staff/line-login' ||
+    path === '/staff/manual-liff' ||
     path === '/api/staff/auth/line-login';
 
   const adminSession = request.cookies.get('pms_session')?.value;
