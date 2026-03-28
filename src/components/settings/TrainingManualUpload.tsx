@@ -136,7 +136,7 @@ export default function TrainingManualUpload() {
             {t('manual_upload_title')}
           </h2>
           <p className="text-xs text-slate-500 mt-1">
-            マニュアルのページ画像（PNG/JPG）を選択してアップロードします。ファイル名の順番でページ番号が割り当てられます。
+            マニュアルファイル（PDF または画像）をアップロードします。PDFは1ファイルで全ページを含みます。
           </p>
         </div>
 
@@ -194,9 +194,9 @@ export default function TrainingManualUpload() {
               />
               {selectedFiles.length === 0 ? (
                 <>
-                  <i className="bi bi-images text-4xl text-slate-300 block mb-2"></i>
-                  <p className="text-sm text-slate-500">クリックして画像ファイルを選択</p>
-                  <p className="text-xs text-slate-400 mt-1">PNG / JPG / WebP 対応 · 複数ファイル可</p>
+                  <i className="bi bi-file-earmark-arrow-up text-4xl text-slate-300 block mb-2"></i>
+                  <p className="text-sm text-slate-500">クリックしてファイルを選択</p>
+                  <p className="text-xs text-slate-400 mt-1">PDF / PNG / JPG / WebP 対応</p>
                 </>
               ) : (
                 <>
@@ -295,8 +295,10 @@ export default function TrainingManualUpload() {
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {t('manual_pages', { count: v.pages.length })} ·{' '}
-                          {new Date(v.createdAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
+                          {v.pages.some(p => p.imageUrl.toLowerCase().endsWith('.pdf'))
+                            ? 'PDF'
+                            : `${v.pages.length}ページ`
+                          } · {new Date(v.createdAt).toLocaleDateString('ja-JP', { timeZone: 'Asia/Tokyo' })}
                         </p>
                       </div>
                     </div>
