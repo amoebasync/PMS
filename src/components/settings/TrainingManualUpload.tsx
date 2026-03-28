@@ -186,7 +186,7 @@ export default function TrainingManualUpload() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,application/pdf"
                 multiple
                 onChange={handleFileChange}
                 className="hidden"
@@ -314,13 +314,20 @@ export default function TrainingManualUpload() {
                     <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2">
                       {v.pages.map(page => (
                         <div key={page.id} className="relative group">
-                          <div className="aspect-[3/4] bg-slate-100 rounded-lg overflow-hidden border border-slate-200">
-                            <img
-                              src={page.imageUrl}
-                              alt={`Page ${page.pageNumber}`}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                            />
+                          <div className="aspect-[3/4] bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center">
+                            {page.imageUrl.toLowerCase().endsWith('.pdf') ? (
+                              <div className="flex flex-col items-center text-slate-400">
+                                <i className="bi bi-file-earmark-pdf text-2xl text-red-400"></i>
+                                <span className="text-[9px] mt-0.5">PDF</span>
+                              </div>
+                            ) : (
+                              <img
+                                src={page.imageUrl}
+                                alt={`Page ${page.pageNumber}`}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                              />
+                            )}
                           </div>
                           <p className="text-center text-xs text-slate-500 mt-1">{page.pageNumber}</p>
                         </div>

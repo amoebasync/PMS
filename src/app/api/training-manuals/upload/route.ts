@@ -37,28 +37,40 @@ export async function POST(request: NextRequest) {
     }
 
     // ファイル種別チェック
-    const allowedTypes = ['image/png', 'image/jpeg', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
+    const imageTypes = ['image/png', 'image/jpeg', 'image/webp'];
+    const isPdf = file.type === 'application/pdf';
+    if (!imageTypes.includes(file.type) && !isPdf) {
       return NextResponse.json(
-        { error: 'PNG/JPG/WebP 形式の画像のみアップロード可能です' },
+        { error: 'PNG/JPG/WebP/PDF 形式のファイルのみアップロード可能です' },
         { status: 400 }
       );
     }
 
-    // 画像をWebPに変換（最大幅1200px、quality: 85）
     const inputBuffer = Buffer.from(await file.arrayBuffer());
-    const image = sharp(inputBuffer);
-    const metadata = await image.metadata();
+    let uploadBuffer: Buffer;
+    let s3Key: string;
+    let contentType: string;
 
-    let pipeline = image;
-    if (metadata.width && metadata.width > 1200) {
-      pipeline = pipeline.resize({ width: 1200, withoutEnlargement: true });
+    if (isPdf) {
+      // PDFはそのままアップロード
+      uploadBuffer = inputBuffer;
+      s3Key = `uploads/training-manuals/${language}/${version}/page-${pageNumber}.pdf`;
+      contentType = 'application/pdf';
+    } else {
+      // 画像をWebPに変換（最大幅1200px、quality: 85）
+      const image = sharp(inputBuffer);
+      const metadata = await image.metadata();
+      let pipeline = image;
+      if (metadata.width && metadata.width > 1200) {
+        pipeline = pipeline.resize({ width: 1200, withoutEnlargement: true });
+      }
+      uploadBuffer = await pipeline.webp({ quality: 85 }).toBuffer();
+      s3Key = `uploads/training-manuals/${language}/${version}/page-${pageNumber}.webp`;
+      contentType = 'image/webp';
     }
-    const webpBuffer = await pipeline.webp({ quality: 85 }).toBuffer();
 
     // S3にアップロード
-    const s3Key = `uploads/training-manuals/${language}/${version}/page-${pageNumber}.webp`;
-    const imageUrl = await uploadToS3(webpBuffer, s3Key, 'image/webp');
+    const imageUrl = await uploadToS3(uploadBuffer, s3Key, contentType);
 
     // DBにUpsert（language + pageNumber + manualVersion のユニーク制約）
     const page = await prisma.trainingManualPage.upsert({

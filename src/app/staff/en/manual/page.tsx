@@ -7,6 +7,8 @@ type ManualPage = {
   imageUrl: string;
 };
 
+const isPdfUrl = (url: string) => url.toLowerCase().endsWith('.pdf');
+
 export default function StaffManualPageEn() {
   const [pages, setPages] = useState<ManualPage[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -64,6 +66,9 @@ export default function StaffManualPageEn() {
     );
   }
 
+  const currentUrl = pages[currentPage]?.imageUrl;
+  const currentIsPdf = currentUrl ? isPdfUrl(currentUrl) : false;
+
   return (
     <div className="flex flex-col min-h-[calc(100vh-120px)]">
       {/* Page indicator */}
@@ -71,20 +76,29 @@ export default function StaffManualPageEn() {
         {currentPage + 1} / {pages.length}
       </div>
 
-      {/* Image container with touch events */}
+      {/* Content container with touch events */}
       <div
         className="flex-1 flex items-center justify-center select-none"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={pages[currentPage]?.imageUrl}
-          alt={`Manual page ${currentPage + 1}`}
-          className="w-full rounded-lg shadow-sm cursor-pointer"
-          onClick={() => setZoomImage(pages[currentPage]?.imageUrl)}
-          draggable={false}
-        />
+        {currentIsPdf ? (
+          <iframe
+            src={currentUrl}
+            className="w-full rounded-lg shadow-sm"
+            style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}
+            title={`Manual page ${currentPage + 1}`}
+          />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={currentUrl}
+            alt={`Manual page ${currentPage + 1}`}
+            className="w-full rounded-lg shadow-sm cursor-pointer"
+            onClick={() => setZoomImage(currentUrl)}
+            draggable={false}
+          />
+        )}
       </div>
 
       {/* Navigation buttons */}
@@ -115,10 +129,10 @@ export default function StaffManualPageEn() {
         </button>
       </div>
 
-      {/* Zoom modal */}
+      {/* Zoom modal (images only) */}
       {zoomImage && (
         <div
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4"
           onClick={() => setZoomImage(null)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
