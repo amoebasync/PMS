@@ -87,7 +87,14 @@ export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon, cont
                   .then(d => {
                     if (d.signingUrl) {
                       window.open(d.signingUrl, '_blank');
+                    } else if (d.status === 'NOT_SENT') {
+                      alert('契約書はまだ準備中です。管理者にお問い合わせください。');
+                    } else {
+                      alert('署名URLを取得できませんでした。管理者にお問い合わせください。');
                     }
+                  })
+                  .catch(() => {
+                    alert('通信エラーが発生しました。もう一度お試しください。');
                   });
               }}
               className="text-xs font-bold text-indigo-700 hover:underline text-left"

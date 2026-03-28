@@ -87,7 +87,14 @@ export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon, co
                   .then(d => {
                     if (d.signingUrl) {
                       window.open(d.signingUrl, '_blank');
+                    } else if (d.status === 'NOT_SENT') {
+                      alert('Your contract is being prepared. Please contact your manager.');
+                    } else {
+                      alert('Could not retrieve the signing URL. Please contact your manager.');
                     }
+                  })
+                  .catch(() => {
+                    alert('A connection error occurred. Please try again.');
                   });
               }}
               className="text-xs font-bold text-indigo-700 hover:underline text-left"
