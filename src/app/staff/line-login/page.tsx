@@ -32,7 +32,9 @@ export default function StaffLineLoginPage() {
 
         if (res.ok) {
           const data = await res.json();
-          router.replace('/staff');
+          const dest = data.language === 'en' ? '/staff/en' : '/staff';
+          // LIFF内ブラウザではNext.js routerが安定しないためlocation.hrefで遷移
+          window.location.href = dest;
         } else {
           const err = await res.json();
           setError(err.error || 'Login failed');

@@ -72,19 +72,19 @@ export default function DistributorDashboard() {
     const load = async () => {
       const profileRes = await fetch('/api/staff/profile');
       if (!profileRes.ok) {
-        router.push('/staff/login');
+        window.location.href = '/staff/login';
         return;
       }
 
       const profile = await profileRes.json();
 
       if (profile.language === 'en') {
-        router.push('/staff/en');
+        window.location.href = '/staff/en';
         return;
       }
 
       if (profile.isPasswordTemp) {
-        router.push('/staff/change-password');
+        window.location.href = '/staff/change-password';
         return;
       }
 
