@@ -87,8 +87,8 @@ export function StaffHeaderEn({ name, missingResidenceCard, visaExpiringSoon, co
                   .then(d => {
                     if (d.signingUrl) {
                       window.open(d.signingUrl, '_blank');
-                    } else if (d.status === 'NOT_SENT') {
-                      alert('Your contract is being prepared. Please contact your manager.');
+                    } else if (d.error) {
+                      alert(d.error);
                     } else {
                       alert('Could not retrieve the signing URL. Please contact your manager.');
                     }

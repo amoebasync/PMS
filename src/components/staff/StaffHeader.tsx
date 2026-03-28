@@ -87,8 +87,8 @@ export function StaffHeader({ name, missingResidenceCard, visaExpiringSoon, cont
                   .then(d => {
                     if (d.signingUrl) {
                       window.open(d.signingUrl, '_blank');
-                    } else if (d.status === 'NOT_SENT') {
-                      alert('契約書はまだ準備中です。管理者にお問い合わせください。');
+                    } else if (d.error) {
+                      alert(d.error);
                     } else {
                       alert('署名URLを取得できませんでした。管理者にお問い合わせください。');
                     }
