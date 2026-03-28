@@ -103,6 +103,16 @@ if [ -n "$CRON_SECRET" ]; then
     echo "CRON既存: PS不正検知分析（スキップ）"
   fi
 
+  # --- アナウンス予約送信 CRON 登録（重複時はスキップ） ---
+  # 5分おきに実行（予約時刻到達分をLINE送信）
+  ANNOUNCE_CRON_JOB="*/5 * * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/send-announcements >> /tmp/pms-cron-send-announcements.log 2>&1"
+  if ! crontab -l 2>/dev/null | grep -q "send-announcements"; then
+    (crontab -l 2>/dev/null; echo "$ANNOUNCE_CRON_JOB") | crontab -
+    echo "CRON登録: アナウンス予約送信（5分おき）"
+  else
+    echo "CRON既存: アナウンス予約送信（スキップ）"
+  fi
+
   # --- ハウスキープ CRON 登録（重複時はスキップ） ---
   # 処理: admin_notifications(30日超削除) / audit_logs(90日超S3アーカイブ) / gps_points(365日超S3アーカイブ)
   HOUSEKEEP_CRON_JOB="0 15 * * * curl -s -H \"Authorization: Bearer $CRON_SECRET\" http://localhost:3000/api/cron/housekeep >> /tmp/pms-cron-housekeep.log 2>&1"
