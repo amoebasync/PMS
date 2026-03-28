@@ -38,6 +38,8 @@ export async function GET(request: Request) {
         id: a.id,
         title: a.title,
         content: a.content,
+        titleEn: a.titleEn,
+        contentEn: a.contentEn,
         imageUrls: a.imageUrls ? JSON.parse(a.imageUrls) : [],
         targetAll: a.targetAll,
         targets: a.targets.map(t => t.distributor),
@@ -51,6 +53,8 @@ export async function GET(request: Request) {
         })),
         createdBy: `${a.createdBy.lastNameJa} ${a.createdBy.firstNameJa}`,
         createdAt: a.createdAt,
+        scheduledAt: a.scheduledAt,
+        sentAt: a.sentAt,
       };
     }));
 
@@ -61,18 +65,22 @@ export async function GET(request: Request) {
   }
 }
 
-// POST: Create announcement + send LINE notifications
+// POST: Create announcement + send LINE notifications (or schedule)
 export async function POST(request: Request) {
   const { employee, error } = await requireAdminSession();
   if (error) return error;
 
   try {
     const body = await request.json();
-    const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds } = body;
+    const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds, scheduledAt } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: 'title と content は必須です' }, { status: 400 });
     }
+
+    // Determine if this is a scheduled send
+    const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
+    const isScheduled = scheduledDate && scheduledDate > new Date();
 
     const announcement = await prisma.distributorAnnouncement.create({
       data: {
@@ -83,14 +91,16 @@ export async function POST(request: Request) {
         imageUrls: imageUrls?.length ? JSON.stringify(imageUrls) : null,
         targetAll: targetAll !== false,
         createdById: employee!.id,
+        scheduledAt: isScheduled ? scheduledDate : null,
+        sentAt: isScheduled ? null : new Date(),
         targets: !targetAll && distributorIds?.length
           ? { create: distributorIds.map((id: number) => ({ distributorId: id })) }
           : undefined,
       },
     });
 
-    // Send LINE notifications
-    if (isLineConfigured()) {
+    // Send LINE notifications immediately if not scheduled
+    if (!isScheduled && isLineConfigured()) {
       let targetDistributors: Array<{ lineUserId: string; language: string }> | undefined;
       if (targetAll !== false) {
         const langFilter = targetLanguage === 'ja' || targetLanguage === 'en'

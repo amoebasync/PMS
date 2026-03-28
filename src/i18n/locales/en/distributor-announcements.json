@@ -21,5 +21,13 @@
   "search_distributor": "Search by name or staff ID...",
   "read_status": "Read",
   "read_status_title": "Read Status",
-  "read_count_label": "read"
+  "read_count_label": "read",
+  "schedule_timing": "Send Timing",
+  "send_now": "Send Now",
+  "send_scheduled": "Schedule",
+  "status_sent": "Sent",
+  "status_scheduled": "Scheduled",
+  "btn_schedule": "Schedule",
+  "preview": "Preview",
+  "view_detail": "Detail"
 }

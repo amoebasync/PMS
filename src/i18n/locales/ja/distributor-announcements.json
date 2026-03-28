@@ -21,5 +21,13 @@
   "search_distributor": "配布員名・スタッフIDで検索...",
   "read_status": "既読",
   "read_status_title": "既読状況",
-  "read_count_label": "名が既読"
+  "read_count_label": "名が既読",
+  "schedule_timing": "送信タイミング",
+  "send_now": "今すぐ送信",
+  "send_scheduled": "予約送信",
+  "status_sent": "送信済",
+  "status_scheduled": "予約中",
+  "btn_schedule": "予約する",
+  "preview": "プレビュー",
+  "view_detail": "詳細"
 }
