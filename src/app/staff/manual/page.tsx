@@ -7,8 +7,6 @@ type ManualPage = {
   imageUrl: string;
 };
 
-const isPdfUrl = (url: string) => url.toLowerCase().endsWith('.pdf');
-
 export default function StaffManualPage() {
   const [pages, setPages] = useState<ManualPage[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -62,33 +60,12 @@ export default function StaffManualPage() {
     );
   }
 
-  // PDFが含まれているかチェック（PDFは1ファイルで全ページを含む）
-  const pdfPage = pages.find(p => isPdfUrl(p.imageUrl));
-  const imagePages = pages.filter(p => !isPdfUrl(p.imageUrl));
-
-  // PDF全画面表示モード
-  if (pdfPage) {
-    return (
-      <div className="fixed inset-0 flex flex-col bg-white" style={{ top: 'env(safe-area-inset-top, 0px)' }}>
-        <iframe
-          src={`${pdfPage.imageUrl}#toolbar=1&navpanes=0&scrollbar=1`}
-          className="flex-1 w-full border-none"
-          title="マニュアル"
-          style={{ minHeight: 0 }}
-        />
-      </div>
-    );
-  }
-
-  // 画像ページモード（従来通り）
-  const currentUrl = imagePages[currentPage]?.imageUrl;
-
   return (
     <div className="flex flex-col min-h-[calc(100vh-120px)]">
       {/* Page indicator */}
-      {imagePages.length > 1 && (
+      {pages.length > 1 && (
         <div className="text-center text-sm text-slate-500 py-2 font-medium">
-          {currentPage + 1} / {imagePages.length}
+          {currentPage + 1} / {pages.length}
         </div>
       )}
 
@@ -100,16 +77,16 @@ export default function StaffManualPage() {
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={currentUrl}
+          src={pages[currentPage]?.imageUrl}
           alt={`マニュアル ${currentPage + 1}ページ`}
           className="w-full rounded-lg shadow-sm cursor-pointer"
-          onClick={() => setZoomImage(currentUrl)}
+          onClick={() => setZoomImage(pages[currentPage]?.imageUrl)}
           draggable={false}
         />
       </div>
 
-      {/* Navigation buttons (only if multiple pages) */}
-      {imagePages.length > 1 && (
+      {/* Navigation buttons */}
+      {pages.length > 1 && (
         <div className="flex justify-between items-center py-4 gap-4">
           <button
             onClick={() => setCurrentPage((p) => p - 1)}
@@ -125,9 +102,9 @@ export default function StaffManualPage() {
           </button>
           <button
             onClick={() => setCurrentPage((p) => p + 1)}
-            disabled={currentPage === imagePages.length - 1}
+            disabled={currentPage === pages.length - 1}
             className={`flex-1 flex items-center justify-center gap-2 min-h-[48px] rounded-xl font-bold text-sm transition-colors ${
-              currentPage === imagePages.length - 1
+              currentPage === pages.length - 1
                 ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
                 : 'bg-indigo-600 text-white active:bg-indigo-700'
             }`}
@@ -138,7 +115,7 @@ export default function StaffManualPage() {
         </div>
       )}
 
-      {/* Zoom modal (images only) */}
+      {/* Zoom modal */}
       {zoomImage && (
         <div
           className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4"
