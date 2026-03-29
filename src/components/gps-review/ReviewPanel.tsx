@@ -250,52 +250,38 @@ export default function ReviewPanel({
       : null;
 
   /* ---- Fit bounds to area polygon (priority) or GPS points ---- */
-  useEffect(() => {
+  const fitMapBounds = useCallback(() => {
     if (!mapRef.current) return;
-
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-
-    // Priority: fit to area polygon
     if (areaGeoJson) {
       const extractCoords = (geojson: any): number[][] => {
         const coords: number[][] = [];
         const features = geojson.features || [geojson];
         for (const f of features) {
           const geom = f.geometry || f;
-          if (geom.type === 'Polygon') {
-            coords.push(...geom.coordinates[0]);
-          } else if (geom.type === 'MultiPolygon') {
-            for (const poly of geom.coordinates) coords.push(...poly[0]);
-          }
+          if (geom.type === 'Polygon') coords.push(...geom.coordinates[0]);
+          else if (geom.type === 'MultiPolygon') for (const poly of geom.coordinates) coords.push(...poly[0]);
         }
         return coords;
       };
-      const coords = extractCoords(areaGeoJson);
-      for (const [lng, lat] of coords) {
-        if (lat < minLat) minLat = lat;
-        if (lat > maxLat) maxLat = lat;
-        if (lng < minLng) minLng = lng;
-        if (lng > maxLng) maxLng = lng;
+      for (const [lng, lat] of extractCoords(areaGeoJson)) {
+        if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng; if (lng > maxLng) maxLng = lng;
       }
     }
-
-    // Fallback: fit to GPS points
     if (minLat === Infinity && trajData?.gpsPoints?.length) {
       for (const p of trajData.gpsPoints) {
-        if (p.lat < minLat) minLat = p.lat;
-        if (p.lat > maxLat) maxLat = p.lat;
-        if (p.lng < minLng) minLng = p.lng;
-        if (p.lng > maxLng) maxLng = p.lng;
+        if (p.lat < minLat) minLat = p.lat; if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng; if (p.lng > maxLng) maxLng = p.lng;
       }
     }
-
     if (minLat !== Infinity) {
-      mapRef.current.fitBounds(
-        [[minLng, minLat], [maxLng, maxLat]],
-        { padding: 40, duration: 500, maxZoom: 17 }
-      );
+      mapRef.current.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 40, duration: 500, maxZoom: 17 });
     }
   }, [areaGeoJson, trajData?.gpsPoints]);
+
+  // Fit on data change
+  useEffect(() => { fitMapBounds(); }, [fitMapBounds]);
 
   /* ---- Save verdict ---- */
   const handleVerdict = async (result: 'OK' | 'NG') => {
@@ -337,15 +323,16 @@ export default function ReviewPanel({
     : defaultCenter;
 
   return (
-    <div className="flex-1 flex flex-col gap-4 overflow-y-auto p-4">
-      {/* ---- Map ---- */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden" style={{ height: 300 }}>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* ---- Map (fills available space) ---- */}
+      <div className="flex-1 min-h-0 relative">
         <Map
           ref={mapRef}
           initialViewState={{ ...center, zoom: 14 }}
           style={{ width: '100%', height: '100%' }}
           mapStyle="mapbox://styles/mapbox/light-v11"
           mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          onLoad={fitMapBounds}
         >
           <NavigationControl position="top-right" />
 
@@ -452,143 +439,112 @@ export default function ReviewPanel({
             </Marker>
           )}
         </Map>
-      </div>
 
-      {/* Speed legend */}
-      <div className="flex items-center gap-3 px-1">
-        <span className="text-[10px] text-slate-400">速度:</span>
-        {[
-          { color: '#ef4444', label: '~1.5km/h' },
-          { color: '#f97316', label: '~3.5km/h' },
-          { color: '#22c55e', label: '~5.0km/h' },
-          { color: '#3b82f6', label: '5.0km/h~' },
-        ].map((l) => (
-          <div key={l.color} className="flex items-center gap-1">
-            <span className="w-3 h-0.5 rounded" style={{ backgroundColor: l.color }} />
-            <span className="text-[10px] text-slate-500">{l.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Map toggle buttons */}
-      <div className="flex items-center gap-2 px-1">
-        <button
-          onClick={() => setShowHeatmap(!showHeatmap)}
-          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
-            showHeatmap ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          <i className="bi bi-fire mr-1" />ヒートマップ
-        </button>
-        <button
-          onClick={() => setShowPastTrajectory(!showPastTrajectory)}
-          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
-            showPastTrajectory ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
-        >
-          <i className="bi bi-clock-history mr-1" />過去比較
-        </button>
-      </div>
-
-      {/* ---- Indicators ---- */}
-      {loadingInd && !indicators ? (
-        <div className="flex justify-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600" />
-        </div>
-      ) : indicators ? (
-        <IndicatorBadges indicators={indicators} />
-      ) : (
-        <div className="text-center text-sm text-slate-400 py-4">指標データなし</div>
-      )}
-
-      {/* ---- Verdict section ---- */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 space-y-3">
-        {/* Current status */}
-        {currentResult && (
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs text-slate-500">判定済み:</span>
-            {currentResult === 'OK' ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-700">
-                <i className="bi bi-check-circle-fill" /> OK
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold bg-red-100 text-red-700">
-                <i className="bi bi-x-circle-fill" /> NG
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Verdict buttons */}
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => handleVerdict('OK')}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
-          >
-            <i className="bi bi-check-lg" />
-            OK
+        {/* Map overlay controls (top-left) */}
+        <div className="absolute top-2 left-2 flex gap-1 z-10">
+          <button onClick={() => setShowHeatmap(!showHeatmap)}
+            className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
+              showHeatmap ? 'bg-orange-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
+            <i className="bi bi-fire mr-0.5" />ヒートマップ
           </button>
-          <button
-            onClick={() => handleVerdict('NG')}
-            disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
-          >
-            <i className="bi bi-x-lg" />
-            NG
+          <button onClick={() => setShowPastTrajectory(!showPastTrajectory)}
+            className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
+              showPastTrajectory ? 'bg-indigo-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
+            <i className="bi bi-clock-history mr-0.5" />過去比較
           </button>
         </div>
 
-        {/* Comment textarea (shown for NG) */}
-        {showComment && (
-          <div className="space-y-2">
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              placeholder="NGの理由を入力..."
-              rows={3}
-              className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-            />
-            <button
-              onClick={() => handleVerdict('NG')}
-              disabled={saving}
-              className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors disabled:opacity-50"
-            >
-              {saving ? '保存中...' : 'NGで保存'}
+        {/* Speed legend overlay (bottom-left) */}
+        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-md px-2 py-1 shadow-sm z-10">
+          {[
+            { color: '#ef4444', label: '~1.5' },
+            { color: '#f97316', label: '~3.5' },
+            { color: '#22c55e', label: '~5.0' },
+            { color: '#3b82f6', label: '5.0~' },
+          ].map(l => (
+            <div key={l.color} className="flex items-center gap-0.5">
+              <span className="w-2.5 h-0.5 rounded" style={{ backgroundColor: l.color }} />
+              <span className="text-[9px] text-slate-500">{l.label}</span>
+            </div>
+          ))}
+          <span className="text-[9px] text-slate-400">km/h</span>
+        </div>
+      </div>
+
+      {/* ---- Compact bottom bar: indicators + verdict ---- */}
+      <div className="shrink-0 border-t border-slate-200 bg-white px-3 py-2 space-y-2">
+        {/* Indicators inline */}
+        <div className="flex items-center gap-3 text-[11px]">
+          {indicators ? (
+            <>
+              <div className="flex items-center gap-1">
+                <i className="bi bi-bar-chart-fill text-slate-400" />
+                <span className="text-slate-500">カバレッジ</span>
+                <span className="font-bold text-slate-800">
+                  {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : '--'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <i className="bi bi-speedometer text-slate-400" />
+                <span className="text-slate-500">速度</span>
+                <span className="font-bold text-slate-800">{indicators.speed?.currentSpeed != null ? `${Math.round(indicators.speed.currentSpeed)}枚/h` : '正常'}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <i className="bi bi-lightning text-slate-400" />
+                <span className="text-slate-500">移動</span>
+                <span className="font-bold text-slate-800">{indicators.fastMove?.fastRatio != null ? `${Math.round(indicators.fastMove.fastRatio * 100)}%` : '正常'}</span>
+              </div>
+              {indicators.auxiliary?.outOfAreaWarning && (
+                <span className="text-[10px] font-bold text-amber-600"><i className="bi bi-exclamation-triangle mr-0.5" />エリア外{Math.round(indicators.auxiliary.outOfAreaPct)}%</span>
+              )}
+            </>
+          ) : loadingInd ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
+          ) : (
+            <span className="text-slate-400">指標データなし</span>
+          )}
+          <div className="ml-auto">
+            <button onClick={() => window.open(`/schedules?trajectory=${scheduleId}`, '_blank')}
+              className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-0.5">
+              <i className="bi bi-map" />詳細<i className="bi bi-box-arrow-up-right text-[8px]" />
             </button>
           </div>
-        )}
-
-        {/* Detail link */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <button
-            onClick={() => window.open(`/schedules?trajectory=${scheduleId}`, '_blank')}
-            className="text-xs text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-1"
-          >
-            <i className="bi bi-map" />
-            詳細GPS画面
-            <i className="bi bi-box-arrow-up-right text-[10px]" />
-          </button>
         </div>
 
-        {/* Navigation buttons */}
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-          <button
-            onClick={onPrev}
-            disabled={!hasPrev}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 disabled:text-slate-300 disabled:cursor-not-allowed"
-          >
-            <i className="bi bi-chevron-left" />
-            前へ
+        {/* Verdict row */}
+        <div className="flex items-center gap-2">
+          {currentResult && (
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold ${
+              currentResult === 'OK' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              <i className={`bi ${currentResult === 'OK' ? 'bi-check-circle-fill' : 'bi-x-circle-fill'}`} />{currentResult}
+            </span>
+          )}
+          <button onClick={() => handleVerdict('OK')} disabled={saving}
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+            <i className="bi bi-check-lg mr-0.5" />OK
           </button>
-          <button
-            onClick={onNext}
-            disabled={!hasNext}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-slate-800 disabled:text-slate-300 disabled:cursor-not-allowed"
-          >
-            次へ
-            <i className="bi bi-chevron-right" />
+          <button onClick={() => handleVerdict('NG')} disabled={saving}
+            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors disabled:opacity-50">
+            <i className="bi bi-x-lg mr-0.5" />NG
           </button>
+          {showComment && (
+            <>
+              <input value={comment} onChange={e => setComment(e.target.value)} placeholder="NGの理由..."
+                className="flex-1 border border-slate-300 rounded-lg text-xs px-2 py-1.5 outline-none focus:ring-1 focus:ring-red-400" />
+              <button onClick={() => handleVerdict('NG')} disabled={saving || !comment.trim()}
+                className="px-3 py-1.5 bg-red-700 text-white text-xs font-bold rounded-lg disabled:opacity-50">
+                {saving ? '...' : '保存'}
+              </button>
+            </>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <button onClick={onPrev} disabled={!hasPrev} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:text-slate-200 disabled:hover:bg-transparent">
+              <i className="bi bi-chevron-left text-sm" />
+            </button>
+            <button onClick={onNext} disabled={!hasNext} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 disabled:text-slate-200 disabled:hover:bg-transparent">
+              <i className="bi bi-chevron-right text-sm" />
+            </button>
+          </div>
         </div>
       </div>
     </div>
