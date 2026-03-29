@@ -88,9 +88,11 @@ export default function IndicatorBadges({ indicators }: Props) {
   const fastMoveStatus = scoreToStatus(fastMoveScore);
 
   /* Main value formatting */
-  const coverageValue = coverage?.diffPercent != null
-    ? `${coverage.diffPercent > 0 ? '+' : ''}${coverage.diffPercent}%`
-    : '--';
+  const coverageValue = coverage?.currentInsideRatio != null
+    ? `${Math.round(coverage.currentInsideRatio * 100)}%`
+    : coverage?.diffPercent != null
+      ? `${coverage.diffPercent > 0 ? '+' : ''}${coverage.diffPercent}%`
+      : '--';
 
   const speedValue = speed?.currentSpeed != null
     ? `${Math.round(speed.currentSpeed)}枚/h`

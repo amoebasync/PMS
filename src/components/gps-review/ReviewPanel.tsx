@@ -157,6 +157,9 @@ export default function ReviewPanel({
   const [comment, setComment] = useState('');
   const [showComment, setShowComment] = useState(false);
   const [currentResult, setCurrentResult] = useState<string | null>(null);
+  const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showPastTrajectory, setShowPastTrajectory] = useState(false);
+  const [pastTrajectories, setPastTrajectories] = useState<any[]>([]);
 
   /* ---- Fetch trajectory ---- */
   const fetchTrajectory = useCallback(async () => {
@@ -211,30 +214,88 @@ export default function ReviewPanel({
     [trajData?.area?.boundaryGeojson]
   );
 
+  const heatmapGeoJson = useMemo(() => {
+    if (!trajData?.gpsPoints?.length) return null;
+    const features = trajData.gpsPoints.map((p, i, arr) => {
+      let weight = 1;
+      if (i > 0) {
+        const dtSec = Math.max((new Date(p.timestamp).getTime() - new Date(arr[i-1].timestamp).getTime()) / 1000, 0.1);
+        const distM = haversineM(arr[i-1].lat, arr[i-1].lng, p.lat, p.lng);
+        const speedKmh = (distM / dtSec) * 3.6;
+        weight = speedKmh < 2 ? 3 : speedKmh < 4 ? 2 : 1;
+      }
+      return {
+        type: 'Feature' as const,
+        properties: { weight },
+        geometry: { type: 'Point' as const, coordinates: [p.lng, p.lat] },
+      };
+    });
+    return { type: 'FeatureCollection' as const, features };
+  }, [trajData?.gpsPoints]);
+
+  useEffect(() => {
+    if (!showPastTrajectory || !scheduleId || pastTrajectories.length > 0) return;
+    fetch(`/api/schedules/${scheduleId}/trajectory/past-area?limit=5`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.pastSessions) setPastTrajectories(data.pastSessions);
+      })
+      .catch(() => {});
+  }, [showPastTrajectory, scheduleId]);
+
   const startPoint = trajData?.gpsPoints?.[0] ?? null;
   const endPoint =
     trajData?.gpsPoints && trajData.gpsPoints.length > 1
       ? trajData.gpsPoints[trajData.gpsPoints.length - 1]
       : null;
 
-  /* ---- Fit bounds ---- */
+  /* ---- Fit bounds to area polygon (priority) or GPS points ---- */
   useEffect(() => {
-    if (!trajData?.gpsPoints?.length || !mapRef.current) return;
-    const points = trajData.gpsPoints;
+    if (!mapRef.current) return;
+
     let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
-    for (const p of points) {
-      if (p.lat < minLat) minLat = p.lat;
-      if (p.lat > maxLat) maxLat = p.lat;
-      if (p.lng < minLng) minLng = p.lng;
-      if (p.lng > maxLng) maxLng = p.lng;
+
+    // Priority: fit to area polygon
+    if (areaGeoJson) {
+      const extractCoords = (geojson: any): number[][] => {
+        const coords: number[][] = [];
+        const features = geojson.features || [geojson];
+        for (const f of features) {
+          const geom = f.geometry || f;
+          if (geom.type === 'Polygon') {
+            coords.push(...geom.coordinates[0]);
+          } else if (geom.type === 'MultiPolygon') {
+            for (const poly of geom.coordinates) coords.push(...poly[0]);
+          }
+        }
+        return coords;
+      };
+      const coords = extractCoords(areaGeoJson);
+      for (const [lng, lat] of coords) {
+        if (lat < minLat) minLat = lat;
+        if (lat > maxLat) maxLat = lat;
+        if (lng < minLng) minLng = lng;
+        if (lng > maxLng) maxLng = lng;
+      }
     }
+
+    // Fallback: fit to GPS points
+    if (minLat === Infinity && trajData?.gpsPoints?.length) {
+      for (const p of trajData.gpsPoints) {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng;
+        if (p.lng > maxLng) maxLng = p.lng;
+      }
+    }
+
     if (minLat !== Infinity) {
       mapRef.current.fitBounds(
         [[minLng, minLat], [maxLng, maxLat]],
         { padding: 40, duration: 500, maxZoom: 17 }
       );
     }
-  }, [trajData?.gpsPoints]);
+  }, [areaGeoJson, trajData?.gpsPoints]);
 
   /* ---- Save verdict ---- */
   const handleVerdict = async (result: 'OK' | 'NG') => {
@@ -319,6 +380,60 @@ export default function ReviewPanel({
             </Source>
           )}
 
+          {/* Heatmap layer */}
+          {showHeatmap && heatmapGeoJson && (
+            <Source id="heatmap" type="geojson" data={heatmapGeoJson}>
+              <Layer
+                id="heatmap-layer"
+                type="heatmap"
+                paint={{
+                  'heatmap-weight': ['get', 'weight'],
+                  'heatmap-intensity': 1,
+                  'heatmap-radius': 20,
+                  'heatmap-color': [
+                    'interpolate', ['linear'], ['heatmap-density'],
+                    0, 'rgba(33,102,172,0)',
+                    0.2, 'rgb(103,169,207)',
+                    0.4, 'rgb(209,229,240)',
+                    0.6, 'rgb(253,219,199)',
+                    0.8, 'rgb(239,138,98)',
+                    1, 'rgb(178,24,43)',
+                  ],
+                  'heatmap-opacity': 0.7,
+                }}
+              />
+            </Source>
+          )}
+
+          {/* Past trajectories */}
+          {showPastTrajectory && pastTrajectories.map((past, idx) => {
+            const pastGeoJson: GeoJSON.FeatureCollection = {
+              type: 'FeatureCollection',
+              features: [{
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'LineString',
+                  coordinates: (past.gpsPoints || []).map((p: any) => [p.longitude || p.lng, p.latitude || p.lat]),
+                },
+              }],
+            };
+            return (
+              <Source key={`past-${idx}`} id={`past-traj-${idx}`} type="geojson" data={pastGeoJson}>
+                <Layer
+                  id={`past-traj-line-${idx}`}
+                  type="line"
+                  paint={{
+                    'line-color': '#94a3b8',
+                    'line-width': 2,
+                    'line-opacity': 0.4,
+                    'line-dasharray': [2, 2],
+                  }}
+                />
+              </Source>
+            );
+          })}
+
           {/* Start marker */}
           {startPoint && (
             <Marker latitude={startPoint.lat} longitude={startPoint.lng} anchor="center">
@@ -353,6 +468,26 @@ export default function ReviewPanel({
             <span className="text-[10px] text-slate-500">{l.label}</span>
           </div>
         ))}
+      </div>
+
+      {/* Map toggle buttons */}
+      <div className="flex items-center gap-2 px-1">
+        <button
+          onClick={() => setShowHeatmap(!showHeatmap)}
+          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+            showHeatmap ? 'bg-orange-100 border-orange-300 text-orange-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <i className="bi bi-fire mr-1" />ヒートマップ
+        </button>
+        <button
+          onClick={() => setShowPastTrajectory(!showPastTrajectory)}
+          className={`px-2.5 py-1 text-[10px] font-bold rounded-lg border transition-colors ${
+            showPastTrajectory ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <i className="bi bi-clock-history mr-1" />過去比較
+        </button>
       </div>
 
       {/* ---- Indicators ---- */}
