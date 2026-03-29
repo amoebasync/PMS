@@ -3293,6 +3293,16 @@ model FraudAnalysis {
   // 分析メタデータ (JSON)
   analysisDetail         String?           @map("analysis_detail") @db.Text
 
+  // --- v2: 3指標ベース (2026-03-29) ---
+  coverageDiff           Float?            @map("coverage_diff")         // カバレッジ率差分 (0.0〜1.0)
+  speedDeviation         Float?            @map("speed_deviation")       // 配布スピード偏差 (0.0〜1.0)
+  fastMoveRatio          Float?            @map("fast_move_ratio")       // 高速移動率 (0.0〜1.0)
+  outOfAreaPct           Float?            @map("out_of_area_pct")       // エリア外活動% (補助)
+  pauseMinutes           Int?              @map("pause_minutes")         // 総PAUSE分数 (補助)
+  riskScoreV2            Int?              @map("risk_score_v2")         // 新スコア (0〜100)
+  riskLevelV2            String?           @map("risk_level_v2") @db.VarChar(10) // LOW/MEDIUM/HIGH/CRITICAL
+  v2Detail               String?           @map("v2_detail") @db.Text    // v2 分析詳細 (JSON)
+
   // 管理者レビュー
   reviewedById           Int?              @map("reviewed_by_id")
   reviewedAt             DateTime?         @map("reviewed_at")
