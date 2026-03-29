@@ -2,15 +2,15 @@
 cd /home/ec2-user/pms_java
 export PATH=$PATH:/home/ec2-user/.nvm/versions/node/v20.20.0/bin
 
-# CodeDeployは上書きのみで古いファイルを削除しないため、
-# .next の古いビルドキャッシュを明示的に削除してから展開
-# （deploy.zip に最新の .next が含まれているのでそれが使われる）
-echo "古い .next キャッシュを削除..."
-rm -rf .next/cache
+# .env と ecosystem.config.js をバックアップから復元
+# （deploy.zipにはこれらが含まれないため、デプロイで消える）
+echo ".env と ecosystem.config.js を復元..."
+cp -f /home/ec2-user/.env.backup .env 2>/dev/null || true
+cp -f /home/ec2-user/ecosystem.config.js.backup ecosystem.config.js 2>/dev/null || true
 
 npm install --legacy-peer-deps
 npx prisma generate
-npx prisma db push
+npx prisma db push || echo "WARNING: prisma db push failed - may need manual intervention"
 # PM2 cluster mode（2プロセス）で起動
 pm2 describe pms > /dev/null 2>&1 && pm2 delete pms
 pm2 start ecosystem.config.js
