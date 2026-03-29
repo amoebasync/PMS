@@ -238,7 +238,7 @@ export default function ReviewPanel({
     fetch(`/api/schedules/${scheduleId}/trajectory/past-area?limit=5`)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
-        if (data?.pastSessions) setPastTrajectories(data.pastSessions);
+        if (data?.pastTrajectories) setPastTrajectories(data.pastTrajectories);
       })
       .catch(() => {});
   }, [showPastTrajectory, scheduleId]);
@@ -330,7 +330,7 @@ export default function ReviewPanel({
           ref={mapRef}
           initialViewState={{ ...center, zoom: 14 }}
           style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/light-v11"
+          mapStyle="mapbox://styles/mapbox/streets-v12"
           mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
           onLoad={fitMapBounds}
         >
