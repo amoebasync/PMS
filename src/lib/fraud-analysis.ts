@@ -422,3 +422,292 @@ export async function analyzeFraudIndicators(sessionId: number): Promise<void> {
 
   console.log(`[FraudAnalysis] session=${sessionId} score=${riskScore} level=${riskLevel}`);
 }
+
+// --- V2 定数 ---
+const V2_WEIGHTS = { coverageDiff: 40, speedDeviation: 35, fastMoveRatio: 25 };
+const V2_RISK_THRESHOLDS = { CRITICAL: 70, HIGH: 50, MEDIUM: 25 };
+const FAST_SPEED_KMH = 5;        // 投函には速すぎる速度（km/h）
+const SPEED_CAP_KMH = 30;        // GPSノイズ除外用キャップ
+const COVERAGE_LOOKBACK_DAYS = 180;
+const COVERAGE_MAX_PAST = 10;
+const COVERAGE_PLANNED_TOLERANCE = 0.2; // ±20%
+
+// --- V2 メイン分析関数 ---
+
+export async function analyzeV2Indicators(sessionId: number): Promise<void> {
+  // 1. セッション取得
+  const session = await prisma.distributionSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      schedule: { include: { items: true, area: true } },
+      gpsPoints: { orderBy: { timestamp: 'asc' } },
+      pauseEvents: { orderBy: { pausedAt: 'asc' } },
+    },
+  });
+
+  if (!session || !session.finishedAt || !session.schedule) return;
+
+  const schedule = session.schedule;
+  const gpsPoints = session.gpsPoints.map((p) => ({
+    lat: p.latitude, lng: p.longitude, timestamp: p.timestamp,
+  }));
+
+  if (gpsPoints.length < 5) return; // データ不足
+
+  // エリアポリゴン取得
+  const polygons = schedule.area?.boundary_geojson
+    ? extractPolygons(schedule.area.boundary_geojson)
+    : [];
+
+  if (polygons.length === 0) return; // ポリゴンなしでは v2 分析不可
+
+  const maxActual = Math.max(...schedule.items.map((i) => i.actualCount ?? 0), 0);
+  const maxPlanned = Math.max(...schedule.items.map((i) => i.plannedCount ?? 0), 0);
+  const sessionMs = session.finishedAt.getTime() - session.startedAt.getTime();
+  const pauseMs = totalPauseMs(session.pauseEvents, session.finishedAt);
+  const workMs = sessionMs - pauseMs;
+  const workHours = workMs / 3_600_000;
+
+  // --- 各GPSポイントのエリア内外判定（キャッシュ） ---
+  const insideFlags = gpsPoints.map((p) => pointInAnyPolygon(p.lat, p.lng, polygons));
+  const insideCount = insideFlags.filter(Boolean).length;
+  const currentInsideRatio = gpsPoints.length > 0 ? insideCount / gpsPoints.length : 0;
+
+  // ===== Core Indicator 1: Coverage Diff (weight: 40) =====
+  let coverageDiffScore = 0;
+  let coverageDiffDetail: Record<string, unknown> = {};
+
+  if (maxActual >= maxPlanned * 0.8 && maxPlanned > 0 && schedule.areaId) {
+    // 過去セッション取得（同エリア、類似plannedCount ±20%、180日以内、最大10件）
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - COVERAGE_LOOKBACK_DAYS);
+
+    const pastSessions = await prisma.distributionSession.findMany({
+      where: {
+        id: { not: sessionId },
+        finishedAt: { not: null },
+        startedAt: { gte: lookbackDate },
+        schedule: { areaId: schedule.areaId },
+      },
+      include: {
+        schedule: { include: { items: true } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
+      },
+      take: 50, // 多めに取って後でフィルタ
+    });
+
+    // 類似plannedCount でフィルタ
+    const lowerBound = maxPlanned * (1 - COVERAGE_PLANNED_TOLERANCE);
+    const upperBound = maxPlanned * (1 + COVERAGE_PLANNED_TOLERANCE);
+    const similarSessions = pastSessions
+      .filter((s) => {
+        const pastPlanned = Math.max(...(s.schedule?.items.map((i) => i.plannedCount ?? 0) || [0]), 0);
+        return pastPlanned >= lowerBound && pastPlanned <= upperBound;
+      })
+      .slice(0, COVERAGE_MAX_PAST);
+
+    if (similarSessions.length >= 2) {
+      // 過去セッションの insideRatio を計算
+      const pastInsideRatios = similarSessions.map((s) => {
+        const pts = s.gpsPoints;
+        if (pts.length === 0) return 1;
+        const inside = pts.filter((p) => pointInAnyPolygon(p.latitude, p.longitude, polygons)).length;
+        return inside / pts.length;
+      });
+
+      const pastAvg = mean(pastInsideRatios);
+      const diff = pastAvg - currentInsideRatio; // positive = current is worse
+
+      if (diff >= 0.30) {
+        coverageDiffScore = 1.0;
+      } else if (diff >= 0.15) {
+        coverageDiffScore = (diff - 0.15) / 0.15; // proportional 0→1
+      } else {
+        coverageDiffScore = 0;
+      }
+
+      coverageDiffDetail = {
+        currentInsideRatio: Math.round(currentInsideRatio * 1000) / 10,
+        pastAvgInsideRatio: Math.round(pastAvg * 1000) / 10,
+        diff: Math.round(diff * 1000) / 10,
+        pastSessionCount: similarSessions.length,
+      };
+    } else {
+      coverageDiffDetail = { skipped: true, reason: 'insufficient_past_data', pastSessionCount: similarSessions.length };
+    }
+  } else {
+    coverageDiffDetail = { skipped: true, reason: maxPlanned <= 0 ? 'no_planned_count' : 'low_completion_rate' };
+  }
+
+  // ===== Core Indicator 2: Speed Deviation (weight: 35) =====
+  let speedDeviationScore = 0;
+  let speedDeviationDetail: Record<string, unknown> = {};
+
+  if (maxActual > 0 && workHours > 0) {
+    const currentSpeed = maxActual / workHours;
+    const distStats = await getDistributorStats(session.distributorId, sessionId);
+
+    if (distStats.count >= 3 && distStats.stdSpeed > 0) {
+      const zScore = (currentSpeed - distStats.avgSpeed) / distStats.stdSpeed;
+
+      if (zScore > 3) {
+        speedDeviationScore = 1.0;
+      } else if (zScore > 2) {
+        speedDeviationScore = 0.6;
+      } else if (zScore > 1.5) {
+        speedDeviationScore = 0.3;
+      } else {
+        speedDeviationScore = 0;
+      }
+
+      speedDeviationDetail = {
+        currentSpeed: Math.round(currentSpeed),
+        avgSpeed: Math.round(distStats.avgSpeed),
+        stdSpeed: Math.round(distStats.stdSpeed * 10) / 10,
+        zScore: Math.round(zScore * 100) / 100,
+        pastSessions: distStats.count,
+      };
+    } else {
+      speedDeviationDetail = { skipped: true, reason: 'insufficient_history', count: distStats.count };
+    }
+  } else {
+    speedDeviationDetail = { skipped: true, reason: 'no_actual_or_work' };
+  }
+
+  // ===== Core Indicator 3: Fast Move Ratio (weight: 25) =====
+  let fastMoveRatioScore = 0;
+  let fastMoveRatioDetail: Record<string, unknown> = {};
+
+  {
+    let totalInsideDurationMs = 0;
+    let fastDurationMs = 0;
+    let segmentCount = 0;
+    let fastSegmentCount = 0;
+
+    for (let i = 1; i < gpsPoints.length; i++) {
+      // Only count segments where both points are inside area polygon
+      if (!insideFlags[i - 1] || !insideFlags[i]) continue;
+
+      const dtMs = gpsPoints[i].timestamp.getTime() - gpsPoints[i - 1].timestamp.getTime();
+      if (dtMs <= 0) continue;
+
+      const distM = haversineM(gpsPoints[i - 1].lat, gpsPoints[i - 1].lng, gpsPoints[i].lat, gpsPoints[i].lng);
+      let speedKmh = (distM / dtMs) * 3600; // m/ms → km/h
+      if (speedKmh > SPEED_CAP_KMH) speedKmh = SPEED_CAP_KMH; // cap noise
+
+      totalInsideDurationMs += dtMs;
+      segmentCount++;
+
+      if (speedKmh > FAST_SPEED_KMH) {
+        fastDurationMs += dtMs;
+        fastSegmentCount++;
+      }
+    }
+
+    const fastRatio = totalInsideDurationMs > 0 ? fastDurationMs / totalInsideDurationMs : 0;
+
+    if (fastRatio >= 0.6) {
+      fastMoveRatioScore = 1.0;
+    } else if (fastRatio >= 0.4) {
+      fastMoveRatioScore = (fastRatio - 0.4) / 0.2; // proportional 0→1
+    } else {
+      fastMoveRatioScore = 0;
+    }
+
+    fastMoveRatioDetail = {
+      fastRatio: Math.round(fastRatio * 1000) / 10,
+      totalInsideDurationMin: Math.round(totalInsideDurationMs / 60_000),
+      fastDurationMin: Math.round(fastDurationMs / 60_000),
+      segmentCount,
+      fastSegmentCount,
+    };
+  }
+
+  // ===== Auxiliary: Out of Area % =====
+  const outOfAreaPct = gpsPoints.length > 0
+    ? Math.round((gpsPoints.length - insideCount) / gpsPoints.length * 1000) / 10
+    : 0;
+
+  // ===== Auxiliary: Pause Minutes =====
+  const pauseMinutes = Math.round(pauseMs / 60_000);
+
+  // ===== Risk Score V2 =====
+  const riskScoreV2 = Math.round(
+    coverageDiffScore * V2_WEIGHTS.coverageDiff +
+    speedDeviationScore * V2_WEIGHTS.speedDeviation +
+    fastMoveRatioScore * V2_WEIGHTS.fastMoveRatio
+  );
+
+  const riskLevelV2: string =
+    riskScoreV2 >= V2_RISK_THRESHOLDS.CRITICAL ? 'CRITICAL' :
+    riskScoreV2 >= V2_RISK_THRESHOLDS.HIGH ? 'HIGH' :
+    riskScoreV2 >= V2_RISK_THRESHOLDS.MEDIUM ? 'MEDIUM' : 'LOW';
+
+  // v2 分析詳細 JSON
+  const v2Detail = JSON.stringify({
+    coverageDiff: { score: coverageDiffScore, ...coverageDiffDetail },
+    speedDeviation: { score: speedDeviationScore, ...speedDeviationDetail },
+    fastMoveRatio: { score: fastMoveRatioScore, ...fastMoveRatioDetail },
+    auxiliary: { outOfAreaPct, pauseMinutes },
+    meta: {
+      gpsPointCount: gpsPoints.length,
+      insideCount,
+      maxActual,
+      maxPlanned,
+      workDurationMin: Math.round(workMs / 60_000),
+      sessionDurationMin: Math.round(sessionMs / 60_000),
+    },
+  });
+
+  // DB保存（upsert: v1と同じレコードにv2フィールドを追記）
+  await prisma.fraudAnalysis.upsert({
+    where: { sessionId },
+    create: {
+      sessionId,
+      scheduleId: session.scheduleId,
+      distributorId: session.distributorId,
+      coverageDiff: coverageDiffScore,
+      speedDeviation: speedDeviationScore,
+      fastMoveRatio: fastMoveRatioScore,
+      outOfAreaPct: outOfAreaPct,
+      pauseMinutes,
+      riskScoreV2,
+      riskLevelV2,
+      v2Detail,
+    },
+    update: {
+      coverageDiff: coverageDiffScore,
+      speedDeviation: speedDeviationScore,
+      fastMoveRatio: fastMoveRatioScore,
+      outOfAreaPct: outOfAreaPct,
+      pauseMinutes,
+      riskScoreV2,
+      riskLevelV2,
+      v2Detail,
+    },
+  });
+
+  // HIGH/CRITICAL の場合は管理者通知
+  if (riskLevelV2 === 'HIGH' || riskLevelV2 === 'CRITICAL') {
+    const distributor = await prisma.flyerDistributor.findUnique({
+      where: { id: session.distributorId },
+      select: { name: true },
+    });
+    const areaName = schedule.area
+      ? `${schedule.area.town_name || ''}${schedule.area.chome_name || ''}`
+      : '';
+
+    await prisma.adminNotification.create({
+      data: {
+        type: 'ALERT',
+        title: `不正検知v2: ${distributor?.name || '不明'} — ${riskLevelV2}`,
+        message: `${areaName} / v2スコア: ${riskScoreV2} (カバレッジ差:${Math.round(coverageDiffScore * 100)}% 速度偏差:${Math.round(speedDeviationScore * 100)}% 高速移動:${Math.round(fastMoveRatioScore * 100)}%)`,
+        scheduleId: session.scheduleId || undefined,
+        distributorId: session.distributorId,
+      },
+    });
+    notificationEmitter.emit({ type: 'ALERT' });
+  }
+
+  console.log(`[FraudAnalysisV2] session=${sessionId} score=${riskScoreV2} level=${riskLevelV2}`);
+}
