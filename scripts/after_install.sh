@@ -1,6 +1,13 @@
 #!/bin/bash
 cd /home/ec2-user/pms_java
 export PATH=$PATH:/home/ec2-user/.nvm/versions/node/v20.20.0/bin
+
+# CodeDeployは上書きのみで古いファイルを削除しないため、
+# .next の古いビルドキャッシュを明示的に削除してから展開
+# （deploy.zip に最新の .next が含まれているのでそれが使われる）
+echo "古い .next キャッシュを削除..."
+rm -rf .next/cache
+
 npm install --legacy-peer-deps
 npx prisma generate
 npx prisma db push
