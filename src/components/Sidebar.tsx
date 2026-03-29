@@ -74,6 +74,7 @@ const MENU_GROUPS: MenuGroup[] = [
       { nameKey: 'alerts', href: '/alerts', icon: 'bi-bell-fill', badge: 'alerts' },
       { nameKey: 'complaint_management', href: '/quality/complaints', icon: 'bi-exclamation-triangle-fill' },
       { nameKey: 'prohibited_properties', href: '/quality/prohibited-properties', icon: 'bi-house-x-fill' },
+      { nameKey: 'gps_review', href: '/gps-review', icon: 'bi-search' },
       { nameKey: 'fraud_detection', href: '/quality/fraud-detection', icon: 'bi-shield-exclamation' },
       { nameKey: 'field_inspections', href: '/inspections', icon: 'bi-clipboard-check' },
       { nameKey: 'inspection_monitoring', href: '/inspections/monitoring', icon: 'bi-shield-check' },
