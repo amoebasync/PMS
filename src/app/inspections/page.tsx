@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslation } from '@/i18n';
 import { useRefreshOnFocus } from '@/hooks/useRefreshOnFocus';
@@ -156,23 +156,26 @@ export default function InspectionsPage() {
   const [assigning, setAssigning] = useState(false);
 
   /* ---- Fetch data ---- */
-  const fetchData = useCallback(async () => {
+  const fetchRef = useRef(0);
+  const fetchData = useCallback(async (overridePage?: number) => {
+    const fetchId = ++fetchRef.current;
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) });
+      const p = overridePage ?? page;
+      const params = new URLSearchParams({ page: String(p), limit: String(LIMIT) });
       if (filterDate) params.append('date', filterDate);
       if (filterStatus !== 'ALL') params.append('status', filterStatus);
       if (filterCategory !== 'ALL') params.append('category', filterCategory);
 
       const res = await fetch(`/api/inspections?${params}`);
-      if (res.ok) {
+      if (res.ok && fetchId === fetchRef.current) {
         const json: InspectionListResponse = await res.json();
         setData(json);
       }
     } catch (err) {
       console.error('Fetch error:', err);
     } finally {
-      setLoading(false);
+      if (fetchId === fetchRef.current) setLoading(false);
     }
   }, [page, filterDate, filterStatus, filterCategory]);
 
@@ -472,7 +475,7 @@ export default function InspectionsPage() {
             {t('line_share')}
           </button>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData()}
             disabled={loading}
             className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-xs font-bold text-slate-600 transition-colors"
           >
