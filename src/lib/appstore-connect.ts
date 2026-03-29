@@ -95,15 +95,15 @@ export async function addBetaTester(
       body: JSON.stringify(body),
     });
 
-    // 409 Conflict: テスターが既にグループに存在する → 削除して再追加（招待メール再送）
+    // 409 Conflict: テスターが既に存在する → テスター自体を完全削除して再追加（招待メール再送）
     if (response.status === 409) {
-      console.log(`[AppStoreConnect] Tester ${email} already exists, removing and re-adding...`);
-      const removeResult = await removeBetaTester(email);
-      if (!removeResult.success && !removeResult.notFound) {
-        return { success: false, error: `再招待のための削除に失敗: ${removeResult.error}` };
+      console.log(`[AppStoreConnect] Tester ${email} already exists, fully deleting and re-adding...`);
+      const deleteResult = await deleteBetaTesterCompletely(email);
+      if (!deleteResult.success && !deleteResult.notFound) {
+        return { success: false, error: `再招待のための削除に失敗: ${deleteResult.error}` };
       }
-      // 少し待ってから再追加
-      await new Promise(r => setTimeout(r, 1000));
+      // Apple APIのキャッシュが反映されるまで待つ
+      await new Promise(r => setTimeout(r, 3000));
       const retryResponse = await fetch(`${API_BASE}/betaTesters`, {
         method: 'POST',
         headers: {
@@ -115,6 +115,7 @@ export async function addBetaTester(
       if (!retryResponse.ok) {
         const retryError = await retryResponse.json().catch(() => null);
         const retryMsg = retryError?.errors?.[0]?.detail || `HTTP ${retryResponse.status}`;
+        console.error(`[AppStoreConnect] Re-invite failed: ${retryMsg}`);
         return { success: false, error: `再招待に失敗: ${retryMsg}` };
       }
       console.log(`[AppStoreConnect] Successfully re-invited beta tester: ${email}`);
@@ -142,6 +143,54 @@ export async function addBetaTester(
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : '不明なエラー';
     console.error('[AppStoreConnect] Error:', errMsg);
+    return { success: false, error: errMsg };
+  }
+}
+
+/**
+ * TestFlight ベータテスターを完全削除する（グループ関連解除ではなくテスター自体を削除）
+ * これにより再追加時に招待メールが確実に再送される
+ */
+async function deleteBetaTesterCompletely(
+  email: string,
+): Promise<{ success: boolean; error?: string; notFound?: boolean }> {
+  try {
+    // まずグローバルにテスターを検索（グループフィルタなし）
+    const token = generateJWT();
+    const searchRes = await fetch(
+      `${API_BASE}/betaTesters?filter[email]=${encodeURIComponent(email)}&fields[betaTesters]=email`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!searchRes.ok) {
+      return { success: false, error: `テスター検索に失敗: HTTP ${searchRes.status}` };
+    }
+    const searchData = await searchRes.json();
+    const testerId = searchData.data?.[0]?.id;
+    if (!testerId) {
+      console.log(`[AppStoreConnect] Tester ${email} not found globally`);
+      return { success: true, notFound: true };
+    }
+
+    // テスター自体を DELETE（グループからの解除ではなく完全削除）
+    const deleteRes = await fetch(`${API_BASE}/betaTesters/${testerId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${generateJWT()}` },
+    });
+
+    if (deleteRes.status === 204 || deleteRes.status === 200) {
+      console.log(`[AppStoreConnect] Completely deleted beta tester: ${email} (id: ${testerId})`);
+      return { success: true };
+    }
+    if (deleteRes.status === 404) {
+      return { success: true, notFound: true };
+    }
+
+    const errData = await deleteRes.json().catch(() => null);
+    const errMsg = errData?.errors?.[0]?.detail || `HTTP ${deleteRes.status}`;
+    console.error(`[AppStoreConnect] Failed to delete tester completely: ${errMsg}`);
+    return { success: false, error: errMsg };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : '不明なエラー';
     return { success: false, error: errMsg };
   }
 }
