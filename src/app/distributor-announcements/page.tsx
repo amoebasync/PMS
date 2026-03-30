@@ -325,7 +325,8 @@ function CreateModal({ t, onClose, onCreated }: {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'scheduled'>('now');
-  const [scheduledAt, setScheduledAt] = useState('');
+  const [scheduledDate, setScheduledDate] = useState('');
+  const [scheduledTime, setScheduledTime] = useState('09:00');
   const fileRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const contentEnRef = useRef<HTMLTextAreaElement>(null);
@@ -387,7 +388,7 @@ function CreateModal({ t, onClose, onCreated }: {
           targetAll: targetMode !== 'select',
           targetLanguage: targetMode === 'ja' || targetMode === 'en' ? targetMode : undefined,
           distributorIds: targetMode === 'select' ? distributorIds : [],
-          scheduledAt: sendMode === 'scheduled' && scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
+          scheduledAt: sendMode === 'scheduled' && scheduledDate ? new Date(`${scheduledDate}T${scheduledTime || '09:00'}`).toISOString() : undefined,
         }),
       });
       if (res.ok) onCreated();
@@ -399,49 +400,54 @@ function CreateModal({ t, onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <h2 className="text-sm font-bold text-slate-800">{t('create_title')}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg" /></button>
         </div>
-        <div className="p-5 space-y-4">
-          {/* Title */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_title')}</label>
-            <input
-              value={title}
-              onChange={e => setTitle(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder={t('placeholder_title')}
-            />
-          </div>
-
-          {/* Content with toolbar + preview */}
-          <div>
-            <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_content')} (日本語)</label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div>
-                <MarkdownToolbar textareaRef={contentRef} value={content} onChange={setContent} />
-                <textarea
-                  ref={contentRef}
-                  value={content}
-                  onChange={e => setContent(e.target.value)}
-                  rows={4}
-                  className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
-                  placeholder={t('placeholder_content')}
-                />
-              </div>
-              <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 max-h-40 overflow-y-auto">
-                <p className="text-[10px] text-slate-400 mb-1">{t('preview')}</p>
-                {content ? <AnnouncementBody text={content} /> : <p className="text-xs text-slate-300 italic">{t('placeholder_content')}</p>}
+        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+          {/* Japanese section */}
+          <div className="border border-slate-200 rounded-lg p-4 space-y-3">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-700 text-white text-[10px] font-bold">JP</span>
+              日本語
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_title')}</label>
+              <input
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder={t('placeholder_title')}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_content')}</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div>
+                  <MarkdownToolbar textareaRef={contentRef} value={content} onChange={setContent} />
+                  <textarea
+                    ref={contentRef}
+                    value={content}
+                    onChange={e => setContent(e.target.value)}
+                    rows={6}
+                    className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none resize-none"
+                    placeholder={t('placeholder_content')}
+                  />
+                </div>
+                <div className="border border-slate-200 rounded-lg p-3 bg-slate-50 min-h-[160px] max-h-[200px] overflow-y-auto">
+                  <p className="text-[10px] text-slate-400 mb-1">{t('preview')}</p>
+                  {content ? <AnnouncementBody text={content} /> : <p className="text-xs text-slate-300 italic">{t('placeholder_content')}</p>}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* English fields with toolbar + preview */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+          {/* English section */}
+          <div className="border border-blue-200 rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700">
-              <i className="bi bi-translate" /> English Version
+              <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-blue-600 text-white text-[10px] font-bold">EN</span>
+              English Version
             </div>
             <div>
               <label className="text-xs font-bold text-slate-500 mb-1 block">{t('field_title')} (English)</label>
@@ -461,12 +467,12 @@ function CreateModal({ t, onClose, onCreated }: {
                     ref={contentEnRef}
                     value={contentEn}
                     onChange={e => setContentEn(e.target.value)}
-                    rows={4}
+                    rows={6}
                     className="w-full border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                     placeholder="Enter announcement content in English..."
                   />
                 </div>
-                <div className="border border-blue-200 rounded-lg p-3 bg-white max-h-40 overflow-y-auto">
+                <div className="border border-blue-200 rounded-lg p-3 bg-blue-50/50 min-h-[160px] max-h-[200px] overflow-y-auto">
                   <p className="text-[10px] text-slate-400 mb-1">{t('preview')}</p>
                   {contentEn ? <AnnouncementBody text={contentEn} /> : <p className="text-xs text-slate-300 italic">Preview will appear here...</p>}
                 </div>
@@ -580,22 +586,37 @@ function CreateModal({ t, onClose, onCreated }: {
               </label>
             </div>
             {sendMode === 'scheduled' && (
-              <input
-                type="datetime-local"
-                value={scheduledAt}
-                onChange={e => setScheduledAt(e.target.value)}
-                className="border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              <div className="flex items-center gap-3">
+                <div>
+                  <label className="text-[10px] text-slate-400 mb-0.5 block">{t('field_date') || '日付'}</label>
+                  <input
+                    type="date"
+                    value={scheduledDate}
+                    onChange={e => setScheduledDate(e.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-slate-400 mb-0.5 block">{t('field_time') || '時間'}</label>
+                  <input
+                    type="time"
+                    value={scheduledTime}
+                    onChange={e => setScheduledTime(e.target.value)}
+                    className="border border-slate-300 rounded-lg text-sm px-3 py-2 focus:ring-2 focus:ring-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
             )}
           </div>
         </div>
-        <div className="p-5 border-t border-slate-200 flex justify-end gap-2">
+        <div className="p-5 border-t border-slate-200 flex justify-end gap-2 flex-shrink-0">
           <button onClick={onClose} className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-100 transition-colors">
             {t('btn_cancel')}
           </button>
           <button
             onClick={handleSubmit}
-            disabled={saving || !title.trim() || !content.trim() || (isScheduled && !scheduledAt)}
+            disabled={saving || !title.trim() || !content.trim() || (isScheduled && !scheduledDate)}
             className="px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
           >
             {saving ? t('sending') : (isScheduled ? t('btn_schedule') : t('btn_send'))}

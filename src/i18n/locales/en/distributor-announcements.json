@@ -29,5 +29,7 @@
   "status_scheduled": "Scheduled",
   "btn_schedule": "Schedule",
   "preview": "Preview",
-  "view_detail": "Detail"
+  "view_detail": "Detail",
+  "field_date": "Date",
+  "field_time": "Time"
 }
