@@ -100,12 +100,45 @@ export async function POST(request: Request) {
     const branchId = parseIntSafe(body.branchId);
 
     const newDistributor = await prisma.$transaction(async (tx) => {
+      // staffIdが未指定またはプレフィックスのみの場合、atomic incrementで自動採番
+      let resolvedStaffId = body.staffId;
+      if (branchId) {
+        const branch = await tx.branch.findUnique({
+          where: { id: branchId },
+          select: { prefix: true, staffIdSeq: true },
+        });
+
+        if (branch?.prefix) {
+          if (!resolvedStaffId || resolvedStaffId === branch.prefix) {
+            // staffId未指定→atomic incrementで自動生成
+            const updated = await tx.branch.update({
+              where: { id: branchId },
+              data: { staffIdSeq: { increment: 1 } },
+              select: { prefix: true, staffIdSeq: true },
+            });
+            resolvedStaffId = `${updated.prefix}${String(updated.staffIdSeq).padStart(3, '0')}`;
+          } else {
+            // staffIdが手入力された場合でもシーケンスを同期
+            const numMatch = resolvedStaffId.match(/(\d+)$/);
+            if (numMatch) {
+              const seqNum = parseInt(numMatch[1], 10);
+              if (seqNum > (branch.staffIdSeq ?? 0)) {
+                await tx.branch.update({
+                  where: { id: branchId },
+                  data: { staffIdSeq: seqNum },
+                });
+              }
+            }
+          }
+        }
+      }
+
       const distributor = await tx.flyerDistributor.create({
         data: {
           branchId,
           countryId: parseIntSafe(body.countryId),
           visaTypeId: parseIntSafe(body.visaTypeId),
-          staffId: body.staffId,
+          staffId: resolvedStaffId,
           name: body.name,
           phone: body.phone,
           email: body.email,
@@ -155,24 +188,6 @@ export async function POST(request: Request) {
           note: body.note,
         },
       });
-
-      // スタッフIDから番号部分を抽出し、支店のシーケンスを更新
-      if (branchId && body.staffId) {
-        const numMatch = body.staffId.match(/(\d+)$/);
-        if (numMatch) {
-          const seqNum = parseInt(numMatch[1], 10);
-          const branch = await tx.branch.findUnique({
-            where: { id: branchId },
-            select: { staffIdSeq: true },
-          });
-          if (branch && seqNum > (branch.staffIdSeq ?? 0)) {
-            await tx.branch.update({
-              where: { id: branchId },
-              data: { staffIdSeq: seqNum },
-            });
-          }
-        }
-      }
 
       return distributor;
     });
