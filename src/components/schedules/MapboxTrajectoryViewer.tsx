@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Map, { Source, Layer, Marker, Popup, NavigationControl } from 'react-map-gl/mapbox';
 import type { MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { useTranslation } from '@/i18n';
 
 // ============================================================
 // Types (same as TrajectoryViewer)
@@ -159,8 +160,8 @@ const fmtDuration = (ms: number) => {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
-  if (h > 0) return `${h}時間${m}分`;
-  return `${m}分${s}秒`;
+  if (h > 0) return `${h}h${m}m`;
+  return `${m}m${s}s`;
 };
 
 // ============================================================
@@ -276,11 +277,11 @@ const dwellColor = (ms: number) => {
   return '#ef4444';
 };
 
-const dwellLabel = (ms: number) => {
-  if (ms < 2 * 60 * 1000) return '短い停止';
-  if (ms < 5 * 60 * 1000) return '中程度';
-  if (ms < 10 * 60 * 1000) return '長め';
-  return '非常に長い';
+const dwellLabelKey = (ms: number) => {
+  if (ms < 2 * 60 * 1000) return 'mapbox_dwell_short';
+  if (ms < 5 * 60 * 1000) return 'mapbox_dwell_medium';
+  if (ms < 10 * 60 * 1000) return 'mapbox_dwell_long';
+  return 'mapbox_dwell_very_long';
 };
 
 // ============================================================
@@ -312,7 +313,7 @@ function SpeedDistributionChart({ speeds }: { speeds: SegmentSpeed[] }) {
           </span>
         </div>
       ))}
-      <div className="text-[9px] text-slate-400 text-center mt-1">km/h → 滞在時間</div>
+      <div className="text-[9px] text-slate-400 text-center mt-1">km/h → duration</div>
     </div>
   );
 }
@@ -321,6 +322,7 @@ function SpeedDistributionChart({ speeds }: { speeds: SegmentSpeed[] }) {
 // Component
 // ============================================================
 export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchToGoogle }: Props) {
+  const { t } = useTranslation('schedules');
   const mapRef = useRef<MapRef>(null);
 
   const [data, setData] = useState<TrajectoryData | null>(null);
@@ -336,7 +338,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   const [viewMode, setViewMode] = useState<ViewMode>('trajectory');
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showProhibited, setShowProhibited] = useState(true);
-  const [show3D, setShow3D] = useState(false);
   const [selectedDwellSpot, setSelectedDwellSpot] = useState<DwellSpot | null>(null);
 
   // Coverage analysis
@@ -362,10 +363,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   const [pastSelectedIdx, setPastSelectedIdx] = useState(0);
   const [pastLoading, setPastLoading] = useState(false);
   const [pastError, setPastError] = useState('');
-
-  // Route suggestion
-  const [suggestedRoute, setSuggestedRoute] = useState<any>(null);
-  const [loadingRoute, setLoadingRoute] = useState(false);
 
   // Playback state
   const [sliderValue, setSliderValue] = useState(1000);
@@ -496,9 +493,9 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         return;
       }
       const err = await psRes.json().catch(() => ({}));
-      setError(err.error || 'データの取得に失敗しました');
+      setError(err.error || 'Failed to load data');
     } catch {
-      setError('データの取得に失敗しました');
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
@@ -516,14 +513,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         const res = await fetch(`/api/schedules/${scheduleId}/trajectory/past-area?limit=5`);
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
-          setPastError(err.error || '過去データ取得失敗');
+          setPastError(err.error || 'Failed to load past data');
           return;
         }
         const json = await res.json();
         setPastTrajectories(json.pastTrajectories || []);
         setPastSelectedIdx(0);
       } catch {
-        setPastError('過去データ取得失敗');
+        setPastError('Failed to load past data');
       } finally {
         setPastLoading(false);
       }
@@ -617,36 +614,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [isPlaying, playbackSpeed]);
 
-  // 3D buildings toggle — pitch + fill-extrusion layer
-  useEffect(() => {
-    const map = mapRef.current?.getMap();
-    if (!map || !map.isStyleLoaded()) return;
-
-    if (show3D) {
-      map.easeTo({ pitch: 45, duration: 500 });
-      if (!map.getLayer('3d-buildings')) {
-        map.addLayer({
-          id: '3d-buildings',
-          source: 'composite',
-          'source-layer': 'building',
-          type: 'fill-extrusion',
-          minzoom: 14,
-          paint: {
-            'fill-extrusion-color': '#e2e8f0',
-            'fill-extrusion-height': ['get', 'height'],
-            'fill-extrusion-base': ['get', 'min_height'],
-            'fill-extrusion-opacity': 0.7,
-          },
-        });
-      }
-    } else {
-      map.easeTo({ pitch: 0, duration: 500 });
-      if (map.getLayer('3d-buildings')) {
-        map.removeLayer('3d-buildings');
-      }
-    }
-  }, [show3D]);
-
   // ============================================================
   // GeoJSON data for Mapbox layers (memoized)
   // ============================================================
@@ -738,7 +705,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         type: 'Feature' as const,
         properties: {
           id: pp.id ?? idx,
-          name: pp.buildingName || pp.address || '禁止物件',
+          name: pp.buildingName || pp.address || 'Prohibited',
           address: pp.address || '',
           buildingName: pp.buildingName || '',
           roomNumber: pp.roomNumber || '',
@@ -781,33 +748,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     return { type: 'FeatureCollection' as const, features };
   }, [data]);
 
-  // Prohibited properties 3D GeoJSON — small square polygons for fill-extrusion columns
-  const prohibited3DData = useMemo(() => {
-    if (!data) return null;
-    const SIZE = 0.000025; // ~2.5m in degrees ≈ 5m x 5m square
-    const features = data.prohibitedProperties
-      .filter(pp => pp.latitude && pp.longitude)
-      .map((pp, idx) => {
-        const lng = pp.longitude!;
-        const lat = pp.latitude!;
-        return {
-          type: 'Feature' as const,
-          properties: { id: pp.id ?? idx },
-          geometry: {
-            type: 'Polygon' as const,
-            coordinates: [[
-              [lng - SIZE, lat - SIZE],
-              [lng + SIZE, lat - SIZE],
-              [lng + SIZE, lat + SIZE],
-              [lng - SIZE, lat + SIZE],
-              [lng - SIZE, lat - SIZE],
-            ]],
-          },
-        };
-      });
-    return { type: 'FeatureCollection' as const, features };
-  }, [data]);
-
   // Dwell spots GeoJSON (circles)
   const dwellGeoJson = useMemo(() => {
     if (dwellSpots.length === 0) return null;
@@ -818,7 +758,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
         dwellMs: spot.dwellMs,
         color: dwellColor(spot.dwellMs),
         radius: Math.min(50, Math.max(15, 15 + (Math.min(1, (spot.dwellMs - DWELL_MIN_MS) / (15 * 60 * 1000 - DWELL_MIN_MS))) * 35)),
-        label: dwellLabel(spot.dwellMs),
+        label: dwellLabelKey(spot.dwellMs),
         startTime: spot.startTime,
         endTime: spot.endTime,
         pointCount: spot.pointCount,
@@ -1080,81 +1020,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
     }
   }, [showCoverage, data, isInsideArea]);
 
-  // Route suggestion handler
-  const generateSuggestedRoute = useCallback(async () => {
-    if (!areaGeoJson || loadingRoute) return;
-
-    // If already showing route, toggle off
-    if (suggestedRoute) {
-      setSuggestedRoute(null);
-      return;
-    }
-
-    setLoadingRoute(true);
-
-    // Compute bounding box of area polygon
-    const allCoords: number[][] = [];
-    for (const feature of areaGeoJson.features) {
-      const geom = feature.geometry as any;
-      if (geom.type === 'Polygon') {
-        allCoords.push(...geom.coordinates[0]);
-      } else if (geom.type === 'MultiPolygon') {
-        for (const poly of geom.coordinates) allCoords.push(...poly[0]);
-      }
-    }
-    if (allCoords.length === 0) { setLoadingRoute(false); return; }
-
-    const minLng = Math.min(...allCoords.map(c => c[0]));
-    const maxLng = Math.max(...allCoords.map(c => c[0]));
-    const minLat = Math.min(...allCoords.map(c => c[1]));
-    const maxLat = Math.max(...allCoords.map(c => c[1]));
-
-    const step = 0.001; // ~100m
-    const points: [number, number][] = [];
-
-    for (let lng = minLng; lng <= maxLng; lng += step) {
-      for (let lat = minLat; lat <= maxLat; lat += step) {
-        points.push([lng, lat]);
-      }
-    }
-
-    // Sample max 12 points evenly
-    const sampled = points.length <= 12 ? points :
-      points.filter((_, i) => i % Math.ceil(points.length / 12) === 0).slice(0, 12);
-
-    if (sampled.length < 2) { setLoadingRoute(false); return; }
-
-    try {
-      const res = await fetch('/api/mapbox/optimization', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ coordinates: sampled, profile: 'walking', roundtrip: true }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error('Route optimization API error:', res.status, err);
-        setLoadingRoute(false);
-        return;
-      }
-      const resData = await res.json();
-      if (resData.trips?.[0]?.geometry) {
-        setSuggestedRoute({
-          type: 'Feature',
-          geometry: resData.trips[0].geometry,
-          properties: {
-            distance: resData.trips[0].distance,
-            duration: resData.trips[0].duration,
-          },
-        });
-      } else {
-        console.error('No trips in optimization response:', resData);
-      }
-    } catch (e) {
-      console.error('Route suggestion error:', e);
-    }
-    setLoadingRoute(false);
-  }, [areaGeoJson, loadingRoute, suggestedRoute]);
-
   // ============================================================
   // Loading / Error states
   // ============================================================
@@ -1163,7 +1028,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center">
           <div className="animate-spin w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full mx-auto mb-3"></div>
-          <p className="text-slate-600 text-sm">軌跡データを読み込み中...</p>
+          <p className="text-slate-600 text-sm">{t('mapbox_loading_trajectory')}</p>
         </div>
       </div>
     );
@@ -1174,8 +1039,8 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <div className="bg-white rounded-xl p-8 text-center max-w-sm">
           <i className="bi bi-exclamation-triangle text-3xl text-amber-500 mb-3 block"></i>
-          <p className="text-slate-700 font-bold mb-2">{error || 'データが見つかりません'}</p>
-          <button onClick={onClose} className="mt-3 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600">閉じる</button>
+          <p className="text-slate-700 font-bold mb-2">{error || t('mapbox_no_data')}</p>
+          <button onClick={onClose} className="mt-3 px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-bold text-slate-600">{t('close')}</button>
         </div>
       </div>
     );
@@ -1264,21 +1129,21 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${viewMode === 'trajectory' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <i className="bi bi-bezier2 mr-1"></i>
-                <span className="hidden md:inline">軌跡</span>
+                <span className="hidden md:inline">{t('mapbox_trajectory')}</span>
               </button>
               <button
                 onClick={() => { setViewMode('dwell'); setSelectedDwellSpot(null); setIsPlaying(false); }}
                 className={`px-2 md:px-3 py-1 rounded-md text-xs font-bold transition-colors ${viewMode === 'dwell' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 <i className="bi bi-clock-fill mr-1"></i>
-                <span className="hidden md:inline">滞在時間</span>
+                <span className="hidden md:inline">{t('mapbox_dwell_time')}</span>
               </button>
             </div>
           ) : (
             <div className="flex bg-slate-100 rounded-lg p-0.5">
               <div className="px-2 md:px-3 py-1 rounded-md text-xs font-bold bg-white text-indigo-600 shadow-sm">
                 <i className="bi bi-bezier2 mr-1"></i>
-                <span className="hidden md:inline">軌跡</span>
+                <span className="hidden md:inline">{t('mapbox_trajectory')}</span>
               </div>
             </div>
           )}
@@ -1306,7 +1171,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             >NG</button>
             {gpsSaving && <div className="w-3 h-3 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin"></div>}
           </div>
-          <button onClick={() => fetchData()} title="更新" className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
+          <button onClick={() => fetchData()} title={t('mapbox_refresh')} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-indigo-600 transition-colors">
             <i className="bi bi-arrow-clockwise"></i>
           </button>
           <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600">
@@ -1319,13 +1184,13 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       {showGpsCommentInput && data?.schedule?.checkGpsResult === 'NG' && (
         <div className="bg-rose-50 border-b border-rose-200 px-3 md:px-4 py-2 flex items-center gap-2 shrink-0">
           <i className="bi bi-exclamation-triangle-fill text-rose-500 text-xs"></i>
-          <span className="text-xs font-bold text-rose-600 shrink-0">NG理由:</span>
+          <span className="text-xs font-bold text-rose-600 shrink-0">{t('mapbox_ng_reason')}:</span>
           <input
             type="text"
             value={gpsComment}
             onChange={(e) => setGpsComment(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') saveGpsComment(); }}
-            placeholder="NGの理由を入力..."
+            placeholder={t('compliance_gps_comment_placeholder')}
             className="flex-1 text-xs border border-rose-200 rounded px-2 py-1 focus:ring-1 focus:ring-rose-400 focus:border-rose-400 placeholder:text-rose-300 bg-white"
           />
           <button
@@ -1333,7 +1198,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
             disabled={gpsSaving || gpsComment === (data?.schedule?.checkGpsComment || '')}
             className="px-3 py-1 rounded text-xs font-bold bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-40 transition-colors shrink-0"
           >
-            {gpsSaving ? '...' : '保存'}
+            {gpsSaving ? '...' : t('btn_save')}
           </button>
         </div>
       )}
@@ -1595,10 +1460,10 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         <div className="text-slate-600"><i className="bi bi-geo-alt text-rose-500 mr-1"></i>{ppPopup.props.address}</div>
                       )}
                       {ppPopup.props.roomNumber && (
-                        <div className="text-slate-500">部屋: {ppPopup.props.roomNumber}</div>
+                        <div className="text-slate-500">{t('mapbox_room')}: {ppPopup.props.roomNumber}</div>
                       )}
                       {ppPopup.props.residentName && (
-                        <div className="text-slate-500">居住者: {ppPopup.props.residentName}</div>
+                        <div className="text-slate-500">{t('mapbox_resident')}: {ppPopup.props.residentName}</div>
                       )}
                       {(ppPopup.props.reasonName || ppPopup.props.reasonDetail) && (
                         <div className="border-t border-slate-100 pt-1 mt-1">
@@ -1607,7 +1472,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         </div>
                       )}
                       {ppPopup.props.severity > 0 && (
-                        <div className="text-[10px] text-slate-400">重要度: {'★'.repeat(ppPopup.props.severity)}{'☆'.repeat(5 - ppPopup.props.severity)}</div>
+                        <div className="text-[10px] text-slate-400">{t('mapbox_severity')}: {'★'.repeat(ppPopup.props.severity)}{'☆'.repeat(5 - ppPopup.props.severity)}</div>
                       )}
                     </div>
                   </Popup>
@@ -1638,39 +1503,6 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       }}
                       paint={{
                         'text-color': '#ffffff',
-                      }}
-                    />
-                  </Source>
-                )}
-
-                {/* Suggested route overlay */}
-                {suggestedRoute && (
-                  <Source id="suggested-route" type="geojson" data={suggestedRoute}>
-                    <Layer
-                      id="suggested-route-line"
-                      type="line"
-                      paint={{
-                        'line-color': '#3b82f6',
-                        'line-width': 4,
-                        'line-dasharray': [2, 2],
-                        'line-opacity': 0.8,
-                      }}
-                      layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-                    />
-                  </Source>
-                )}
-
-                {/* Prohibited property 3D red columns */}
-                {show3D && showProhibited && prohibited3DData && (
-                  <Source id="prohibited-3d" type="geojson" data={prohibited3DData}>
-                    <Layer
-                      id="prohibited-3d-extrusion"
-                      type="fill-extrusion"
-                      paint={{
-                        'fill-extrusion-color': '#ef4444',
-                        'fill-extrusion-height': 30,
-                        'fill-extrusion-base': 0,
-                        'fill-extrusion-opacity': 0.8,
                       }}
                     />
                   </Source>
@@ -1738,7 +1570,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       anchor="center"
                       onClick={(ev) => {
                         ev.originalEvent.stopPropagation();
-                        setPopup({ lng: e.lng!, lat: e.lat!, content: `${e.mailboxCount}枚完了 (${fmtTime(e.timestamp)})` });
+                        setPopup({ lng: e.lng!, lat: e.lat!, content: `${e.mailboxCount} ${t('mapbox_sheets_done')} (${fmtTime(e.timestamp)})` });
                       }}
                     >
                       <div className="w-7 h-7 rounded-full bg-emerald-500 border-2 border-white shadow-md flex items-center justify-center text-white text-[9px] font-bold">
@@ -1759,7 +1591,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       ev.originalEvent.stopPropagation();
                       setPopup({
                         lng: e.lng, lat: e.lat,
-                        content: `スキップ (${fmtTime(e.timestamp)})${e.reason ? `\n${e.reason}` : ''}${e.prohibitedProperty ? `\n${e.prohibitedProperty.buildingName || e.prohibitedProperty.address}` : ''}`,
+                        content: `${t('mapbox_skip')} (${fmtTime(e.timestamp)})${e.reason ? `\n${e.reason}` : ''}${e.prohibitedProperty ? `\n${e.prohibitedProperty.buildingName || e.prohibitedProperty.address}` : ''}`,
                       });
                     }}
                   >
@@ -1850,7 +1682,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 }`}
               >
                 <i className="bi bi-fire mr-1"></i>
-                ヒートマップ
+                {t('mapbox_heatmap')}
               </button>
               <button
                 onClick={() => setShowProhibited(!showProhibited)}
@@ -1861,18 +1693,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 }`}
               >
                 <i className="bi bi-slash-circle mr-1"></i>
-                禁止物件
-              </button>
-              <button
-                onClick={() => setShow3D(!show3D)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
-                  show3D
-                    ? 'bg-purple-600 text-white border-purple-700'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                <i className="bi bi-badge-3d"></i>
-                3D建物
+                {t('mapbox_prohibited')}
               </button>
               <button
                 onClick={() => setShowCoverage(!showCoverage)}
@@ -1883,19 +1704,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 }`}
               >
                 <i className="bi bi-grid-3x3"></i>
-                カバレッジ
-              </button>
-              <button
-                onClick={generateSuggestedRoute}
-                disabled={loadingRoute}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
-                  suggestedRoute
-                    ? 'bg-blue-600 text-white border-blue-700'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                } ${loadingRoute ? 'opacity-50' : ''}`}
-              >
-                <i className={`bi ${loadingRoute ? 'bi-arrow-repeat animate-spin' : 'bi-signpost-2'}`}></i>
-                ルート提案
+                {t('mapbox_coverage')}
               </button>
               <button
                 onClick={() => setShowSpeed(!showSpeed)}
@@ -1906,7 +1715,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 }`}
               >
                 <i className="bi bi-speedometer2"></i>
-                移動速度
+                {t('speed_toggle')}
               </button>
               <button
                 onClick={() => setShowPastComparison(!showPastComparison)}
@@ -1917,7 +1726,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 }`}
               >
                 <i className={`bi ${pastLoading ? 'bi-arrow-repeat animate-spin' : 'bi-clock-history'}`}></i>
-                過去比較
+                {t('mapbox_past_compare')}
               </button>
             </div>
           )}
@@ -1926,12 +1735,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
           {showPastComparison && selectedPast && (
             <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10 max-w-56">
               <div className="font-bold text-slate-700 mb-1.5">
-                <i className="bi bi-clock-history mr-1"></i>過去比較
+                <i className="bi bi-clock-history mr-1"></i>{t('mapbox_past_compare')}
               </div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded" style={{ background: '#ec4899' }}></div>
-                  <span className="text-slate-600">今回</span>
+                  <span className="text-slate-600">{t('mapbox_current')}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded border border-amber-400" style={{ background: '#f59e0b' }}></div>
@@ -1971,46 +1780,35 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
           {showCoverage && coverageRate !== null && (
             <div className="absolute top-16 left-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg border border-slate-200 text-sm font-bold z-10">
               <i className="bi bi-grid-3x3 text-teal-500 mr-1.5"></i>
-              カバレッジ: <span className={coverageRate > 0.8 ? 'text-emerald-600' : coverageRate > 0.5 ? 'text-amber-600' : 'text-red-600'}>{Math.round(coverageRate * 100)}%</span>
+              {t('mapbox_coverage')}: <span className={coverageRate > 0.8 ? 'text-emerald-600' : coverageRate > 0.5 ? 'text-amber-600' : 'text-red-600'}>{Math.round(coverageRate * 100)}%</span>
             </div>
           )}
 
           {/* Speed legend */}
           {showSpeed && (
             <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10">
-              <div className="font-bold text-slate-700 mb-1.5">移動速度</div>
+              <div className="font-bold text-slate-700 mb-1.5">{t('speed_legend')}</div>
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.posting }}></div>
-                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.posting} km/h（配布中）</span>
+                  <span className="text-slate-600">~{SPEED_THRESHOLDS.posting} km/h ({t('speed_posting_label')})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.slowWalk }}></div>
-                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.slowWalk} km/h（配布歩行）</span>
+                  <span className="text-slate-600">~{SPEED_THRESHOLDS.slowWalk} km/h ({t('speed_slow_walk_label')})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.normalWalk }}></div>
-                  <span className="text-slate-600">〜{SPEED_THRESHOLDS.normalWalk} km/h（通常歩行）</span>
+                  <span className="text-slate-600">~{SPEED_THRESHOLDS.normalWalk} km/h ({t('speed_normal_walk_label')})</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="w-5 h-1 rounded" style={{ background: SPEED_COLORS.fast }}></div>
-                  <span className="text-slate-600">{SPEED_THRESHOLDS.normalWalk}+ km/h（高速移動）</span>
+                  <span className="text-slate-600">{SPEED_THRESHOLDS.normalWalk}+ km/h ({t('speed_fast_label')})</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Route info badge */}
-          {suggestedRoute && (
-            <div className="absolute top-16 right-3 bg-white/95 backdrop-blur px-3 py-2 rounded-lg shadow-lg border border-slate-200 text-xs z-10">
-              <div className="font-bold text-blue-600 mb-1"><i className="bi bi-signpost-2 mr-1"></i>推奨ルート</div>
-              <div>距離: {(suggestedRoute.properties.distance / 1000).toFixed(1)} km</div>
-              <div>所要時間: {Math.round(suggestedRoute.properties.duration / 60)} 分</div>
-              <button onClick={() => setSuggestedRoute(null)} className="mt-1 text-slate-400 hover:text-slate-600 text-[10px]">
-                <i className="bi bi-x-circle mr-0.5"></i>クリア
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Side panel */}
@@ -2034,7 +1832,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                     <i className="bi bi-info-circle mr-1"></i>
-                    PMS GPS セッションなし。Posting System の GPS データを表示中。
+                    {t('mapbox_ps_notice')}
                   </div>
                 </div>
               )}
@@ -2044,7 +1842,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-speedometer2 mr-1"></i>
-                    パフォーマンス
+                    {t('mapbox_performance')}
                   </h3>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     {dataSource === 'pms' && (
@@ -2055,7 +1853,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                         </div>
                         <div className="bg-emerald-50 rounded-lg p-2 text-center">
                           <div className="text-emerald-600 font-black text-lg">{data.session.totalSteps.toLocaleString()}</div>
-                          <div className="text-emerald-400">歩</div>
+                          <div className="text-emerald-400">{t('mapbox_steps')}</div>
                         </div>
                         <div className="bg-orange-50 rounded-lg p-2 text-center">
                           <div className="text-orange-600 font-black text-lg">{Math.round(data.session.totalCalories)}</div>
@@ -2065,12 +1863,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     )}
                     <div className="bg-purple-50 rounded-lg p-2 text-center">
                       <div className="text-purple-600 font-black text-lg">{fmtDuration(duration)}</div>
-                      <div className="text-purple-400">作業時間{totalPausedMs > 0 ? '*' : ''}</div>
+                      <div className="text-purple-400">{t('mapbox_work_time')}{totalPausedMs > 0 ? '*' : ''}</div>
                     </div>
                     {isFinished && totalMailboxes > 0 && (
                       <div className="bg-indigo-50 rounded-lg p-2 text-center">
                         <div className="text-indigo-600 font-black text-lg">{durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0}</div>
-                        <div className="text-indigo-400">枚/時</div>
+                        <div className="text-indigo-400">{t('mapbox_sheets_per_hour')}</div>
                       </div>
                     )}
                   </div>
@@ -2083,16 +1881,16 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   <div className="p-4 border-b border-slate-100">
                     <h3 className="font-bold text-slate-700 text-sm mb-3">
                       <i className="bi bi-speedometer2 mr-1"></i>
-                      速度分析
+                      {t('speed_analysis')}
                     </h3>
                     <div className="grid grid-cols-2 gap-2 text-xs mb-3">
                       <div className="bg-blue-50 rounded-lg p-2 text-center">
                         <div className="text-blue-600 font-black text-lg">{speedStats.avg.toFixed(1)}</div>
-                        <div className="text-blue-400">平均 km/h</div>
+                        <div className="text-blue-400">{t('speed_avg')}</div>
                       </div>
                       <div className="bg-indigo-50 rounded-lg p-2 text-center">
                         <div className="text-indigo-600 font-black text-lg">{speedStats.max.toFixed(1)}</div>
-                        <div className="text-indigo-400">最高 km/h</div>
+                        <div className="text-indigo-400">{t('speed_max')}</div>
                       </div>
                     </div>
                   </div>
@@ -2100,7 +1898,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   <div className="p-4 border-b border-slate-100">
                     <h3 className="font-bold text-slate-700 text-sm mb-3">
                       <i className="bi bi-pie-chart mr-1"></i>
-                      配布 vs 移動
+                      {t('speed_posting_vs_moving')}
                     </h3>
                     <div className="flex h-6 rounded-full overflow-hidden mb-2">
                       <div
@@ -2120,14 +1918,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1.5">
                           <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-red-500 to-orange-500"></span>
-                          配布活動（〜{SPEED_THRESHOLDS.slowWalk} km/h）
+                          {t('speed_posting_activity')} (~{SPEED_THRESHOLDS.slowWalk} km/h)
                         </span>
                         <span className="font-bold text-slate-700">{fmtDuration(speedStats.postingTime)}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="flex items-center gap-1.5">
                           <span className="w-2.5 h-2.5 rounded-full bg-gradient-to-r from-green-500 to-blue-500"></span>
-                          移動（{SPEED_THRESHOLDS.slowWalk}+ km/h）
+                          {t('speed_moving')} ({SPEED_THRESHOLDS.slowWalk}+ km/h)
                         </span>
                         <span className="font-bold text-slate-700">{fmtDuration(speedStats.movingTime)}</span>
                       </div>
@@ -2137,7 +1935,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   <div className="p-4 border-b border-slate-100">
                     <h3 className="font-bold text-slate-700 text-sm mb-3">
                       <i className="bi bi-bar-chart mr-1"></i>
-                      速度分布
+                      {t('speed_distribution')}
                     </h3>
                     <SpeedDistributionChart speeds={segmentSpeeds} />
                   </div>
@@ -2149,7 +1947,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-clock-history mr-1 text-amber-500"></i>
-                    過去比較
+                    {t('mapbox_past_compare')}
                   </h3>
                   {/* Past trajectory selector */}
                   {pastTrajectories && pastTrajectories.length > 1 && (
@@ -2175,25 +1973,25 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                   </div>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">今回 距離</span>
+                      <span className="text-slate-500">{t('mapbox_current_distance')}</span>
                       <span className="font-bold text-slate-700">{(data.session.totalDistance / 1000).toFixed(1)} km</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">過去 距離（エリア内）</span>
+                      <span className="text-slate-500">{t('mapbox_past_distance')}</span>
                       <span className="font-bold text-amber-600">{(calcFilteredDistance(pastGpsFiltered) / 1000).toFixed(1)} km</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">今回 GPS点数</span>
+                      <span className="text-slate-500">{t('mapbox_current_gps_points')}</span>
                       <span className="font-bold text-slate-700">{data.gpsPoints.length.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">過去 GPS点数（エリア内）</span>
+                      <span className="text-slate-500">{t('mapbox_past_gps_points')}</span>
                       <span className="font-bold text-amber-600">{pastGpsFiltered.length.toLocaleString()}</span>
                     </div>
                     {selectedPast.startedAt && selectedPast.finishedAt && (
                       <div className="mt-2 pt-2 border-t border-slate-100">
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-500">過去 時間</span>
+                          <span className="text-slate-500">{t('mapbox_past_time')}</span>
                           <span className="font-bold text-amber-600">
                             {fmtTime(selectedPast.startedAt)} ~ {fmtTime(selectedPast.finishedAt)}
                           </span>
@@ -2203,16 +2001,16 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     {/* 配布実績比較 */}
                     <div className="mt-2 pt-2 border-t border-slate-100">
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">今回 配布枚数</span>
+                        <span className="text-slate-500">{t('mapbox_current_sheets')}</span>
                         <span className="font-bold text-slate-700">
-                          {data.schedule.items.reduce((s: number, i: any) => s + (i.actualCount || 0), 0).toLocaleString()} 枚
+                          {data.schedule.items.reduce((s: number, i: any) => s + (i.actualCount || 0), 0).toLocaleString()}
                         </span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-slate-500">過去 配布枚数</span>
+                        <span className="text-slate-500">{t('mapbox_past_sheets')}</span>
                         <span className="font-bold text-amber-600">
                           {((selectedPast as any).totalSheets || 0) > 0
-                            ? `${((selectedPast as any).totalSheets).toLocaleString()} 枚`
+                            ? `${((selectedPast as any).totalSheets).toLocaleString()}`
                             : '-'}
                         </span>
                       </div>
@@ -2226,13 +2024,13 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-grid-3x3-gap mr-1 text-indigo-500"></i>
-                    エリアカバー率
+                    {t('mapbox_area_coverage_rate')}
                   </h3>
                   {/* 2つのバーを並べて比較 */}
                   <div className="space-y-2 mb-3">
                     <div>
                       <div className="flex justify-between items-center text-[10px] mb-0.5">
-                        <span className="text-pink-600 font-bold">今回</span>
+                        <span className="text-pink-600 font-bold">{t('mapbox_current')}</span>
                         <span className="font-black text-pink-600">{Math.round(trajectoryMatchRate.currentMatchRate * 100)}%</span>
                       </div>
                       <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -2241,7 +2039,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     </div>
                     <div>
                       <div className="flex justify-between items-center text-[10px] mb-0.5">
-                        <span className="text-amber-600 font-bold">過去</span>
+                        <span className="text-amber-600 font-bold">{t('mapbox_past')}</span>
                         <span className="font-black text-amber-600">100%</span>
                       </div>
                       <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
@@ -2270,22 +2068,22 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                           diff >= -10 ? 'text-emerald-600' : diff >= -30 ? 'text-amber-700' : 'text-red-700'
                         }`}>
                           {diff >= -10
-                            ? '過去と同等以上のカバレッジ'
+                            ? t('mapbox_coverage_equal_or_better')
                             : diff >= -30
-                              ? `過去より${absDiff}%少ないカバレッジ`
-                              : `過去より${absDiff}%少ない — 要確認`}
+                              ? t('mapbox_coverage_less', { pct: absDiff })
+                              : t('mapbox_coverage_much_less', { pct: absDiff })}
                         </p>
                       </div>
                     );
                   })()}
                   <div className="text-[10px] text-slate-400 mt-2 space-y-0.5">
                     <div className="flex justify-between">
-                      <span>カバー済み</span>
-                      <span>{trajectoryMatchRate.pastMatched.toLocaleString()} / {trajectoryMatchRate.pastTotal.toLocaleString()} 地点</span>
+                      <span>{t('mapbox_covered')}</span>
+                      <span>{trajectoryMatchRate.pastMatched.toLocaleString()} / {trajectoryMatchRate.pastTotal.toLocaleString()} {t('mapbox_points')}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>判定基準</span>
-                      <span>30m以内を同一ルートとみなす</span>
+                      <span>{t('mapbox_criteria')}</span>
+                      <span>{t('mapbox_criteria_desc')}</span>
                     </div>
                   </div>
                 </div>
@@ -2294,7 +2092,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                     <i className="bi bi-info-circle mr-1"></i>
-                    同エリアの過去の配布データがありません。
+                    {t('mapbox_no_past_data')}
                   </div>
                 </div>
               )}
@@ -2304,24 +2102,24 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-graph-up mr-1"></i>
-                    時間あたり
+                    {t('mapbox_per_hour')}
                   </h3>
                   {totalPausedMs > 0 && (
                     <div className="mb-2 text-xs text-yellow-700 bg-yellow-50 border border-yellow-200 rounded px-2 py-1">
-                      * PAUSE 時間（{fmtDuration(totalPausedMs)}）を除いた実効時間で計算
+                      * {t('mapbox_pause_excluded', { duration: fmtDuration(totalPausedMs) })}
                     </div>
                   )}
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">配布ペース</span>
-                      <span className="font-bold text-slate-700">{durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} ポスト/h</span>
+                      <span className="text-slate-500">{t('mapbox_posting_pace')}</span>
+                      <span className="font-bold text-slate-700">{durationHours > 0 ? Math.round(totalMailboxes / durationHours).toLocaleString() : 0} {t('mapbox_posts_per_hour')}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">歩数</span>
-                      <span className="font-bold text-slate-700">{durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} 歩/h</span>
+                      <span className="text-slate-500">{t('mapbox_steps')}</span>
+                      <span className="font-bold text-slate-700">{durationHours > 0 ? Math.round(data.session.totalSteps / durationHours).toLocaleString() : 0} {t('mapbox_steps_per_hour')}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">移動距離</span>
+                      <span className="text-slate-500">{t('mapbox_travel_distance')}</span>
                       <span className="font-bold text-slate-700">{durationHours > 0 ? (data.session.totalDistance / 1000 / durationHours).toFixed(1) : 0} km/h</span>
                     </div>
                   </div>
@@ -2332,7 +2130,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
               <div className="p-4 border-b border-slate-100">
                 <h3 className="font-bold text-slate-700 text-sm mb-3">
                   <i className="bi bi-file-earmark-text mr-1"></i>
-                  配布チラシ
+                  {t('mapbox_distribution_flyers')}
                 </h3>
                 <div className="space-y-1.5 text-xs">
                   {data.schedule.items.map((item) => (
@@ -2347,7 +2145,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 </div>
                 {data.session.incompleteReason && (
                   <div className="mt-2 text-xs bg-amber-50 border border-amber-200 rounded-lg px-2 py-1.5 text-amber-700">
-                    未完了: {data.session.incompleteReason === 'AREA_DONE' ? 'エリア終了' : data.session.incompleteReason === 'GIVE_UP' ? 'ギブアップ' : 'その他'}
+                    {t('mapbox_incomplete')}: {data.session.incompleteReason === 'AREA_DONE' ? t('incomplete_area_done') : data.session.incompleteReason === 'GIVE_UP' ? t('incomplete_give_up') : t('incomplete_other')}
                     {data.session.incompleteNote && <span className="block text-amber-500 mt-0.5">{data.session.incompleteNote}</span>}
                   </div>
                 )}
@@ -2358,7 +2156,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-clock-history mr-1"></i>
-                    配布進捗
+                    {t('mapbox_progress_timeline')}
                   </h3>
                   <div className="space-y-1 text-xs">
                     {[
@@ -2375,7 +2173,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       .map((item, idx) => {
                         const dotColor = item.type === 'START' ? 'bg-emerald-500' : item.type === 'PROGRESS' ? 'bg-blue-400' : item.type === 'SKIP' ? 'bg-orange-400' : item.type === 'PAUSE' ? 'bg-yellow-400' : item.type === 'RESUME' ? 'bg-teal-400' : 'bg-red-500';
                         const textColor = item.type === 'START' ? 'text-emerald-600' : item.type === 'PROGRESS' ? 'text-blue-600' : item.type === 'SKIP' ? 'text-orange-600' : item.type === 'PAUSE' ? 'text-yellow-600' : item.type === 'RESUME' ? 'text-teal-600' : 'text-red-600';
-                        const label = item.type === 'PROGRESS' && 'mailboxCount' in item ? `${item.mailboxCount}枚` : item.type;
+                        const label = item.type === 'PROGRESS' && 'mailboxCount' in item ? `${item.mailboxCount}` : item.type;
                         return (
                           <div key={`${item.type}-${idx}`} className="flex items-center gap-2">
                             <span className={`w-2 h-2 ${dotColor} rounded-full shrink-0`}></span>
@@ -2386,7 +2184,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       })}
                     {(data.pauseEvents || []).some((e) => !e.resumedAt) && !data.session.finishedAt && (
                       <div className="mt-1 text-xs bg-yellow-50 border border-yellow-200 rounded px-2 py-1 text-yellow-700 font-bold">
-                        現在一時停止中
+                        {t('mapbox_currently_paused')}
                       </div>
                     )}
                   </div>
@@ -2398,21 +2196,21 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 <div className="p-4 border-b border-slate-100">
                   <h3 className="font-bold text-slate-700 text-sm mb-3">
                     <i className="bi bi-geo-alt mr-1"></i>
-                    GPS データ
+                    {t('mapbox_gps_data')}
                   </h3>
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center">
-                      <span className="text-slate-500">GPS ポイント数</span>
+                      <span className="text-slate-500">{t('mapbox_gps_points')}</span>
                       <span className="font-bold text-slate-700">{data.gpsPoints.length}</span>
                     </div>
                     {data.gpsPoints.length > 0 && (
                       <>
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-500">開始</span>
+                          <span className="text-slate-500">{t('mapbox_start')}</span>
                           <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[0].timestamp)}</span>
                         </div>
                         <div className="flex justify-between items-center">
-                          <span className="text-slate-500">{isFinished ? '終了' : '最終GPS'}</span>
+                          <span className="text-slate-500">{isFinished ? t('mapbox_end') : t('mapbox_last_gps')}</span>
                           <span className="font-bold text-slate-700">{fmtTime(data.gpsPoints[data.gpsPoints.length - 1].timestamp)}</span>
                         </div>
                       </>
@@ -2427,24 +2225,24 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
               <div className="p-4 border-b border-slate-100">
                 <h3 className="font-bold text-slate-700 text-sm mb-3">
                   <i className="bi bi-clock-fill mr-1 text-orange-500"></i>
-                  滞在分析サマリー
+                  {t('mapbox_dwell_summary')}
                 </h3>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="bg-orange-50 rounded-lg p-2 text-center">
                     <div className="text-orange-600 font-black text-lg">{dwellStats.count}</div>
-                    <div className="text-orange-400">滞在スポット</div>
+                    <div className="text-orange-400">{t('mapbox_dwell_spots')}</div>
                   </div>
                   <div className="bg-amber-50 rounded-lg p-2 text-center">
                     <div className="text-amber-600 font-black text-lg">{fmtDuration(dwellStats.totalMs)}</div>
-                    <div className="text-amber-400">総滞在時間</div>
+                    <div className="text-amber-400">{t('mapbox_total_dwell')}</div>
                   </div>
                   <div className="bg-blue-50 rounded-lg p-2 text-center">
                     <div className="text-blue-600 font-black text-lg">{dwellStats.count > 0 ? fmtDuration(dwellStats.avgMs) : '-'}</div>
-                    <div className="text-blue-400">平均滞在</div>
+                    <div className="text-blue-400">{t('mapbox_avg_dwell')}</div>
                   </div>
                   <div className="bg-red-50 rounded-lg p-2 text-center">
                     <div className="text-red-600 font-black text-lg">{dwellStats.maxMs > 0 ? fmtDuration(dwellStats.maxMs) : '-'}</div>
-                    <div className="text-red-400">最長滞在</div>
+                    <div className="text-red-400">{t('mapbox_max_dwell')}</div>
                   </div>
                 </div>
               </div>
@@ -2453,24 +2251,24 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
               <div className="p-4 border-b border-slate-100">
                 <h3 className="font-bold text-slate-700 text-sm mb-2">
                   <i className="bi bi-palette mr-1"></i>
-                  凡例
+                  {t('mapbox_legend')}
                 </h3>
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-green-500 shrink-0"></span>
-                    <span className="text-slate-600">30秒〜2分（個別住宅）</span>
+                    <span className="text-slate-600">{t('mapbox_legend_30s_2m')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-yellow-500 shrink-0"></span>
-                    <span className="text-slate-600">2分〜5分（小〜中規模アパート）</span>
+                    <span className="text-slate-600">{t('mapbox_legend_2m_5m')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-orange-500 shrink-0"></span>
-                    <span className="text-slate-600">5分〜10分（大規模マンション）</span>
+                    <span className="text-slate-600">{t('mapbox_legend_5m_10m')}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>
-                    <span className="text-slate-600">10分以上（要確認）</span>
+                    <span className="text-slate-600">{t('mapbox_legend_10m_plus')}</span>
                   </div>
                 </div>
               </div>
@@ -2479,10 +2277,10 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
               <div className="p-4 border-b border-slate-100 flex-1">
                 <h3 className="font-bold text-slate-700 text-sm mb-3">
                   <i className="bi bi-sort-down mr-1"></i>
-                  滞在スポット（長い順）
+                  {t('mapbox_dwell_ranking')}
                 </h3>
                 {dwellSorted.length === 0 ? (
-                  <p className="text-xs text-slate-400 text-center py-4">滞在スポットなし</p>
+                  <p className="text-xs text-slate-400 text-center py-4">{t('mapbox_no_dwell_spots')}</p>
                 ) : (
                   <div className="space-y-1.5 text-xs">
                     {dwellSorted.map((spot, idx) => {
@@ -2495,7 +2293,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                             setSelectedDwellSpot(spot);
                             setPopup({
                               lng: spot.centerLng, lat: spot.centerLat,
-                              content: `滞在時間: ${fmtDuration(spot.dwellMs)}\n${fmtTime(spot.startTime)} 〜 ${fmtTime(spot.endTime)}\nGPSポイント: ${spot.pointCount}件\n${dwellLabel(spot.dwellMs)}`,
+                              content: `${t('mapbox_dwell_time')}: ${fmtDuration(spot.dwellMs)}\n${fmtTime(spot.startTime)} 〜 ${fmtTime(spot.endTime)}\n${t('mapbox_gps_points')}: ${spot.pointCount}\n${t(dwellLabelKey(spot.dwellMs))}`,
                             });
                             mapRef.current?.flyTo({ center: [spot.centerLng, spot.centerLat], zoom: 18, duration: 500 });
                           }}
@@ -2510,7 +2308,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                             <div className="text-slate-400">{fmtTime(spot.startTime)} 〜 {fmtTime(spot.endTime)}</div>
                           </div>
                           {spot.dwellMs >= 10 * 60 * 1000 && (
-                            <span className="text-red-500 shrink-0" title="10分以上の長時間滞在">
+                            <span className="text-red-500 shrink-0" title={t('mapbox_long_dwell_warning')}>
                               <i className="bi bi-exclamation-triangle-fill"></i>
                             </span>
                           )}
@@ -2585,12 +2383,12 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
       {viewMode === 'dwell' && (
         <div className="bg-white border-t border-slate-200 px-4 py-2 md:py-3 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4 text-xs text-slate-500">
-            <span><i className="bi bi-geo-alt mr-1"></i>{dwellStats.count} スポット検出</span>
-            <span><i className="bi bi-clock mr-1"></i>総滞在 {fmtDuration(dwellStats.totalMs)}</span>
+            <span><i className="bi bi-geo-alt mr-1"></i>{dwellStats.count} {t('mapbox_spots_detected')}</span>
+            <span><i className="bi bi-clock mr-1"></i>{t('mapbox_total_dwell')} {fmtDuration(dwellStats.totalMs)}</span>
             {dwellSorted.filter(s => s.dwellMs >= 10 * 60 * 1000).length > 0 && (
               <span className="text-red-500 font-bold">
                 <i className="bi bi-exclamation-triangle-fill mr-1"></i>
-                {dwellSorted.filter(s => s.dwellMs >= 10 * 60 * 1000).length}件の長時間滞在
+                {dwellSorted.filter(s => s.dwellMs >= 10 * 60 * 1000).length} {t('mapbox_long_dwell_count')}
               </span>
             )}
           </div>
