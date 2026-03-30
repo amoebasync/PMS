@@ -363,6 +363,8 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
   const [pastSelectedIdx, setPastSelectedIdx] = useState(0);
   const [pastLoading, setPastLoading] = useState(false);
   const [pastError, setPastError] = useState('');
+  const [showCurrentLine, setShowCurrentLine] = useState(true);
+  const [showPastLine, setShowPastLine] = useState(true);
 
   // Playback state
   const [sliderValue, setSliderValue] = useState(1000);
@@ -1303,7 +1305,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       layout={{
                         'line-cap': 'round',
                         'line-join': 'round',
-                        visibility: showSpeed ? 'none' : 'visible',
+                        visibility: showSpeed || (showPastComparison && !showCurrentLine) ? 'none' : 'visible',
                       }}
                     />
                   </Source>
@@ -1323,7 +1325,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       layout={{
                         'line-cap': 'round',
                         'line-join': 'round',
-                        visibility: showSpeed ? 'visible' : 'none',
+                        visibility: showSpeed && !(showPastComparison && !showCurrentLine) ? 'visible' : 'none',
                       }}
                     />
                   </Source>
@@ -1343,14 +1345,14 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                       layout={{
                         'line-cap': 'round',
                         'line-join': 'round',
-                        visibility: showSpeed ? 'none' : 'visible',
+                        visibility: showSpeed || (showPastComparison && !showCurrentLine) ? 'none' : 'visible',
                       }}
                     />
                   </Source>
                 )}
 
                 {/* Past area trajectory comparison overlay */}
-                {showPastComparison && pastTrajectoryGeoJson && (
+                {showPastComparison && showPastLine && pastTrajectoryGeoJson && (
                   <Source key={`past-traj-${selectedPast?.scheduleId || 0}`} id={`past-traj-${selectedPast?.scheduleId || 0}`} type="geojson" data={pastTrajectoryGeoJson}>
                     <Layer
                       id={`past-traj-line-${selectedPast?.scheduleId || 0}`}
@@ -1364,7 +1366,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                     />
                   </Source>
                 )}
-                {showPastComparison && pastGpsFiltered.length > 0 && (
+                {showPastComparison && showPastLine && pastGpsFiltered.length > 0 && (
                   <>
                     <Marker longitude={pastGpsFiltered[0].lng} latitude={pastGpsFiltered[0].lat} anchor="center">
                       <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center">
@@ -1718,7 +1720,7 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
                 {t('speed_toggle')}
               </button>
               <button
-                onClick={() => setShowPastComparison(!showPastComparison)}
+                onClick={() => { setShowPastComparison(!showPastComparison); setShowCurrentLine(true); setShowPastLine(true); }}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold shadow-md border transition-colors ${
                   showPastComparison
                     ? 'bg-amber-600 text-white border-amber-700'
@@ -1733,22 +1735,34 @@ export default function MapboxTrajectoryViewer({ scheduleId, onClose, onSwitchTo
 
           {/* Past comparison legend */}
           {showPastComparison && selectedPast && (
-            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10 max-w-56">
+            <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg px-3 py-2.5 text-xs z-10 max-w-60">
               <div className="font-bold text-slate-700 mb-1.5">
                 <i className="bi bi-clock-history mr-1"></i>{t('mapbox_past_compare')}
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-1 rounded" style={{ background: '#ec4899' }}></div>
-                  <span className="text-slate-600">{t('mapbox_current')}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-5 h-1 rounded border border-amber-400" style={{ background: '#f59e0b' }}></div>
-                  <span className="text-slate-600 truncate">
+              <div className="space-y-1.5">
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={showCurrentLine}
+                    onChange={e => setShowCurrentLine(e.target.checked)}
+                    className="accent-pink-500 w-3.5 h-3.5"
+                  />
+                  <div className="w-5 h-1 rounded" style={{ background: showCurrentLine ? '#ec4899' : '#d1d5db' }}></div>
+                  <span className={`${showCurrentLine ? 'text-slate-600' : 'text-slate-400'} group-hover:text-slate-700`}>{t('mapbox_current')}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={showPastLine}
+                    onChange={e => setShowPastLine(e.target.checked)}
+                    className="accent-amber-500 w-3.5 h-3.5"
+                  />
+                  <div className="w-5 h-1 rounded border border-amber-400" style={{ background: showPastLine ? '#f59e0b' : '#d1d5db' }}></div>
+                  <span className={`${showPastLine ? 'text-slate-600' : 'text-slate-400'} group-hover:text-slate-700 truncate`}>
                     {new Date(selectedPast.date).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', timeZone: 'Asia/Tokyo' })}
                     {' '}{selectedPast.distributorName}
                   </span>
-                </div>
+                </label>
               </div>
               {/* Past trajectory selector */}
               {pastTrajectories && pastTrajectories.length > 1 && (
