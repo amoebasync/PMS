@@ -20,11 +20,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    // Find announcements where scheduledAt <= now AND sentAt IS NULL
+    // Find announcements where scheduledAt <= now AND sentAt IS NULL AND not draft
     const pending = await prisma.distributorAnnouncement.findMany({
       where: {
         scheduledAt: { lte: new Date() },
         sentAt: null,
+        isDraft: false,
       },
       include: {
         targets: {

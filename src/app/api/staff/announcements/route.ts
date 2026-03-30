@@ -20,6 +20,8 @@ export async function GET() {
     const announcements = await prisma.distributorAnnouncement.findMany({
       where: {
         id: { notIn: readAnnouncementIds.length > 0 ? readAnnouncementIds : undefined },
+        isDraft: false,
+        sentAt: { not: null },
         OR: [
           { targetAll: true },
           { targets: { some: { distributorId: distributor.id } } },

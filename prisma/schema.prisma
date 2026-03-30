@@ -2290,6 +2290,7 @@ model DistributorAnnouncement {
   contentEn   String?  @db.Text @map("content_en")
   imageUrls   String?  @db.Text @map("image_urls") // JSON array of S3 URLs
   targetAll   Boolean  @default(true) @map("target_all")
+  isDraft     Boolean  @default(false) @map("is_draft")
   createdById Int      @map("created_by_id")
   createdBy   Employee @relation("DistributorAnnouncementCreatedBy", fields: [createdById], references: [id])
   scheduledAt DateTime? @map("scheduled_at")

@@ -9,6 +9,9 @@ export async function GET(request: Request) {
   if (error) return error;
 
   try {
+    const { searchParams } = new URL(request.url);
+    const includeDrafts = searchParams.get('includeDrafts') !== 'false';
+
     const announcements = await prisma.distributorAnnouncement.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -55,6 +58,7 @@ export async function GET(request: Request) {
         createdAt: a.createdAt,
         scheduledAt: a.scheduledAt,
         sentAt: a.sentAt,
+        isDraft: a.isDraft,
       };
     }));
 
@@ -72,7 +76,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds, scheduledAt } = body;
+    const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds, scheduledAt, isDraft } = body;
 
     if (!title || !content) {
       return NextResponse.json({ error: 'title と content は必須です' }, { status: 400 });
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
 
     // Determine if this is a scheduled send
     const scheduledDate = scheduledAt ? new Date(scheduledAt) : null;
-    const isScheduled = scheduledDate && scheduledDate > new Date();
+    const isScheduled = !isDraft && scheduledDate && scheduledDate > new Date();
 
     const announcement = await prisma.distributorAnnouncement.create({
       data: {
@@ -90,17 +94,18 @@ export async function POST(request: Request) {
         contentEn: contentEn || null,
         imageUrls: imageUrls?.length ? JSON.stringify(imageUrls) : null,
         targetAll: targetAll !== false,
+        isDraft: isDraft || false,
         createdById: employee!.id,
-        scheduledAt: isScheduled ? scheduledDate : null,
-        sentAt: isScheduled ? null : new Date(),
+        scheduledAt: isDraft ? null : (isScheduled ? scheduledDate : null),
+        sentAt: isDraft ? null : (isScheduled ? null : new Date()),
         targets: !targetAll && distributorIds?.length
           ? { create: distributorIds.map((id: number) => ({ distributorId: id })) }
           : undefined,
       },
     });
 
-    // Send LINE notifications immediately if not scheduled
-    if (!isScheduled && isLineConfigured()) {
+    // Send LINE notifications immediately if not scheduled and not draft
+    if (!isDraft && !isScheduled && isLineConfigured()) {
       let targetDistributors: Array<{ lineUserId: string; language: string }> | undefined;
       if (targetAll !== false) {
         const langFilter = targetLanguage === 'ja' || targetLanguage === 'en'

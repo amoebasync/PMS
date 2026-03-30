@@ -37,6 +37,7 @@ interface AnnouncementItem {
   createdAt: string;
   scheduledAt: string | null;
   sentAt: string | null;
+  isDraft: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -48,6 +49,7 @@ export default function DistributorAnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [editItem, setEditItem] = useState<AnnouncementItem | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [viewItem, setViewItem] = useState<AnnouncementItem | null>(null);
 
@@ -71,6 +73,9 @@ export default function DistributorAnnouncementsPage() {
   const detailItem = announcements.find(a => a.id === detailId);
 
   const getStatusBadge = (a: AnnouncementItem) => {
+    if (a.isDraft) {
+      return <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600">{t('status_draft')}</span>;
+    }
     if (a.sentAt) {
       return <span className="inline-flex px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-700">{t('status_sent')}</span>;
     }
@@ -110,11 +115,11 @@ export default function DistributorAnnouncementsPage() {
       ) : (
         <div className="space-y-3">
           {announcements.map(a => (
-            <div key={a.id} className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            <div key={a.id} className={`bg-white rounded-xl shadow-sm border p-4 ${a.isDraft ? 'border-dashed border-slate-300' : 'border-slate-200'}`}>
               <div className="flex items-start justify-between gap-3">
                 <div
                   className="flex-1 min-w-0 cursor-pointer"
-                  onClick={() => setViewItem(a)}
+                  onClick={() => a.isDraft ? setEditItem(a) : setViewItem(a)}
                 >
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <h3 className="text-sm font-bold text-slate-800 truncate">{a.title}</h3>
@@ -136,23 +141,36 @@ export default function DistributorAnnouncementsPage() {
                     </div>
                   )}
                 </div>
-                <button
-                  onClick={() => handleDelete(a.id)}
-                  className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                >
-                  <i className="bi bi-trash text-sm" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {a.isDraft && (
+                    <button
+                      onClick={() => setEditItem(a)}
+                      className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                      title={t('btn_edit')}
+                    >
+                      <i className="bi bi-pencil text-sm" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleDelete(a.id)}
+                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                  >
+                    <i className="bi bi-trash text-sm" />
+                  </button>
+                </div>
               </div>
               <div className="flex items-center gap-3 text-[11px] text-slate-400">
                 <span>{a.createdBy}</span>
                 <span>{new Date(a.createdAt).toLocaleDateString('ja-JP')}</span>
-                <span
-                  className="cursor-pointer hover:text-indigo-600 transition-colors"
-                  onClick={() => setDetailId(a.id)}
-                >
-                  <i className="bi bi-eye mr-0.5" />
-                  {t('read_status')}: {a.readCount}/{a.targetCount}
-                </span>
+                {!a.isDraft && (
+                  <span
+                    className="cursor-pointer hover:text-indigo-600 transition-colors"
+                    onClick={() => setDetailId(a.id)}
+                  >
+                    <i className="bi bi-eye mr-0.5" />
+                    {t('read_status')}: {a.readCount}/{a.targetCount}
+                  </span>
+                )}
               </div>
             </div>
           ))}
@@ -161,10 +179,20 @@ export default function DistributorAnnouncementsPage() {
 
       {/* Create Modal */}
       {showCreate && (
-        <CreateModal
+        <CreateEditModal
           t={t}
           onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); fetchAll(); }}
+          onSaved={() => { setShowCreate(false); fetchAll(); }}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editItem && (
+        <CreateEditModal
+          t={t}
+          editData={editItem}
+          onClose={() => setEditItem(null)}
+          onSaved={() => { setEditItem(null); fetchAll(); }}
         />
       )}
 
@@ -213,12 +241,44 @@ function MarkdownToolbar({ textareaRef, value, onChange }: {
     }, 0);
   };
 
+  const insertLinePrefix = (prefix: string) => {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const selected = value.slice(start, end);
+
+    if (selected) {
+      // Apply prefix to each selected line
+      const lines = selected.split('\n');
+      const formatted = lines.map((line, i) => {
+        if (!line.trim()) return line;
+        if (prefix === '1. ') return `${i + 1}. ${line}`;
+        return `${prefix}${line}`;
+      }).join('\n');
+      const newText = value.slice(0, start) + formatted + value.slice(end);
+      onChange(newText);
+      setTimeout(() => { ta.focus(); ta.setSelectionRange(start, start + formatted.length); }, 0);
+    } else {
+      // Insert a single list item on new line
+      const beforeCursor = value.slice(0, start);
+      const needsNewLine = beforeCursor.length > 0 && !beforeCursor.endsWith('\n');
+      const insert = (needsNewLine ? '\n' : '') + prefix;
+      const newText = value.slice(0, start) + insert + value.slice(end);
+      onChange(newText);
+      setTimeout(() => { ta.focus(); ta.setSelectionRange(start + insert.length, start + insert.length); }, 0);
+    }
+  };
+
   return (
     <div className="flex gap-1 mb-1">
       <button type="button" onClick={() => insertFormat('**', '**')} className="px-2 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="太字">B</button>
       <button type="button" onClick={() => insertFormat('*', '*')} className="px-2 py-1 text-xs italic bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="斜体">I</button>
       <button type="button" onClick={() => insertFormat('## ', '')} className="px-2 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="見出し2">H2</button>
       <button type="button" onClick={() => insertFormat('### ', '')} className="px-2 py-1 text-xs font-bold bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="見出し3">H3</button>
+      <div className="w-px bg-slate-200 mx-0.5" />
+      <button type="button" onClick={() => insertLinePrefix('- ')} className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="箇条書き"><i className="bi bi-list-ul" /></button>
+      <button type="button" onClick={() => insertLinePrefix('1. ')} className="px-2 py-1 text-xs bg-slate-100 hover:bg-slate-200 rounded transition-colors" title="番号付きリスト"><i className="bi bi-list-ol" /></button>
     </div>
   );
 }
@@ -304,29 +364,41 @@ function ViewModal({ item, t, onClose, onShowReadStatus }: {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Create Modal                                                       */
+/*  Create / Edit Modal                                                */
 /* ------------------------------------------------------------------ */
 
-function CreateModal({ t, onClose, onCreated }: {
-  t: (k: string) => string;
+function CreateEditModal({ t, editData, onClose, onSaved }: {
+  t: (k: string, params?: Record<string, string | number>) => string;
+  editData?: AnnouncementItem;
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [titleEn, setTitleEn] = useState('');
-  const [contentEn, setContentEn] = useState('');
-  const [targetMode, setTargetMode] = useState<'all' | 'ja' | 'en' | 'select'>('all');
-  const [distributorIds, setDistributorIds] = useState<number[]>([]);
-  const [selectedDistributors, setSelectedDistributors] = useState<Map<number, DistributorOption>>(new Map());
+  const isEdit = !!editData;
+  const [title, setTitle] = useState(editData?.title || '');
+  const [content, setContent] = useState(editData?.content || '');
+  const [titleEn, setTitleEn] = useState(editData?.titleEn || '');
+  const [contentEn, setContentEn] = useState(editData?.contentEn || '');
+  const [targetMode, setTargetMode] = useState<'all' | 'ja' | 'en' | 'select'>(
+    editData ? (editData.targetAll ? 'all' : 'select') : 'all'
+  );
+  const [distributorIds, setDistributorIds] = useState<number[]>(
+    editData?.targets?.map(t => t.id) || []
+  );
+  const [selectedDistributors, setSelectedDistributors] = useState<Map<number, DistributorOption>>(
+    new Map(editData?.targets?.map(t => [t.id, t]) || [])
+  );
   const [distributorSearch, setDistributorSearch] = useState('');
   const [distributorOptions, setDistributorOptions] = useState<DistributorOption[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [imageUrls, setImageUrls] = useState<string[]>(editData?.imageUrls || []);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'scheduled'>('now');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('09:00');
+  const [scheduledDate, setScheduledDate] = useState(
+    editData?.scheduledAt ? new Date(editData.scheduledAt).toISOString().split('T')[0] : ''
+  );
+  const [scheduledTime, setScheduledTime] = useState(
+    editData?.scheduledAt ? new Date(editData.scheduledAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Tokyo' }) : '09:00'
+  );
   const fileRef = useRef<HTMLInputElement>(null);
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const contentEnRef = useRef<HTMLTextAreaElement>(null);
@@ -373,25 +445,33 @@ function CreateModal({ t, onClose, onCreated }: {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (asDraft: boolean) => {
     if (!title.trim() || !content.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch('/api/distributor-announcements', {
-        method: 'POST',
+      const payload = {
+        title, content,
+        titleEn: titleEn || undefined,
+        contentEn: contentEn || undefined,
+        imageUrls,
+        targetAll: targetMode !== 'select',
+        targetLanguage: targetMode === 'ja' || targetMode === 'en' ? targetMode : undefined,
+        distributorIds: targetMode === 'select' ? distributorIds : [],
+        scheduledAt: !asDraft && sendMode === 'scheduled' && scheduledDate
+          ? new Date(`${scheduledDate}T${scheduledTime || '09:00'}`).toISOString()
+          : undefined,
+        isDraft: asDraft,
+      };
+
+      const url = isEdit ? `/api/distributor-announcements/${editData!.id}` : '/api/distributor-announcements';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title, content,
-          titleEn: titleEn || undefined,
-          contentEn: contentEn || undefined,
-          imageUrls,
-          targetAll: targetMode !== 'select',
-          targetLanguage: targetMode === 'ja' || targetMode === 'en' ? targetMode : undefined,
-          distributorIds: targetMode === 'select' ? distributorIds : [],
-          scheduledAt: sendMode === 'scheduled' && scheduledDate ? new Date(`${scheduledDate}T${scheduledTime || '09:00'}`).toISOString() : undefined,
-        }),
+        body: JSON.stringify(payload),
       });
-      if (res.ok) onCreated();
+      if (res.ok) onSaved();
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
   };
@@ -402,7 +482,9 @@ function CreateModal({ t, onClose, onCreated }: {
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-sm font-bold text-slate-800">{t('create_title')}</h2>
+          <h2 className="text-sm font-bold text-slate-800">
+            {isEdit ? t('edit_title') : t('create_title')}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg" /></button>
         </div>
         <div className="flex-1 overflow-y-auto p-5 space-y-5">
@@ -615,7 +697,14 @@ function CreateModal({ t, onClose, onCreated }: {
             {t('btn_cancel')}
           </button>
           <button
-            onClick={handleSubmit}
+            onClick={() => handleSubmit(true)}
+            disabled={saving || !title.trim() || !content.trim()}
+            className="px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
+          >
+            {saving ? '...' : t('btn_save_draft')}
+          </button>
+          <button
+            onClick={() => handleSubmit(false)}
             disabled={saving || !title.trim() || !content.trim() || (isScheduled && !scheduledDate)}
             className="px-4 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors disabled:opacity-50"
           >

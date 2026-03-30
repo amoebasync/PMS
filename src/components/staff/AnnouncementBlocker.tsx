@@ -101,7 +101,7 @@ export default function AnnouncementBlocker() {
             <div className="text-[11px] text-indigo-200">
               {isEn ? 'Notice' : 'お知らせ'} {announcements.length > 1 ? `(${currentIndex + 1}/${announcements.length})` : ''}
             </div>
-            <div className="text-sm font-bold truncate">{displayTitle}</div>
+            <div className="text-sm font-bold">{displayTitle}</div>
           </div>
         </div>
 
