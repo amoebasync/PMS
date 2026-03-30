@@ -1279,6 +1279,65 @@ export const sendAndroidOpenTestEmail = async (
 };
 
 // ─────────────────────────────────────────────────────────
+// 12b. TestFlight パブリックリンク案内メール（API招待が使えない場合のフォールバック）
+// ─────────────────────────────────────────────────────────
+const TESTFLIGHT_PUBLIC_LINK = 'https://testflight.apple.com/join/XnMp57H8';
+
+export const sendTestFlightPublicLinkEmail = async (
+  toEmail: string,
+  distributorName: string,
+) => {
+  const contentHtml = `
+    <p style="font-size:16px;font-weight:bold;color:#1e293b;margin:0 0 24px;">${distributorName} さん</p>
+    <p style="margin:0 0 16px;">
+      配布アプリ（iPhone版）のインストール案内です。<br>
+      以下の手順でアプリをインストールしてください。
+    </p>
+
+    <table cellpadding="0" cellspacing="0" style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:10px;margin:24px 0;width:100%;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 14px;font-size:14px;font-weight:bold;color:#4338ca;">
+          📱 インストール手順
+        </p>
+        <table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;">
+          <tr>
+            <td style="padding:6px 0;color:#4338ca;font-weight:bold;width:32px;vertical-align:top;">1.</td>
+            <td style="padding:6px 0;">iPhoneで下の「TestFlightでインストール」ボタンをタップ</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#4338ca;font-weight:bold;vertical-align:top;">2.</td>
+            <td style="padding:6px 0;">TestFlightアプリが開きます（未インストールの場合はApp Storeからインストール）</td>
+          </tr>
+          <tr>
+            <td style="padding:6px 0;color:#4338ca;font-weight:bold;vertical-align:top;">3.</td>
+            <td style="padding:6px 0;">「テストを開始」をタップしてアプリをインストール</td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <div style="text-align:center;margin:28px 0;">
+      <a href="${TESTFLIGHT_PUBLIC_LINK}" style="display:inline-block;background:#4f46e5;color:#fff;padding:14px 36px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;">
+        TestFlightでインストール →
+      </a>
+    </div>
+
+    <p style="margin:16px 0 0;color:#94a3b8;font-size:12px;">
+      ※ iPhoneのみ対応です。Androidの方は管理者にお知らせください。<br>
+      ※ テスト版のため、予期しない動作が発生する場合があります。
+    </p>
+  `;
+
+  await transporter.sendMail({
+    from: process.env.MAIL_FROM || '"Tiramis" <recruit@tiramis.co.jp>',
+    to: toEmail,
+    subject: '【Tiramis】配布アプリ（iPhone版）インストールのご案内',
+    html: htmlWrapper(contentHtml),
+    text: `${distributorName} さん\n\n配布アプリ（iPhone版）のインストール案内です。\n\n【インストール手順】\n1. 以下のURLにiPhoneでアクセスしてください\n2. TestFlightアプリが開きます\n3. 「テストを開始」をタップしてアプリをインストール\n\nTestFlightリンク:\n${TESTFLIGHT_PUBLIC_LINK}\n\n※ iPhoneのみ対応です\n※ テスト版のため、予期しない動作が発生する場合があります`,
+  });
+};
+
+// ─────────────────────────────────────────────────────────
 // 13. 研修確定通知メール（管理者予約時 or 応募者セルフ予約時）
 // ─────────────────────────────────────────────────────────
 export async function sendTrainingConfirmationEmail(

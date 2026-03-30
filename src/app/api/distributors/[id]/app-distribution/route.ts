@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/prisma';
 import { addBetaTester } from '@/lib/appstore-connect';
 import { writeAuditLog, getAdminActorInfo, getIpAddress } from '@/lib/audit';
-import { sendAndroidOpenTestEmail } from '@/lib/mailer';
+import { sendAndroidOpenTestEmail, sendTestFlightPublicLinkEmail } from '@/lib/mailer';
 
 // GET /api/distributors/[id]/app-distribution
 // 配信履歴取得
@@ -93,7 +93,7 @@ export async function POST(
     });
 
     // 2. プラットフォーム別処理
-    let result: { success: boolean; error?: string; alreadyExists?: boolean };
+    let result: { success: boolean; error?: string; alreadyExists?: boolean; fallbackToPublicLink?: boolean };
 
     if (platform === 'APPLE') {
       // iOS: TestFlight 招待送信
@@ -101,6 +101,17 @@ export async function POST(
       const lastName = nameParts.length > 1 ? nameParts[0] : undefined;
       const firstName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : nameParts[0];
       result = await addBetaTester(email, firstName, lastName);
+
+      // API招待が失敗してパブリックリンク送信にフォールバック
+      if (result.fallbackToPublicLink) {
+        try {
+          await sendTestFlightPublicLinkEmail(email, distributor.name);
+          console.log(`[AppDist] Sent TestFlight public link email to ${email}`);
+        } catch (mailErr: any) {
+          console.error('[AppDist] Failed to send public link email:', mailErr);
+          result = { success: false, error: 'TestFlightリンクメール送信に失敗しました' };
+        }
+      }
     } else {
       // Android: オープンテスト案内メール送信（Googleグループ追加不要）
       try {
@@ -153,7 +164,9 @@ export async function POST(
     }
 
     const message = platform === 'APPLE'
-      ? (result.alreadyExists ? 'このメールアドレスは既にTestFlightに登録されています' : 'TestFlight招待を送信しました')
+      ? (result.fallbackToPublicLink
+        ? 'TestFlightパブリックリンクをメールで送信しました'
+        : result.alreadyExists ? 'TestFlight招待を再送信しました' : 'TestFlight招待を送信しました')
       : 'アプリインストール案内メールを送信しました';
 
     return NextResponse.json({
