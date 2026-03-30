@@ -92,7 +92,9 @@ export default function IndicatorBadges({ indicators }: Props) {
     ? `${Math.round(coverage.currentInsideRatio * 100)}%`
     : coverage?.diffPercent != null
       ? `${coverage.diffPercent > 0 ? '+' : ''}${coverage.diffPercent}%`
-      : '--';
+      : coverage?.score != null
+        ? `${Math.round((1 - coverage.score) * 100)}%`
+        : '--';
 
   const speedValue = speed?.currentSpeed != null
     ? `${Math.round(speed.currentSpeed)}枚/h`

@@ -92,7 +92,7 @@ const haversineM = (lat1: number, lng1: number, lat2: number, lng2: number) => {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
 
-const PAST_COLORS = ['#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#6366f1'];
+const PAST_COLORS = ['#a855f7', '#14b8a6', '#f59e0b', '#6366f1', '#f43f5e'];
 
 const SPEED_THRESHOLDS = { posting: 1.5, slowWalk: 3.5, normalWalk: 5.0 };
 const SPEED_COLORS: Record<string, string> = {
@@ -107,6 +107,21 @@ function speedToColor(kmh: number): string {
   if (kmh <= SPEED_THRESHOLDS.slowWalk) return SPEED_COLORS.slowWalk;
   if (kmh <= SPEED_THRESHOLDS.normalWalk) return SPEED_COLORS.normalWalk;
   return SPEED_COLORS.fast;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Point-in-polygon (ray casting)                                     */
+/* ------------------------------------------------------------------ */
+
+function isPointInPolygon(lat: number, lng: number, polygon: number[][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
 }
 
 function buildSpeedSegments(points: GpsPoint[]): GeoJSON.FeatureCollection {
@@ -160,9 +175,10 @@ export default function ReviewPanel({
   const [showComment, setShowComment] = useState(false);
   const [currentResult, setCurrentResult] = useState<string | null>(null);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showSpeedColors, setShowSpeedColors] = useState(false);
   const [showPastTrajectory, setShowPastTrajectory] = useState(false);
   const [pastTrajectories, setPastTrajectories] = useState<any[]>([]);
-  const [selectedPastIndices, setSelectedPastIndices] = useState<Set<number>>(new Set());
+  const [selectedPastIndex, setSelectedPastIndex] = useState<number | null>(null);
 
   /* ---- Fetch trajectory ---- */
   const fetchTrajectory = useCallback(async () => {
@@ -217,6 +233,30 @@ export default function ReviewPanel({
     [trajData?.area?.boundaryGeojson]
   );
 
+  const pinkLineGeoJson = useMemo(() => {
+    if (!trajData?.gpsPoints?.length || trajData.gpsPoints.length < 2) return null;
+    const coordinates = trajData.gpsPoints.map(p => [p.lng, p.lat]);
+    return {
+      type: 'FeatureCollection' as const,
+      features: [{
+        type: 'Feature' as const,
+        properties: {},
+        geometry: { type: 'LineString' as const, coordinates },
+      }],
+    };
+  }, [trajData?.gpsPoints]);
+
+  const areaPolygonCoords = useMemo(() => {
+    if (!areaGeoJson) return null;
+    const features = areaGeoJson.features || [];
+    for (const f of features) {
+      const geom = f.geometry;
+      if (geom?.type === 'Polygon') return (geom as any).coordinates[0];
+      if (geom?.type === 'MultiPolygon') return (geom as any).coordinates[0][0];
+    }
+    return null;
+  }, [areaGeoJson]);
+
   const heatmapGeoJson = useMemo(() => {
     if (!trajData?.gpsPoints?.length) return null;
     const features = trajData.gpsPoints.map((p, i, arr) => {
@@ -243,7 +283,7 @@ export default function ReviewPanel({
       .then(data => {
         if (data?.pastTrajectories) {
           setPastTrajectories(data.pastTrajectories);
-          setSelectedPastIndices(new Set(data.pastTrajectories.map((_: any, i: number) => i)));
+          setSelectedPastIndex(null);
         }
       })
       .catch(() => {});
@@ -336,7 +376,7 @@ export default function ReviewPanel({
           ref={mapRef}
           initialViewState={{ ...center, zoom: 14 }}
           style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/navigation-day-v1"
+          mapStyle="mapbox://styles/mapbox/light-v11"
           mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
           onLoad={fitMapBounds}
         >
@@ -358,19 +398,35 @@ export default function ReviewPanel({
             </Source>
           )}
 
-          {/* Speed-colored trajectory segments */}
-          {speedSegments && speedSegments.features.length > 0 && (
-            <Source id="speed-segments" type="geojson" data={speedSegments}>
-              <Layer
-                id="speed-line"
-                type="line"
-                paint={{
-                  'line-color': ['get', 'color'],
-                  'line-width': 3,
-                  'line-opacity': 0.85,
-                }}
-              />
-            </Source>
+          {/* Trajectory: pink solid (default) or speed-colored segments */}
+          {showSpeedColors ? (
+            speedSegments && speedSegments.features.length > 0 && (
+              <Source id="speed-segments" type="geojson" data={speedSegments}>
+                <Layer
+                  id="speed-line"
+                  type="line"
+                  paint={{
+                    'line-color': ['get', 'color'],
+                    'line-width': 3,
+                    'line-opacity': 0.85,
+                  }}
+                />
+              </Source>
+            )
+          ) : (
+            pinkLineGeoJson && (
+              <Source id="pink-line" type="geojson" data={pinkLineGeoJson}>
+                <Layer
+                  id="pink-line-layer"
+                  type="line"
+                  paint={{
+                    'line-color': '#ec4899',
+                    'line-width': 3,
+                    'line-opacity': 0.85,
+                  }}
+                />
+              </Source>
+            )
           )}
 
           {/* Heatmap layer */}
@@ -398,29 +454,32 @@ export default function ReviewPanel({
             </Source>
           )}
 
-          {/* Past trajectories (solid colored lines) */}
-          {showPastTrajectory && pastTrajectories.map((past, idx) => {
-            if (!selectedPastIndices.has(idx)) return null;
+          {/* Past trajectory (single selection, area-filtered) */}
+          {showPastTrajectory && selectedPastIndex !== null && pastTrajectories[selectedPastIndex] && (() => {
+            const past = pastTrajectories[selectedPastIndex];
             const coords = (past.gpsPoints || []).map((p: any) => [p.longitude || p.lng, p.latitude || p.lat]).filter((c: number[]) => c[0] && c[1]);
-            if (coords.length < 2) return null;
+            const filteredCoords = coords.filter(([lng, lat]: number[]) =>
+              areaPolygonCoords ? isPointInPolygon(lat, lng, areaPolygonCoords) : true
+            );
+            if (filteredCoords.length < 2) return null;
             const pastGeoJson: GeoJSON.FeatureCollection = {
               type: 'FeatureCollection',
-              features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } }],
+              features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: filteredCoords } }],
             };
             return (
-              <Source key={`past-${idx}`} id={`past-traj-${idx}`} type="geojson" data={pastGeoJson}>
+              <Source key={`past-${selectedPastIndex}`} id={`past-traj-${selectedPastIndex}`} type="geojson" data={pastGeoJson}>
                 <Layer
-                  id={`past-traj-line-${idx}`}
+                  id={`past-traj-line-${selectedPastIndex}`}
                   type="line"
                   paint={{
-                    'line-color': PAST_COLORS[idx % PAST_COLORS.length],
+                    'line-color': PAST_COLORS[selectedPastIndex % PAST_COLORS.length],
                     'line-width': 2.5,
                     'line-opacity': 0.6,
                   }}
                 />
               </Source>
             );
-          })}
+          })()}
 
           {/* Start marker */}
           {startPoint && (
@@ -442,30 +501,31 @@ export default function ReviewPanel({
         </Map>
 
         {/* Map overlay controls (top-left) */}
-        <div className="absolute top-2 left-2 flex gap-1 z-10">
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1 z-10">
           <button onClick={() => setShowHeatmap(!showHeatmap)}
             className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
               showHeatmap ? 'bg-orange-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
             <i className="bi bi-fire mr-0.5" />ヒートマップ
           </button>
-          <button onClick={() => setShowPastTrajectory(!showPastTrajectory)}
+          <button onClick={() => setShowSpeedColors(!showSpeedColors)}
+            className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
+              showSpeedColors ? 'bg-blue-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
+            <i className="bi bi-speedometer2 mr-0.5" />移動速度
+          </button>
+          <button onClick={() => { setShowPastTrajectory(!showPastTrajectory); if (showPastTrajectory) setSelectedPastIndex(null); }}
             className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
               showPastTrajectory ? 'bg-indigo-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
             <i className="bi bi-clock-history mr-0.5" />過去比較
           </button>
-          {/* Past trajectory date chips */}
+          {/* Past trajectory date chips (radio-button style) */}
           {showPastTrajectory && pastTrajectories.length > 0 && pastTrajectories.map((past, idx) => {
             const d = new Date(past.date);
             const label = `${d.getMonth() + 1}/${d.getDate()} ${past.distributorName?.split(' ')[0] || ''}`;
-            const selected = selectedPastIndices.has(idx);
+            const selected = selectedPastIndex === idx;
             const color = PAST_COLORS[idx % PAST_COLORS.length];
             return (
               <button key={idx} onClick={() => {
-                setSelectedPastIndices(prev => {
-                  const next = new Set(prev);
-                  if (next.has(idx)) next.delete(idx); else next.add(idx);
-                  return next;
-                });
+                setSelectedPastIndex(prev => prev === idx ? null : idx);
               }}
                 className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
                   selected ? 'text-white' : 'bg-white/90 text-slate-500'}`}
@@ -476,21 +536,23 @@ export default function ReviewPanel({
           })}
         </div>
 
-        {/* Speed legend overlay (bottom-left) */}
-        <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-md px-2 py-1 shadow-sm z-10">
-          {[
-            { color: '#ef4444', label: '~1.5' },
-            { color: '#f97316', label: '~3.5' },
-            { color: '#22c55e', label: '~5.0' },
-            { color: '#3b82f6', label: '5.0~' },
-          ].map(l => (
-            <div key={l.color} className="flex items-center gap-0.5">
-              <span className="w-2.5 h-0.5 rounded" style={{ backgroundColor: l.color }} />
-              <span className="text-[9px] text-slate-500">{l.label}</span>
-            </div>
-          ))}
-          <span className="text-[9px] text-slate-400">km/h</span>
-        </div>
+        {/* Speed legend overlay (bottom-left) — only when speed coloring is on */}
+        {showSpeedColors && (
+          <div className="absolute bottom-2 left-2 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-md px-2 py-1 shadow-sm z-10">
+            {[
+              { color: '#ef4444', label: '~1.5' },
+              { color: '#f97316', label: '~3.5' },
+              { color: '#22c55e', label: '~5.0' },
+              { color: '#3b82f6', label: '5.0~' },
+            ].map(l => (
+              <div key={l.color} className="flex items-center gap-0.5">
+                <span className="w-2.5 h-0.5 rounded" style={{ backgroundColor: l.color }} />
+                <span className="text-[9px] text-slate-500">{l.label}</span>
+              </div>
+            ))}
+            <span className="text-[9px] text-slate-400">km/h</span>
+          </div>
+        )}
       </div>
 
       {/* ---- Compact bottom bar: indicators + verdict ---- */}
@@ -503,7 +565,7 @@ export default function ReviewPanel({
                 <i className="bi bi-bar-chart-fill text-slate-400" />
                 <span className="text-slate-500">カバレッジ</span>
                 <span className="font-bold text-slate-800">
-                  {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : '--'}
+                  {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : indicators.coverage?.score != null ? `${Math.round((1 - indicators.coverage.score) * 100)}%` : '--'}
                 </span>
               </div>
               <div className="flex items-center gap-1">
@@ -532,6 +594,45 @@ export default function ReviewPanel({
             </button>
           </div>
         </div>
+
+        {/* Past comparison stats */}
+        {showPastTrajectory && selectedPastIndex !== null && pastTrajectories[selectedPastIndex] && (() => {
+          const past = pastTrajectories[selectedPastIndex];
+          const d = new Date(past.date);
+          const pastLabel = `${d.getMonth() + 1}/${d.getDate()} ${past.distributorName?.split(' ')[0] || ''}`;
+          const pastSheets = past.totalSheets ?? 0;
+          const pastGps = past.gpsPoints || [];
+          let pastSpeed = 0;
+          if (pastGps.length >= 2 && pastSheets > 0) {
+            const pastStart = new Date(pastGps[0].timestamp || pastGps[0].recordedAt).getTime();
+            const pastEnd = new Date(pastGps[pastGps.length - 1].timestamp || pastGps[pastGps.length - 1].recordedAt).getTime();
+            const pastHours = Math.max((pastEnd - pastStart) / 3600000, 0.01);
+            pastSpeed = Math.round(pastSheets / pastHours);
+          }
+          const currentGps = trajData?.gpsPoints || [];
+          let currentSheets = 0;
+          let currentSpeed = 0;
+          if (indicators?.speed?.currentSpeed) {
+            currentSpeed = Math.round(indicators.speed.currentSpeed);
+          }
+          // Try to get current sheets from trajectory session or indicators
+          if (currentGps.length >= 2 && currentSpeed > 0) {
+            const cStart = new Date(currentGps[0].timestamp).getTime();
+            const cEnd = new Date(currentGps[currentGps.length - 1].timestamp).getTime();
+            const cHours = Math.max((cEnd - cStart) / 3600000, 0.01);
+            currentSheets = Math.round(currentSpeed * cHours);
+          }
+          return (
+            <div className="flex items-center gap-2 text-[10px] bg-indigo-50 rounded-md px-2 py-1">
+              <i className="bi bi-arrow-left-right text-indigo-500" />
+              <span className="text-indigo-700 font-bold">過去 {pastLabel}:</span>
+              <span className="text-slate-700">{pastSheets}枚 {pastSpeed}枚/h</span>
+              <span className="text-slate-400">|</span>
+              <span className="text-pink-700 font-bold">今回:</span>
+              <span className="text-slate-700">{currentSheets > 0 ? `${currentSheets}枚` : '--'} {currentSpeed > 0 ? `${currentSpeed}枚/h` : '--'}</span>
+            </div>
+          );
+        })()}
 
         {/* Verdict row */}
         <div className="flex items-center gap-2">
