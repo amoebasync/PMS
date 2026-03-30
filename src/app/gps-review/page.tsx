@@ -260,9 +260,9 @@ export default function GpsReviewPage() {
       </div>
 
       {/* ---- Main Layout ---- */}
-      <div className="flex gap-4 flex-1 min-h-0">
+      <div className="flex gap-0 flex-1 min-h-0">
         {/* ---- Left Panel (Schedule List) ---- */}
-        <div className="w-[400px] flex-shrink-0 flex flex-col bg-white rounded-2xl shadow-sm border border-slate-200">
+        <div className="w-[400px] flex-shrink-0 flex flex-col bg-white border-r border-slate-200">
           {/* Filter tabs */}
           <div className="p-3 border-b border-slate-100">
             <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
