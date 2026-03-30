@@ -101,11 +101,11 @@ export default function IndicatorBadges({ indicators }: Props) {
 
   const speedValue = speed?.currentSpeed != null
     ? `${Math.round(speed.currentSpeed)}${t('sheets_per_hour')}`
-    : t('speed_normal');
+    : '--';
 
   const fastMoveValue = fastMove?.fastRatio != null
     ? `${Math.round(fastMove.fastRatio * 100)}%`
-    : t('speed_normal');
+    : '--';
 
   return (
     <div className="space-y-3">

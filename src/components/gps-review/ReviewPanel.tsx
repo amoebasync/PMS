@@ -574,12 +574,12 @@ export default function ReviewPanel({
               <div className="flex items-center gap-1">
                 <i className="bi bi-speedometer text-slate-400" />
                 <span className="text-slate-500">{t('speed_label')}</span>
-                <span className="font-bold text-slate-800">{indicators.speed?.currentSpeed != null ? `${Math.round(indicators.speed.currentSpeed)}${t('sheets_per_hour')}` : t('speed_normal')}</span>
+                <span className="font-bold text-slate-800">{indicators.speed?.currentSpeed != null ? `${Math.round(indicators.speed.currentSpeed)}${t('sheets_per_hour')}` : '--'}</span>
               </div>
               <div className="flex items-center gap-1">
                 <i className="bi bi-lightning text-slate-400" />
                 <span className="text-slate-500">{t('movement_label')}</span>
-                <span className="font-bold text-slate-800">{indicators.fastMove?.fastRatio != null ? `${Math.round(indicators.fastMove.fastRatio * 100)}%` : t('speed_normal')}</span>
+                <span className="font-bold text-slate-800">{indicators.fastMove?.fastRatio != null ? `${Math.round(indicators.fastMove.fastRatio * 100)}%` : '--'}</span>
               </div>
               {indicators.auxiliary?.outOfAreaWarning && (
                 <span className="text-[10px] font-bold text-amber-600"><i className="bi bi-exclamation-triangle mr-0.5" />{t('indicator_out_of_area')}{Math.round(indicators.auxiliary.outOfAreaPct)}%</span>
