@@ -313,13 +313,44 @@ function ViewModal({ item, t, onClose, onShowReadStatus }: {
   onClose: () => void;
   onShowReadStatus: (id: number) => void;
 }) {
+  const [viewLang, setViewLang] = useState<'ja' | 'en'>('ja');
+  const hasEn = !!(item.titleEn || item.contentEn);
+
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-          <h2 className="text-sm font-bold text-slate-800 truncate flex-1 mr-2">{item.title}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg" /></button>
+        <div className="p-5 border-b border-slate-200 flex-shrink-0">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-bold text-slate-800 truncate flex-1 mr-2">
+              {viewLang === 'en' && item.titleEn ? item.titleEn : item.title}
+            </h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg" /></button>
+          </div>
+          {hasEn && (
+            <div className="flex gap-1">
+              <button
+                onClick={() => setViewLang('ja')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                  viewLang === 'ja'
+                    ? 'bg-slate-700 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                JP 日本語
+              </button>
+              <button
+                onClick={() => setViewLang('en')}
+                className={`px-3 py-1 rounded-md text-xs font-bold transition-colors ${
+                  viewLang === 'en'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                }`}
+              >
+                EN English
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Content */}
@@ -338,20 +369,12 @@ function ViewModal({ item, t, onClose, onShowReadStatus }: {
             </div>
           )}
 
-          {/* Japanese content */}
+          {/* Content based on selected language */}
           <div>
-            <AnnouncementBody text={item.content} />
+            <AnnouncementBody text={
+              viewLang === 'en' && item.contentEn ? item.contentEn : item.content
+            } />
           </div>
-
-          {/* English content if exists */}
-          {item.contentEn && (
-            <div className="mt-4 pt-4 border-t border-slate-200">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-blue-700 mb-2">
-                <i className="bi bi-translate" /> English
-              </div>
-              <AnnouncementBody text={item.contentEn} />
-            </div>
-          )}
 
           {/* Meta info */}
           <div className="text-[11px] text-slate-400 flex items-center gap-3 pt-3 border-t border-slate-100">
