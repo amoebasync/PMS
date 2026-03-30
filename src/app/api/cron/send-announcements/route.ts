@@ -68,7 +68,7 @@ export async function GET(request: Request) {
           const buildMessages = (lang: string) => {
             const isEn = lang === 'en';
             const t = isEn ? (a.titleEn || a.title) : a.title;
-            const portalUrl = isEn ? `${baseUrl}/staff/en` : `${baseUrl}/staff`;
+            const portalUrl = `${baseUrl}/staff/line-login`;
             const notice = isEn
               ? 'You have a new announcement.\nPlease read and confirm it on the portal before starting work.'
               : '新しいお知らせがあります。業務開始前にポータルで必ず確認してください。';
