@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import ReviewPanel from '@/components/gps-review/ReviewPanel';
+import { useTranslation } from '@/i18n';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -87,6 +88,7 @@ function shiftDate(dateStr: string, delta: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function GpsReviewPage() {
+  const { t } = useTranslation('gps-review');
   const [date, setDate] = useState(getYesterdayJST);
   const [schedules, setSchedules] = useState<ScheduleItem[]>([]);
   const [summary, setSummary] = useState<Summary>({ total: 0, reviewed: 0, unreviewedHigh: 0 });
@@ -245,7 +247,7 @@ export default function GpsReviewPage() {
               />
             </div>
             <span className="text-xs font-bold text-slate-600 whitespace-nowrap">
-              {summary.reviewed}/{summary.total}件 レビュー済み
+              {t('progress', { reviewed: summary.reviewed, total: summary.total })}
             </span>
           </div>
 
@@ -253,7 +255,7 @@ export default function GpsReviewPage() {
           {summary.unreviewedHigh > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-red-100 text-red-700 rounded-lg text-xs font-bold">
               <i className="bi bi-exclamation-triangle-fill" />
-              未レビューHIGH: {summary.unreviewedHigh}件
+              {t('unreviewed_high', { count: summary.unreviewedHigh })}
             </span>
           )}
         </div>
@@ -267,9 +269,9 @@ export default function GpsReviewPage() {
           <div className="p-3 border-b border-slate-100">
             <div className="inline-flex bg-slate-100 rounded-lg p-0.5">
               {([
-                { key: 'all' as FilterTab, label: '全て' },
-                { key: 'unreviewed' as FilterTab, label: '未レビュー' },
-                { key: 'high' as FilterTab, label: 'HIGH以上' },
+                { key: 'all' as FilterTab, label: t('filter_all') },
+                { key: 'unreviewed' as FilterTab, label: t('filter_unreviewed') },
+                { key: 'high' as FilterTab, label: t('filter_high') },
               ]).map((tab) => (
                 <button
                   key={tab.key}
@@ -295,7 +297,7 @@ export default function GpsReviewPage() {
             ) : filtered.length === 0 ? (
               <div className="px-6 py-12 text-center text-slate-400">
                 <i className="bi bi-inbox text-3xl block mb-2" />
-                <p className="text-sm">対象スケジュールなし</p>
+                <p className="text-sm">{t('no_schedules')}</p>
               </div>
             ) : (
               filtered.map((s) => {
@@ -334,7 +336,7 @@ export default function GpsReviewPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
                           <span className="text-sm font-bold text-slate-800 truncate">
-                            {s.distributorName || '未割当'}
+                            {s.distributorName || t('unassigned')}
                           </span>
                           {s.distributorStaffId && (
                             <span className="text-[10px] text-slate-400 flex-shrink-0">
@@ -350,24 +352,24 @@ export default function GpsReviewPage() {
                           <div className="flex items-center gap-1">
                             <span
                               className={`w-2 h-2 rounded-full ${indicatorDot(s.coverageDiff != null ? Math.abs(s.coverageDiff) : null, 0.6, 0.3)}`}
-                              title="カバレッジ"
+                              title={t('indicator_coverage')}
                             />
                             <span
                               className={`w-2 h-2 rounded-full ${indicatorDot(s.speedDeviation, 0.6, 0.3)}`}
-                              title="配布速度"
+                              title={t('indicator_speed')}
                             />
                             <span
                               className={`w-2 h-2 rounded-full ${indicatorDot(s.fastMoveRatio, 0.6, 0.3)}`}
-                              title="移動速度"
+                              title={t('indicator_fast_move')}
                             />
                           </div>
                           <span className="text-[10px] text-slate-400">|</span>
                           <span className="text-[10px] text-slate-600">
-                            {s.plannedCount}/{s.actualCount}枚
+                            {s.plannedCount}/{s.actualCount}{t('sheets_unit')}
                           </span>
                           <span className="text-[10px] text-slate-400">|</span>
                           <span className="text-[10px] text-slate-600">
-                            {s.speedPerHour}枚/h
+                            {s.speedPerHour}{t('sheets_per_hour')}
                           </span>
                         </div>
                       </div>
@@ -394,8 +396,8 @@ export default function GpsReviewPage() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-slate-400">
               <i className="bi bi-geo-alt text-4xl block mb-3" />
-              <p className="text-sm">左のリストからスケジュールを選択してください</p>
-              <p className="text-xs mt-1 text-slate-300">キーボード: ↑↓で移動, Enterで即OK</p>
+              <p className="text-sm">{t('select_schedule')}</p>
+              <p className="text-xs mt-1 text-slate-300">{t('keyboard_hint')}</p>
             </div>
           </div>
         )}

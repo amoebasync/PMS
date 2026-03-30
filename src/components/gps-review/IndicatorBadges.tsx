@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslation } from '@/i18n';
+
 /* ------------------------------------------------------------------ */
 /*  IndicatorBadges — 3 core indicator cards + 2 auxiliary badges      */
 /* ------------------------------------------------------------------ */
@@ -54,10 +56,10 @@ interface Props {
 
 /* ---- Helpers ---- */
 
-function scoreToStatus(score: number): { label: string; bg: string; text: string } {
-  if (score >= 0.6) return { label: '要確認', bg: 'bg-red-50', text: 'text-red-700' };
-  if (score >= 0.3) return { label: '注意', bg: 'bg-amber-50', text: 'text-amber-700' };
-  return { label: '問題なし', bg: 'bg-emerald-50', text: 'text-emerald-700' };
+function scoreToStatus(score: number, t: (key: string) => string): { label: string; bg: string; text: string } {
+  if (score >= 0.6) return { label: t('status_danger'), bg: 'bg-red-50', text: 'text-red-700' };
+  if (score >= 0.3) return { label: t('status_warning'), bg: 'bg-amber-50', text: 'text-amber-700' };
+  return { label: t('status_ok'), bg: 'bg-emerald-50', text: 'text-emerald-700' };
 }
 
 function scoreToIcon(score: number): string {
@@ -77,15 +79,16 @@ function scoreToDot(score: number): string {
 /* ------------------------------------------------------------------ */
 
 export default function IndicatorBadges({ indicators }: Props) {
+  const { t } = useTranslation('gps-review');
   const { coverage, speed, fastMove, auxiliary } = indicators;
 
   const coverageScore = coverage?.score ?? 0;
   const speedScore = speed?.score ?? 0;
   const fastMoveScore = fastMove?.score ?? 0;
 
-  const coverageStatus = scoreToStatus(coverageScore);
-  const speedStatus = scoreToStatus(speedScore);
-  const fastMoveStatus = scoreToStatus(fastMoveScore);
+  const coverageStatus = scoreToStatus(coverageScore, t);
+  const speedStatus = scoreToStatus(speedScore, t);
+  const fastMoveStatus = scoreToStatus(fastMoveScore, t);
 
   /* Main value formatting */
   const coverageValue = coverage?.currentInsideRatio != null
@@ -97,12 +100,12 @@ export default function IndicatorBadges({ indicators }: Props) {
         : '--';
 
   const speedValue = speed?.currentSpeed != null
-    ? `${Math.round(speed.currentSpeed)}枚/h`
-    : '正常';
+    ? `${Math.round(speed.currentSpeed)}${t('sheets_per_hour')}`
+    : t('speed_normal');
 
   const fastMoveValue = fastMove?.fastRatio != null
     ? `${Math.round(fastMove.fastRatio * 100)}%`
-    : '正常';
+    : t('speed_normal');
 
   return (
     <div className="space-y-3">
@@ -112,7 +115,7 @@ export default function IndicatorBadges({ indicators }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 mb-1.5">
             <i className="bi bi-bar-chart-fill text-sm" />
-            <span>カバレッジ</span>
+            <span>{t('indicator_coverage')}</span>
           </div>
           <div className="text-lg font-bold text-slate-800 mb-1.5">{coverageValue}</div>
           <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${coverageStatus.bg} ${coverageStatus.text}`}>
@@ -125,7 +128,7 @@ export default function IndicatorBadges({ indicators }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 mb-1.5">
             <i className="bi bi-lightning-charge-fill text-sm" />
-            <span>配布速度</span>
+            <span>{t('indicator_speed')}</span>
           </div>
           <div className="text-lg font-bold text-slate-800 mb-1.5">{speedValue}</div>
           <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${speedStatus.bg} ${speedStatus.text}`}>
@@ -138,7 +141,7 @@ export default function IndicatorBadges({ indicators }: Props) {
         <div className="bg-white rounded-xl border border-slate-200 p-3 text-center">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-slate-500 mb-1.5">
             <i className="bi bi-person-walking text-sm" />
-            <span>移動速度</span>
+            <span>{t('indicator_fast_move')}</span>
           </div>
           <div className="text-lg font-bold text-slate-800 mb-1.5">{fastMoveValue}</div>
           <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold ${fastMoveStatus.bg} ${fastMoveStatus.text}`}>
@@ -152,7 +155,7 @@ export default function IndicatorBadges({ indicators }: Props) {
       {auxiliary && (
         <div className="flex items-center gap-4 px-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs text-slate-500">エリア外:</span>
+            <span className="text-xs text-slate-500">{t('indicator_out_of_area')}:</span>
             <span className={`text-xs font-bold ${auxiliary.outOfAreaWarning ? 'text-amber-700' : 'text-slate-700'}`}>
               {Math.round(auxiliary.outOfAreaPct)}%
             </span>
@@ -164,7 +167,7 @@ export default function IndicatorBadges({ indicators }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="text-xs text-slate-500">PAUSE:</span>
             <span className={`text-xs font-bold ${auxiliary.pauseWarning ? 'text-amber-700' : 'text-slate-700'}`}>
-              {Math.round(auxiliary.pauseMinutes)}分
+              {Math.round(auxiliary.pauseMinutes)}{t('minutes')}
             </span>
             {auxiliary.pauseWarning && (
               <span className={`w-1.5 h-1.5 rounded-full ${scoreToDot(0.5)}`} />

@@ -52,14 +52,58 @@ export async function GET(
     }
 
     // If v2Detail JSON exists, parse and return it
+    // v2Detail keys: coverageDiff, speedDeviation, fastMoveRatio
+    // UI expects:    coverage,     speed,          fastMove
     if (fa.v2Detail) {
       try {
         const detail = JSON.parse(fa.v2Detail);
+
+        // Map coverageDiff → coverage (convert % to ratio)
+        const rawCoverage = detail.coverageDiff ?? detail.coverage ?? null;
+        const coverage = rawCoverage ? {
+          score: rawCoverage.score ?? 0,
+          currentInsideRatio: rawCoverage.currentInsideRatio != null ? rawCoverage.currentInsideRatio / 100 : null,
+          pastAvgInsideRatio: rawCoverage.pastAvgInsideRatio != null ? rawCoverage.pastAvgInsideRatio / 100 : null,
+          diffPercent: rawCoverage.diff != null ? Math.round(rawCoverage.diff) : null,
+          pastSamples: rawCoverage.pastSessionCount ?? null,
+          isDeliverAll: rawCoverage.isDeliverAll ?? null,
+          reason: rawCoverage.reason ?? (rawCoverage.skipped ? 'skipped' : 'v2'),
+        } : null;
+
+        // Map speedDeviation → speed
+        const rawSpeed = detail.speedDeviation ?? detail.speed ?? null;
+        const speed = rawSpeed ? {
+          score: rawSpeed.score ?? 0,
+          currentSpeed: rawSpeed.currentSpeed ?? null,
+          avgSpeed: rawSpeed.avgSpeed ?? null,
+          stdSpeed: rawSpeed.stdSpeed ?? null,
+          zScore: rawSpeed.zScore ?? null,
+          pastSamples: rawSpeed.pastSessions ?? rawSpeed.pastSamples ?? null,
+          reason: rawSpeed.reason ?? (rawSpeed.skipped ? 'skipped' : 'v2'),
+        } : null;
+
+        // Map fastMoveRatio → fastMove (convert % to ratio)
+        const rawFastMove = detail.fastMoveRatio ?? detail.fastMove ?? null;
+        const fastMove = rawFastMove ? {
+          score: rawFastMove.score ?? 0,
+          fastRatio: rawFastMove.fastRatio != null ? rawFastMove.fastRatio / 100 : null,
+          totalInsideMinutes: rawFastMove.totalInsideDurationMin ?? rawFastMove.totalInsideMinutes ?? null,
+          fastMinutes: rawFastMove.fastDurationMin ?? rawFastMove.fastMinutes ?? null,
+          reason: rawFastMove.reason ?? 'v2',
+        } : null;
+
+        const aux = detail.auxiliary ?? null;
+
         return NextResponse.json({
-          coverage: detail.coverage ?? null,
-          speed: detail.speed ?? null,
-          fastMove: detail.fastMove ?? null,
-          auxiliary: detail.auxiliary ?? {
+          coverage,
+          speed,
+          fastMove,
+          auxiliary: aux ? {
+            outOfAreaPct: aux.outOfAreaPct ?? 0,
+            outOfAreaWarning: (aux.outOfAreaPct ?? 0) > 20,
+            pauseMinutes: aux.pauseMinutes ?? 0,
+            pauseWarning: (aux.pauseMinutes ?? 0) > 60,
+          } : {
             outOfAreaPct: fa.outOfAreaPct ?? 0,
             outOfAreaWarning: (fa.outOfAreaPct ?? 0) > 20,
             pauseMinutes: fa.pauseMinutes ?? 0,

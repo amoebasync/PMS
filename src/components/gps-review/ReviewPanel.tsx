@@ -5,6 +5,7 @@ import Map, { Source, Layer, Marker, NavigationControl } from 'react-map-gl/mapb
 import type { MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import IndicatorBadges, { type IndicatorData } from './IndicatorBadges';
+import { useTranslation } from '@/i18n';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -166,6 +167,7 @@ export default function ReviewPanel({
   hasNext,
 }: Props) {
   const mapRef = useRef<MapRef>(null);
+  const { t } = useTranslation('gps-review');
 
   /* ---- State ---- */
   const [trajData, setTrajData] = useState<TrajectoryData | null>(null);
@@ -506,17 +508,17 @@ export default function ReviewPanel({
           <button onClick={() => setShowHeatmap(!showHeatmap)}
             className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
               showHeatmap ? 'bg-orange-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
-            <i className="bi bi-fire mr-0.5" />ヒートマップ
+            <i className="bi bi-fire mr-0.5" />{t('heatmap')}
           </button>
           <button onClick={() => setShowSpeedColors(!showSpeedColors)}
             className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
               showSpeedColors ? 'bg-blue-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
-            <i className="bi bi-speedometer2 mr-0.5" />移動速度
+            <i className="bi bi-speedometer2 mr-0.5" />{t('movement_speed')}
           </button>
           <button onClick={() => { setShowPastTrajectory(!showPastTrajectory); if (showPastTrajectory) setSelectedPastIndex(null); }}
             className={`px-2 py-1 text-[10px] font-bold rounded-md shadow-sm backdrop-blur-sm transition-colors ${
               showPastTrajectory ? 'bg-indigo-500 text-white' : 'bg-white/90 text-slate-600 hover:bg-white'}`}>
-            <i className="bi bi-clock-history mr-0.5" />過去比較
+            <i className="bi bi-clock-history mr-0.5" />{t('past_comparison')}
           </button>
           {/* Past trajectory date chips (radio-button style) */}
           {showPastTrajectory && pastTrajectories.length > 0 && pastTrajectories.map((past, idx) => {
@@ -564,34 +566,34 @@ export default function ReviewPanel({
             <>
               <div className="flex items-center gap-1">
                 <i className="bi bi-bar-chart-fill text-slate-400" />
-                <span className="text-slate-500">カバレッジ</span>
+                <span className="text-slate-500">{t('indicator_coverage')}</span>
                 <span className="font-bold text-slate-800">
                   {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : realtimeCoverage != null ? `${realtimeCoverage}%` : '--'}
                 </span>
               </div>
               <div className="flex items-center gap-1">
                 <i className="bi bi-speedometer text-slate-400" />
-                <span className="text-slate-500">速度</span>
-                <span className="font-bold text-slate-800">{indicators.speed?.currentSpeed != null ? `${Math.round(indicators.speed.currentSpeed)}枚/h` : '正常'}</span>
+                <span className="text-slate-500">{t('speed_label')}</span>
+                <span className="font-bold text-slate-800">{indicators.speed?.currentSpeed != null ? `${Math.round(indicators.speed.currentSpeed)}${t('sheets_per_hour')}` : t('speed_normal')}</span>
               </div>
               <div className="flex items-center gap-1">
                 <i className="bi bi-lightning text-slate-400" />
-                <span className="text-slate-500">移動</span>
-                <span className="font-bold text-slate-800">{indicators.fastMove?.fastRatio != null ? `${Math.round(indicators.fastMove.fastRatio * 100)}%` : '正常'}</span>
+                <span className="text-slate-500">{t('movement_label')}</span>
+                <span className="font-bold text-slate-800">{indicators.fastMove?.fastRatio != null ? `${Math.round(indicators.fastMove.fastRatio * 100)}%` : t('speed_normal')}</span>
               </div>
               {indicators.auxiliary?.outOfAreaWarning && (
-                <span className="text-[10px] font-bold text-amber-600"><i className="bi bi-exclamation-triangle mr-0.5" />エリア外{Math.round(indicators.auxiliary.outOfAreaPct)}%</span>
+                <span className="text-[10px] font-bold text-amber-600"><i className="bi bi-exclamation-triangle mr-0.5" />{t('indicator_out_of_area')}{Math.round(indicators.auxiliary.outOfAreaPct)}%</span>
               )}
             </>
           ) : loadingInd ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600" />
           ) : (
-            <span className="text-slate-400">指標データなし</span>
+            <span className="text-slate-400">{t('no_indicator_data')}</span>
           )}
           <div className="ml-auto">
             <button onClick={() => window.open(`/schedules?trajectory=${scheduleId}`, '_blank')}
               className="text-[10px] text-indigo-600 hover:text-indigo-700 font-bold flex items-center gap-0.5">
-              <i className="bi bi-map" />詳細<i className="bi bi-box-arrow-up-right text-[8px]" />
+              <i className="bi bi-map" />{t('detail')}<i className="bi bi-box-arrow-up-right text-[8px]" />
             </button>
           </div>
         </div>
@@ -626,11 +628,11 @@ export default function ReviewPanel({
           return (
             <div className="flex items-center gap-2 text-[10px] bg-indigo-50 rounded-md px-2 py-1">
               <i className="bi bi-arrow-left-right text-indigo-500" />
-              <span className="text-indigo-700 font-bold">過去 {pastLabel}:</span>
-              <span className="text-slate-700">{pastSheets}枚 {pastSpeed}枚/h</span>
+              <span className="text-indigo-700 font-bold">{t('past_label')} {pastLabel}:</span>
+              <span className="text-slate-700">{pastSheets}{t('sheets_unit')} {pastSpeed}{t('sheets_per_hour')}</span>
               <span className="text-slate-400">|</span>
-              <span className="text-pink-700 font-bold">今回:</span>
-              <span className="text-slate-700">{currentSheets > 0 ? `${currentSheets}枚` : '--'} {currentSpeed > 0 ? `${currentSpeed}枚/h` : '--'}</span>
+              <span className="text-pink-700 font-bold">{t('current_label')}:</span>
+              <span className="text-slate-700">{currentSheets > 0 ? `${currentSheets}${t('sheets_unit')}` : '--'} {currentSpeed > 0 ? `${currentSpeed}${t('sheets_per_hour')}` : '--'}</span>
             </div>
           );
         })()}
@@ -653,11 +655,11 @@ export default function ReviewPanel({
           </button>
           {showComment && (
             <>
-              <input value={comment} onChange={e => setComment(e.target.value)} placeholder="NGの理由..."
+              <input value={comment} onChange={e => setComment(e.target.value)} placeholder={t('ng_reason_short')}
                 className="flex-1 border border-slate-300 rounded-lg text-xs px-2 py-1.5 outline-none focus:ring-1 focus:ring-red-400" />
               <button onClick={() => handleVerdict('NG')} disabled={saving || !comment.trim()}
                 className="px-3 py-1.5 bg-red-700 text-white text-xs font-bold rounded-lg disabled:opacity-50">
-                {saving ? '...' : '保存'}
+                {saving ? '...' : t('save')}
               </button>
             </>
           )}
