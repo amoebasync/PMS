@@ -9,6 +9,14 @@ import {
   OUT_OF_AREA_DWELL_THRESHOLD_MS,
   mean,
   stdDev,
+  getDistributorStats,
+  V2_WEIGHTS,
+  V2_RISK_THRESHOLDS,
+  FAST_SPEED_KMH,
+  SPEED_CAP_KMH,
+  COVERAGE_LOOKBACK_DAYS,
+  COVERAGE_MAX_PAST,
+  COVERAGE_PLANNED_TOLERANCE,
 } from '@/lib/fraud-analysis';
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -368,7 +376,7 @@ async function analyzeScheduleWithPsGps(
     }
   }
 
-  // --- 総合リスクスコア ---
+  // --- 総合リスクスコア (v1) ---
   const riskScore = Math.round(
     outOfAreaRatio * PS_WEIGHTS.outOfAreaRatio +
     outOfAreaDwell * PS_WEIGHTS.outOfAreaDwell +
@@ -381,7 +389,7 @@ async function analyzeScheduleWithPsGps(
     riskScore >= RISK_THRESHOLDS.HIGH ? 'HIGH' :
     riskScore >= RISK_THRESHOLDS.MEDIUM ? 'MEDIUM' : 'LOW';
 
-  // 分析詳細
+  // v1 分析詳細
   const detail = {
     source: 'posting-system',
     gpsPointCount: gpsPoints.length,
@@ -399,7 +407,163 @@ async function analyzeScheduleWithPsGps(
     lastGpsTime: lastTimestamp.toISOString(),
   };
 
-  // DB保存（sessionId = null でスケジュールIDベースで保存）
+  // ===== V2 分析（GPSレビュー画面用 3指標） =====
+  const maxPlanned = Math.max(...schedule.items.map((i: any) => i.plannedCount ?? 0), 0);
+  const insideFlags = gpsPoints.map(p => pointInAnyPolygon(p.lat, p.lng, polygons));
+  const insideCount = insideFlags.filter(Boolean).length;
+  const currentInsideRatio = gpsPoints.length > 0 ? insideCount / gpsPoints.length : 0;
+
+  // V2-1: Coverage Diff
+  let coverageDiffScore = 0;
+  let coverageDiffDetail: Record<string, unknown> = {};
+
+  if (maxActual >= maxPlanned * 0.8 && maxPlanned > 0 && schedule.areaId) {
+    const lookbackDate = new Date();
+    lookbackDate.setDate(lookbackDate.getDate() - COVERAGE_LOOKBACK_DAYS);
+
+    const pastSessions = await prisma.distributionSession.findMany({
+      where: {
+        finishedAt: { not: null },
+        startedAt: { gte: lookbackDate },
+        schedule: { areaId: schedule.areaId },
+      },
+      include: {
+        schedule: { include: { items: true } },
+        gpsPoints: { orderBy: { timestamp: 'asc' } },
+      },
+      take: 50,
+    });
+
+    const lowerBound = maxPlanned * (1 - COVERAGE_PLANNED_TOLERANCE);
+    const upperBound = maxPlanned * (1 + COVERAGE_PLANNED_TOLERANCE);
+    const similarSessions = pastSessions
+      .filter(s => {
+        const pastPlanned = Math.max(...(s.schedule?.items.map(i => i.plannedCount ?? 0) || [0]), 0);
+        return pastPlanned >= lowerBound && pastPlanned <= upperBound;
+      })
+      .slice(0, COVERAGE_MAX_PAST);
+
+    if (similarSessions.length >= 2) {
+      const pastInsideRatios = similarSessions.map(s => {
+        const pts = s.gpsPoints;
+        if (pts.length === 0) return 1;
+        const inside = pts.filter(p => pointInAnyPolygon(p.latitude, p.longitude, polygons)).length;
+        return inside / pts.length;
+      });
+      const pastAvg = mean(pastInsideRatios);
+      const diff = pastAvg - currentInsideRatio;
+
+      coverageDiffScore = diff >= 0.30 ? 1.0 : diff >= 0.15 ? (diff - 0.15) / 0.15 : 0;
+      coverageDiffDetail = {
+        currentInsideRatio: Math.round(currentInsideRatio * 1000) / 10,
+        pastAvgInsideRatio: Math.round(pastAvg * 1000) / 10,
+        diff: Math.round(diff * 1000) / 10,
+        pastSessionCount: similarSessions.length,
+      };
+    } else {
+      coverageDiffDetail = { skipped: true, reason: 'insufficient_past_data', pastSessionCount: similarSessions.length };
+    }
+  } else {
+    coverageDiffDetail = { skipped: true, reason: maxPlanned <= 0 ? 'no_planned_count' : 'low_completion_rate' };
+  }
+
+  // V2-2: Speed Deviation
+  let speedDeviationScore = 0;
+  let speedDeviationDetail: Record<string, unknown> = {};
+
+  if (maxActual > 0 && workHours > 0 && schedule.distributorId) {
+    const currentSpeed = maxActual / workHours;
+    const distStats = await getDistributorStats(schedule.distributorId, 0);
+
+    if (distStats.count >= 3 && distStats.stdSpeed > 0) {
+      const zScore = (currentSpeed - distStats.avgSpeed) / distStats.stdSpeed;
+      speedDeviationScore = zScore > 3 ? 1.0 : zScore > 2 ? 0.6 : zScore > 1.5 ? 0.3 : 0;
+      speedDeviationDetail = {
+        currentSpeed: Math.round(currentSpeed),
+        avgSpeed: Math.round(distStats.avgSpeed),
+        stdSpeed: Math.round(distStats.stdSpeed * 10) / 10,
+        zScore: Math.round(zScore * 100) / 100,
+        pastSessions: distStats.count,
+      };
+    } else {
+      speedDeviationDetail = { skipped: true, reason: 'insufficient_history', count: distStats.count };
+    }
+  } else {
+    speedDeviationDetail = { skipped: true, reason: 'no_actual_or_work' };
+  }
+
+  // V2-3: Fast Move Ratio
+  let fastMoveRatioScore = 0;
+  let fastMoveRatioDetail: Record<string, unknown> = {};
+  {
+    let totalInsideDurationMs = 0;
+    let fastDurationMs = 0;
+    let segmentCount = 0;
+    let fastSegmentCount = 0;
+
+    for (let i = 1; i < gpsPoints.length; i++) {
+      if (!insideFlags[i - 1] || !insideFlags[i]) continue;
+      const dtMs = gpsPoints[i].timestamp.getTime() - gpsPoints[i - 1].timestamp.getTime();
+      if (dtMs <= 0) continue;
+
+      const distM = haversineM(gpsPoints[i - 1].lat, gpsPoints[i - 1].lng, gpsPoints[i].lat, gpsPoints[i].lng);
+      let speedKmh = (distM / dtMs) * 3600;
+      if (speedKmh > SPEED_CAP_KMH) speedKmh = SPEED_CAP_KMH;
+
+      totalInsideDurationMs += dtMs;
+      segmentCount++;
+      if (speedKmh > FAST_SPEED_KMH) {
+        fastDurationMs += dtMs;
+        fastSegmentCount++;
+      }
+    }
+
+    const fastRatio = totalInsideDurationMs > 0 ? fastDurationMs / totalInsideDurationMs : 0;
+    fastMoveRatioScore = fastRatio >= 0.6 ? 1.0 : fastRatio >= 0.4 ? (fastRatio - 0.4) / 0.2 : 0;
+
+    fastMoveRatioDetail = {
+      fastRatio: Math.round(fastRatio * 1000) / 10,
+      totalInsideDurationMin: Math.round(totalInsideDurationMs / 60_000),
+      fastDurationMin: Math.round(fastDurationMs / 60_000),
+      segmentCount,
+      fastSegmentCount,
+    };
+  }
+
+  // V2 Auxiliary
+  const v2OutOfAreaPct = gpsPoints.length > 0
+    ? Math.round((gpsPoints.length - insideCount) / gpsPoints.length * 1000) / 10
+    : 0;
+  const v2PauseMinutes = 0; // PS fallback ではpause情報なし
+
+  // V2 Risk Score
+  const riskScoreV2 = Math.round(
+    coverageDiffScore * V2_WEIGHTS.coverageDiff +
+    speedDeviationScore * V2_WEIGHTS.speedDeviation +
+    fastMoveRatioScore * V2_WEIGHTS.fastMoveRatio
+  );
+
+  const riskLevelV2: string =
+    riskScoreV2 >= V2_RISK_THRESHOLDS.CRITICAL ? 'CRITICAL' :
+    riskScoreV2 >= V2_RISK_THRESHOLDS.HIGH ? 'HIGH' :
+    riskScoreV2 >= V2_RISK_THRESHOLDS.MEDIUM ? 'MEDIUM' : 'LOW';
+
+  const v2Detail = JSON.stringify({
+    coverageDiff: { score: coverageDiffScore, ...coverageDiffDetail },
+    speedDeviation: { score: speedDeviationScore, ...speedDeviationDetail },
+    fastMoveRatio: { score: fastMoveRatioScore, ...fastMoveRatioDetail },
+    auxiliary: { outOfAreaPct: v2OutOfAreaPct, pauseMinutes: v2PauseMinutes },
+    meta: {
+      source: 'posting-system',
+      gpsPointCount: gpsPoints.length,
+      insideCount,
+      maxActual,
+      maxPlanned,
+      workDurationMin: Math.round(workMs / 60_000),
+    },
+  });
+
+  // DB保存（sessionId = null でスケジュールIDベースで保存、v1 + v2 同時）
   await prisma.fraudAnalysis.create({
     data: {
       sessionId: null,
@@ -409,16 +573,25 @@ async function analyzeScheduleWithPsGps(
       outOfAreaDwell,
       distanceCountRatio,
       speedAnomaly,
-      gpsGapRatio: 0, // PS fallback では算出しない
-      workRatio: 0,    // PS fallback では算出しない
+      gpsGapRatio: 0,
+      workRatio: 0,
       riskScore,
       riskLevel,
       analysisDetail: JSON.stringify(detail),
+      coverageDiff: coverageDiffScore,
+      speedDeviation: speedDeviationScore,
+      fastMoveRatio: fastMoveRatioScore,
+      outOfAreaPct: v2OutOfAreaPct,
+      pauseMinutes: v2PauseMinutes,
+      riskScoreV2,
+      riskLevelV2,
+      v2Detail,
     },
   });
 
-  // HIGH/CRITICAL の場合は管理者通知
-  if (riskLevel === 'HIGH' || riskLevel === 'CRITICAL') {
+  // HIGH/CRITICAL の場合は管理者通知（v2スコアで判定）
+  const alertLevel = riskLevelV2 === 'CRITICAL' || riskLevelV2 === 'HIGH' ? riskLevelV2 : (riskLevel === 'HIGH' || riskLevel === 'CRITICAL' ? riskLevel : null);
+  if (alertLevel) {
     const areaName = schedule.area
       ? `${schedule.area.chome_name || schedule.area.town_name || ''}`
       : '';
@@ -426,8 +599,8 @@ async function analyzeScheduleWithPsGps(
     await prisma.adminNotification.create({
       data: {
         type: 'ALERT',
-        title: `不正検知(PS): ${schedule.distributor?.name || '不明'} — ${riskLevel}`,
-        message: `${areaName} / リスクスコア: ${riskScore}`,
+        title: `不正検知(PS): ${schedule.distributor?.name || '不明'} — ${alertLevel}`,
+        message: `${areaName} / v2スコア: ${riskScoreV2} (カバレッジ差:${Math.round(coverageDiffScore * 100)}% 速度偏差:${Math.round(speedDeviationScore * 100)}% 高速移動:${Math.round(fastMoveRatioScore * 100)}%)`,
         scheduleId: schedule.id,
         distributorId: schedule.distributorId,
       },
@@ -435,6 +608,6 @@ async function analyzeScheduleWithPsGps(
     notificationEmitter.emit({ type: 'ALERT' });
   }
 
-  console.log(`[PS-FraudAnalysis] scheduleId=${schedule.id} score=${riskScore} level=${riskLevel}`);
+  console.log(`[PS-FraudAnalysis] scheduleId=${schedule.id} v1=${riskScore}/${riskLevel} v2=${riskScoreV2}/${riskLevelV2}`);
   return true;
 }

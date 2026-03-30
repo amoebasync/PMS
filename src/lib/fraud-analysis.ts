@@ -148,7 +148,7 @@ async function getAreaStats(areaId: number, excludeSessionId: number): Promise<H
   return getHistoricalStats({ areaId }, excludeSessionId);
 }
 
-async function getDistributorStats(distributorId: number, excludeSessionId: number): Promise<HistoricalStats> {
+export async function getDistributorStats(distributorId: number, excludeSessionId: number): Promise<HistoricalStats> {
   return getHistoricalStats({ distributorId }, excludeSessionId);
 }
 
@@ -424,13 +424,13 @@ export async function analyzeFraudIndicators(sessionId: number): Promise<void> {
 }
 
 // --- V2 定数 ---
-const V2_WEIGHTS = { coverageDiff: 40, speedDeviation: 35, fastMoveRatio: 25 };
-const V2_RISK_THRESHOLDS = { CRITICAL: 70, HIGH: 50, MEDIUM: 25 };
-const FAST_SPEED_KMH = 5;        // 投函には速すぎる速度（km/h）
-const SPEED_CAP_KMH = 30;        // GPSノイズ除外用キャップ
-const COVERAGE_LOOKBACK_DAYS = 180;
-const COVERAGE_MAX_PAST = 10;
-const COVERAGE_PLANNED_TOLERANCE = 0.2; // ±20%
+export const V2_WEIGHTS = { coverageDiff: 40, speedDeviation: 35, fastMoveRatio: 25 };
+export const V2_RISK_THRESHOLDS = { CRITICAL: 70, HIGH: 50, MEDIUM: 25 };
+export const FAST_SPEED_KMH = 5;        // 投函には速すぎる速度（km/h）
+export const SPEED_CAP_KMH = 30;        // GPSノイズ除外用キャップ
+export const COVERAGE_LOOKBACK_DAYS = 180;
+export const COVERAGE_MAX_PAST = 10;
+export const COVERAGE_PLANNED_TOLERANCE = 0.2; // ±20%
 
 // --- V2 メイン分析関数 ---
 
