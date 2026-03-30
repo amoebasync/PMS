@@ -78,7 +78,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { title, content, titleEn, contentEn, imageUrls, targetAll, targetLanguage, distributorIds, scheduledAt, isDraft } = body;
 
-    if (!title || !content) {
+    if (!isDraft && (!title || !content)) {
       return NextResponse.json({ error: 'title と content は必須です' }, { status: 400 });
     }
 
@@ -88,8 +88,8 @@ export async function POST(request: Request) {
 
     const announcement = await prisma.distributorAnnouncement.create({
       data: {
-        title,
-        content,
+        title: title || '',
+        content: content || '',
         titleEn: titleEn || null,
         contentEn: contentEn || null,
         imageUrls: imageUrls?.length ? JSON.stringify(imageUrls) : null,

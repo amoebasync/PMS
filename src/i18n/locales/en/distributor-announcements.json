@@ -32,6 +32,8 @@
   "btn_edit": "Edit",
   "status_draft": "Draft",
   "edit_title": "Edit Announcement",
+  "copy_title": "Copy & Create Announcement",
+  "btn_copy": "Duplicate",
   "preview": "Preview",
   "view_detail": "Detail",
   "field_date": "Date",

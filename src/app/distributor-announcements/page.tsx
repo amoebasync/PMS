@@ -50,6 +50,7 @@ export default function DistributorAnnouncementsPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [editItem, setEditItem] = useState<AnnouncementItem | null>(null);
+  const [copyItem, setCopyItem] = useState<AnnouncementItem | null>(null);
   const [detailId, setDetailId] = useState<number | null>(null);
   const [viewItem, setViewItem] = useState<AnnouncementItem | null>(null);
 
@@ -151,6 +152,15 @@ export default function DistributorAnnouncementsPage() {
                       <i className="bi bi-pencil text-sm" />
                     </button>
                   )}
+                  {!a.isDraft && (
+                    <button
+                      onClick={() => setCopyItem(a)}
+                      className="text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                      title={t('btn_copy')}
+                    >
+                      <i className="bi bi-copy text-sm" />
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(a.id)}
                     className="text-slate-400 hover:text-red-500 transition-colors p-1"
@@ -193,6 +203,16 @@ export default function DistributorAnnouncementsPage() {
           editData={editItem}
           onClose={() => setEditItem(null)}
           onSaved={() => { setEditItem(null); fetchAll(); }}
+        />
+      )}
+
+      {/* Copy Modal */}
+      {copyItem && (
+        <CreateEditModal
+          t={t}
+          copyFrom={copyItem}
+          onClose={() => setCopyItem(null)}
+          onSaved={() => { setCopyItem(null); fetchAll(); }}
         />
       )}
 
@@ -367,29 +387,31 @@ function ViewModal({ item, t, onClose, onShowReadStatus }: {
 /*  Create / Edit Modal                                                */
 /* ------------------------------------------------------------------ */
 
-function CreateEditModal({ t, editData, onClose, onSaved }: {
+function CreateEditModal({ t, editData, copyFrom, onClose, onSaved }: {
   t: (k: string, params?: Record<string, string | number>) => string;
   editData?: AnnouncementItem;
+  copyFrom?: AnnouncementItem;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const isEdit = !!editData;
-  const [title, setTitle] = useState(editData?.title || '');
-  const [content, setContent] = useState(editData?.content || '');
-  const [titleEn, setTitleEn] = useState(editData?.titleEn || '');
-  const [contentEn, setContentEn] = useState(editData?.contentEn || '');
+  const source = editData || copyFrom;
+  const [title, setTitle] = useState(source?.title || '');
+  const [content, setContent] = useState(source?.content || '');
+  const [titleEn, setTitleEn] = useState(source?.titleEn || '');
+  const [contentEn, setContentEn] = useState(source?.contentEn || '');
   const [targetMode, setTargetMode] = useState<'all' | 'ja' | 'en' | 'select'>(
-    editData ? (editData.targetAll ? 'all' : 'select') : 'all'
+    source ? (source.targetAll ? 'all' : 'select') : 'all'
   );
   const [distributorIds, setDistributorIds] = useState<number[]>(
-    editData?.targets?.map(t => t.id) || []
+    source?.targets?.map(t => t.id) || []
   );
   const [selectedDistributors, setSelectedDistributors] = useState<Map<number, DistributorOption>>(
-    new Map(editData?.targets?.map(t => [t.id, t]) || [])
+    new Map(source?.targets?.map(t => [t.id, t]) || [])
   );
   const [distributorSearch, setDistributorSearch] = useState('');
   const [distributorOptions, setDistributorOptions] = useState<DistributorOption[]>([]);
-  const [imageUrls, setImageUrls] = useState<string[]>(editData?.imageUrls || []);
+  const [imageUrls, setImageUrls] = useState<string[]>(source?.imageUrls || []);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [sendMode, setSendMode] = useState<'now' | 'scheduled'>('now');
@@ -446,7 +468,7 @@ function CreateEditModal({ t, editData, onClose, onSaved }: {
   };
 
   const handleSubmit = async (asDraft: boolean) => {
-    if (!title.trim() || !content.trim()) return;
+    if (!asDraft && (!title.trim() || !content.trim())) return;
     setSaving(true);
     try {
       const payload = {
@@ -483,7 +505,7 @@ function CreateEditModal({ t, editData, onClose, onSaved }: {
       <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="p-5 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
           <h2 className="text-sm font-bold text-slate-800">
-            {isEdit ? t('edit_title') : t('create_title')}
+            {isEdit ? t('edit_title') : copyFrom ? t('copy_title') : t('create_title')}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><i className="bi bi-x-lg" /></button>
         </div>
@@ -698,7 +720,7 @@ function CreateEditModal({ t, editData, onClose, onSaved }: {
           </button>
           <button
             onClick={() => handleSubmit(true)}
-            disabled={saving || !title.trim() || !content.trim()}
+            disabled={saving}
             className="px-4 py-1.5 rounded-lg text-xs font-bold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             {saving ? '...' : t('btn_save_draft')}

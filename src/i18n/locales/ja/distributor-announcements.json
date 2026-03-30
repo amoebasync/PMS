@@ -32,6 +32,8 @@
   "btn_edit": "編集",
   "status_draft": "下書き",
   "edit_title": "アナウンス編集",
+  "copy_title": "アナウンスをコピーして作成",
+  "btn_copy": "コピーして作成",
   "preview": "プレビュー",
   "view_detail": "詳細",
   "field_date": "日付",
