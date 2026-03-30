@@ -32,11 +32,7 @@ export default function DistributorLoginPage() {
     }
 
     const isEn = data.language === 'en';
-    if (data.isPasswordTemp) {
-      router.push(isEn ? '/staff/en/change-password' : '/staff/change-password');
-    } else {
-      router.push(isEn ? '/staff/en' : '/staff');
-    }
+    router.push(isEn ? '/staff/en' : '/staff');
   };
 
   return (

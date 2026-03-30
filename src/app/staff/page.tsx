@@ -83,11 +83,6 @@ export default function DistributorDashboard() {
         return;
       }
 
-      if (profile.isPasswordTemp) {
-        window.location.href = '/staff/change-password';
-        return;
-      }
-
       // Determine missing setup steps
       const missing: ('residence-card' | 'payment-method')[] = [];
       if (!profile.residenceCardFrontUrl || !profile.residenceCardBackUrl) {
