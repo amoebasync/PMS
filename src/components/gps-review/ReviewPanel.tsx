@@ -113,12 +113,14 @@ function speedToColor(kmh: number): string {
 /*  Point-in-polygon (ray casting)                                     */
 /* ------------------------------------------------------------------ */
 
+/** polygon coords are GeoJSON [lng, lat] pairs */
 function isPointInPolygon(lat: number, lng: number, polygon: number[][]): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i][0], yi = polygon[i][1];
-    const xj = polygon[j][0], yj = polygon[j][1];
-    const intersect = ((yi > lng) !== (yj > lng)) && (lat < (xj - xi) * (lng - yi) / (yj - yi) + xi);
+    const pLng_i = polygon[i][0], pLat_i = polygon[i][1];
+    const pLng_j = polygon[j][0], pLat_j = polygon[j][1];
+    const intersect = ((pLat_i > lat) !== (pLat_j > lat)) &&
+      (lng < (pLng_j - pLng_i) * (lat - pLat_i) / (pLat_j - pLat_i) + pLng_i);
     if (intersect) inside = !inside;
   }
   return inside;
@@ -376,7 +378,7 @@ export default function ReviewPanel({
           ref={mapRef}
           initialViewState={{ ...center, zoom: 14 }}
           style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/light-v11"
+          mapStyle="mapbox://styles/mapbox/streets-v12"
           mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
           onLoad={fitMapBounds}
         >
@@ -398,35 +400,26 @@ export default function ReviewPanel({
             </Source>
           )}
 
-          {/* Trajectory: pink solid (default) or speed-colored segments */}
-          {showSpeedColors ? (
-            speedSegments && speedSegments.features.length > 0 && (
-              <Source id="speed-segments" type="geojson" data={speedSegments}>
-                <Layer
-                  id="speed-line"
-                  type="line"
-                  paint={{
-                    'line-color': ['get', 'color'],
-                    'line-width': 3,
-                    'line-opacity': 0.85,
-                  }}
-                />
-              </Source>
-            )
-          ) : (
-            pinkLineGeoJson && (
-              <Source id="pink-line" type="geojson" data={pinkLineGeoJson}>
-                <Layer
-                  id="pink-line-layer"
-                  type="line"
-                  paint={{
-                    'line-color': '#ec4899',
-                    'line-width': 3,
-                    'line-opacity': 0.85,
-                  }}
-                />
-              </Source>
-            )
+          {/* Trajectory: both layers always mounted, toggle visibility */}
+          {pinkLineGeoJson && (
+            <Source id="pink-line" type="geojson" data={pinkLineGeoJson}>
+              <Layer
+                id="pink-line-layer"
+                type="line"
+                layout={{ visibility: showSpeedColors ? 'none' : 'visible' }}
+                paint={{ 'line-color': '#ec4899', 'line-width': 3, 'line-opacity': 0.85 }}
+              />
+            </Source>
+          )}
+          {speedSegments && speedSegments.features.length > 0 && (
+            <Source id="speed-segments" type="geojson" data={speedSegments}>
+              <Layer
+                id="speed-line"
+                type="line"
+                layout={{ visibility: showSpeedColors ? 'visible' : 'none' }}
+                paint={{ 'line-color': ['get', 'color'], 'line-width': 3, 'line-opacity': 0.85 }}
+              />
+            </Source>
           )}
 
           {/* Heatmap layer */}
