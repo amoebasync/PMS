@@ -181,6 +181,7 @@
 
   "summary_workers": "Workers",
   "summary_main_count": "Main Flyer Count",
+  "summary_sub_count": "Sub Flyer Count",
 
   "all_traj_btn": "All Trajectories Map",
   "all_traj_title": "All Distributors GPS Trajectories",

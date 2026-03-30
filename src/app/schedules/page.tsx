@@ -1282,6 +1282,18 @@ export default function ScheduleListPage() {
                 }, 0).toLocaleString()}
               </span>
               {(() => {
+                const subTotal = filteredSchedules.reduce((sum, s) => {
+                  const subItems = (s.items || []).filter((item: any) => item.isSubFlyer);
+                  return sum + subItems.reduce((s2: number, item: any) => s2 + (item.plannedCount || 0), 0);
+                }, 0);
+                return subTotal > 0 ? (
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-lg text-xs font-bold text-purple-700">
+                    <i className="bi bi-file-earmark-fill text-purple-500"></i>
+                    {t('summary_sub_count') || 'サブ枚数'}: {subTotal.toLocaleString()}
+                  </span>
+                ) : null;
+              })()}
+              {(() => {
                 const unassignedCount = filteredSchedules.filter(s => isDistOnlySchedule(s)).length;
                 return unassignedCount > 0 ? (
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 rounded-lg text-xs font-bold text-red-700">

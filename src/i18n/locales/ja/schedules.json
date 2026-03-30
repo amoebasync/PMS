@@ -181,6 +181,7 @@
 
   "summary_workers": "出勤人数",
   "summary_main_count": "メイン枚数",
+  "summary_sub_count": "サブ枚数",
 
   "all_traj_btn": "全体マップ",
   "all_traj_title": "全配布員GPS軌跡",
