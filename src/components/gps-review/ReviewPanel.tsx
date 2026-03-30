@@ -259,6 +259,14 @@ export default function ReviewPanel({
     return null;
   }, [areaGeoJson]);
 
+  // Realtime coverage: % of GPS points inside area polygon
+  const realtimeCoverage = useMemo(() => {
+    if (!areaPolygonCoords || !trajData?.gpsPoints?.length) return null;
+    const total = trajData.gpsPoints.length;
+    const inside = trajData.gpsPoints.filter(p => isPointInPolygon(p.lat, p.lng, areaPolygonCoords)).length;
+    return Math.round((inside / total) * 100);
+  }, [areaPolygonCoords, trajData?.gpsPoints]);
+
   const heatmapGeoJson = useMemo(() => {
     if (!trajData?.gpsPoints?.length) return null;
     const features = trajData.gpsPoints.map((p, i, arr) => {
@@ -465,7 +473,7 @@ export default function ReviewPanel({
                   id={`past-traj-line-${selectedPastIndex}`}
                   type="line"
                   paint={{
-                    'line-color': PAST_COLORS[selectedPastIndex % PAST_COLORS.length],
+                    'line-color': '#0ea5e9',
                     'line-width': 2.5,
                     'line-opacity': 0.6,
                   }}
@@ -515,7 +523,7 @@ export default function ReviewPanel({
             const d = new Date(past.date);
             const label = `${d.getMonth() + 1}/${d.getDate()} ${past.distributorName?.split(' ')[0] || ''}`;
             const selected = selectedPastIndex === idx;
-            const color = PAST_COLORS[idx % PAST_COLORS.length];
+            const color = '#0ea5e9';
             return (
               <button key={idx} onClick={() => {
                 setSelectedPastIndex(prev => prev === idx ? null : idx);
@@ -558,7 +566,7 @@ export default function ReviewPanel({
                 <i className="bi bi-bar-chart-fill text-slate-400" />
                 <span className="text-slate-500">カバレッジ</span>
                 <span className="font-bold text-slate-800">
-                  {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : indicators.coverage?.score != null ? `${Math.round((1 - indicators.coverage.score) * 100)}%` : '--'}
+                  {indicators.coverage?.currentInsideRatio != null ? `${Math.round(indicators.coverage.currentInsideRatio * 100)}%` : indicators.coverage?.diffPercent != null ? `${indicators.coverage.diffPercent > 0 ? '+' : ''}${indicators.coverage.diffPercent}%` : realtimeCoverage != null ? `${realtimeCoverage}%` : '--'}
                 </span>
               </div>
               <div className="flex items-center gap-1">

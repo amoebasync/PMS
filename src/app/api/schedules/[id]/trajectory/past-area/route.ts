@@ -112,7 +112,7 @@ export async function GET(
         startedAt: ps.session?.startedAt,
         finishedAt: ps.session?.finishedAt,
         gpsPointCount: gps.length,
-        totalSheets: ps.items.reduce((sum, item) => sum + (item.actualCount || 0), 0),
+        totalSheets: ps.items.length > 0 ? Math.max(...ps.items.map(item => item.actualCount || 0)) : 0,
         totalPosted: 0,
         gpsPoints: gps.map(p => ({ lat: p.latitude, lng: p.longitude, timestamp: p.timestamp.toISOString() })),
       });
