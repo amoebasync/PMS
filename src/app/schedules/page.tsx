@@ -1274,24 +1274,32 @@ export default function ScheduleListPage() {
                   </span>
                 );
               })()}
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
-                <i className="bi bi-file-earmark text-amber-500"></i>
-                {t('summary_main_count')}: {filteredSchedules.reduce((sum, s) => {
-                  const mainItems = (s.items || []).filter((item: any) => item.flyerName && !item.isSubFlyer);
-                  return sum + mainItems.reduce((s2: number, item: any) => s2 + (item.plannedCount || 0), 0);
-                }, 0).toLocaleString()}
-              </span>
               {(() => {
-                const subTotal = filteredSchedules.reduce((sum, s) => {
+                let mainSum = 0, mainMaxSum = 0, subSum = 0, subMaxSum = 0;
+                for (const s of filteredSchedules) {
+                  const mainItems = (s.items || []).filter((item: any) => item.flyerName && !item.isSubFlyer);
                   const subItems = (s.items || []).filter((item: any) => item.isSubFlyer);
-                  return sum + subItems.reduce((s2: number, item: any) => s2 + (item.plannedCount || 0), 0);
-                }, 0);
-                return subTotal > 0 ? (
-                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-lg text-xs font-bold text-purple-700">
-                    <i className="bi bi-file-earmark-fill text-purple-500"></i>
-                    {t('summary_sub_count') || 'サブ枚数'}: {subTotal.toLocaleString()}
-                  </span>
-                ) : null;
+                  mainSum += mainItems.reduce((acc: number, item: any) => acc + (item.plannedCount || 0), 0);
+                  mainMaxSum += mainItems.length > 0 ? Math.max(...mainItems.map((item: any) => item.plannedCount || 0)) : 0;
+                  subSum += subItems.reduce((acc: number, item: any) => acc + (item.plannedCount || 0), 0);
+                  subMaxSum += subItems.length > 0 ? Math.max(...subItems.map((item: any) => item.plannedCount || 0)) : 0;
+                }
+                return (
+                  <>
+                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-lg text-xs font-bold text-amber-700">
+                      <i className="bi bi-file-earmark text-amber-500"></i>
+                      {t('summary_main_count')}: {mainMaxSum.toLocaleString()}
+                      <span className="text-amber-400 font-normal">({t('summary_total') || '合計'}: {mainSum.toLocaleString()})</span>
+                    </span>
+                    {subMaxSum > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-50 rounded-lg text-xs font-bold text-purple-700">
+                        <i className="bi bi-file-earmark-fill text-purple-500"></i>
+                        {t('summary_sub_count') || 'サブ枚数'}: {subMaxSum.toLocaleString()}
+                        <span className="text-purple-400 font-normal">({t('summary_total') || '合計'}: {subSum.toLocaleString()})</span>
+                      </span>
+                    )}
+                  </>
+                );
               })()}
               {(() => {
                 const unassignedCount = filteredSchedules.filter(s => isDistOnlySchedule(s)).length;
